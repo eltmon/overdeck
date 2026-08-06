@@ -1,0 +1,901 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-06T16:47:56.509Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3568: Adopt Effect diagnostics (@effect/language-service) as a mechanical CI gate and agent feedback loop",
+    "updated": "2026-08-06T16:54:45.049Z"
+  },
+  "plan": {
+    "id": "pan-3568",
+    "title": "Adopt Effect diagnostics (@effect/language-service) as a mechanical CI gate and agent feedback loop",
+    "status": "proposed",
+    "uid": "bf73740d-92ad-494c-b7ec-703eefff4070",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-06T16:47:56.509Z",
+    "updated": "2026-08-06T16:54:45.049Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3568",
+        "label": "PAN-3568",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3567",
+        "label": "PAN-3567 (motivating bug class)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effect",
+      "tooling",
+      "ci",
+      "ratchet",
+      "typecheck",
+      "lint"
+    ],
+    "metadata": {
+      "sizeJustification": "Genuinely inseparable, and the reported subsystem count is a heuristic artifact. On breadth: the projected surface is 15 files, comfortably under the 25-file limit. The 14 'subsystems' come from the first-two-path-segments heuristic, which charges a separate subsystem for every root-level file and every single file under scripts/ — so package.json, bun.lock, tsconfig.effect-diag.json, CLAUDE.md, and four individual scripts/ files each count as their own subsystem. The real subsystems touched are five: build/package config, scripts/ (the ratchet and audit), tests/unit/scripts/, roles/ (one reviewer prompt), and docs/. On inseparability: this is one mechanism whose parts deliver zero value alone. The four tsconfig.effect-diag.json lanes enforce nothing without the ratchet script; the ratchet script cannot run without the plugin hoisted to the repo root and the TypeScript install patched; and the script fails the build on every pre-existing finding until the baseline is seeded, so the seed cannot be deferred to a sibling issue. Shipping any subset leaves either a dead configuration or a red required gate. The reviewer-prompt and docs items are the agent-pickup and documentation halves the issue explicitly scopes in, and the acp typecheck gate is the blind spot the issue names as scope item 3, so splitting them out would deliver the issue partially in violation of the deliver-complete-features rule.",
+      "canonicalFilename": "2026-08-06-PAN-3568-adopt-effect-diagnostics-effect-language-service-as-a-mechanical-ci-gate-and-agent-feedback-loop.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Effect values constructed but never run (the floatingEffect bug class) ship today: six live instances sit in the dashboard type baseline, including an inert cost-WAL sync, feedback files never written, a token refresh that reports success without running, and a bypassed workspace-deletion safety guard. The codebase is Effect-dense (~982 importing files, 1,217 non-test Effect.runPromise edges) so every Promise/Effect bridge is a fresh opportunity for the same mistake, and work agents demonstrably ship it. @effect/language-service@0.84.2 is already pinned in the Bun catalog and installed under packages/contracts but wired into nothing, so no gate can catch the class today. Separately, packages/effect-acp is typechecked by no root gate at all.",
+      "Proposal": "Build a diagnostic lane that is enforced mechanically and cannot disturb existing gates. Hoist the plugin to a root devDependency, add four tsconfig.effect-diag.json files that extend their sibling project tsconfigs and add the plugin (root/lib+cli, dashboard server, contracts, effect-acp), and patch the local TypeScript install so plugin diagnostics surface in CLI tsc runs. Those diag tsconfigs are consumed ONLY by a new line-level shrink-only ratchet, scripts/lint-effect-diagnostics.sh, cloned from the PAN-3192 frontend ratchet, wired into npm run lint and into scripts/lint-ratchet-audit.sh. Because npm run lint is already a required verification gate, work agents get NEW findings pushed back automatically; a short addition to roles/review-correctness.md makes the correctness reviewer treat them as blocking. A live probe pinned the mechanics: findings are discriminated by the plugin's '    effect(<ruleName>)' message marker (never by numeric code, which collides with real TypeScript codes), lane isolation is structural because a plugin-free tsconfig emits byte-identical output after patching, and the patch is idempotent so the script can simply run it every time. Finally, wire packages/effect-acp into the root typecheck chain, which its currently-clean typecheck makes a one-liner.",
+      "NonGoals": "- Do NOT adopt @effect/tsgo; it requires TypeScript >= 7 and this repo is on 5.9.3. Revisit alongside a TypeScript 7 upgrade.\n- Do NOT wire the plugin into editors or an LSP; agents running CLI gates are the consumer that matters here.\n- Do NOT enable style or effect-native rule categories, diagnosticSeverity maps, or per-file overrides arrays; includeSuggestionsInTsc is deliberately set false to suppress suggestion-category style output.\n- Do NOT promote any rule to a hard error gate in this issue; enforcement lives solely in the ratchet, and per-rule promotion is a separate future issue taken only after that rule's baseline slice reaches zero.\n- Do NOT burn down the seeded baseline or fix baselined findings; PAN-3567 covers the acute bugs and further burn-down is incremental follow-up through the ratchet.\n- Do NOT typecheck test files beyond packages/effect-acp, whose own tsconfig already includes them.\n- Do NOT change quality_gates in ~/.overdeck/projects.yaml; lint is already required, which is why wiring into the lint chain suffices.\n- Do NOT add the plugins entry to any real project tsconfig; the extends-variant isolation is load-bearing.\n- Do NOT block on PAN-3567 landing first.\n- Do NOT extend ratchet-audit coverage to the two pre-existing type-error baselines (dashboard, frontend); that gap is real but out of scope.\n- Do NOT add a Mintlify docs page; this is dev-repo tooling, not a product surface."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retracted the canonical PRD's D-3 (identify findings by the plugin's numeric diagnostic code range) and replaced it with a message-marker filter.",
+        "rationale": "A live probe showed floatingEffect renders as 'error TS3' and unnecessaryEffectGen as 'message TS5' — small integers colliding with real TypeScript diagnostic codes. A code-range filter would either sweep real type errors into the effect baseline or miss findings. The '    effect(<ruleName>)' suffix cannot be configured away because the patch path force-sets diagnosticsName: true, making it a stable contract."
+      },
+      {
+        "summary": "Set \"includeSuggestionsInTsc\": false in all four diag tsconfigs rather than keeping every plugin default.",
+        "rationale": "The option defaults to true and promotes suggestion-category style rules into the tsc output stream, which would land style noise in the seeded baseline. The issue explicitly lists enabling style / effect-native rule categories as a non-goal, so suppressing them is the defensible reading of 'keep default severities' — severities are untouched; only the suggestion-to-message promotion is disabled."
+      },
+      {
+        "summary": "Replaced the canonical PRD's marker-probe self-heal with an unconditional patch call at the top of the ratchet script.",
+        "rationale": "The probe verified `effect-language-service patch` is idempotent — a second run skips both files and exits 0 in ~200ms. An unconditional call is simpler than a node_modules grep probe, removes a whole class of probe-drift bugs, and makes patch survival across bun install a non-issue for correctness."
+      },
+      {
+        "summary": "Rewrote the crash guard instead of cloning scripts/lint-frontend-types.sh:52 verbatim.",
+        "rationale": "The frontend guard fails when tsc exits non-zero with zero findings. In a diag lane that is the normal case — the dashboard lane holds 47 real type errors that the base gates own, so it exits non-zero while the effect-finding count can legitimately be 0. Copying the guard would false-fail every run. The replacement keys on the absence of any position-prefixed TS diagnostic line, which the probe confirmed distinguishes a launcher crash (exit 1, zero such lines) from a lane holding real errors."
+      },
+      {
+        "summary": "Dropped the canonical PRD's CP-4 conditional (build an acp baseline if the package is red) and made WI-8 unconditional.",
+        "rationale": "`npx tsc --noEmit -p packages/effect-acp/tsconfig.json` exits 0 today, including the .test.ts files its include covers. Keeping a dead conditional branch in the plan would leave a judgment call in front of the executor for no reason."
+      },
+      {
+        "summary": "Amended D-5 so PAN-3567 does not gate this work; the baseline is seeded from the tree as it stands.",
+        "rationale": "PAN-3567 is still OPEN. The canonical PRD already named seeding-with-bugs-present as an acceptable fallback, and a shrink-only ratchet lowers cleanly via --update once those fixes land, so a cross-issue dependency would add stall risk for no benefit."
+      },
+      {
+        "summary": "Do not assert a literal dashboard baseline count in NFR-1 evidence.",
+        "rationale": "The canonical PRD cited 54; the file now reads 47 and PAN-3567 may lower it further. Asserting the guard passes while reading the count from the baseline file keeps the acceptance criterion true across concurrent burn-down."
+      },
+      {
+        "summary": "Wire the effect-diag ratchet into the lint chain, not the typecheck chain where the two existing type ratchets actually live.",
+        "rationale": "The issue scope names npm run lint, and both typecheck and lint are required: true quality gates for this project so either reaches work agents mechanically. Following the stated scope avoids an unrequested change to the typecheck chain's meaning."
+      },
+      {
+        "summary": "Corrected a stale lint/typecheck description in .overdeck/context/codebase/stack.md during planning.",
+        "rationale": "The planning role owns keeping the codebase map accurate. The file claimed lint was 'ESLint + scripts/lint-skills.sh' when the chain now holds ~20 guards, and it did not record that the type ratchets sit in the typecheck chain — exactly the fact this issue's wiring decision depends on."
+      }
+    ],
+    "items": [
+      {
+        "id": "root-devdep",
+        "title": "Hoist @effect/language-service to a root devDependency",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"console.log(require.resolve('@effect/language-service/package.json'))\"",
+            "node scripts/check-effect-versions.mjs",
+            "ls node_modules/.bin/effect-language-service"
+          ],
+          "expected_outputs": [
+            "require.resolve prints a path under node_modules instead of throwing MODULE_NOT_FOUND",
+            "check-effect-versions.mjs exits 0",
+            "node_modules/.bin/effect-language-service exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add \"@effect/language-service\": \"catalog:\" to the devDependencies block of the root package.json, reusing the existing exact pin at package.json:52 (\"@effect/language-service\": \"0.84.2\" in the Bun workspace catalog). Run bun install and commit package.json together with bun.lock. Today the package resolves only from packages/contracts/node_modules and require.resolve from the repo root throws MODULE_NOT_FOUND, so nothing at root can invoke its bin. Do NOT touch scripts/check-effect-versions.mjs: its EXCLUDED set at line 33 deliberately omits this package because it is a devtool rather than a runtime Effect dependency, and the catalog pin plus the deliberate-upgrade rule govern its version."
+        },
+        "items": [
+          {
+            "id": "root-devdep.ac1",
+            "title": "Given a shell at the repo root, when require.resolve('@effect/language-service/package.json') runs, then it returns a node_modules path instead of throwing MODULE_NOT_FOUND",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-devdep.ac2",
+            "title": "node scripts/check-effect-versions.mjs exits 0 and scripts/check-effect-versions.mjs remains unmodified in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-devdep.ac3",
+            "title": "The commit contains both package.json and bun.lock, and package.json declares the dependency as \"catalog:\" rather than a literal version string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-devdep.ac4",
+            "title": "Given the root install, when ls node_modules/.bin/effect-language-service runs, then it prints the bin path, so the patch command is invokable from the repo root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diag-tsconfigs",
+        "title": "Add the four tsconfig.effect-diag.json lanes that carry the plugin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "patch-wiring",
+            "ratchet-script",
+            "ratchet-tests",
+            "lint-chain-wiring",
+            "ratchet-audit-wiring",
+            "docs"
+          ],
+          "files_scope": [
+            "tsconfig.effect-diag.json",
+            "src/dashboard/server/tsconfig.effect-diag.json",
+            "packages/contracts/tsconfig.effect-diag.json",
+            "packages/effect-acp/tsconfig.effect-diag.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p tsconfig.effect-diag.json",
+            "git grep -l '\"plugins\"' -- 'tsconfig.json' '*/tsconfig.json' '**/tsconfig.json'",
+            "npx tsc --listFiles -p packages/effect-acp/tsconfig.effect-diag.json > /tmp/diag-files.txt; npx tsc --listFiles -p packages/effect-acp/tsconfig.json > /tmp/base-files.txt; diff /tmp/diag-files.txt /tmp/base-files.txt"
+          ],
+          "expected_outputs": [
+            "tsc runs the root diag lane to completion rather than erroring on config resolution",
+            "the git grep for plugins in project tsconfigs prints nothing and exits 1",
+            "the listFiles diff between the acp diag lane and its base tsconfig is empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create four files, each named tsconfig.effect-diag.json and each sitting beside the project tsconfig it extends: at the repo root (extends ./tsconfig.json), in src/dashboard/server/, in packages/contracts/, and in packages/effect-acp/. Every one has exactly this body, with only the extends target differing:\n\n{\n  \"extends\": \"./tsconfig.json\",\n  \"compilerOptions\": {\n    \"plugins\": [\n      {\n        \"name\": \"@effect/language-service\",\n        \"includeSuggestionsInTsc\": false,\n        \"ignoreEffectErrorsInTscExitCode\": true,\n        \"ignoreEffectWarningsInTscExitCode\": true\n      }\n    ]\n  }\n}\n\nThe three options are all load-bearing and none is optional. includeSuggestionsInTsc: false suppresses suggestion-category style rules such as unnecessaryEffectGen, which otherwise reach the output as 'message' lines and would pollute the seeded baseline; the issue lists style rule categories as an explicit non-goal. Both ignoreEffect*InTscExitCode flags keep the lane's exit code reflecting only real TypeScript errors, which the base gates already own.\n\nThis item is the isolation design: because extends resolves relative to the extending file, include and exclude are inherited unchanged, and because stock tsc only reads plugins from the tsconfig it was given, the real project tsconfigs cannot see plugin output. A probe confirmed this structurally — after patching node_modules/typescript, running the plugin-free root tsconfig produced byte-identical output to the pre-patch run. Do not add a plugins entry to any real project tsconfig."
+        },
+        "items": [
+          {
+            "id": "diag-tsconfigs.ac1",
+            "title": "Given the four named directories, then each contains a tsconfig.effect-diag.json that extends the ./tsconfig.json sibling beside it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diag-tsconfigs.ac2",
+            "title": "Each of the four diag tsconfigs contains includeSuggestionsInTsc false and both ignoreEffectErrorsInTscExitCode and ignoreEffectWarningsInTscExitCode true on its @effect/language-service plugin entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diag-tsconfigs.ac3",
+            "title": "Given the diag lanes exist, when git grep -l '\"plugins\"' runs over tsconfig.json and every */tsconfig.json and **/tsconfig.json, then it prints nothing — no real project tsconfig gained a plugin entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diag-tsconfigs.ac4",
+            "title": "Given the acp diag lane and its base tsconfig, when tsc --listFiles output is diffed between them, then the diff is empty, proving the variant checks the same file set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diag-tsconfigs.ac5",
+            "title": "When npx tsc --noEmit -p tsconfig.effect-diag.json runs, then it exits without a config-resolution error such as TS5058 or TS5024",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patch-wiring",
+        "title": "Wire effect-language-service patch into the install lifecycle and prove the build stays clean",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "scripts/postinstall.mjs"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx effect-language-service patch",
+            "npx tsc --noEmit -p tsconfig.effect-diag.json",
+            "npm run build",
+            "npx tsc --noEmit -p tsconfig.json"
+          ],
+          "expected_outputs": [
+            "patch reports both typescript.js and _tsc.js patched, and a re-run reports them already patched and exits 0",
+            "the diag lane emits at least one line ending in the effect(<ruleName>) marker for a planted floating Effect",
+            "npm run build completes green and dist/ content is unchanged apart from timestamps",
+            "the plugin-free root tsconfig emits no line containing the effect( marker"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Stock tsc ignores language-service plugins entirely, so the diag lanes emit nothing until the local TypeScript install is patched. Change package.json:140 from \"prepare\": \"husky\" to \"prepare\": \"husky && effect-language-service patch\". Treat this hook as an optimisation that front-loads the roughly four-second first-run cost, not as the correctness guarantee — the ratchet script runs patch unconditionally on every invocation (verified idempotent: a second run prints 'is already patched with version 0.84.2, skipped' for both files and exits 0 in about 200ms). If prepare turns out not to fire under bun install, move the patch call into scripts/postinstall.mjs instead, which is already wired at package.json:139; either location satisfies the requirement.\n\nThe build-isolation checkpoint is mandatory and narrow. The typechecking dimension is already proven safe: after patching, a plugin-free tsconfig produces byte-identical output. What is unverified is tsdown's dts generation, which drives the same patched TypeScript API and produces the published @overdeck/contracts types. Run npm run build before and after patching and confirm it stays green with dist/ unchanged apart from timestamps. If dist/ is contaminated, take the documented fallback instead of improvising: create scripts/effect-diag/package.json with its own typescript and @effect/language-service dependencies, patch that isolated install, have the ratchet invoke scripts/effect-diag/node_modules/.bin/tsc, revert the prepare change, and record the fallback's install step in docs/EFFECT-DIAGNOSTICS.md."
+        },
+        "items": [
+          {
+            "id": "patch-wiring.ac1",
+            "title": "Given a patched TypeScript install and a source file holding a floating Effect, when npx tsc --noEmit -p tsconfig.effect-diag.json runs, then it emits a diagnostic line ending in the marker effect(floatingEffect)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patch-wiring.ac2",
+            "title": "Given the same patched install, when npx tsc --noEmit -p tsconfig.json runs against the plugin-free root config, then no output line contains the effect( marker, preserving existing gate behaviour",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patch-wiring.ac3",
+            "title": "npm run build exits 0 after patching and dist/ content is unchanged apart from timestamps compared with a pre-patch build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patch-wiring.ac4",
+            "title": "The install lifecycle invokes effect-language-service patch from either the prepare script or scripts/postinstall.mjs, and running the patch command twice in a row exits 0 both times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-script",
+        "title": "Add scripts/lint-effect-diagnostics.sh with the marker filter and a rewritten crash guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effect-diagnostics.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/lint-effect-diagnostics.sh",
+            "printf '# seed\\n' > scripts/effect-diagnostics-baseline.txt && bash scripts/lint-effect-diagnostics.sh; echo exit=$?",
+            "grep -n 'effect(' scripts/lint-effect-diagnostics.sh"
+          ],
+          "expected_outputs": [
+            "bash -n reports no syntax error",
+            "the script runs all four lanes and either reports findings against the baseline or fails with a NEW: labelled list — never a silent 0-findings pass on a crashed lane",
+            "the script contains the pinned marker constant and contains no filter on 'error TS' or on a numeric code range"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/lint-effect-diagnostics.sh by cloning scripts/lint-frontend-types.sh (96 lines, PAN-3192) and applying six deltas.\n\n1. Header comment: name PAN-3568, explain the diag lane and why the real tsconfigs stay plugin-free, and record the exact emitted line format, which is 'file(line,col): <category> TS<ruleCode>: <message>    effect(<ruleName>)' with four spaces before the marker.\n\n2. Run npx effect-language-service patch once at the top, before any lane, unconditionally. It is idempotent, so no node_modules marker probe is needed and none should be added.\n\n3. Run npx tsc --noEmit -p <lane> for all four diag tsconfigs, concatenating output and capturing each lane's exit status separately.\n\n4. Marker filter: count as a finding only lines matching the effect-finding marker at end of line, that is the regex '    effect\\\\([A-Za-z]+\\\\)$', pinned as a commented constant. Never filter on the 'error TS' or 'warning TS' severity prefix and never on a numeric code range: plugin rule codes are small integers that collide with real TypeScript codes, since floatingEffect renders as 'error TS3'. Real TypeScript errors appearing in a lane belong to the base gates and must be ignored here.\n\n5. Crash guard: do NOT copy scripts/lint-frontend-types.sh:52, which fails when tsc_status is non-zero and the finding count is 0. In a diag lane that combination is normal, because the dashboard lane holds 47 real type errors and exits non-zero while its effect-finding count can legitimately be 0. Instead, fail loudly only when a lane exits non-zero AND its output holds zero lines matching '^[^(]+\\\\([0-9]+,[0-9]+\\\\): (error|warning|message) TS[0-9]+: '. That distinguishes a launcher or config-resolution crash, which exits non-zero with no such line, from a lane holding real diagnostics.\n\n6. Keep the rest of the frontend contract byte-for-byte in spirit: the norm() position-stripping comparison key, a baseline file of '#' header lines plus one sorted finding per line, NEW: and known: labelling through comm, and a --update mode that lowers the baseline but refuses to raise it. Adapt norm(): the frontend version greps 'error TS', which would silently drop warning-category and message-category findings, so grep the marker instead and then strip the (line,col) position exactly as the original does."
+        },
+        "items": [
+          {
+            "id": "ratchet-script.ac1",
+            "title": "The script counts a line as a finding only when it ends in the effect(<ruleName>) marker, and contains no filter keyed on an 'error TS' or 'warning TS' prefix or on a numeric diagnostic-code range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac2",
+            "title": "Given a lane that exits non-zero while emitting no position-prefixed TS diagnostic line, when the script runs, then it exits non-zero with a message naming the crashed lane and its reproduce command rather than reporting zero findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac3",
+            "title": "Given a lane whose only non-zero-exit cause is real TypeScript errors with no effect marker, when the script runs, then it does not treat that lane as crashed and counts zero findings from it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac4",
+            "title": "The script invokes effect-language-service patch unconditionally before the first lane and covers all four tsconfig.effect-diag.json paths with npx tsc --noEmit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac5",
+            "title": "Running the script with --update rewrites the baseline when the current finding count is lower, and exits non-zero refusing to write when the count is higher",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-tests",
+        "title": "Add the hermetic unit test locking the ratchet's filter and crash contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/lint-effect-diagnostics.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-effect-diagnostics.test.ts"
+          ],
+          "expected_outputs": [
+            "all five named cases pass and the file reports no skipped tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/scripts/lint-effect-diagnostics.test.ts mirroring the harness in tests/unit/scripts/lint-frontend-types.test.ts (152 lines). That harness builds a temp root with mkdtempSync, copies the script under test into scripts/, writes a baseline file, and writes a fake bin/npx shim that cats a fixture file and exits with FAKE_TSC_EXIT — so no real tsc ever runs and the tests are hermetic and fast. The same shim absorbs the script's unconditional patch call, so no special handling is needed for it.\n\nWrite exactly these five cases:\n(a) a fixture line carrying the effect marker with no baseline match: the script exits non-zero and labels the line NEW:.\n(b) a fixture line that is a plain TypeScript error with no marker, for example \"src/x.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number'.\": the script does not count it as a finding and passes. This is the case that would have caught the retracted numeric-code filter.\n(c) --update against a baseline holding more findings than the fixture: the baseline file is rewritten with the lower set and the script exits 0.\n(d) --update against a baseline holding fewer findings than the fixture: the script exits non-zero and leaves the baseline file unchanged.\n(e) FAKE_TSC_EXIT non-zero with fixture output holding no position-prefixed diagnostic line: the script exits non-zero with a crash message, not a zero-findings pass.\n\nThese tests shell out synchronously and need no timers. If any polling or retry is ever added to the script, the tests must switch to vi.useFakeTimers() with advanceTimersByTimeAsync rather than real setTimeout. If a change to the test appears to have no effect, purge node_modules/.experimental-vitest-cache before debugging — the stale cache serves pre-fix transforms."
+        },
+        "items": [
+          {
+            "id": "ratchet-tests.ac1",
+            "title": "Case (a) asserts the script exits non-zero and its stderr labels an unbaselined marker line with the NEW: prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-tests.ac2",
+            "title": "Case (b) feeds a plain 'error TS2322' line with no effect marker and asserts the script exits 0, proving real TypeScript errors are not counted as findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-tests.ac3",
+            "title": "Cases (c) and (d) assert that --update rewrites the baseline file when lowering and exits non-zero while leaving the file byte-identical when it would raise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-tests.ac4",
+            "title": "Case (e) sets a non-zero fake tsc exit with output holding no position-prefixed diagnostic line and asserts the script exits non-zero with a crash message rather than reporting zero findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-tests.ac5",
+            "title": "When npx vitest run executes the file, then it passes without invoking the repository's real tsc, because the test builds its own temp root with a fake npx shim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-chain-wiring",
+        "title": "Seed the baseline and wire lint:effect-diagnostics into npm run lint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "scripts/effect-diagnostics-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-effect-diagnostics.sh --update",
+            "bash scripts/lint-effect-diagnostics.sh",
+            "npm run lint",
+            "npm run typecheck",
+            "bash scripts/lint-dashboard-types.sh",
+            "bash scripts/lint-frontend-types.sh"
+          ],
+          "expected_outputs": [
+            "the seeded baseline file exists with '#' header lines plus sorted findings, and a second plain run exits 0 reporting no new findings",
+            "npm run lint invokes lint:effect-diagnostics and exits 0",
+            "npm run typecheck exits 0 and both existing type ratchets pass at their current baselines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add \"lint:effect-diagnostics\": \"bash scripts/lint-effect-diagnostics.sh\" to package.json scripts, and append && npm run lint:effect-diagnostics to the end of the lint chain at package.json:105. Then seed scripts/effect-diagnostics-baseline.txt by running bash scripts/lint-effect-diagnostics.sh --update. Seed from the tree exactly as it stands: PAN-3567 is still open and does not gate this work, and its fixes will lower the baseline through --update later, which is the ratchet working as designed. The baseline may be large; that is expected. Fixing baselined findings is an explicit non-goal for this issue.\n\nThis is also the commit that must prove existing gates are untouched, because it is the moment the new step joins a required gate. Run npm run typecheck, bash scripts/lint-dashboard-types.sh, and bash scripts/lint-frontend-types.sh and confirm each behaves as before. Read the dashboard baseline from scripts/dashboard-types-baseline.txt rather than asserting a literal count: it reads 47 today, the earlier draft cited 54, and concurrent burn-down may lower it again.\n\nWatch the wall clock. The four lanes measured 26 seconds unpatched, so there is generous headroom under the roughly 90-second budget for added lint time, but the plugin adds analysis work. If the patched runs blow the budget, drop the contracts lane, which has the lowest Effect-bug density of the four, and record that decision in docs/EFFECT-DIAGNOSTICS.md."
+        },
+        "items": [
+          {
+            "id": "lint-chain-wiring.ac1",
+            "title": "Given a seeded baseline, when npm run lint runs, then it invokes lint:effect-diagnostics and the whole chain exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-chain-wiring.ac2",
+            "title": "scripts/effect-diagnostics-baseline.txt exists, opens with '#'-prefixed header lines, and holds one sorted finding per remaining line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-chain-wiring.ac3",
+            "title": "npm run typecheck exits 0, and bash scripts/lint-dashboard-types.sh and bash scripts/lint-frontend-types.sh each exit 0 at the counts recorded in their own baseline files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-chain-wiring.ac4",
+            "title": "Either npm run lint stays under the stated added-time budget, or the contracts lane is dropped and docs/EFFECT-DIAGNOSTICS.md records that decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-audit-wiring",
+        "title": "Bring the effect-diagnostics baseline under scripts/lint-ratchet-audit.sh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-ratchet-audit.sh",
+            "tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:ratchet-audit",
+            "npx vitest run tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:ratchet-audit exits 0 on the current history",
+            "the audit test file passes including the new effect-diagnostics baseline cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add EFFECT_DIAG_BASELINE=\"scripts/effect-diagnostics-baseline.txt\" beside the existing constants at scripts/lint-ratchet-audit.sh:24-25, then add effect_diag_baseline_at, parent_effect_diag_baseline_at, and effect_diag_baseline_increases_for_commit helpers following the circular_baseline_* pattern (reader at :37, comparator at :66), and call the new comparator alongside the existing two at :154-155. A commit that grows the baseline without an issue reference matching ([A-Z]+-[0-9]+|#[0-9]+) in its message must fail.\n\nOne concrete deviation from the pattern is required. circular_baseline_at() drops only blank lines, because scripts/circular-deps-baseline.txt carries no '#' headers. The effect-diagnostics baseline carries two header lines, so the new reader must strip '#'-prefixed lines as well as blanks; otherwise editing a header would read as baseline growth and fail the audit spuriously.\n\nFor context on why this matters: the audit currently covers only scripts/circular-deps-baseline.txt and eslint-any-allowlist.json. Neither existing type-error baseline is audited. This work makes the effect-diagnostics baseline the third audited surface; extending coverage to the two type baselines is a real gap but out of scope here.\n\nExtend tests/unit/scripts/lint-ratchet-audit.test.ts (251 lines) with cases for the new file: growth without an issue reference fails, growth with one passes, shrinking is always free, and a header-only edit is not treated as growth."
+        },
+        "items": [
+          {
+            "id": "ratchet-audit-wiring.ac1",
+            "title": "Given a commit that adds a line to scripts/effect-diagnostics-baseline.txt with no issue reference in its message, when lint:ratchet-audit runs over that commit, then it exits non-zero naming the baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-wiring.ac2",
+            "title": "Given the same growth in a commit whose message carries a reference matching ([A-Z]+-[0-9]+|#[0-9]+), when the audit runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-wiring.ac3",
+            "title": "Given a commit that only edits a '#' header line in the baseline, when the audit runs, then it exits 0 because the new reader strips comment lines before comparing line sets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-wiring.ac4",
+            "title": "npx vitest run tests/unit/scripts/lint-ratchet-audit.test.ts passes with the added effect-diagnostics cases, and npm run lint:ratchet-audit exits 0 on the branch history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-typecheck-gate",
+        "title": "Add packages/effect-acp to the root typecheck chain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:acp",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck:acp exits 0",
+            "npm run typecheck exits 0 and its output shows the acp lane running"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Close a typecheck blind spot this issue's investigation exposed: packages/effect-acp has a local typecheck script at packages/effect-acp/package.json:36 that nothing invokes, so 14 of its 16 Effect-heavy source files are checked by no mandated gate. Add \"typecheck:acp\": \"tsc --noEmit -p packages/effect-acp/tsconfig.json\" to package.json scripts and append && npm run typecheck:acp to the typecheck chain at package.json:102.\n\nThis is unconditional. The package typechecks clean today — npx tsc --noEmit -p packages/effect-acp/tsconfig.json exits 0, including the .test.ts files that its include: [\"src\"] covers — so there is no red-branch decision to make and no baseline variant to build."
+        },
+        "items": [
+          {
+            "id": "acp-typecheck-gate.ac1",
+            "title": "package.json contains a typecheck:acp script running tsc --noEmit against packages/effect-acp/tsconfig.json, and the typecheck chain at package.json:102 invokes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-typecheck-gate.ac2",
+            "title": "npm run typecheck:acp exits 0 with no reported diagnostics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-typecheck-gate.ac3",
+            "title": "Given a deliberate type error planted in a packages/effect-acp/src file, when npm run typecheck runs, then it exits non-zero — proving the lane is actually reached by the root chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reviewer-prompt",
+        "title": "Make the correctness reviewer treat NEW effect findings as blocking",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/review-correctness.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompt-trailer",
+            "git log -1 --format=%B | grep -c 'Prompt-Change:'"
+          ],
+          "expected_outputs": [
+            "lint:prompt-trailer exits 0",
+            "the commit message contains a Prompt-Change: trailer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Append a short section to roles/review-correctness.md (currently 107 lines) in the file's existing imperative voice: run npm run lint:effect-diagnostics; any NEW: finding on the branch is a blocking correctness finding; baselined known: findings are pre-existing and not the author's to fix. Keep it to roughly six lines. Place it inside the correctness-focus material rather than after the 'Write contract' section, which deliberately ends the file with the reviewer's stop instruction.\n\nThis is the agent-pickup half of the issue. Because npm run lint is already a required verification gate for this project, work agents receive NEW findings mechanically; this prompt change makes the reviewer refuse to pass them rather than relying on reviewer attention, which is the failure mode the whole issue exists to remove.\n\nscripts/check-prompt-change-trailer.sh:31 rejects any commit touching roles/*.md without a Prompt-Change: trailer, so this commit must carry one, for example: Prompt-Change: correctness reviewer runs the effect-diagnostics ratchet. Never bypass the hook with --no-verify."
+        },
+        "items": [
+          {
+            "id": "reviewer-prompt.ac1",
+            "title": "roles/review-correctness.md contains an instruction to run npm run lint:effect-diagnostics and states that a NEW: finding blocks review while a known: finding is not the author's to fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-prompt.ac2",
+            "title": "The added section precedes the 'Write contract' section, so the file still closes with the reviewer's stop instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-prompt.ac3",
+            "title": "The commit touching roles/review-correctness.md carries a Prompt-Change: trailer and npm run lint:prompt-trailer exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the diagnostic lane and point CLAUDE.md at it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:47:56.509Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/EFFECT-DIAGNOSTICS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/EFFECT-DIAGNOSTICS.md",
+            "grep -n 'lint:effect-diagnostics' CLAUDE.md",
+            "grep -n 'EFFECT-DIAGNOSTICS' CLAUDE.md",
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "docs/EFFECT-DIAGNOSTICS.md exists",
+            "CLAUDE.md names lint:effect-diagnostics and links docs/EFFECT-DIAGNOSTICS.md",
+            "lint:prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/EFFECT-DIAGNOSTICS.md covering, in this order: what the lane is and why it exists, linking PAN-3567 as the motivating bug class; the four diag tsconfigs and why the real project tsconfigs stay plugin-free; the patch mechanism, the decision to run patch unconditionally from the ratchet script, and the isolated-TypeScript fallback if the build-isolation checkpoint forced it; the marker-based filter and an explicit warning that numeric diagnostic codes are unsafe because floatingEffect renders as 'error TS3'; ratchet operations, meaning how to lower the baseline with --update, what NEW: and known: mean to an author, and the audit rule requiring an issue reference for any raise; the inline // @effect-diagnostics effect/<rule>:off escape hatch and the convention that each use carries a trailing issue reference; the per-rule severity-promotion path as deliberate future work once a rule's baseline slice reaches zero; and a closing note on @effect/tsgo as the successor requiring TypeScript 7.\n\nThen extend the quality-gates block at CLAUDE.md:223-226 so it names lint:effect-diagnostics as part of npm run lint and links the new doc. While editing that block, also name typecheck:acp as part of the typecheck chain, since this issue adds it.\n\nNo Mintlify page: this is dev-repo tooling rather than a product surface, which is a deliberate scoping decision rather than an omission."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/EFFECT-DIAGNOSTICS.md contains the rule that findings are matched by the effect(<ruleName>) message marker and warns that numeric diagnostic codes collide with real TypeScript codes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/EFFECT-DIAGNOSTICS.md contains the command that lowers the baseline and explains what NEW: and known: mean for an author reading a failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/EFFECT-DIAGNOSTICS.md records the inline // @effect-diagnostics effect/<rule>:off escape hatch and the audit rule requiring an issue reference to raise the baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "The quality-gates block in CLAUDE.md contains lint:effect-diagnostics as part of npm run lint, names typecheck:acp as part of the typecheck chain, and links docs/EFFECT-DIAGNOSTICS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "root-devdep",
+        "to": "diag-tsconfigs",
+        "type": "blocks"
+      },
+      {
+        "from": "root-devdep",
+        "to": "patch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "diag-tsconfigs",
+        "to": "patch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "diag-tsconfigs",
+        "to": "ratchet-script",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-wiring",
+        "to": "ratchet-script",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-script",
+        "to": "ratchet-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-script",
+        "to": "lint-chain-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "root-devdep",
+        "to": "lint-chain-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-wiring",
+        "to": "lint-chain-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "root-devdep",
+        "to": "acp-typecheck-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-wiring",
+        "to": "acp-typecheck-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-chain-wiring",
+        "to": "acp-typecheck-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-chain-wiring",
+        "to": "ratchet-audit-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-chain-wiring",
+        "to": "reviewer-prompt",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-wiring",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-chain-wiring",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-script",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "acp-typecheck-gate",
+        "to": "docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
