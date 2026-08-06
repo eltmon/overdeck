@@ -1,4 +1,10 @@
-import type { SystemHealthSnapshot, HealthReason } from '@overdeck/contracts';
+import type { HealthReason, SystemHealthConsumer, SystemHealthSnapshot } from '@overdeck/contracts';
+
+export interface AttentionAgentTarget {
+  agentId: string;
+  issueId?: string;
+  killConsumer?: SystemHealthConsumer;
+}
 
 export interface AttentionItem {
   severity: 'critical' | 'warning';
@@ -6,7 +12,10 @@ export interface AttentionItem {
   title: string;
   sub: string;
   agents: string[];
+  targets: AttentionAgentTarget[];
   agentId?: string;
+  issueId?: string;
+  killConsumer?: SystemHealthConsumer;
 }
 
 /**
@@ -24,7 +33,7 @@ export function contextNotes(snapshot: SystemHealthSnapshot): HealthReason[] {
 /**
  * Mapping from reason code to user-visible label, extracted from SystemHealthPill.
  */
-function reasonLabel(snapshot: SystemHealthSnapshot, reason: HealthReason): string | null {
+export function reasonLabel(snapshot: SystemHealthSnapshot, reason: HealthReason): string | null {
   switch (reason.code) {
     case 'admission.memory_available.soft':
       return 'spawn headroom tight';
@@ -85,10 +94,20 @@ function formatBytes(bytes: number): string {
  * Sorts by severity (critical first), then by code (stalled before idle).
  */
 export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionItem[] {
+  const agentConsumers = new Map<string, SystemHealthConsumer>();
+  for (const consumer of snapshot.topConsumers) {
+    if (consumer.type === 'container') continue;
+    const agentId = consumer.killTarget?.kind === 'agent'
+      ? consumer.killTarget.agentId ?? consumer.id
+      : consumer.id;
+    if (!agentConsumers.has(agentId)) {
+      agentConsumers.set(agentId, consumer);
+    }
+  }
+
   const allReasons: Array<{
     reason: HealthReason;
-    agentId?: string;
-    agentIssueId?: string;
+    target?: AttentionAgentTarget;
   }> = [];
 
   // Collect host reasons
@@ -115,14 +134,17 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
   });
 
   // Collect agent reasons
-  snapshot.agents.forEach((agent, agentIndex) => {
+  snapshot.agents.forEach((agent) => {
     agent.reasons
       .filter(r => r.severity !== 'info')
       .forEach(reason => {
         allReasons.push({
           reason,
-          agentId: snapshot.agents[agentIndex]?.id,
-          agentIssueId: snapshot.agents[agentIndex]?.issueId,
+          target: {
+            agentId: agent.id,
+            issueId: agent.issueId,
+            killConsumer: agentConsumers.get(agent.id),
+          },
         });
       });
   });
@@ -130,8 +152,7 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
   // Group by reason code
   const grouped = new Map<string, Array<{
     reason: HealthReason;
-    agentId?: string;
-    agentIssueId?: string;
+    target?: AttentionAgentTarget;
   }>>();
   for (const item of allReasons) {
     const key = item.reason.code;
@@ -153,10 +174,10 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
 
     if (isGroupable) {
       // Grouped row
-      const agentIds = entries
-        .map(e => e.agentId)
-        .filter((id): id is string => id !== undefined);
-
+      const targets = entries
+        .map(e => e.target)
+        .filter((target): target is AttentionAgentTarget => target !== undefined);
+      const agentIds = targets.map(target => target.agentId);
       const subLine = agentIds.slice(0, 2).join(', ') + (agentIds.length > 2 ? ` +${agentIds.length - 2} more` : '');
 
       items.push({
@@ -165,25 +186,31 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
         title: reasonLabel(snapshot, reason) ?? code,
         sub: `${agentIds.length}× agents: ${subLine}`,
         agents: agentIds,
+        targets,
       });
     } else {
       // Singleton row
-      const agentId = firstEntry.agentId;
-      const issueId = firstEntry.agentIssueId;
-      let sub = reason.message;
-      if (agentId && issueId) {
-        sub = `${agentId} · ${issueId}`;
-      } else if (agentId) {
-        sub = agentId;
-      }
+      const target = firstEntry.target;
+      const agentId = target?.agentId;
+      const issueId = target?.issueId;
+      const title = agentId
+        ? issueId ? `${agentId} · ${issueId}` : agentId
+        : reasonLabel(snapshot, reason) ?? code;
+      const agentMessagePrefix = agentId ? `${agentId} has produced ` : undefined;
+      const sub = agentMessagePrefix && reason.message.startsWith(agentMessagePrefix)
+        ? reason.message.slice(agentMessagePrefix.length)
+        : reason.message;
 
       items.push({
         severity: mapPresentationSeverity(reason.code, reason.severity),
         code,
-        title: reasonLabel(snapshot, reason) ?? code,
+        title,
         sub,
         agents: agentId ? [agentId] : [],
+        targets: target ? [target] : [],
         agentId,
+        issueId,
+        killConsumer: target?.killConsumer,
       });
     }
   }
@@ -222,26 +249,39 @@ function mapPresentationSeverity(code: string, serverSeverity: string): 'critica
  * Returns a one-sentence answer to "do I need to do anything right now?"
  */
 export function summaryLine(snapshot: SystemHealthSnapshot, items: AttentionItem[]): string {
+  const stalledAgentCount = items
+    .filter(item => item.code === 'agent.runtime.inactive.stalled')
+    .reduce((sum, item) => sum + item.agents.length, 0);
+  const idleAgentCount = items
+    .filter(item => item.code === 'agent.runtime.inactive.warning')
+    .reduce((sum, item) => sum + item.agents.length, 0);
+  const warningCount = items.filter(item => item.severity === 'warning').length;
+  const criticalCount = items.filter(item => item.severity === 'critical').length;
+  const contextNoteCount = contextNotes(snapshot).length;
+  const memory = snapshot.host.metrics.memoryUsedPercent == null
+    ? 'memory unavailable'
+    : `memory at ${snapshot.host.metrics.memoryUsedPercent.toFixed(1)}%`;
+  const headroom = snapshot.admission.availableMemoryBytes == null
+    ? 'spawn headroom unavailable'
+    : `${formatBytes(snapshot.admission.availableMemoryBytes)} spawn headroom`;
+  const relay = !snapshot.summary.smeeRelay.configured
+    ? 'relay not configured'
+    : snapshot.summary.smeeRelay.running ? 'relay running' : 'relay stopped';
+  const operationalContext = [
+    `${stalledAgentCount} stalled agent${stalledAgentCount === 1 ? '' : 's'}`,
+    `${idleAgentCount} idle agent${idleAgentCount === 1 ? '' : 's'}`,
+    memory,
+    headroom,
+    `${contextNoteCount} context note${contextNoteCount === 1 ? '' : 's'}`,
+  ].join(' · ');
+
   if (items.length === 0) {
-    // Healthy: name spawn headroom, relay state, zero stalled agents
-    const headroomGib = (snapshot.admission.availableMemoryBytes ?? 0) / (1024 ** 3);
-    const relayStatus = snapshot.services.find(s => s.id === 'smee-relay' || s.id === 'webhook-relay');
-    const relayRunning = relayStatus?.status === 'running';
-
-    const headroomStr = headroomGib >= 1 ? `${headroomGib.toFixed(1)} GiB spawn headroom` : 'Limited spawn headroom';
-    const relayStr = relayRunning ? 'relay running' : 'relay stopped';
-
-    return `All clear · ${headroomStr} · ${relayStr} · 0 stalled agents`;
+    return `All clear · ${memory} · ${headroom} · ${relay} · ${stalledAgentCount} stalled agents · ${idleAgentCount} idle agents · ${contextNoteCount} context note${contextNoteCount === 1 ? '' : 's'}`;
   }
-
-  const stalledItems = items.filter(i => i.code === 'agent.runtime.inactive.stalled');
-  const stalledAgentCount = stalledItems.reduce((sum, item) => sum + item.agents.length, 0);
-  const warningCount = items.filter(i => i.severity === 'warning').length;
-  const criticalCount = items.filter(i => i.severity === 'critical').length;
 
   if (criticalCount > 0) {
-    return `Action required: ${criticalCount} critical issue${criticalCount !== 1 ? 's' : ''} (${stalledAgentCount} stalled agent${stalledAgentCount !== 1 ? 's' : ''})`;
+    return `Action required: ${criticalCount} critical issue${criticalCount === 1 ? '' : 's'} · ${operationalContext}`;
   }
 
-  return `Attention needed: ${warningCount} warning${warningCount !== 1 ? 's' : ''}`;
+  return `Attention needed: ${warningCount} warning${warningCount === 1 ? '' : 's'} · ${operationalContext}`;
 }

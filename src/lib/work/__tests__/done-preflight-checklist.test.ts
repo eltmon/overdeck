@@ -89,6 +89,19 @@ describe('plan checklist evaluation', () => {
     expect(planMocks.readWorkspacePlan).not.toHaveBeenCalled();
   });
 
+  it('treats pending children of a cancelled item as satisfied', () => {
+    const doc = planWithStatus('completed');
+    doc.plan.items = [{
+      id: 'cancelled-item',
+      title: 'Deliberately deferred',
+      status: 'cancelled',
+      created: '2026-08-01T00:00:00.000Z',
+      items: [{ id: 'ac-1', title: 'Pending acceptance criterion', status: 'pending' }],
+    }];
+
+    expect(evaluateIncompletePlanItems(doc)).toEqual([]);
+  });
+
   it('ignores pending acceptance criteria under a cancelled item', () => {
     expect(evaluateIncompletePlanItems(planWithStatus('cancelled', 'pending'))).toEqual([]);
   });

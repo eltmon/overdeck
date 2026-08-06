@@ -87,12 +87,13 @@ describe('task mutation door', () => {
     });
   });
 
-  it('cancels acceptance criteria with their parent item', async () => {
+  it('cancels an item and its acceptance-criteria children in one sequence increment', async () => {
     await expect(applyTaskStatusChange(project, ISSUE_ID, {
-      type: 'cancel', itemId: 'wi-1', writerId: 'agent-a', reason: 'deferred until deployment',
+      type: 'cancel', itemId: 'wi-1', writerId: 'agent-a', reason: 'deliberately deferred',
     })).resolves.toMatchObject({ status: 'cancelled', sequence: 1 });
     expect(readIssueRecordSync(project, ISSUE_ID)).toMatchObject({
       statusOverrides: { 'wi-1': 'cancelled', 'wi-1.ac-1': 'cancelled' },
+      tasks: { sequence: 1 },
     });
   });
 
@@ -110,6 +111,7 @@ describe('task mutation door', () => {
       type: 'cancel', itemId: 'wi-cancelled', writerId: 'agent-a', reason: 'repair child state',
     })).resolves.toMatchObject({ status: 'cancelled', sequence: 1, idempotent: true });
   });
+
 
   it.each([
     ['block', undefined, /requires --reason/i],
