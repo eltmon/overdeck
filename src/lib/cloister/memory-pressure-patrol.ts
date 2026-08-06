@@ -143,22 +143,63 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   const journalText = await d.readNewKernelJournal();
   const oomKills = parseOomKills(journalText);
 
-  // Emit OOM kills regardless of level transition
-  for (const kill of oomKills) {
-    const message = `Kernel OOM: Killed process ${kill.pid} (${kill.comm}), ${formatGib(kill.rssBytes)} RSS${kill.inOverdeckTree ? ' in Overdeck tmux-server' : ''}`;
+  // Emit OOM kills with backpressure: aggregate burst into one event per level
+  // to avoid unbounded durable writes when the machine is memory-constrained
+  if (oomKills.length > 0) {
+    const overdeckKills = oomKills.filter((k) => k.inOverdeckTree);
+    const hostKills = oomKills.filter((k) => !k.inOverdeckTree);
 
-    d.emit({
-      level: kill.inOverdeckTree ? 'error' : 'warn',
-      source: 'cloister',
-      link: '/resources',
-      message,
-      details: `Cgroup: ${kill.cgroup || '(unknown)'}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
-      desktop: kill.inOverdeckTree,
-    });
+    // Emit Overdeck-tree kills as error
+    if (overdeckKills.length > 0) {
+      const plural = overdeckKills.length === 1 ? '' : 's';
+      const message =
+        overdeckKills.length === 1
+          ? `Kernel OOM: Killed process ${overdeckKills[0].pid} (${overdeckKills[0].comm}), ${formatGib(overdeckKills[0].rssBytes)} RSS in Overdeck tmux-server`
+          : `Kernel OOM: Killed ${overdeckKills.length} process${plural} in Overdeck tmux-server (${overdeckKills.map((k) => `${k.pid}/${k.comm}`).join(', ')})`;
 
-    const action = `memory-pressure-patrol: oom-kill (pid ${kill.pid} ${kill.comm} ${formatGib(kill.rssBytes)})`;
-    actions.push(action);
-    logDeaconEventSync(`[deacon] ${action}`);
+      const details = overdeckKills
+        .map((k) => `  PID ${k.pid} (${k.comm}): ${formatGib(k.rssBytes)} RSS | Cgroup: ${k.cgroup || '(unknown)'}`)
+        .join('\n');
+
+      d.emit({
+        level: 'error',
+        source: 'cloister',
+        link: '/resources',
+        message,
+        details: `OOM kills in Overdeck tree:\n${details}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
+        desktop: true,
+      });
+
+      const action = `memory-pressure-patrol: oom-kills (${overdeckKills.length} in Overdeck tree)`;
+      actions.push(action);
+      logDeaconEventSync(`[deacon] ${action}`);
+    }
+
+    // Emit host kills as warn (less urgent)
+    if (hostKills.length > 0) {
+      const plural = hostKills.length === 1 ? '' : 's';
+      const message =
+        hostKills.length === 1
+          ? `Kernel OOM: Killed process ${hostKills[0].pid} (${hostKills[0].comm}), ${formatGib(hostKills[0].rssBytes)} RSS outside Overdeck`
+          : `Kernel OOM: Killed ${hostKills.length} process${plural} outside Overdeck (${hostKills.map((k) => `${k.pid}/${k.comm}`).join(', ')})`;
+
+      const details = hostKills
+        .map((k) => `  PID ${k.pid} (${k.comm}): ${formatGib(k.rssBytes)} RSS | Cgroup: ${k.cgroup || '(unknown)'}`)
+        .join('\n');
+
+      d.emit({
+        level: 'warn',
+        source: 'cloister',
+        link: '/resources',
+        message,
+        details: `OOM kills outside Overdeck:\n${details}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
+        desktop: false,
+      });
+
+      const action = `memory-pressure-patrol: oom-kills (${hostKills.length} outside Overdeck)`;
+      actions.push(action);
+      logDeaconEventSync(`[deacon] ${action}`);
+    }
   }
 
   const level = memoryFeedLevel(verdict.band, verdict.availableBytes, watchBytes);
@@ -190,7 +231,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     if (topConsumers.length > 0) {
       const consumerLines = topConsumers.map(
         (c) =>
-          `  ${formatGib(c.rssBytes)} | pid ${c.pid} (${c.command.substring(0, 80)}) in session ${c.sessionName || '(host)'}`,
+          `  ${formatGib(c.rssBytes)} | pid ${c.pid} (${c.comm}) in session ${c.sessionName || '(host)'}`,
       );
       details += '\n\nTop memory consumers:\n' + consumerLines.join('\n');
     }
@@ -286,7 +327,7 @@ export function __resetMemoryPressurePatrolState(): void {
 export interface TopConsumer {
   pid: number;
   rssBytes: number;
-  command: string;
+  comm: string;
   sessionName: string | null;
 }
 
@@ -326,7 +367,7 @@ export function topMemoryConsumers(census: RuntimeCensus, limit: number): TopCon
     return {
       pid: proc.pid,
       rssBytes: proc.rssBytes,
-      command: proc.command.slice(0, 80),
+      comm: proc.comm,
       sessionName,
     };
   });
