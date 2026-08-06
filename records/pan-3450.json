@@ -278,7 +278,7 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T08:52:35.772Z",
+  "updated": "2026-08-06T08:52:50.577Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "passed",
@@ -287,10 +287,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T08:52:35.753Z",
+    "updatedAt": "2026-08-06T08:52:50.539Z",
     "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
     "testNotes": "Reconciled from green GitHub Actions CI on d8b4dbb6: lint (https://github.com/eltmon/overdeck/actions/runs/30733578185/job/91458036596)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -468,7 +468,7 @@
       },
       "costAtCloseOut": {
         "usd": 242.1357618,
-        "pricingAsOf": "2026-08-06T08:52:35.761Z"
+        "pricingAsOf": "2026-08-06T08:52:50.543Z"
       }
     },
     "merges": [
