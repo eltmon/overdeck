@@ -1,0 +1,593 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-06T00:03:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3550: Memory pressure must warn in the activity feed before anything dies",
+    "updated": "2026-08-06T00:04:58.642Z"
+  },
+  "plan": {
+    "id": "pan-3550",
+    "title": "Memory pressure must warn in the activity feed before anything dies — silent shedding and kernel OOMs are invisible to the operator",
+    "status": "proposed",
+    "uid": "35d89581-40f9-4bc4-848d-5629a718767b",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-06T00:03:39Z",
+    "updated": "2026-08-06T00:04:58.642Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3550",
+        "label": "PAN-3550",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory-governor",
+      "cloister",
+      "deacon",
+      "activity-feed",
+      "observability",
+      "oom"
+    ],
+    "narratives": {
+      "Problem": "Nothing tells the operator that memory is running out until something is already dead. Verified at HEAD f69486a9c6, three gaps exist. (1) Nothing samples memory on a clock: assessMemoryPressure() runs only when something tries to resume or dispatch an agent, so on a quiet pipeline the cached band that concurrency.ts reads can be hours stale. (2) When the band goes soft, every autonomous resume and dispatch defers and the only trace is a logDeaconEventSync line in a deacon log file — the operator sees a pipeline that has quietly stopped advancing with no stated reason. (3) Kernel OOM kills are entirely invisible: no OOM reader exists in src/ at all. On 2026-08-04 01:37:07 EDT the kernel killed pid 2230723 (python, 41.3 GiB anon-rss) inside the overdeck-tmux-server.service cgroup and the operator learned about it from dead sessions. The issue body's premise that the governor sheds silently is FALSE — shed() at memory-governor.ts:342 is exported and unit-tested but has zero callers anywhere in src/, so no automatic shedding has ever run; docs/RESOURCE-GOVERNOR.md:172-211 describing it as live behavior is documentation drift.",
+      "Proposal": "Ship warnings only — no code path gains the ability to stop, pause, or kill anything. A new src/lib/cloister/memory-pressure-patrol.ts, modelled on the existing bridge-pool-patrol.ts, folds the governor band and a new WATCH reserve into four feed levels (ok, watch, holding, shedding) and emits exactly one activity entry per level TRANSITION, so a sustained condition warns once rather than once per tick. The WATCH tier fires above SOFT, while the governor is still admitting, and its details name the top RSS consumers attributed to their owning tmux sessions using the already-collected runtime census. The same patrol reads new kernel journal entries through journalctl --cursor-file and reports any OOM kill with its victim, pid, RSS at death and cgroup — loudly, with a desktop notification, when the victim was inside the Overdeck cgroup tree. It all runs on one dedicated 15-second timer inside the deacon child process, which also keeps the cached governor band fresh as a side effect. Finally the eviction-ladder documentation is corrected to state plainly that shed() has no caller.",
+      "NonGoals": "- Wiring, deleting, or otherwise changing the behavior of shed(), canAdmit(), or estimateFootprint() — they stay exactly as they are\n- Adding any new code path that stops, pauses, kills, or evicts an agent, session, container, or process\n- Changing the governor's SOFT/HARD/RECOVERY reserves, its hysteresis transitions (nextGovernorMode, nextGovernorModeWithRunway), or the swap/PSI runway logic\n- Changing the HTTP spawn-path predicate classifyMemoryPressure or the memoryWarnGb/memoryBlockGb thresholds it reads\n- Any frontend change — no new component, no ActivityPanel edit, no new route\n- Wiring createResourceSpikeSampler in src/dashboard/server/routes/resources/spike-sampler.ts, which is likewise built, tested and unwired; its object-valued details is a latent render bug to note, not to fix here\n- Reading, parsing, or depending on ~/.overdeck/logs/memory-census.log or ~/.overdeck/bin/memory-census.sh, which are machine-local and not in this repo\n- Adding a pan CLI verb, a REST route, or a settings-UI control for the watch reserve — it is a config.yaml key only, like every other governor reserve\n- Emitting an activity entry at each individual admission-deferral site, which would produce dozens of duplicate rows per minute\n- Browser or Playwright UAT — this change produces backend activity entries covered by unit tests and adds no new UI surface"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Top-RSS consumers come from getRuntimeCensus(), not the machine-local ~/.overdeck/logs/memory-census.log",
+        "rationale": "The census log is written by a systemd unit that is not in this repo, so depending on it would make the shipped feature silently inert on every other host. runtime-census.ts already runs the same ps with a 3s TTL and additionally maps pane pids to tmux sessions, which the log cannot do."
+      },
+      {
+        "summary": "OOM detection reads journalctl -k with --cursor-file rather than cgroup memory.events",
+        "rationale": "memory.events oom_kill is only a counter — it cannot name the victim, its RSS, or its command, and it resets when the unit restarts (verified reading 0 today despite the Aug 04 kill). The kernel journal line carries pid, comm, anon-rss and task_memcg in full, and --cursor-file makes repeated reads non-overlapping across ticks and restarts."
+      },
+      {
+        "summary": "The first canary run plants the journal cursor with -n 0 and emits nothing",
+        "rationale": "Verified that journalctl -k --cursor-file=<f> -n 0 writes the cursor and prints nothing. Without it a fresh install would replay every OOM kill in journal history into the activity feed on the first tick."
+      },
+      {
+        "summary": "No --grep on the journalctl call; filter the batch in Node instead",
+        "rationale": "--cursor-file advances only to the last SHOWN entry, so with --grep and no match the cursor never advances and every tick rescans the entire journal. Kernel entries in a 15-second window are a handful of lines."
+      },
+      {
+        "summary": "Consumer attribution walks parents upward from each top-N pid rather than descendants downward from every session",
+        "rationale": "With around 120 live tmux sessions, descendant walks are O(sessions x tree) per tick, while parent walks from five pids are O(5 x depth). RuntimeProcessRecord.ppid makes the upward walk trivial."
+      },
+      {
+        "summary": "The band-transition entry is the admission-hold signal; no emit is added at the three individual deferral sites",
+        "rationale": "deacon-auto-resume.ts:801, deacon-auto-resume.ts:918 and boot-reconciliation-apply.ts:113 run once per candidate per patrol, so emitting there would produce dozens of duplicate rows per minute. One entry on entering holding plus one on recovery is the complete non-spammy signal."
+      },
+      {
+        "summary": "The WATCH reserve defaults to max(0.20 x total RAM, 10 GiB) and is normalized to always exceed SOFT",
+        "rationale": "Mirrors the host-scaling shape of computeGovernorReserveDefaultsGb in config-yaml/defaults.ts:14-21, landing between SOFT max(0.15x, 8) and RECOVERY max(0.25x, 12). A watch reserve at or below SOFT could never fire before the hold, so merge.ts normalizes it upward exactly as it already does for RECOVERY."
+      },
+      {
+        "summary": "No frontend work is required",
+        "rationale": "activity.entry already renders in ActivityPanel, /resources is already a real route in App/routes.ts:15 so link:'/resources' resolves, and desktop:true is already consumed by App/hooks/useDesktopActivityNotifications.ts."
+      }
+    ],
+    "items": [
+      {
+        "id": "watch-reserve-config",
+        "title": "Add the governor_watch_reserve_gb config key with host-scaled default and above-SOFT normalization",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3550",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/cloister/memory-governor.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "memory-governor.test.ts passes including the new watch-reserve cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a fourth governor reserve, GiB, that sits strictly above SOFT and drives the activity-feed warn tier. Raw key `governor_watch_reserve_gb` in the ResourcesConfig interface (schema.ts, after governor_recovery_reserve_gb at line 407); normalized field `governorWatchReserveGb` in the resources block (schema.ts ~line 919). Extend computeGovernorReserveDefaultsGb() in defaults.ts:14 to return watch: Math.max(0.20 * totalGb, 10) and add governorWatchReserveGb to DEFAULT_CONFIG.resources after line 207. In merge.ts add the override read after the governor_recovery_reserve_gb block (line 660), add the key to the defaults spread (~line 185), and add a normalization guard AFTER the existing RECOVERY guard (line 683) that raises watch to soft + 1 whenever watch <= soft. Finally export readGovernorWatchReserveBytes() from memory-governor.ts beside readGovernorReserves() (line 86), reading loadConfigSync().config.resources.governorWatchReserveGb * GIB. See PRD WI-1 for exact before/after snippets."
+        },
+        "items": [
+          {
+            "id": "watch-reserve-config.ac1",
+            "title": "Given a config.yaml setting resources.governor_watch_reserve_gb to 30, loadConfigSync().config.resources.governorWatchReserveGb returns 30",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-reserve-config.ac2",
+            "title": "Given a config.yaml whose governor_watch_reserve_gb is at or below governor_soft_reserve_gb, the merged config returns a watch reserve exactly one GiB above the soft reserve instead of the configured value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-reserve-config.ac3",
+            "title": "Given no governor_watch_reserve_gb key, readGovernorWatchReserveBytes() returns max(0.20 * os.totalmem(), 10 GiB) expressed in bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-reserve-config.ac4",
+            "title": "npm run typecheck exits zero with no new errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pressure-level-patrol",
+        "title": "Create memory-pressure-patrol.ts emitting one activity entry per memory feed-level transition",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3550",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "top-consumer-attribution",
+            "oom-canary",
+            "deacon-memory-timer"
+          ],
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "memory-pressure-patrol.test.ts passes with transition and no-repeat cases green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-5",
+            "NFR-7"
+          ],
+          "acJustification": "Six criteria: four cover the distinct emit levels this item introduces (watch, holding, shedding, recovery), one locks the transition-only no-repeat guarantee that is the whole point of the module, and one locks the details-is-a-string invariant that a render bug depends on. Collapsing any of them would leave a level or an invariant unverified."
+        },
+        "narrative": {
+          "Action": "New module modelled directly on src/lib/cloister/bridge-pool-patrol.ts — read that file first; reuse its module-level lastLevel, its Partial<Deps> parameter, its Promise<string[]> return, and its __reset...ForTests export. Export type MemoryFeedLevel = 'ok'|'watch'|'holding'|'shedding' and the pure memoryFeedLevel(band, availableBytes, watchBytes): 'hard' band maps to shedding, 'soft' to holding, otherwise availableBytes < watchBytes gives watch else ok. patrolMemoryPressure(deps) awaits the injected assess() (default assessMemoryPressure), reads the injected watch reserve (default readGovernorWatchReserveBytes), computes the level, returns [] when it equals lastLevel, otherwise stores it and emits exactly one entry with source 'cloister' and link '/resources'. Levels map to warn (watch), warn (holding), error (shedding), info (recovery to ok). Message copy MUST be the full-sentence text given in PRD WI-2 — it names the crossed reserve, states what Overdeck has stopped doing, and states that nothing has been stopped or killed. details is a plain multi-line string carrying MemAvailable, all four reserves, swap free, and PSI full avg10 — never an object (see hazard H1)."
+        },
+        "items": [
+          {
+            "id": "pressure-level-patrol.ac1",
+            "title": "Given a verdict with band ok and available memory below the watch reserve, the patrol emits exactly one warn-level entry whose message contains both the available memory and the phrase 'watch reserve', and returns one action string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pressure-level-patrol.ac2",
+            "title": "Given the same watch-level verdict on the second and third consecutive call, the patrol emits nothing further and returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pressure-level-patrol.ac3",
+            "title": "Given a verdict with band soft, the emitted warn entry states that Overdeck has stopped admitting work and names the recovery reserve required to resume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pressure-level-patrol.ac4",
+            "title": "Given a verdict with band hard, the patrol emits an entry whose level is error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pressure-level-patrol.ac5",
+            "title": "Given a watch-level verdict followed by an ok verdict above the watch reserve, the second call emits exactly one info entry containing the word 'cleared'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pressure-level-patrol.ac6",
+            "title": "Every emitted entry contains a details value that passes a typeof details === 'string' check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "top-consumer-attribution",
+        "title": "Attribute the top RSS consumers from the runtime census into the warning details",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3550",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "memory-pressure-patrol.test.ts passes including attribution and cycle-guard cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Export the pure topMemoryConsumers(census: RuntimeCensus, limit: number): TopConsumer[] where TopConsumer is { pid, rssBytes, command, sessionName: string|null }. Build sessionByPanePid once from census.panesBySession (each TmuxPaneRecord at src/lib/tmux.ts:545 carries sessionName and panePid). Sort [...census.processesByPid.values()] by rssBytes descending, take limit, and for each walk UPWARD via census.processesByPid.get(pid)?.ppid until a pane pid is hit (return that session), the pid reaches 1 or 0, or a visited-pid Set sees a repeat (cycle guard) — never walk descendants of every session (decision D7, ~120 live sessions). Truncate command to 80 chars. Add a census dep to patrolMemoryPressure defaulting to getRuntimeCensus from ../runtime-census.js and append a 'Top memory consumers:' block to the details string, one line per consumer showing RSS, pid, truncated command, and the owning session or '(host)'. When census.processAvailable is false append 'Top memory consumers: unavailable (process census could not be read)' rather than omitting the section — an absent section reads as 'nothing was using memory'. Source is getRuntimeCensus, never ~/.overdeck/logs/memory-census.log (decision D3)."
+        },
+        "items": [
+          {
+            "id": "top-consumer-attribution.ac1",
+            "title": "Given a census containing three processes with distinct RSS values and limit 2, topMemoryConsumers returns the two largest in descending RSS order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumer-attribution.ac2",
+            "title": "Given a process whose grandparent pid is a pane pid of session agent-pan-1234, topMemoryConsumers returns that process with sessionName equal to agent-pan-1234",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumer-attribution.ac3",
+            "title": "Given a process with no pane ancestor, topMemoryConsumers returns it with sessionName null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumer-attribution.ac4",
+            "title": "Given a process tree containing a parent cycle, topMemoryConsumers returns without hanging and reports that process with sessionName null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumer-attribution.ac5",
+            "title": "Given a census whose processAvailable is false, the emitted details string contains the word 'unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oom-canary",
+        "title": "Detect kernel OOM kills from the journal and report the victim in the activity feed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3550",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "memory-pressure-patrol.test.ts passes including the real-kernel-line parse fixtures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: three cover the parser against distinct real kernel line shapes (both lines present, out-of-tree cgroup, victim line only), and three cover runtime behavior that the parser cannot express (level and desktop routing, disable-once degradation, and emission on an unchanged-level tick). Merging parser and runtime criteria would hide which half failed.",
+          "parallelSafeReason": "Complex only in parsing detail. It adds self-contained pure functions plus one injected reader inside memory-pressure-patrol.ts and touches no other production file, so it cannot conflict with any sibling item once pressure-level-patrol has landed."
+        },
+        "narrative": {
+          "Action": "Export the pure parseOomKills(journalText): OomKillRecord[] where OomKillRecord is { pid, comm, rssBytes, cgroup: string|null, inOverdeckTree }. Match oom-kill: lines with /task_memcg=(\\S+?),task=([^,]+),pid=(\\d+)/ and victim lines with /Out of memory: Killed process (\\d+) \\(([^)]+)\\)(.*)$/, summing every /(?:anon|file|shmem)-rss:(\\d+)kB/g capture times 1024 for rssBytes; join the two shapes on pid, and emit a record even when only one shape is present (rssBytes 0 or cgroup null). inOverdeckTree is true when cgroup matches an EXPORTED named regex constant /overdeck-tmux-server\\.service|overdeck-/ so a unit rename is a one-line change. Add readNewKernelJournal() using promisify(execFile) — never execSync, never a shell string — running journalctl -k --cursor-file=<OVERDECK_HOME>/oom-canary.cursor --no-pager -o cat with a 10s timeout; on the first call (cursor file absent) add -n 0 and return '' so a fresh install never replays historical kills (decision D5). Do NOT pass --grep (decision D6). On ANY throw set module-level oomCanaryDisabled = true, console.warn once, and return '' forever after; reset it in __resetMemoryPressurePatrolState(). Run the OOM check in patrolMemoryPressure BEFORE the level check so a kill is reported even on a tick whose level did not change. Emit one entry per record: level error with desktop true when inOverdeckTree, else level warn with no desktop; message names comm, pid, RSS at death and whether the victim was inside the Overdeck tmux server; details is a string carrying the cgroup path plus the current memory block. Real kernel fixture lines are quoted verbatim in PRD WI-4 — use them as test input."
+        },
+        "items": [
+          {
+            "id": "oom-canary.ac1",
+            "title": "Given the two real kernel lines quoted in the PRD, parseOomKills returns exactly one record with pid 2230723, comm python, rssBytes equal to (41321032 + 66872 + 8744) * 1024, and inOverdeckTree true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary.ac2",
+            "title": "Given an oom-kill: line whose task_memcg names an app-com.google.Chrome scope, parseOomKills returns a record with inOverdeckTree false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary.ac3",
+            "title": "Given journal text with an 'Out of memory: Killed process' line and no matching oom-kill: line, parseOomKills returns one record with cgroup null and a non-zero rssBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary.ac4",
+            "title": "Given a record with inOverdeckTree true the patrol emits an entry with level error and desktop true, and given inOverdeckTree false it emits level warn with no desktop flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary.ac5",
+            "title": "Given a journal reader dep that rejects, the patrol returns normally, emits no OOM entry, and a second call does not invoke the reader again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oom-canary.ac6",
+            "title": "Given an OOM record on a tick whose memory feed level is unchanged, the OOM entry is still emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-memory-timer",
+        "title": "Run the memory patrol on a dedicated 15-second timer in the deacon child",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3550",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "bash scripts/lint-circular-deps.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the timer lifecycle cases pass under fake timers",
+            "lint-circular-deps.sh reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a sibling timer to deacon.ts alongside the existing deaconInterval (declared line 309, started line 3484, cleared line 3496). Declare let memoryPatrolInterval: NodeJS.Timeout | null = null and export const MEMORY_PATROL_INTERVAL_MS = 15_000. In startDeacon() after the deaconInterval setInterval block, start memoryPatrolInterval on that constant; its callback dynamically imports ./memory-pressure-patrol.js (matching the patrolDockerBridgePool style at deacon.ts:2735 — a static import risks the documented stacks -> review-status -> agents -> spawn -> concurrency cycle, hazard H3), awaits patrolMemoryPressure(), and writes each returned action through logDeaconEventSync, catching and logging any rejection so a failing tick never throws. Call memoryPatrolInterval.unref?.(). In stopDeacon() clear and null it, mirroring the deaconInterval teardown. Do NOT fold this into runScheduledPatrol — its 60s cadence is the entire reason a separate timer exists (decision D2). Interval tests MUST use vi.useFakeTimers() and vi.advanceTimersByTimeAsync (hazard H5)."
+        },
+        "items": [
+          {
+            "id": "deacon-memory-timer.ac1",
+            "title": "deacon.ts exports MEMORY_PATROL_INTERVAL_MS and it resolves to 15000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-memory-timer.ac2",
+            "title": "Given fake timers and a started deacon, advancing 45 simulated seconds invokes the memory patrol three times and the 60-second scheduled patrol at most once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-memory-timer.ac3",
+            "title": "Given stopDeacon() has run, advancing a further 60 simulated seconds produces zero additional memory-patrol invocations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-memory-timer.ac4",
+            "title": "Given a memory patrol that rejects, startDeacon does not throw and the timer fires again on the next interval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-governor-signals",
+        "title": "Document the activity-feed signals and correct the eviction-ladder claim in RESOURCE-GOVERNOR.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T00:03:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3550",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RESOURCE-GOVERNOR.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'no caller' docs/RESOURCE-GOVERNOR.md",
+            "grep -n 'governor_watch_reserve_gb' docs/RESOURCE-GOVERNOR.md"
+          ],
+          "expected_outputs": [
+            "the eviction-ladder section states shed() has no caller in src/",
+            "the autonomous-governor config table lists governor_watch_reserve_gb"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Four edits. (1) docs/RESOURCE-GOVERNOR.md lines 172-211 currently open with 'shed() runs only when the band is hard', which is false — replace that opening with an explicit statement that shed() is implemented and unit-tested but has NO CALLER in src/, that Overdeck therefore performs no automatic shedding, and that PAN-3550 deliberately left it that way per operator directive; keep the ladder description as a record of what the function would do if wired. (2) Add a new '## Activity-feed signals (PAN-3550)' section after the bands section (~line 104) covering the four feed levels, the dedicated 15-second deacon timer, transition-only emission, the runtime-census attribution source, and the OOM canary with its --cursor-file idempotency and its disable-once behavior when the journal is unreadable. (3) Add a governor_watch_reserve_gb row to the Autonomous governor config table (~line 352) giving the normalized field name governorWatchReserveGb, the default max(20% of total RAM, 10 GiB), and the normalization that keeps it above the SOFT reserve. (4) In CLAUDE.md's 'Agent Auto-Resume Gates' section, extend the Memory gate (PAN-2500) bullet with one sentence noting that as of PAN-3550 governor level transitions and kernel OOM kills are announced in the dashboard activity feed by a dedicated 15-second deacon patrol, so an admission hold is no longer silent."
+        },
+        "items": [
+          {
+            "id": "docs-governor-signals.ac1",
+            "title": "The eviction-ladder section of docs/RESOURCE-GOVERNOR.md contains an explicit statement that shed() has no caller in src/ and that Overdeck performs no automatic shedding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-governor-signals.ac2",
+            "title": "docs/RESOURCE-GOVERNOR.md contains a section naming all four feed levels — ok, watch, holding, shedding — and the 15-second deacon timer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-governor-signals.ac3",
+            "title": "The Autonomous governor config table in docs/RESOURCE-GOVERNOR.md contains a governor_watch_reserve_gb row showing its normalized field name and its default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-governor-signals.ac4",
+            "title": "The memory-gate bullet in CLAUDE.md contains a sentence saying admission holds and kernel OOM kills appear in the activity feed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "watch-reserve-config",
+        "to": "pressure-level-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "pressure-level-patrol",
+        "to": "top-consumer-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "pressure-level-patrol",
+        "to": "oom-canary",
+        "type": "blocks"
+      },
+      {
+        "from": "pressure-level-patrol",
+        "to": "deacon-memory-timer",
+        "type": "blocks"
+      },
+      {
+        "from": "top-consumer-attribution",
+        "to": "docs-governor-signals",
+        "type": "informs"
+      },
+      {
+        "from": "oom-canary",
+        "to": "docs-governor-signals",
+        "type": "informs"
+      },
+      {
+        "from": "watch-reserve-config",
+        "to": "docs-governor-signals",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-06-PAN-3550-memory-pressure-must-warn-in-the-activity-feed-before-anything-dies-silent-shedding-and-kernel-ooms-are-invisible-to-the-operator.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
