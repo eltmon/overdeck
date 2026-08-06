@@ -139,19 +139,21 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T09:00:21.162Z",
+  "updated": "2026-08-06T09:00:58.309Z",
   "pipeline": {
     "issueId": "PAN-3575",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:57:39.599Z",
-    "updatedAt": "2026-08-06T09:00:20.610Z",
-    "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
+    "updatedAt": "2026-08-06T09:00:58.256Z",
+    "reviewNotes": "all in-PR-scope findings resolved; remaining findings are advisory or pre-existing",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
+    "reviewedAtCommit": "3e0c9c3b7322a45b652de2f1c3a7550e97550a56",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "reviewRequestedAt": "2026-08-06T08:57:39.599Z",
     "reviewSpawnedAt": "2026-08-06T08:57:38.171Z",
@@ -214,9 +216,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 3315227,
-            "output": 67340,
-            "cacheRead": 20063232,
+            "input": 3335479,
+            "output": 72072,
+            "cacheRead": 20809728,
             "cacheWrite": 0
           }
         },
@@ -263,15 +265,15 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 7766001,
-          "output": 338026,
-          "cacheRead": 99390976,
+          "input": 7786253,
+          "output": 342758,
+          "cacheRead": 100137472,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 49.333278,
-        "pricingAsOf": "2026-08-06T09:00:21.150Z"
+        "usd": 49.641512,
+        "pricingAsOf": "2026-08-06T09:00:58.292Z"
       }
     },
     "merges": [
