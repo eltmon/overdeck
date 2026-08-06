@@ -71,7 +71,7 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:51:31.976Z",
+  "updated": "2026-08-06T08:52:22.265Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -121,7 +121,9 @@
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "recordedAt": "2026-08-06T08:08:19.232Z"
-    }
+    },
+    "reviewRequestedAt": "2026-08-06T08:52:21.853Z",
+    "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z"
   },
   "closeOut": {
     "usage": {
