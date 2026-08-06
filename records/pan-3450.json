@@ -278,7 +278,7 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T07:53:40.796Z",
+  "updated": "2026-08-06T08:01:53.646Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "passed",
@@ -290,7 +290,7 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T07:53:40.719Z",
+    "updatedAt": "2026-08-06T08:01:53.607Z",
     "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
     "testNotes": "Reconciled from green GitHub Actions CI on d8b4dbb6: lint (https://github.com/eltmon/overdeck/actions/runs/30733578185/job/91458036596)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -423,6 +423,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 4752,
+            "output": 18769,
+            "cacheRead": 4646745,
+            "cacheWrite": 146962
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 3225588,
@@ -450,11 +458,17 @@
           "output": 81539,
           "cacheRead": 15360512,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 4752,
+          "output": 18769,
+          "cacheRead": 4646745,
+          "cacheWrite": 146962
         }
       },
       "costAtCloseOut": {
-        "usd": 237.4361328,
-        "pricingAsOf": "2026-08-06T07:53:40.785Z"
+        "usd": 238.93008079999998,
+        "pricingAsOf": "2026-08-06T08:01:53.625Z"
       }
     },
     "merges": [
