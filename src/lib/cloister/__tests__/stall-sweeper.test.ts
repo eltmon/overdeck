@@ -102,12 +102,13 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     expect(String(recs[0]!.payload.recommendation)).toContain('merge for re-evaluation');
   });
 
-  it('uat-failed: recommends a UAT rework re-drive with the notes as evidence', async () => {
+  it('uat-failed: recommends starting work after the relay found no live target', async () => {
     const h = harness([parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'login flow broken' } })]);
     await runStallSweeperPatrol(h.deps);
     const recs = recommendations(h);
     expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('UAT rework');
+    expect(String(recs[0]!.payload.recommendation)).toContain('pan start');
+    expect(String(recs[0]!.payload.recommendation)).toContain('UAT-failure relay found no live target');
     expect(String(recs[0]!.payload.uatNotes)).toContain('login flow broken');
   });
 

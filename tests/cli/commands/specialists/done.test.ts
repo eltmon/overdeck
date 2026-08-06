@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../src/lib/internal-token.js';
 
 const {
   mockSetReviewStatus,
@@ -69,6 +70,8 @@ describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
+    vi.stubEnv('OVERDECK_INTERNAL_TOKEN', 'test-token');
+    _resetInternalTokenCacheForTests();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
@@ -107,6 +110,7 @@ describe('specialists done command', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    _resetInternalTokenCacheForTests();
     vi.restoreAllMocks();
   });
 
@@ -305,7 +309,10 @@ describe('specialists done command', () => {
     expect(mockReadWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059');
     expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/done', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-token',
+      },
       body: JSON.stringify({
         specialist: 'inspect',
         issueId: 'PAN-1059',

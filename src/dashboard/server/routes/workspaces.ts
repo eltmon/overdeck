@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
 import { spawnPanCli } from '../../../lib/pan-cli-invocation.js';
@@ -1430,10 +1431,14 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
 
 // ─── Route: POST /api/review/:issueId/status ──────────────────────
 
-const postWorkspaceReviewStatusRoute = HttpRouter.add(
+export const postWorkspaceReviewStatusRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/status',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     if (!parseIssueIdSync(issueId)) {

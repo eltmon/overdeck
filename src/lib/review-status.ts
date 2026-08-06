@@ -513,6 +513,15 @@ export function setReviewStatusSync(
     void deliverTestFailureToWorkAgentHostSide(issueId, updated);
   }
 
+  // A UAT failure can enter through the REST route, specialist completion, or
+  // deacon recovery. Route from this write door so every entry point reaches the
+  // same feedback-target resurrection and needs-you escalation path.
+  if (update.uatStatus === 'failed') {
+    void deliverUatFailureToWorkAgentHostSide(issueId, updated);
+  } else if (update.uatStatus) {
+    void clearUatFailureAnchorHostSide(issueId);
+  }
+
   return updated;
 }
 
@@ -694,6 +703,28 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
   });
 }
 
+async function deliverUatFailureToWorkAgentHostSide(issueId: string, status: ReviewStatus): Promise<void> {
+  try {
+    const { relayUatFailureFeedbackPromise } = await import('./cloister/uat-failure-feedback.js');
+    await relayUatFailureFeedbackPromise({
+      issueId,
+      uatNotes: status.uatNotes,
+      anchor: status.reviewedAtCommit,
+    });
+  } catch (err) {
+    console.warn(`[review-status] host-side UAT-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function clearUatFailureAnchorHostSide(issueId: string): Promise<void> {
+  try {
+    const { clearUatFailureFeedbackAnchor } = await import('./cloister/uat-failure-feedback.js');
+    clearUatFailureFeedbackAnchor(issueId);
+  } catch (err) {
+    console.warn(`[review-status] host-side UAT-failure anchor clear for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: ReviewStatus): Promise<void> {
   try {
     const { resolveProjectFromIssueSync } = await import('./projects.js');
@@ -863,6 +894,9 @@ export function fixStuckCommentedReviews(): void {
 }
 
 export function clearReviewStatus(issueId: string): void {
+  // Terminal lifecycle owns removal of the UAT feedback dedup entry. The relay
+  // stays dynamically imported to preserve the Node ESM boot graph.
+  void clearUatFailureAnchorHostSide(issueId);
   try {
     dbDelete(issueId);
   } catch (err) {
