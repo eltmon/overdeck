@@ -44,4 +44,4 @@
 1518 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3544
 1008 src/lib/cloister/review-agent.ts # PAN-3549
 3571 src/lib/cloister/deacon.ts # PAN-3550
-1039 src/dashboard/server/routes/workspaces/workspace-data.ts # PAN-3362
+1058 src/dashboard/server/routes/workspaces/workspace-data.ts # PAN-3362

@@ -38,7 +38,8 @@ import {
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
-import { listOverdeckAgentStatesSync } from '../../../../lib/overdeck/agent-state-sync.js';
+import { listOverdeckAgentStatesByIssueSync } from '../../../../lib/overdeck/agent-state-sync.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
 import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
@@ -142,16 +143,33 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
  * obviously-fake FIX-1 UAT fixture (PAN-3362) has a persisted work-agent
  * `branch` (written through the canonical agent-state write door) but no
  * on-disk checkout to shell against, so report that instead of nothing.
+ *
+ * Pure selection over an already issue-scoped agent list — the caller fetches
+ * that list through listOverdeckAgentStatesByIssueSync()'s `agents_issue_idx`
+ * lookup rather than decoding the whole table (review finding, PAN-3362 UAT
+ * cycle 3).
  */
-export function getPersistedBranchFallback(issueId: string): {
+export function getPersistedBranchFallback(issueAgents: AgentState[]): {
   branch: string;
   uncommittedFiles: number;
   latestCommit: string;
 } | null {
-  const workAgent = listOverdeckAgentStatesSync().find(
-    (a) => a.issueId.toUpperCase() === issueId.toUpperCase() && a.role === 'work' && a.branch,
-  );
+  const workAgent = issueAgents.find((a) => a.role === 'work' && a.branch);
   return workAgent?.branch ? { branch: workAgent.branch, uncommittedFiles: 0, latestCommit: '' } : null;
+}
+
+/**
+ * Async wrapper around the issue-scoped, indexed agent lookup so the branch
+ * fallback composes with the route's other Promise.all-based I/O instead of
+ * running as a separate blocking call (review finding, PAN-3362 UAT cycle 3).
+ */
+async function getPersistedBranchFallbackAsync(issueId: string): Promise<{
+  branch: string;
+  uncommittedFiles: number;
+  latestCommit: string;
+} | null> {
+  const issueAgents = listOverdeckAgentStatesByIssueSync(issueId);
+  return getPersistedBranchFallback(issueAgents);
 }
 async function getIndexStats(workspacePath: string): Promise<{
   fileCount?: number;
@@ -622,14 +640,15 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [shellGit, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
+        const [shellGit, repoGit, containers, stackHealth, mrUrl, branchFallback] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
+          getPersistedBranchFallbackAsync(issueId),
         ]));
-        const git = shellGit ?? getPersistedBranchFallback(issueId);
+        const git = shellGit ?? branchFallback;
         const sessionNames = yield* listSessionNames();
         const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 

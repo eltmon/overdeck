@@ -186,6 +186,37 @@ export function pruneAgentsForReadSource(
   return { agentsById: nextAgentsById, prunedCount };
 }
 
+/**
+ * Prunes review-status entries for closed issues on every snapshot request —
+ * not just at boot (review finding, PAN-3362 UAT cycle 3). mergeDbOnlyReviewStatuses()
+ * can hydrate a review_status row for an issue reconstructCacheAuto() never
+ * covered (e.g. the FIX-1 UAT fixture, which has no per-issue record). If
+ * that issue is later closed, close-out deletes the DB row but emits no
+ * read-model removal event, so the in-memory snapshot would otherwise keep
+ * showing it as reviewing/ready-to-merge indefinitely. Reusing
+ * getClosedIssueIdsForReadSource() here — the same live, per-request signal
+ * pruneAgentsForReadSource() already uses — means a mid-session close is
+ * caught on the very next snapshot, not only after a restart.
+ */
+export function pruneReviewStatusesForReadSource(
+  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>,
+  issues: unknown[],
+): { reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>; prunedCount: number } {
+  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
+  const nextReviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
+  let prunedCount = 0;
+
+  for (const [issueId, status] of Object.entries(reviewStatusByIssueId)) {
+    if (closedIssueIds.has(issueId.toUpperCase())) {
+      prunedCount++;
+      continue;
+    }
+    nextReviewStatusByIssueId[issueId] = status;
+  }
+
+  return { reviewStatusByIssueId: nextReviewStatusByIssueId, prunedCount };
+}
+
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
@@ -510,6 +541,12 @@ export const ReadModelServiceLive = Layer.effect(
       if (pruned.prunedCount > 0) {
         state = { ...state, agentsById: pruned.agentsById };
         console.log(`[ReadModel] Pruned ${pruned.prunedCount} stale agent${pruned.prunedCount === 1 ? '' : 's'} from read source`);
+      }
+
+      const prunedReviewStatuses = pruneReviewStatusesForReadSource(state.reviewStatusByIssueId, state.issuesRaw);
+      if (prunedReviewStatuses.prunedCount > 0) {
+        state = { ...state, reviewStatusByIssueId: prunedReviewStatuses.reviewStatusByIssueId };
+        console.log(`[ReadModel] Pruned ${prunedReviewStatuses.prunedCount} stale review status${prunedReviewStatuses.prunedCount === 1 ? '' : 'es'} from read source`);
       }
 
       return buildSnapshot();
