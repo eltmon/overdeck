@@ -245,7 +245,7 @@
     "recordedAt": "2026-08-06T07:39:46.028Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T08:33:36.741Z",
+  "updated": "2026-08-06T10:05:33.352Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
@@ -256,7 +256,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-06T07:44:50.638Z",
     "updatedAt": "2026-08-06T08:33:36.657Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: assertContainerEnv now requires real container-runtime evidence (/.dockerenv or /run/.containerenv), not just the caller-controlled OVERDECK_DISABLE_DEACON/CONTAINER_MODE env flags, closing the NonGoal-4 host-write path the requirements reviewer identified.",
     "testNotes": "Ran from workspace feature-pan-3362 at HEAD c36f8d4693 (verified pwd/branch before every command; working tree clean). Gates per projects.yaml panopticon-cli.quality_gates. install: bun install --frozen-lockfile clean, no changes. typecheck: npm run typecheck clean (root tsc + hooks + evals + dashboard-types guard 47 known/0 new + frontend-types guard 0 known/0 new). frontend-typecheck: npx tsc --noEmit in src/dashboard/frontend clean. lint: npm run lint exit 0 (skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all passed; only pre-existing unrelated rolldown warnings in src/lib/acp/runtime-model.d.ts and two ineffective-dynamic-import notices). build: npm run build exit 0, dist-externals guard passed. server-bundle: npm run build:dashboard:server:bundle exit 0. test (changed-base gate, CHANGED_BASE=merge-base with origin/main = ada230bf73, root+frontend run concurrently per projects.yaml): root 589 test files passed/2 skipped (5859 tests passed/20 skipped), frontend 309 files/3032 tests passed, combined exit 0. All automated gates green.",
