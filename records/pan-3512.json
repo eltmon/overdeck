@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:04:45.896Z",
+  "updated": "2026-08-06T21:08:02.588Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,16 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "migrate-unsignaled": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1943497,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:04:45.896Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2498,6 +2490,17 @@
         "outcome": "completed",
         "reason": "Both terminal restores (completed-review after coordinator exit; orphaned-reviewing snapshot) now route through recordReviewVerdict with writer 'orphan-restore' via a new orphan-restore-verdict.ts adapter; stuck/retry/test fields carried as extra. 7 tests.",
         "releasedAt": "2026-08-06T21:04:42.894Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1943497,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:04:45.896Z",
+        "itemId": "migrate-unsignaled",
+        "outcome": "completed",
+        "reason": "Both auto-completes (alive-unresponsive, dead-session) now route through recordReviewVerdict with writer 'unsignaled-recovery'. reconcileUnappliedReviewVerdicts already converged via convergeRowFromVerdictOfRecord on main; the :82 write is a non-terminal reset to pending, out of scope. 3 tests.",
+        "releasedAt": "2026-08-06T21:08:02.588Z"
       }
     ],
     "statusReasons": {
@@ -2540,6 +2543,10 @@
       "migrate-orphan-restore": {
         "reason": "Both terminal restores (completed-review after coordinator exit; orphaned-reviewing snapshot) now route through recordReviewVerdict with writer 'orphan-restore' via a new orphan-restore-verdict.ts adapter; stuck/retry/test fields carried as extra. 7 tests.",
         "updatedAt": "2026-08-06T21:04:42.894Z"
+      },
+      "migrate-unsignaled": {
+        "reason": "Both auto-completes (alive-unresponsive, dead-session) now route through recordReviewVerdict with writer 'unsignaled-recovery'. reconcileUnappliedReviewVerdicts already converged via convergeRowFromVerdictOfRecord on main; the :82 write is a non-terminal reset to pending, out of scope. 3 tests.",
+        "updatedAt": "2026-08-06T21:08:02.588Z"
       }
     }
   },
@@ -2588,7 +2595,10 @@
     "migrate-orphan-restore.ac2": "completed",
     "migrate-orphan-restore.ac3": "completed",
     "migrate-orphan-restore.ac4": "completed",
-    "migrate-unsignaled": "running"
+    "migrate-unsignaled": "completed",
+    "migrate-unsignaled.ac1": "completed",
+    "migrate-unsignaled.ac2": "completed",
+    "migrate-unsignaled.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
