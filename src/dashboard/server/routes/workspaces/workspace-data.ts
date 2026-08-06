@@ -640,15 +640,18 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [shellGit, repoGit, containers, stackHealth, mrUrl, branchFallback] = yield* Effect.promise(() => Promise.all([
+        const [shellGit, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
-          getPersistedBranchFallbackAsync(issueId),
         ]));
-        const git = shellGit ?? branchFallback;
+        // The issue-scoped DB read only runs when Git inspection actually
+        // found nothing — every request with a real .git checkout skips it
+        // entirely (review finding, PAN-3362 UAT cycle 4: it previously ran
+        // unconditionally inside the Promise.all above, on every request).
+        const git = shellGit ?? (yield* Effect.promise(() => getPersistedBranchFallbackAsync(issueId)));
         const sessionNames = yield* listSessionNames();
         const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 
