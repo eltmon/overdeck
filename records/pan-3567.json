@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:57:04.418Z",
+  "updated": "2026-08-06T16:58:26.436Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "extract-container-guard": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2421921,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:57:04.418Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Yielded test feedback writes directly and converted typed failures or defects into the existing non-fatal log path.",
         "releasedAt": "2026-08-06T16:56:56.998Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2421921,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:57:04.418Z",
+        "itemId": "extract-container-guard",
+        "outcome": "completed",
+        "reason": "Extracted a direct Effect-based container guard that returns fail-closed 409 or 500 verdicts before backups or deletion.",
+        "releasedAt": "2026-08-06T16:58:26.436Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "fix-test-feedback-effect": {
         "reason": "Yielded test feedback writes directly and converted typed failures or defects into the existing non-fatal log path.",
         "updatedAt": "2026-08-06T16:56:56.998Z"
+      },
+      "extract-container-guard": {
+        "reason": "Extracted a direct Effect-based container guard that returns fail-closed 409 or 500 verdicts before backups or deletion.",
+        "updatedAt": "2026-08-06T16:58:26.436Z"
       }
     }
   },
@@ -150,6 +157,11 @@
     "fix-test-feedback-effect.ac2": "completed",
     "fix-test-feedback-effect.ac3": "completed",
     "fix-test-feedback-effect.ac4": "completed",
-    "extract-container-guard": "running"
+    "extract-container-guard": "completed",
+    "extract-container-guard.ac1": "completed",
+    "extract-container-guard.ac2": "completed",
+    "extract-container-guard.ac3": "completed",
+    "extract-container-guard.ac4": "completed",
+    "extract-container-guard.ac5": "completed"
   }
 }
