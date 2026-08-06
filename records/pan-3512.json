@@ -902,6 +902,11 @@
       "reason": "feedback",
       "note": "[2026-08-06T21:45Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-06T21:45:19.483Z"
+    },
+    {
+      "timestamp": "2026-08-06T22:07:34.530Z",
+      "reason": "end",
+      "note": "Anomalies first: the core deliverable had ALREADY landed on main via strike commit fd48e3af39; my branch carried a stale, non-compiling duplicate of the verdict door and was 196 commits behind. Reconciled by merging origin/main and resolving all 3 conflicts in main's favor, which superseded the duplicate and dissolved the 8 blocking findings from the earlier cycle. Four items (quick-signal, coordinator, docs, door/events/guard) are closed citing main, not new code from me. An unattributed main-merge (7347e94ded) appeared mid-work; not investigated, but all final gates ran on top of it and are green. Two intermediate full-suite runs showed failures that were contention from my own overlapping background npm test, not regressions -- the clean run is exit 0, 13468 passed, 0 failed. Delta actually implemented: fallback convoy-parent kill is now conditional on the verdict landing (the PAN-1577 failure shape); both terminal orphan-restore writes routed through the door via a new orphan-restore-verdict.ts adapter carrying stuck/retry fields as extra; both unsignaled-recovery auto-completes migrated; the review-infrastructure bypass migrated (site had drifted :1557 -> :1560); stale head-anchor write-site manifest entry removed. Cycle-3 review finding fixed at the door rather than the caller: input.extra was spread AFTER the fresh-head test-gate reset, so an orphan restore's historical passed test result could overwrite it and make a newer reviewed head look verified with no new test run -- the exact merge-gate admission failure this door exists to prevent. The re-gate now lands last; added the regression the reviewer asked for. Outstanding by nature: AC #5 (production proof on PAN-1577's next live verdict) is a post-merge observation this branch cannot satisfy; the cycle-3 requirements reviewer raised no blocker on it. All 12 plan items terminal, typecheck/lint/full suite green, all file-size ceilings held with no allowlist change. Re-review was already requested via pan review request before this signal."
     }
   ],
   "feedback": [
@@ -969,7 +974,7 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:07:29.661Z",
+  "updated": "2026-08-06T22:07:34.584Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -979,7 +984,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:07:29.659Z",
+    "updatedAt": "2026-08-06T22:07:34.527Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: the test-gate re-gate now lands after caller extras in the verdict write door, so an orphan restore's historical passed test result can no longer overwrite the fresh-head reset; added the regression the reviewer asked for. Also completed the remaining verdict-door migrations (fallback kill-conditional, orphan-restore, unsignaled auto-completes, infra-bypass).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
@@ -1168,7 +1173,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.4165137,
-        "pricingAsOf": "2026-08-06T22:07:26.977Z"
+        "pricingAsOf": "2026-08-06T22:07:34.554Z"
       }
     },
     "merges": [
