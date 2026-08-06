@@ -414,10 +414,10 @@ export function ConversationRow({
                 <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
               </>
             )}
+            <span className={styles.conversationMetaSep} aria-hidden>·</span>
+            <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
             {conv.model && (
               <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
                 <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
               </>

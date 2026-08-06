@@ -31,6 +31,16 @@ vi.mock('../../../../src/lib/agents/agent-state.js', async () => {
   };
 });
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn((path: Parameters<typeof actual.existsSync>[0]) => (
+      path === '/tmp/workspace' || actual.existsSync(path)
+    )),
+  };
+});
+
 vi.mock('../../../../src/lib/agents/spawn-prep.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../src/lib/agents/spawn-prep.js')>(),
   // spawn.ts calls the prepareWorkspaceForAgentSpawn wrapper (clearStaleClosedOutBeforeSpawn +

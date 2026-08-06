@@ -19,7 +19,11 @@ import {
   evaluateIncompletePlanItems,
 } from '../done-preflight.js';
 
-function planWithStatus(status: 'pending' | 'completed'): XBriefDocument {
+function planWithStatus(
+  status: 'pending' | 'completed' | 'cancelled',
+  childStatus?: 'pending' | 'completed',
+  childId = 'ac1',
+): XBriefDocument {
   return {
     xBRIEFInfo: {
       version: '0.8',
@@ -41,6 +45,14 @@ function planWithStatus(status: 'pending' | 'completed'): XBriefDocument {
         title: 'First item',
         status,
         created: '2026-08-01T00:00:00.000Z',
+        ...(childStatus ? {
+          items: [{
+            id: childId,
+            title: 'Acceptance criterion',
+            status: childStatus,
+            metadata: { kind: 'acceptance_criterion' },
+          }],
+        } : {}),
       }],
       edges: [],
     },
@@ -88,6 +100,17 @@ describe('plan checklist evaluation', () => {
     }];
 
     expect(evaluateIncompletePlanItems(doc)).toEqual([]);
+  });
+
+  it('ignores pending acceptance criteria under a cancelled item', () => {
+    expect(evaluateIncompletePlanItems(planWithStatus('cancelled', 'pending'))).toEqual([]);
+  });
+
+  it('still reports pending acceptance criteria under a completed item without duplicating qualified IDs', () => {
+    expect(evaluateIncompletePlanItems(planWithStatus('completed', 'pending', 'item-one.ac1'))).toEqual([
+      '  Incomplete plan items (1):',
+      '    - item-one.ac1 Acceptance criterion (pending)',
+    ]);
   });
 
   it('reports a missing plan consistently through the shared evaluator', () => {
