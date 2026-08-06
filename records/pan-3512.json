@@ -942,9 +942,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T22:13:07.122Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T22:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T22:15:31.831Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T22:15:31Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3512\n\n# Review Synthesis — PAN-3512 — 2026-08-06T18:14:55-04:00\n\n## Verdict: CHANGES REQUESTED — fresh-head orphan restores can reinstate a historical passed or skipped test gate when the current row is pending\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/context.json\n- Branch: feature/pan-3512\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512\n- HEAD reviewed: a63150255d34ef88c774450cb0703e2d84a27b6e\n- Cycle number: 4\n- Prior cycle SHA: 8eed74d4c4eb476878f487d1e945085543845cac\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness, requirements] Historical test status bypasses re-gating when the current row is pending — `src/lib/cloister/review-verdict-writer.ts:230`\n\nThe revised ordering prevents `input.extra` from overwriting a reset only when the existing row has `testStatus: 'passed'` or `'skipped'`. The orphan-restore adapter still forwards a historical terminal test result through `extra`, and a row already marked `pending` makes `testGateReset` false. The update then persists that historical `passed` or `skipped` status against the fresh evidence head, allowing it to advance without a new test run.\n\nThis finding is PR-scoped and cycle-scoped: `src/lib/cloister/review-verdict-writer.ts` changed after the prior reviewed SHA. Treat terminal `input.extra.testStatus` values as re-gateable whenever evidence differs from the row anchor, and add a regression that starts with `status.testStatus: 'pending'`, supplies `extra.testStatus: 'passed'` or `'skipped'`, and asserts the persisted update remains pending with re-gate notes.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3512 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
@@ -1001,22 +1014,21 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:13:11.738Z",
+  "updated": "2026-08-06T22:15:31.832Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:13:11.472Z",
-    "reviewNotes": "Agent re-review request (1/25): Addressed feedback: the test-gate re-gate now lands after caller extras in the verdict write door, so an orphan restore's historical passed test result can no longer overwrite the fresh-head reset; added the regression the reviewer asked for. Also completed the remaining verdict-door migrations (fallback kill-conditional, orphan-restore, unsignaled auto-completes, infra-bypass).",
+    "updatedAt": "2026-08-06T22:15:31.171Z",
+    "reviewNotes": "Fresh-head orphan restores can reinstate historical passed or skipped test status when the row is pending",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
-    "reviewRequestedAt": "2026-08-06T22:07:29.659Z",
     "reviewSpawnedAt": "2026-08-06T22:12:44.980Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -1093,9 +1105,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 4693863,
-            "output": 53143,
-            "cacheRead": 9410560,
+            "input": 5570532,
+            "output": 62222,
+            "cacheRead": 15335936,
             "cacheWrite": 0
           }
         },
@@ -1186,9 +1198,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 7428118,
-          "output": 107202,
-          "cacheRead": 19432960,
+          "input": 8304787,
+          "output": 116281,
+          "cacheRead": 25358336,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1199,8 +1211,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 76.4042297,
-        "pricingAsOf": "2026-08-06T22:13:11.657Z"
+        "usd": 80.2134387,
+        "pricingAsOf": "2026-08-06T22:15:31.187Z"
       }
     },
     "merges": [
