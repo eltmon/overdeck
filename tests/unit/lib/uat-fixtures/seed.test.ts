@@ -47,7 +47,7 @@ describe('seedUatFixturesLocal', () => {
   it('populates 5 agent rows, 1 review_status row with PR fields, and readable activity events (AC-1)', async () => {
     const { seed, agentStateSync, reviewStatusSync, cacheServiceModule } = await importSeedModules();
 
-    const report = await seed.seedUatFixturesLocal();
+    const report = await seed.seedUatFixturesLocal({ detectContainer: () => true });
     expect(report.agentsWritten).toBe(5);
     expect(report.activityEntriesWritten).toBe(4);
 
@@ -70,19 +70,31 @@ describe('seedUatFixturesLocal', () => {
     }
   });
 
-  it('rejects without container env markers, with no override (AC-2)', async () => {
+  it('rejects without container env markers, even with real container-runtime evidence (AC-2)', async () => {
     vi.stubEnv('OVERDECK_DISABLE_DEACON', undefined as unknown as string);
     vi.stubEnv('CONTAINER_MODE', undefined as unknown as string);
     const { seed } = await importSeedModules();
 
-    await expect(seed.seedUatFixturesLocal()).rejects.toThrow(/refuses to seed a non-container OVERDECK_HOME/);
+    await expect(seed.seedUatFixturesLocal({ detectContainer: () => true })).rejects.toThrow(
+      /refuses to seed outside a detected container runtime/,
+    );
+  });
+
+  it('rejects with a container env marker set but no real container-runtime evidence, with no production override (AC-2, review finding UAT cycle 2)', async () => {
+    // beforeEach already stubs OVERDECK_DISABLE_DEACON=1 — a caller-controlled
+    // env var alone must not be enough to pass the guard.
+    const { seed } = await importSeedModules();
+
+    await expect(seed.seedUatFixturesLocal({ detectContainer: () => false })).rejects.toThrow(
+      /refuses to seed outside a detected container runtime/,
+    );
   });
 
   it('is idempotent: a second run leaves identical row counts in agents, review_status, the issue cache, and activity history (AC-3)', async () => {
     const { seed, agentStateSync, reviewStatusSync, cacheServiceModule } = await importSeedModules();
 
-    await seed.seedUatFixturesLocal();
-    await seed.seedUatFixturesLocal();
+    await seed.seedUatFixturesLocal({ detectContainer: () => true });
+    await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
     const agents = agentStateSync.listOverdeckAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
     expect(agents).toHaveLength(5);
@@ -109,7 +121,7 @@ describe('seedUatFixturesLocal', () => {
     const { seed } = await importSeedModules();
     const { readPlanSync } = await import('../../../../src/lib/xbrief/io.js');
 
-    const report = await seed.seedUatFixturesLocal();
+    const report = await seed.seedUatFixturesLocal({ detectContainer: () => true });
     expect(report.planPath).toContain(join('uat-fixtures', 'repo', 'workspaces', 'feature-fix-1', '.overdeck'));
     expect(report.continuePath).toContain(join('uat-fixtures', 'repo', 'workspaces', 'feature-fix-1', '.overdeck'));
 
@@ -121,7 +133,7 @@ describe('seedUatFixturesLocal', () => {
     const { seed } = await importSeedModules();
     const { fixtureWorkspacePath } = await import('../../../../src/lib/uat-fixtures/fixture-data.js');
 
-    await seed.seedUatFixturesLocal();
+    await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
     const claudeMdPath = join(fixtureWorkspacePath(), 'CLAUDE.md');
     expect(existsSync(claudeMdPath)).toBe(true);

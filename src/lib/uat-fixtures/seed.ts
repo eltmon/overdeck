@@ -3,11 +3,13 @@
  *
  * Writes the FIX-1 fixture set (built by fixture-data.ts) into the
  * container-local OVERDECK_HOME through the canonical write doors — no raw
- * SQL. Always refuses to run outside a workspace container: seeding the host
- * dashboard or any non-container OVERDECK_HOME is an explicit NonGoal, so
- * there is no override (review finding, PAN-3362 cycle 1).
+ * SQL. Always refuses to run outside a real container runtime: seeding the
+ * host dashboard or any non-container OVERDECK_HOME is an explicit NonGoal,
+ * so there is no production override (review findings, PAN-3362 cycle 1 and
+ * UAT cycle 2) — the container check itself is injectable only for tests.
  */
 
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -41,18 +43,46 @@ export interface SeedReport {
 }
 
 /**
- * Refuses to seed outside a workspace container. Both env markers are set by
- * the container compose template (CONTAINER_MODE on frontend, OVERDECK_DISABLE_DEACON
- * on server) — see docs/WORKSPACE-CONTAINERS.md. No override: a real
- * OVERDECK_HOME must never receive fixture writes.
+ * True only when the process is actually running inside a container
+ * runtime — the same real signal `shouldRefuseHostDashboardPort()` in
+ * src/dashboard/server/identity.ts:86-89 uses, rather than an
+ * environment variable a host process could set by hand.
  */
-function assertContainerEnv(): void {
-  if (process.env.OVERDECK_DISABLE_DEACON === '1' || process.env.CONTAINER_MODE === '1') return;
+export function isRunningInContainer(): boolean {
+  return existsSync('/.dockerenv') || existsSync('/run/.containerenv');
+}
+
+/**
+ * Refuses to seed outside a real container runtime. OVERDECK_DISABLE_DEACON
+ * and CONTAINER_MODE are ordinary caller-controlled environment variables —
+ * proof of intent, not proof of isolation — so a host process that merely
+ * sets one of them by hand must still be rejected. Both markers remain a
+ * required defense-in-depth check alongside the real container-runtime
+ * check: the container compose template always sets one of them (see
+ * docs/WORKSPACE-CONTAINERS.md), so a genuine container satisfies both.
+ * No override in production: a real host OVERDECK_HOME must never receive
+ * fixture writes (review finding, PAN-3362 UAT cycle 2).
+ */
+function assertContainerEnv(detectContainer: () => boolean = isRunningInContainer): void {
+  const hasContainerEnvMarker =
+    process.env.OVERDECK_DISABLE_DEACON === '1' || process.env.CONTAINER_MODE === '1';
+  if (hasContainerEnvMarker && detectContainer()) return;
   throw new Error(
-    'seedUatFixturesLocal refuses to seed a non-container OVERDECK_HOME (neither ' +
-    'OVERDECK_DISABLE_DEACON=1 nor CONTAINER_MODE=1 is set in the environment). ' +
-    'Run this only inside a workspace container.',
+    'seedUatFixturesLocal refuses to seed outside a detected container runtime ' +
+    '(requires both a container env marker — OVERDECK_DISABLE_DEACON=1 or ' +
+    'CONTAINER_MODE=1 — and real container-runtime evidence — /.dockerenv or ' +
+    '/run/.containerenv). Run this only inside a workspace container.',
   );
+}
+
+export interface SeedUatFixturesOptions {
+  /**
+   * Injectable override for the real container-runtime check, so tests can
+   * simulate running inside a container without a real /.dockerenv file.
+   * Production callers (the CLI) never pass this — defaults to the real
+   * isRunningInContainer() detection.
+   */
+  detectContainer?: () => boolean;
 }
 
 /**
@@ -60,8 +90,8 @@ function assertContainerEnv(): void {
  * canonical write doors. Idempotent: every write is an upsert, so re-running
  * leaves identical row counts in agents, review_status, and the issue cache.
  */
-export async function seedUatFixturesLocal(): Promise<SeedReport> {
-  assertContainerEnv();
+export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {}): Promise<SeedReport> {
+  assertContainerEnv(options.detectContainer);
 
   const home = getOverdeckHome();
   await mkdir(home, { recursive: true });
