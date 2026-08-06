@@ -355,21 +355,66 @@
     "recordedAt": "2026-08-06T09:11:11.873Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-06T09:11:11.874Z",
+  "updated": "2026-08-06T09:11:12.771Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-06T09:10:38.592Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-06T09:11:12.770Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewedAtCommit": "e00985f0004f6f0d2e6f4151594d1f2c6ff5c0fb",
     "lastVerifiedCommit": "b7b28e17342591fb7a70cb6f802b510c0407b8ea",
-    "reviewSpawnedAt": "2026-08-06T07:33:40.508Z"
+    "reviewSpawnedAt": "2026-08-06T07:33:40.508Z",
+    "reviewRequestedAt": "2026-08-06T09:11:12.770Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+        "src/lib/pan-dir/__tests__/task-door.test.ts",
+        "src/lib/pan-dir/task-door.ts",
+        "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+        "src/lib/work/done-preflight.ts",
+        "tests/unit/lib/agents/spawn-flywheel-provenance.test.ts",
+        "tests/unit/lib/harness-resolve.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/pan-dir/__tests__/task-door.test.ts",
+        "src/lib/pan-dir/task-door.ts",
+        "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+        "src/lib/work/done-preflight.ts",
+        "tests/unit/lib/agents/spawn-flywheel-provenance.test.ts",
+        "tests/unit/lib/harness-resolve.test.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "recordedAt": "2026-08-06T09:11:11.873Z"
+    }
   },
   "closeOut": {
     "usage": {
