@@ -41,3 +41,4 @@
 1319 src/lib/tmux.ts # PAN-3539
 1518 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3544
 1008 src/lib/cloister/review-agent.ts # PAN-3549
+3571 src/lib/cloister/deacon.ts # PAN-3550
