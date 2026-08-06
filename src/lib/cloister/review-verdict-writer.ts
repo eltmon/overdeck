@@ -23,14 +23,13 @@ const execFileAsync = promisify(execFile);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type VerdictWriter = 'coordinator' | 'fallback' | 'quick-signal' | 'orphan-restore' | 'sweeper-restore' | 'unsignaled-recovery' | 'infra-bypass';
+export type VerdictWriter = 'coordinator' | 'fallback' | 'quick-signal' | 'orphan-restore' | 'sweeper-restore' | 'unsignaled-recovery' | 'infra-bypass' | 'dispatch-converge';
 
 export type ReviewVerdict = 'passed' | 'blocked' | 'failed';
 
 export interface VerdictInput {
   verdict: ReviewVerdict;
   notes?: string;
-  reviewerVerdicts?: ReviewStatus['reviewerVerdicts'];
   evidenceHead?: HeadAnchor;
   extra?: Record<string, unknown>;
   runId?: string;
@@ -133,7 +132,6 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     setReviewStatusSync(issueId, {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     });
     return { landed: true, classification: 'no-evidence' };
@@ -150,22 +148,40 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
     return { landed: true, classification: 'no-evidence' };
   }
 
-  // Evidence heads equal: take the anchor-match path
+  // Evidence heads equal: land the verdict without re-gating the same test result.
   if (input.evidenceHead === status.lastVerifiedCommit) {
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
+      reviewedAtCommit: input.evidenceHead as HeadAnchor,
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
+
+    const eventStore = getCloisterEventStore();
+    if (eventStore) {
+      eventStore.append({
+        type: 'review.verdict_dispatched' as const,
+        timestamp: new Date().toISOString(),
+        payload: {
+          issueId,
+          workspaceId: workspacePath ? workspacePath.split('/').pop() : undefined,
+          writer: input.writer,
+          verdict: input.verdict,
+          evidenceHead: input.evidenceHead as string,
+          rowHead: status.lastVerifiedCommit as string,
+          classification: 'anchor-match',
+          testGateReset: false,
+        },
+      });
+    }
+
     return { landed: true, classification: 'anchor-match' };
   }
 
@@ -211,12 +227,12 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
   }
 
   // Fresh or indeterminate: land the verdict
-  const testGateReset = status.testStatus === 'passed' || status.testStatus === 'skipped';
+  const testGateReset = (status.testStatus === 'passed' || status.testStatus === 'skipped')
+    && input.evidenceHead !== status.lastVerifiedCommit;
   const update: ReviewStatusUpdate = {
     reviewStatus: input.verdict,
     reviewNotes: input.notes,
     ...(input.evidenceHead ? { reviewedAtCommit: input.evidenceHead as HeadAnchor } : {}),
-    ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
     ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
     ...(input.extra ? { ...input.extra } : {}),
   };

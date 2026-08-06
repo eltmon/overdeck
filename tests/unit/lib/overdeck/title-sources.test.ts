@@ -92,6 +92,7 @@ describe('TitleSource schema', () => {
       name: 'schema-test',
       cwd: '/tmp',
       issueId: null,
+      projectKey: null,
       harness: null,
       model: null,
       effort: null,

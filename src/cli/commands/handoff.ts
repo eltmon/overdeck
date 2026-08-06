@@ -11,6 +11,7 @@ interface HandoffOptions {
   model?: string;
   harness?: string;
   cwd?: string;
+  project?: string;
   issue?: string;
   author?: string;
   authorModel?: string;
@@ -109,6 +110,7 @@ export async function handoffCommand(
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
       cwd: options.cwd,
+      projectKey: options.project,
       issueId,
       forkMode: 'handoff',
       focus,
@@ -143,6 +145,7 @@ export async function handoffCommand(
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
+  if (newConv.projectKey) console.log(chalk.gray(`  Project: ${newConv.projectKey}`));
   console.log(chalk.gray(`  Issue: ${newConv.issueId ?? 'none'}${options.issue ? ' (from --issue)' : ''}`));
   if (newConv.handoffDocPath) {
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));

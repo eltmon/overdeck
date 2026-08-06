@@ -165,12 +165,12 @@ function mockSpawnDependencies(): void {
   vi.doMock('../cloister/verdict-preservation.js', () => ({
     shouldPreservePipelineVerdicts: shouldPreservePipelineVerdictsMock,
   }));
-  vi.doMock('../review-status.js', async (importOriginal) => ({
-    ...((await importOriginal()) as typeof import('../review-status.js')),
-    resetPipelineVerdictsForWorkStartSync: resetPipelineVerdictsForWorkStartMock,
-    setReviewStatusSync: setReviewStatusMock,
+  vi.doMock('../cloister/work-start-verdicts.js', () => ({
+    refreshWorkStartReviewedAnchor: (issueId: string, anchor: string) =>
+      setReviewStatusMock(issueId, { reviewedAtCommit: anchor }),
+    resetWorkStartPipelineVerdicts: resetPipelineVerdictsForWorkStartMock,
   }));
-  vi.doMock('../cloister/merge-agent.js', () => ({
+  vi.doMock('../cloister/post-merge-state.js', () => ({
     resetPostMergeState: resetPostMergeStateMock,
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({

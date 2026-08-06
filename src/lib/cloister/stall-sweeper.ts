@@ -24,7 +24,7 @@
  * visible (PAN-3489 wires those events into the God View).
  *
  * Guardrails:
- *  - one recommendation per row per cooldown window; SWEEP_MAX_ACTIONS_PER_ROW
+ *  - one recommendation per row per cooldown window; SWEEP_MAX_RECOMMENDATIONS_PER_ROW
  *    per park episode, then escalate-only;
  *  - a global recommendation budget per scan so a graveyard census can't
  *    flood the feed at once;
@@ -53,9 +53,9 @@ import {
 // ─── Policy constants ─────────────────────────────────────────────────────────
 
 /** Max recommendations per park episode; beyond this the row is escalate-only. */
-export const SWEEP_MAX_ACTIONS_PER_ROW = 8;
+export const SWEEP_MAX_RECOMMENDATIONS_PER_ROW = 8;
 /** Max recommendations per patrol scan — a full graveyard surfaces over cycles, never in one burst. */
-export const SWEEP_MAX_ACTIONS_PER_SCAN = 4;
+export const SWEEP_MAX_RECOMMENDATIONS_PER_SCAN = 4;
 /** Operator-gated / exhausted rows re-surface to the operator this often (and stay hands-off otherwise). */
 export const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
 
@@ -85,7 +85,7 @@ export interface StallSweeperDeps {
 }
 
 interface ScanOutcome {
-  actions: string[];
+  recommendations: string[];
   escalations: string[];
 }
 
@@ -117,9 +117,9 @@ function defaultEmitActivity(entry: { level: ActivityLevel; issueId?: string; me
 // ─── Per-row helpers ──────────────────────────────────────────────────────────
 
 function coolingDown(state: StallSweeperRowState | null, orbit: ParkedOrbit, now: number): boolean {
-  if (!state?.lastActionAt) return false;
+  if (!state?.lastRecommendedAt) return false;
   const cooldown = ORBIT_COOLDOWN_MS[orbit] ?? 60 * 60_000;
-  return now - Date.parse(state.lastActionAt) < cooldown;
+  return now - Date.parse(state.lastRecommendedAt) < cooldown;
 }
 
 function dueForResurface(state: StallSweeperRowState | null, now: number): boolean {
@@ -127,21 +127,19 @@ function dueForResurface(state: StallSweeperRowState | null, now: number): boole
   return now - Date.parse(state.lastEscalatedAt) >= SWEEP_RESURFACE_TTL_MS;
 }
 
-function recordAction(issueId: string, orbit: ParkedOrbit, state: StallSweeperRowState | null, now: number): void {
+function recordRecommendation(issueId: string, orbit: ParkedOrbit, state: StallSweeperRowState | null, now: number): void {
   writeSweeperRowState(issueId, orbit, {
-    actionCount: (state?.actionCount ?? 0) + 1,
-    lastActionAt: new Date(now).toISOString(),
+    recommendationCount: (state?.recommendationCount ?? 0) + 1,
+    lastRecommendedAt: new Date(now).toISOString(),
     episodeStartedAt: state?.episodeStartedAt ?? new Date(now).toISOString(),
     ...(state?.lastEscalatedAt ? { lastEscalatedAt: state.lastEscalatedAt } : {}),
-    ...(state?.lastNudgedAt ? { lastNudgedAt: state.lastNudgedAt } : {}),
-    ...(state?.nudgedActivityAt ? { nudgedActivityAt: state.nudgedActivityAt } : {}),
   });
 }
 
 function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweeperRowState | null, now: number): void {
   writeSweeperRowState(issueId, orbit, {
-    actionCount: state?.actionCount ?? 0,
-    ...(state?.lastActionAt ? { lastActionAt: state.lastActionAt } : {}),
+    recommendationCount: state?.recommendationCount ?? 0,
+    ...(state?.lastRecommendedAt ? { lastRecommendedAt: state.lastRecommendedAt } : {}),
     episodeStartedAt: state?.episodeStartedAt ?? new Date(now).toISOString(),
     lastEscalatedAt: new Date(now).toISOString(),
   });
@@ -164,7 +162,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
 
   const rows = await resolveRows();
-  const outcome: ScanOutcome = { actions: [], escalations: [] };
+  const outcome: ScanOutcome = { recommendations: [], escalations: [] };
 
   // Population signature → sweep.scan fires only on CHANGE (a scan that finds
   // the same population is not news; a scan that finds a different one is).
@@ -183,7 +181,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 
   const severity = (row: ParkedRow) => PARKED_ORBIT_SEVERITY.indexOf(row.orbit);
   const work = [...rows].sort((a, b) => severity(a) - severity(b) || a.parkedAt.localeCompare(b.parkedAt));
-  let actionBudget = SWEEP_MAX_ACTIONS_PER_SCAN;
+  let recommendationBudget = SWEEP_MAX_RECOMMENDATIONS_PER_SCAN;
 
   for (const row of work) {
     const { issueId, orbit } = row;
@@ -201,30 +199,30 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     }
 
     if (coolingDown(state, orbit, now)) continue;
-    if ((state?.actionCount ?? 0) >= SWEEP_MAX_ACTIONS_PER_ROW) {
+    if ((state?.recommendationCount ?? 0) >= SWEEP_MAX_RECOMMENDATIONS_PER_ROW) {
       if (dueForResurface(state, now)) {
         recordEscalation(issueId, orbit, state, now);
-        emitEvent('sweep.escalated', { issueId, orbit, reason: `exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} sweep recommendations` });
-        emitActivity({ level: 'warn', issueId, message: `🧹 sweeper: ${issueId} (${orbit}) exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} recommendations — needs a human. ${row.parkReason}` });
+        emitEvent('sweep.escalated', { issueId, orbit, reason: `exhausted ${SWEEP_MAX_RECOMMENDATIONS_PER_ROW} sweep recommendations` });
+        emitActivity({ level: 'warn', issueId, message: `🧹 sweeper: ${issueId} (${orbit}) exhausted ${SWEEP_MAX_RECOMMENDATIONS_PER_ROW} recommendations — needs a human. ${row.parkReason}` });
         outcome.escalations.push(`${issueId} (${orbit}) exhausted → operator`);
       }
       continue;
     }
-    if (actionBudget <= 0) continue;
+    if (recommendationBudget <= 0) continue;
 
     const reported = reportRow(row, state, now, { readArtifact, isAgentLive, emitActivity, emitEvent }, outcome);
     if (reported) {
-      recordAction(issueId, orbit, state, now);
-      actionBudget--;
+      recordRecommendation(issueId, orbit, state, now);
+      recommendationBudget--;
     }
   }
 
-  return [...outcome.actions, ...outcome.escalations];
+  return [...outcome.recommendations, ...outcome.escalations];
 }
 
 // ─── Per-orbit recommendations ────────────────────────────────────────────────
 
-interface ReportActions {
+interface ReportDeps {
   readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
   isAgentLive: (agentId: string) => boolean;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
@@ -247,24 +245,24 @@ function reportRow(
   row: ParkedRow,
   state: StallSweeperRowState | null,
   now: number,
-  actions: ReportActions,
+  reporting: ReportDeps,
   outcome: ScanOutcome,
 ): boolean {
   const { issueId, orbit } = row;
-  const recurrence = state?.actionCount ?? 0;
+  const recurrence = state?.recommendationCount ?? 0;
   const substrateNote = recurrence >= 1
     ? ` This stall has recurred (${recurrence + 1} sweeps this episode) — that is a substrate bug: file why ${issueId} keeps parking here (flywheel substrate intake), don't just remedy the symptom.`
     : '';
   const recommend = (recommendation: string, evidence: Record<string, unknown> = {}) => {
-    actions.emitEvent('sweep.recommendation', { issueId, orbit, recommendation, recurring: recurrence >= 1, ...evidence });
-    actions.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper recommends: ${recommendation} — ${row.parkReason}.${substrateNote} ${NO_ACTION_TRAILER}` });
-    outcome.actions.push(`${issueId} (${orbit}) recommended: ${recommendation}`);
+    reporting.emitEvent('sweep.recommendation', { issueId, orbit, recommendation, recurring: recurrence >= 1, ...evidence });
+    reporting.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper recommends: ${recommendation} — ${row.parkReason}.${substrateNote} ${NO_ACTION_TRAILER}` });
+    outcome.recommendations.push(`${issueId} (${orbit}) recommended: ${recommendation}`);
   };
 
   switch (orbit) {
     case 'zombie-session': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      const live = actions.isAgentLive(agentId);
+      const live = reporting.isAgentLive(agentId);
       recommend(`reap zombie session ${agentId} via the existing door (pan close ${issueId} owns merged/closed teardown; the reaper is the backstop)`, { agentId, sessionCurrentlyLive: live });
       return true;
     }
@@ -280,11 +278,6 @@ function reportRow(
       return true;
     }
 
-    case 'conflicts': {
-      recommend(`resolve ${issueId}'s branch conflicts via pan sync-main ${issueId}, then pan done ${issueId}`);
-      return true;
-    }
-
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
 
@@ -292,7 +285,7 @@ function reportRow(
       // from re-driving work over a review that has already finished. The
       // sweeper remains observability-only and cannot promote that evidence into
       // a terminal review status.
-      const artifact = actions.readArtifact(issueId);
+      const artifact = reporting.readArtifact(issueId);
       if (artifact?.verdict === 'passed') {
         recommend(
           `preserve ${issueId}'s passed review evidence from run ${artifact.runId} and await pan admin specialists done review; do not re-dispatch or resume rework`,
@@ -316,8 +309,8 @@ function reportRow(
       // Unknown / dead-end stuck flavors are operator-owned — re-surface on TTL.
       if (dueForResurface(state, now)) {
         recordEscalation(issueId, orbit, state, now);
-        actions.emitEvent('sweep.escalated', { issueId, orbit, reason: row.parkReason });
-        actions.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper re-surface: ${issueId} remains stuck (${reason || 'unknown'}) — ${row.parkReason}` });
+        reporting.emitEvent('sweep.escalated', { issueId, orbit, reason: row.parkReason });
+        reporting.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper re-surface: ${issueId} remains stuck (${reason || 'unknown'}) — ${row.parkReason}` });
         outcome.escalations.push(`${issueId} (stuck:${reason || 'unknown'}) re-surfaced`);
       }
       return false;
@@ -326,23 +319,15 @@ function reportRow(
     case 'idle-running': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
       const lastActivity = typeof row.details?.idleMinutes === 'number' ? row.details.idleMinutes : 0;
-      const graceMs = IDLE_RECOMMEND_GRACE_MS;
-      if (state?.lastNudgedAt && now - Date.parse(state.lastNudgedAt) < graceMs) return false;
-      const previouslyReported = !!state?.lastNudgedAt;
-      writeSweeperRowState(issueId, orbit, {
-        actionCount: (state?.actionCount ?? 0) + 1,
-        lastActionAt: new Date(now).toISOString(),
-        episodeStartedAt: state?.episodeStartedAt ?? new Date(now).toISOString(),
-        lastNudgedAt: new Date(now).toISOString(),
-        ...(state?.nudgedActivityAt ? { nudgedActivityAt: state.nudgedActivityAt } : {}),
-      });
+      if (state?.lastRecommendedAt && now - Date.parse(state.lastRecommendedAt) < IDLE_RECOMMEND_GRACE_MS) return false;
+      const previouslyRecommended = !!state?.lastRecommendedAt;
       recommend(
-        previouslyReported
+        previouslyRecommended
           ? `stop or resume ${agentId} via pan kill ${agentId} / pan resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
           : `nudge ${agentId} via pan tell ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
-        { agentId, idleMinutes: lastActivity, live: actions.isAgentLive(agentId) },
+        { agentId, idleMinutes: lastActivity, live: reporting.isAgentLive(agentId) },
       );
-      return false; // the recommendation records its own row state above
+      return true;
     }
 
     default:

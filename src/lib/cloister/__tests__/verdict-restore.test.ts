@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  convergeRowFromVerdictOfRecord,
   observeActiveReviewArtifact,
   restoreWouldTripHeadGuard,
+  type VerdictOfRecordConvergenceDeps,
 } from '../verdict-restore.js';
 
 const artifact = {
@@ -58,6 +60,82 @@ describe('observeActiveReviewArtifact', () => {
 
     expect(result).toMatchObject({ outcome: 'observed', artifact });
     expect(observationDeps.emitEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('convergeRowFromVerdictOfRecord', () => {
+  function convergenceDeps(overrides: Partial<VerdictOfRecordConvergenceDeps> = {}) {
+    return {
+      readArtifact: vi.fn(async () => artifact),
+      snapshotWorkspaceHeads: vi.fn(async () => artifact.headSha),
+      recordVerdict: vi.fn(async () => ({ landed: true as const, classification: 'anchor-match' as const })),
+      ...overrides,
+    };
+  }
+
+  it('records a fresh active-run artifact at the workspace head through the verdict write door', async () => {
+    const convergenceDepsForTest = convergenceDeps();
+
+    const result = await convergeRowFromVerdictOfRecord('PAN-1', {
+      runId: artifact.runId,
+      workspacePath: '/workspace',
+      writer: 'dispatch-converge',
+      deps: convergenceDepsForTest,
+    });
+
+    expect(result).toMatchObject({ converged: true, artifact });
+    expect(convergenceDepsForTest.recordVerdict).toHaveBeenCalledWith('PAN-1', {
+      verdict: 'passed',
+      notes: 'all checks passed',
+      evidenceHead: artifact.headSha,
+      runId: artifact.runId,
+      writer: 'dispatch-converge',
+    });
+  });
+
+  it('does not converge an artifact older than the freshness bound', async () => {
+    const convergenceDepsForTest = convergenceDeps({
+      readArtifact: vi.fn(async () => ({
+        ...artifact,
+        mtimeMs: Date.now() - (31 * 60_000),
+      })),
+    });
+
+    await expect(convergeRowFromVerdictOfRecord('PAN-1', {
+      runId: artifact.runId,
+      workspacePath: '/workspace',
+      writer: 'dispatch-converge',
+      deps: convergenceDepsForTest,
+    })).resolves.toEqual({ converged: false });
+    expect(convergenceDepsForTest.snapshotWorkspaceHeads).not.toHaveBeenCalled();
+    expect(convergenceDepsForTest.recordVerdict).not.toHaveBeenCalled();
+  });
+
+  it('does not converge an artifact whose head differs from the workspace head', async () => {
+    const convergenceDepsForTest = convergenceDeps({
+      snapshotWorkspaceHeads: vi.fn(async () => 'b'.repeat(40)),
+    });
+
+    await expect(convergeRowFromVerdictOfRecord('PAN-1', {
+      runId: artifact.runId,
+      workspacePath: '/workspace',
+      writer: 'dispatch-converge',
+      deps: convergenceDepsForTest,
+    })).resolves.toEqual({ converged: false });
+    expect(convergenceDepsForTest.recordVerdict).not.toHaveBeenCalled();
+  });
+
+  it('does not converge when the write door rejects stale evidence', async () => {
+    const convergenceDepsForTest = convergenceDeps({
+      recordVerdict: vi.fn(async () => ({ landed: false as const, reason: 'stale-evidence-head' })),
+    });
+
+    await expect(convergeRowFromVerdictOfRecord('PAN-1', {
+      runId: artifact.runId,
+      workspacePath: '/workspace',
+      writer: 'dispatch-converge',
+      deps: convergenceDepsForTest,
+    })).resolves.toEqual({ converged: false });
   });
 });
 

@@ -60,7 +60,19 @@ function resolveWorkspacePath(issueId: string, workspacePath?: string): string |
 
 async function readHeadEvidenceAsync(runDir: string): Promise<string | undefined> {
   try {
-    const context = JSON.parse(await readFile(join(runDir, 'context.json'), 'utf-8')) as { headSha?: unknown };
+    const context = JSON.parse(await readFile(join(runDir, 'context.json'), 'utf-8')) as {
+      headSha?: unknown;
+      repos?: Array<{ repoKey?: unknown; headSha?: unknown }>;
+    };
+    if (context.repos) {
+      const heads = context.repos.map(({ repoKey, headSha }) => (
+        typeof repoKey === 'string' && repoKey.length > 0 && typeof headSha === 'string' && headSha.length > 0
+          ? `${repoKey}@${headSha}`
+          : null
+      ));
+      if (heads.length > 0 && heads.every((head): head is string => head !== null)) return heads.join(' ');
+      return undefined;
+    }
     if (typeof context.headSha === 'string' && context.headSha.length > 0) return context.headSha;
   } catch { /* head is optional evidence (quick mode often omits context.json) */ }
   return undefined;

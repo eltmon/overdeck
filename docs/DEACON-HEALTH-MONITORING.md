@@ -58,7 +58,7 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 
 ### Blocked Review Rework Drift (`checkPostReviewCommits`)
 - **File:** `src/lib/cloister/deacon-post-review-commits.ts`
-- **Criteria:** `reviewStatus='blocked'` and the workspace tree moved past the reviewed anchor. Legacy rows may use `reviewerVerdicts[*].atCommit` only when every reviewer agrees on one anchor.
+- **Criteria:** `reviewStatus='blocked'` and the workspace tree moved past `reviewedAtCommit`.
 - **Debounce:** The same new HEAD must appear on two consecutive patrol ticks, so per-item pushes do not start review before the rework batch is complete.
 - **Action:** Reset review to `pending` without clearing test verdicts or feedback notes, then emit `Re-dispatched review for <issue>: rework commit after BLOCKED verdict (<old> → <new>)` after the fresh convoy starts.
 

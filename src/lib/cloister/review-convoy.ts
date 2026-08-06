@@ -1,6 +1,6 @@
 /**
- * PAN-1862: the review CONVOY — sub-reviewer prompts and spawning, selective
- * re-review scope, warm-parent fork, and the discovery-ready orchestration.
+ * PAN-1862: the review CONVOY — sub-reviewer prompts and spawning, plus
+ * missing-reviewer recovery.
  *
  * Split out of review-agent.ts (which keeps the review entry point, the
  * synthesis/self-review prompts, mode resolution, and session teardown).
@@ -12,10 +12,8 @@
  * the fifth review role. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
 
-import { exec } from 'child_process';
-import { mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 import { listSessionNames } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -23,13 +21,11 @@ import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.j
 import { formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { reviewersToRerun, type ReviewerVerdictsMap, type ReReviewScope } from './review-rerun-scope.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
+import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
-const execAsync = promisify(exec);
 
 /**
  * Read a convoy sub-role prompt template from the overdeck install.
@@ -147,23 +143,6 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
-  /**
-   * PAN-1862 Phase A: a session id FORKED from the synthesis parent's discovery
-   * session. When set, the reviewer launches with `claude --resume <id>` so its
-   * first request replays the parent's byte-identical prefix and reads the warm
-   * prompt cache instead of re-reading the diff and files at full price.
-   */
-  forkedSessionId?: string;
-  /**
-   * The synthesis parent's OWN session id (the fork source). On non-Anthropic
-   * models routed through CLIProxy, the launcher exports
-   * ANTHROPIC_CUSTOM_HEADERS="X-Claude-Code-Session-Id: <this>" so the forked
-   * reviewer shares the parent's Codex prompt-cache scope. Without it, CLIProxy
-   * (v7.2.x) derives the scope from the reviewer's own session header and the
-   * replayed prefix can never hit the parent's cache (proven 2026-08-01: same
-   * bytes + parent scope = 97% cached; own scope = 0).
-   */
-  forkParentSessionId?: string;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
     const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent, stopAgent } = await import('../agents.js');
@@ -203,11 +182,9 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
     // PAN-1862: convoy sub-reviewers RESUME by default too — same rule as quick review. Each
     // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
     // the whole diff. Fresh-spawn only on a harness/model change or when no session exists.
-    // A forked first-cycle spawn (forkedSessionId) bypasses the saved-resume decision entirely:
-    // there is no prior lane context, and the fork IS the context.
     const reviewerAgent = reviewerAgentId(opts.issueId, opts.subRole);
-    const savedReviewer = opts.forkedSessionId ? null : getAgentStateSync(reviewerAgent);
-    const canResumeReviewer = !opts.forkedSessionId && reviewResumeDecision({
+    const savedReviewer = getAgentStateSync(reviewerAgent);
+    const canResumeReviewer = reviewResumeDecision({
       requestedModel: opts.model ?? model,
       requestedHarness: opts.harness,
       savedModel: savedReviewer?.model,
@@ -247,41 +224,13 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       }
     }
 
-    const forkedPreface = opts.forkedSessionId
-      ? [
-          'SHARED DISCOVERY CONTEXT (PAN-1862): this session was forked from the review',
-          'parent AFTER it completed a shared discovery pass — the diff, the high-risk',
-          'changed files, and their surrounding code are already in your history above.',
-          'That pass exists for cost (forked reviewers reuse the warm prompt cache instead',
-          'of four full-price re-reads) and for consistency (every reviewer sees the same',
-          'curated context). BUILD ON IT: do not re-run a broad git diff and do not',
-          're-read the files already shown above; read further code only where your',
-          'sub-role needs deeper detail.',
-          '',
-        ].join('\n')
-      : '';
-    // Share the parent's CLIProxy prompt-cache scope (see forkParentSessionId doc).
-    // ANTHROPIC_CUSTOM_HEADERS overrides the header Claude Code sends natively.
-    // Anthropic-routed models skip this: their cache is content-addressed and the
-    // spoofed session header would only distort Anthropic-side attribution.
-    let forkScopeHeaderExport: string | undefined;
-    if (opts.forkedSessionId && opts.forkParentSessionId) {
-      try {
-        const { getProviderForModelSync } = await import('../providers.js');
-        if (getProviderForModelSync(model).name !== 'anthropic') {
-          forkScopeHeaderExport = `export ANTHROPIC_CUSTOM_HEADERS="X-Claude-Code-Session-Id: ${opts.forkParentSessionId}"`;
-        }
-      } catch { /* provider lookup failure — spawn without the scope header */ }
-    }
     const reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
     const spawnOptions = {
       workspace: opts.workspace,
       subRole: opts.subRole,
-      prompt: forkedPreface + prompt,
+      prompt,
       model,
       harness: opts.harness,
-      ...(opts.forkedSessionId ? { resumeSessionId: opts.forkedSessionId } : {}),
-      ...(forkScopeHeaderExport ? { extraEnvExports: [forkScopeHeaderExport] } : {}),
       // Persist every signal-routing field before tmux launch. A later
       // running-state cache write may contend, but the reviewer can still
       // finish and the Stop-hook can still deliver REVIEWER_READY.
@@ -289,7 +238,6 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
       reviewDeadlineAt,
-      reviewForkedFromParent: !!opts.forkedSessionId,
       allowHost: opts.allowHost ?? false,
       startedBy: 'review-convoy' as const,
     };
@@ -337,163 +285,23 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
 }
 
 
-/**
- * PAN-1862: selective re-review scope for one dispatch — which convoy reviewers
- * run this cycle and which carry their prior passed verdict forward. Shared by
- * the inline dispatch path and the discovery-ready fork handler.
- */
-export async function computeConvoyScope(issueId: string, workspace: string): Promise<{
-  inScope: ReviewSubRole[];
-  carried: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
-  scope: ReReviewScope;
-}> {
-  let inScope: ReviewSubRole[] = [...REVIEW_SUB_ROLES];
-  let carried: Array<{ subRole: ReviewSubRole; atCommit?: string }> = [];
-  let scope: ReReviewScope = 'changed';
-  try {
-    // Dynamic import: review-status.ts reaches back into cloister via review-agent,
-    // so a static edge here would close a module cycle (lint:circular).
-    const { getReviewStatusSync } = await import('../review-status.js');
-    scope = resolveReReviewScope(issueId);
-    const priorVerdicts = getReviewStatusSync(issueId)?.reviewerVerdicts as ReviewerVerdictsMap | undefined;
-    let changedFiles: string[] | undefined;
-    const anchors = new Set(
-      Object.values(priorVerdicts ?? {}).map(v => v?.atCommit).filter((c): c is string => !!c),
-    );
-    if (anchors.size === 1) {
-      try {
-        // PAN-2948: diff in the primary code repo, not the workspace root — a
-        // polyrepo wrapper's HEAD never moves, so a wrapper-anchored diff would
-        // report zero drift and wrongly carry every verdict forward. Composite
-        // or wrapper-era anchors fail the ref lookup here and fall through to
-        // the conservative full-convoy path.
-        const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
-        const primaryRepoDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
-        const { stdout } = await execAsync(`git diff --name-only ${[...anchors][0]}..HEAD`, {
-          cwd: primaryRepoDir, encoding: 'utf-8', timeout: 15_000,
-        });
-        changedFiles = stdout.split('\n').map(l => l.trim()).filter(Boolean);
-      } catch { /* anchor unreachable (rebase) -> unknown drift -> all run */ }
-    }
-    inScope = reviewersToRerun({ scope, priorVerdicts, changedFiles });
-    carried = REVIEW_SUB_ROLES
-      .filter(r => !inScope.includes(r))
-      .map(r => ({ subRole: r, atCommit: priorVerdicts?.[r]?.atCommit }));
-    if (carried.length > 0) {
-      console.log(`[review-agent] Selective re-review for ${issueId} (scope=${scope}): re-running [${inScope.join(', ')}], carrying forward [${carried.map(c => c.subRole).join(', ')}]`);
-    }
-  } catch (scopeErr) {
-    console.warn(`[review-agent] Selective re-review scope resolution failed for ${issueId} — running the full convoy:`, scopeErr);
-    inScope = [...REVIEW_SUB_ROLES];
-    carried = [];
-  }
-  return { inScope, carried, scope };
-}
-
-/**
- * PAN-1862 Phase A: fork the synthesis parent's Claude session JSONL to a fresh
- * session id so a convoy reviewer can `--resume` it and inherit the discovery
- * context (and its warm, content-addressed prompt cache). Returns null when the
- * fork is not possible — caller degrades to a fresh independent spawn (NFR-2).
- * The source JSONL is copied, never modified.
- */
-async function forkParentSessionForReviewer(parentAgentId: string, workspace: string): Promise<{ sessionId: string; parentSessionId: string } | null> {
-  try {
-    const { getLatestSessionIdSync } = await import('../agents.js');
-    const parentSessionId = getLatestSessionIdSync(parentAgentId);
-    if (!parentSessionId) return null;
-    const src = sessionFilePath(workspace, parentSessionId);
-    const { existsSync } = await import('fs');
-    if (!existsSync(src)) return null;
-    const { reserveForkSession, copySessionForFork } = await import('../conversations/session-fork.js');
-    const reserved = await reserveForkSession(workspace);
-    await copySessionForFork(src, reserved.sessionFile, { fullHistory: true });
-    return { sessionId: reserved.sessionId, parentSessionId };
-  } catch (err) {
-    console.warn(`[review-agent] Fork from ${parentAgentId} failed (degrading to independent spawn): ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  }
-}
-
 export interface ConvoyLaunchParams {
   issueId: string;
   workspace: string;
   runId: string;
   synthesisAgentId: string;
-  inScope: ReviewSubRole[];
-  carried: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
-  scope: ReReviewScope;
+  /** Recovery provides only lanes with no report and no live session. */
+  subRoles?: ReviewSubRole[];
   contextManifestPath?: string;
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
-  /** PAN-1862 Phase A: fork each eligible first-cycle reviewer from the parent's session. */
-  forkFromParent?: boolean;
 }
 
-/**
- * Launch the review convoy for one run: write carried-forward stub reports, then
- * spawn (or fork-resume) each in-scope sub-reviewer. Shared by the inline
- * dispatch path (no fork) and the discovery-ready handler (fork).
- */
+/** Launch all four independent reviewers for one review run. */
 export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): Promise<Array<{ success: boolean; message: string }>> {
-  const reviewDir = join(params.workspace, PAN_DIRNAME, 'review', params.runId);
-  // PAN-1862 (FR-8): materialize carried-forward verdicts as stub reports in the
-  // NEW run directory so synthesis and the deacon fallback still see one report
-  // per sub-role, exactly as when every reviewer runs. Blocking-findings
-  // extraction on a stub finds none -> the sub-role reads as passed.
-  if (params.carried.length > 0) {
-    await mkdir(reviewDir, { recursive: true });
-    for (const c of params.carried) {
-      const stubPath = reviewerAgentOutputPath(params.workspace, params.runId, c.subRole);
-      const anchorNote = c.atCommit ? ` at commit ${c.atCommit.slice(0, 8)}` : '';
-      await writeFile(stubPath, [
-        `# ${c.subRole} review — VERDICT CARRIED FORWARD`,
-        '',
-        '## Verdict: APPROVED (carried forward — reviewer not re-run this cycle)',
-        '',
-        `This reviewer passed the prior cycle${anchorNote} and no files in its domain`,
-        `changed since (reReviewScope=${params.scope}, PAN-1862 selective re-review).`,
-        'Its prior findings report remains the report of record for that verdict.',
-        '',
-        '## Findings',
-        '',
-        'None.',
-        '',
-      ].join('\n'), 'utf-8');
-    }
-  }
-
-  const cfg = loadYamlConfig().config;
-  const { getAgentStateSync } = await import('../agents.js');
-  const parentState = getAgentStateSync(params.synthesisAgentId);
-  const reviewerResults = await Promise.all(params.inScope.map(async (subRole) => {
+  const reviewerResults = await Promise.all((params.subRoles ?? REVIEW_SUB_ROLES).map(async (subRole) => {
     const outputPath = reviewerAgentOutputPath(params.workspace, params.runId, subRole);
-
-    // PAN-1862 Phase A fork decision, per reviewer: fork only when (a) fork mode is
-    // on, (b) the parent runs claude-code (the fork machinery is Claude's --resume),
-    // (c) the reviewer resolves to the SAME model as the parent (the cache is
-    // per-model — a mismatched fork would replay the history at full price and the
-    // Settings banner is the operator surface for that), and (d) the reviewer has
-    // no resumable prior-cycle session of its own (its OWN context beats a re-fork —
-    // PRD decision 3). Every failure degrades to today's independent spawn (NFR-2).
-    let forkedSessionId: string | undefined;
-    let forkParentSessionId: string | undefined;
-    if (params.forkFromParent && parentState?.harness === 'claude-code' && !params.harness) {
-      try {
-        const { getLatestSessionIdSync } = await import('../agents.js');
-        const reviewerModel = params.model ?? resolveModel('review', subRole, cfg);
-        const hasOwnSession = !!getLatestSessionIdSync(reviewerAgentId(params.issueId, subRole));
-        if (!hasOwnSession && reviewerModel === parentState.model) {
-          const fork = await forkParentSessionForReviewer(params.synthesisAgentId, params.workspace);
-          forkedSessionId = fork?.sessionId;
-          forkParentSessionId = fork?.parentSessionId;
-          if (forkedSessionId) {
-            console.log(`[review-agent] Forked ${subRole} reviewer for ${params.issueId} from ${params.synthesisAgentId}'s discovery session (PAN-1862)`);
-          }
-        }
-      } catch { /* degrade to independent spawn */ }
-    }
 
     const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: params.issueId,
@@ -505,8 +313,6 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
       synthesisAgentId: params.synthesisAgentId,
       ...(params.model ? { model: params.model } : {}),
       ...(params.harness ? { harness: params.harness } : {}),
-      ...(forkedSessionId ? { forkedSessionId } : {}),
-      ...(forkParentSessionId ? { forkParentSessionId } : {}),
       allowHost: params.allowHost ?? false,
     }));
     if (!result.success) {
@@ -554,8 +360,6 @@ export const spawnReviewSubRoleForIssue = (opts: {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
-  forkedSessionId?: string;
-  forkParentSessionId?: string;
 }): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
   Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
 
@@ -567,14 +371,10 @@ export const spawnReviewSubRoleForIssue = (opts: {
 
 
 /**
- * PAN-1862 Phase A (FR-2/FR-3/FR-4, NFR-5): handle the parent's discovery-ready
- * signal — fork the parent's session into the convoy reviewers and launch them.
- * Idempotent: a repeat signal (or a signal after the convoy already launched)
- * is a no-op. The parent survives unmodified and resumes its synthesis role;
- * the CLI (`pan admin specialists discovery-ready review <id>`) and the deacon
- * stalled-discovery backstop both land here.
+ * Re-launch only convoy lanes whose report and session are both absent for the
+ * current parent run. It is idempotent, so a repeated recovery request is a no-op.
  */
-export async function handleReviewDiscoveryReady(
+export async function recoverMissingConvoyReviewers(
   issueId: string,
   opts: { source?: string; model?: string; harness?: RuntimeName } = {},
 ): Promise<{ success: boolean; message: string; launched?: number }> {
@@ -583,7 +383,7 @@ export async function handleReviewDiscoveryReady(
   const { saveAgentState, getAgentStateSync } = await import('../agents.js');
   const parentState = getAgentStateSync(parentId);
   if (!parentState) {
-    return { success: false, message: `No review parent state for ${normalized} — nothing to fork` };
+    return { success: false, message: `No review parent state for ${normalized} — cannot recover reviewers` };
   }
 
   let parent: typeof parentState | null;
@@ -602,15 +402,8 @@ export async function handleReviewDiscoveryReady(
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
 
-  // PAN-2585: the signal is AUTHORITATIVE. `reviewDiscoveryPending` is persisted only
-  // in state.json and is invisible through the DB-backed agent reader, so it must not
-  // gate the launch — gating on it left parents standing by forever for reviewers that
-  // were never forked.
-  //
-  // PAN-3368: idempotency is PER LANE, not convoy-wide. One completed report or one
-  // surviving reviewer proves only that lane launched; treating it as proof for all four
-  // stranded any sibling reviewer that died before writing its report.
-  const { inScope, carried, scope } = await computeConvoyScope(normalized, workspace);
+  // Reviewer evidence is per lane: one completed report or live session never
+  // proves that a sibling reviewer launched.
   let sessions = new Set<string>();
   let livenessProbeOk = true;
   try {
@@ -623,7 +416,7 @@ export async function handleReviewDiscoveryReady(
 
   const { existsSync } = await import('node:fs');
   const reviewersToLaunch: ReviewSubRole[] = [];
-  for (const subRole of inScope) {
+  for (const subRole of REVIEW_SUB_ROLES) {
     const reviewerId = reviewerAgentId(normalized, subRole);
     const reviewer = getAgentStateSync(reviewerId);
     const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
@@ -647,21 +440,9 @@ export async function handleReviewDiscoveryReady(
     }
     reviewersToLaunch.push(subRole);
   }
-  const carriedToWrite = carried.filter(({ subRole }) =>
-    !existsSync(reviewerAgentOutputPath(workspace, runId, subRole)),
-  );
-
-  if (reviewersToLaunch.length === 0 && carriedToWrite.length === 0) {
-    parent.reviewDiscoveryPending = false;
-    await Effect.runPromise(saveAgentState(parent));
+  if (reviewersToLaunch.length === 0) {
     return { success: true, message: `Convoy already launched for ${normalized} run ${runId} — no-op` };
   }
-
-  // Clear the pending flag BEFORE launching so a concurrent duplicate signal
-  // short-circuits on the per-lane evidence above.
-  parent.reviewDiscoveryPending = false;
-  parent.reviewDiscoveryReadyAt = new Date().toISOString();
-  await Effect.runPromise(saveAgentState(parent));
 
   // The per-issue review-model override has to be re-read here: this path is entered from a
   // signal, not from the parent's spawn opts, so nothing carries `model` in. Read the record
@@ -675,43 +456,16 @@ export async function handleReviewDiscoveryReady(
     workspace,
     runId,
     synthesisAgentId: parentId,
-    inScope: reviewersToLaunch,
-    carried: carriedToWrite,
-    scope,
+    subRoles: reviewersToLaunch,
     contextManifestPath: parent.reviewContextManifestPath,
     ...(reviewModel ? { model: reviewModel } : {}),
     ...(opts.harness ? { harness: opts.harness } : {}),
     allowHost: parent.hostOverride ?? false,
-    forkFromParent: true,
   });
 
-  const refreshed = getAgentStateSync(parentId);
-  if (refreshed) {
-    refreshed.reviewConvoyForkedAt = new Date().toISOString();
-    await Effect.runPromise(saveAgentState(refreshed));
-  }
-
   const launched = results.filter(r => r.success).length;
-  const message = `Discovery-ready for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing convoy reviewer(s)${carriedToWrite.length ? `, carried [${carriedToWrite.map(c => c.subRole).join(', ')}]` : ''}`;
+  const message = `Convoy recovery for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing reviewer(s)`;
   console.log(`[review-agent] ${message}`);
   emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: normalized });
   return { success: launched === reviewersToLaunch.length, message, launched };
 }
-
-
-
-/** PAN-1862 (FR-7): resolved re-review scope — merged config, default 'changed'. */
-export function resolveReReviewScope(issueId?: string): ReReviewScope {
-  // PAN-1874: per-issue record override beats merged project/global config
-  // (same resolution shape as resolveReviewMode in review-agent.ts).
-  if (issueId) {
-    try {
-      const project = resolveProjectForIssue(issueId);
-      const issueScope = project ? readIssueRecordSync(project, issueId)?.reReviewScope : undefined;
-      if (issueScope === 'all' || issueScope === 'changed' || issueScope === 'blockers') return issueScope;
-    } catch { /* fall through to config */ }
-  }
-  const scope = loadYamlConfig().config.roles?.review?.reReviewScope;
-  return scope === 'all' || scope === 'blockers' ? scope : 'changed';
-}
-

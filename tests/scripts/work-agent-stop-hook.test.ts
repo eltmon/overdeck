@@ -295,7 +295,7 @@ exit 99
     expect(existsSync(lockDir)).toBe(false)
   })
 
-  it('drops a timed-out completion check without emitting a resolution', async () => {
+  it('routes a timed-out completion check into the UNCLEAR ladder instead of silence (PAN-3571)', async () => {
     writeFallbackRuntime()
     const startedAt = Date.now()
 
@@ -308,9 +308,13 @@ exit 99
     })
 
     expect(Date.now() - startedAt).toBeLessThan(2_500)
-    expect(existsSync(heartbeatLog)).toBe(false)
+    // PAN-3571: a timeout must emit a resolution like every other check
+    // failure — silence stranded agents until a patrol noticed (334 times).
+    expect(existsSync(heartbeatLog)).toBe(true)
+    expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"unclear"')
     const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
     expect(hooksLog).toContain('completion-check LLM timed out')
+    expect(hooksLog).toContain('treating as UNCLEAR')
   })
 
   it('drops a rate-limited completion check before invoking claude', async () => {

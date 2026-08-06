@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, PipelineStatusChangedEvent, SubstrateBugFiledEvent, SystemHeartbeatEvent, WorkCompletedEvent } from "./events"
+import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, PipelineStatusChangedEvent, SubstrateBugFiledEvent, SweepScanEvent, SystemHeartbeatEvent, WorkCompletedEvent } from "./events"
 import { AgentSnapshot } from "./types"
 import { INITIAL_READ_MODEL_STATE, applyEvent } from "./event-reducers"
 
@@ -9,6 +9,7 @@ const decodeOperatorInterventionEvent = Schema.decodeUnknownSync(OperatorInterve
 const decodeSubstrateBugFiledEvent = Schema.decodeUnknownSync(SubstrateBugFiledEvent)
 const encodeSubstrateBugFiledEvent = Schema.encodeSync(SubstrateBugFiledEvent)
 const decodeSystemHeartbeatEvent = Schema.decodeUnknownSync(SystemHeartbeatEvent)
+const decodeSweepScanEvent = Schema.decodeUnknownSync(SweepScanEvent)
 const decodeDomainEvent = Schema.decodeUnknownSync(DomainEvent)
 
 const operatorInterventionKinds = [
@@ -33,6 +34,22 @@ function operatorInterventionEvent(kind: typeof operatorInterventionKinds[number
     },
   }
 }
+
+describe("Stall sweeper observation events", () => {
+  it("keeps scan observations while rejecting retired actor events", () => {
+    const scan = {
+      type: "sweep.scan",
+      sequence: 1,
+      timestamp: "2026-08-05T13:00:00.000Z",
+      payload: { issueCount: 1, rowCount: 1, rows: [{ issueId: "PAN-3552", orbit: "stuck-flag", parkedAt: "2026-08-05T12:00:00.000Z" }] },
+    }
+
+    expect(decodeSweepScanEvent(scan)).toEqual(scan)
+    expect(decodeDomainEvent(scan)).toEqual(scan)
+    expect(() => decodeDomainEvent({ type: "sweep.action", sequence: 2, timestamp: scan.timestamp, payload: { issueId: "PAN-3552", orbit: "stuck-flag", action: "re-drive" } })).toThrow()
+    expect(() => decodeDomainEvent({ type: "sweep.unparked", sequence: 3, timestamp: scan.timestamp, payload: { issueId: "PAN-3552", orbit: "stuck-flag", action: "re-drive" } })).toThrow()
+  })
+})
 
 describe("AgentContextSaturationChangedEvent", () => {
   it("decodes set and clear events through DomainEvent", () => {

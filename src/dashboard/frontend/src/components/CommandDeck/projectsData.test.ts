@@ -5,6 +5,7 @@ import {
   groupProjects,
   isUnscopedConversation,
   refreshProjectPipelineMembership,
+  resolveConversationProject,
   type RegisteredProjectLite,
 } from './projectsData';
 
@@ -41,6 +42,34 @@ function feature(issueId: string, projectName: string): ProjectFeature {
     isShadow: false,
   };
 }
+
+describe('resolveConversationProject', () => {
+  const registeredProjects: RegisteredProjectLite[] = [
+    { key: 'root-key', name: 'Root Project', path: '/projects/root' },
+    { key: 'nested-key', name: 'Nested Project', path: '/projects/root/nested' },
+  ];
+
+  it('resolves an explicit association for an isolated handoff cwd', () => {
+    expect(resolveConversationProject(
+      { projectKey: 'nested-key', cwd: '/isolated/handoff' },
+      registeredProjects,
+    )).toEqual(registeredProjects[1]);
+  });
+
+  it('falls back to cwd containment only when no explicit association exists', () => {
+    expect(resolveConversationProject(
+      { projectKey: null, cwd: '/projects/root/src' },
+      registeredProjects,
+    )).toEqual(registeredProjects[0]);
+  });
+
+  it('does not override an unknown explicit association with cwd containment', () => {
+    expect(resolveConversationProject(
+      { projectKey: 'missing', cwd: '/projects/root/src' },
+      registeredProjects,
+    )).toBeNull();
+  });
+});
 
 describe('project pipeline membership probes', () => {
   it('rejects a typed unavailable GET body returned with HTTP 200', async () => {

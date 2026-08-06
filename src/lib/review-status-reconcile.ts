@@ -1,87 +1,28 @@
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { upsertReviewStatusSync as dbUpsert, markWorkspaceStuck } from './overdeck/review-status-sync.js';
-import type { readJournalStatusSync } from './overdeck/review-status-record-sync.js';
-import type { InspectionStatusFields } from './inspection-status.js';
-import type { StrikeLandingStatus } from './strike-landing.js';
-import type { ScopeDriftRecord } from './xbrief/continue-state.js';
-import type { ReviewCycleEntry } from './cloister/review-convergence.js';
+import type {
+  BlockerReason,
+  ReviewStatus,
+  StatusHistoryEntry,
+} from './review-status-types.js';
 import {
   countBlockingFindingsForRun,
   evaluateReviewConvergence,
   findLatestReviewRunDir,
+  type ReviewCycleEntry,
 } from './cloister/review-convergence.js';
 import { resolveProjectFromIssueSync } from './projects.js';
 import { REVIEW_STATUS_HISTORY_LIMIT } from './review-status-limits.js';
 
-export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
-  status: string;
-  timestamp: string;
-  notes?: string;
-}
+export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-types.js';
 
 export { REVIEW_STATUS_HISTORY_LIMIT };
 
-export interface BlockerReason {
-  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable' | 'unmerged_sibling_repo';
-  summary: string;
-  details?: string;
-  detectedAt: string;
-}
-
-export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusFields {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
-  uatNotes?: string;
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  reviewNotes?: string;
-  testNotes?: string;
-  mergeNotes?: string;
-  releaseNotes?: string;
+type ReviewStatusJournal = {
   updatedAt: string;
-  readyForMerge: boolean;
-  autoMerge?: boolean;
-  autoRequeueCount?: number;
-  mergeRetryCount?: number;
-  prUrl?: string;
-  prHeadSha?: string;
-  prNumber?: number;
-  history?: StatusHistoryEntry[];
-  blockerReasons?: BlockerReason[];
-  reviewedAtCommit?: string;
-  lastVerifiedCommit?: string;
-  mergeStep?: string;
-  stuck?: boolean;
-  stuckReason?: string;
-  stuckAt?: string;
-  stuckDetails?: string;
-  reviewSpawnedAt?: string | number;
-  reviewRequestedAt?: string;
-  conflictResolutionDispatchedAt?: string;
-  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
-  testRetryCount?: number;
-  reviewRetryCount?: number;
-  recoveryStartedAt?: string;
-  deaconIgnored?: boolean;
-  deaconIgnoredAt?: string;
-  deaconIgnoredReason?: string;
-  scopeDrift?: ScopeDriftRecord;
-  reviewerVerdicts?: Partial<Record<string, {
-    status: 'passed' | 'blocked';
-    atCommit?: string;
-    findingsPath?: string;
-  }>>;
-  reviewCycleHistory?: ReviewCycleEntry[];
-}
-
-type ReviewStatusJournal = NonNullable<ReturnType<typeof readJournalStatusSync>>;
+  durable: Record<string, unknown>;
+  clearedFields?: string[];
+};
 
 export interface ReviewStatusReconcileHooks {
   notifyStatusChanged(issueId: string, status: ReviewStatus): void;

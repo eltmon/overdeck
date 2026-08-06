@@ -47,7 +47,7 @@ type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 type HandoffAuthor = 'source' | 'external';
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; handoffAuthor?: HandoffAuthor; handoffAuthorModel?: string; handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; handoffAuthor?: HandoffAuthor; handoffAuthorModel?: string; handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; projectKey?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,6 +65,7 @@ async function summaryForkConversation(opts: { conv: Conversation; model: string
       handoffAuthor: opts.handoffAuthor,
       handoffAuthorModel: opts.handoffAuthorModel,
       handoffAuthorHarness: opts.handoffAuthorHarness,
+      projectKey: opts.projectKey,
     }),
   });
   const data = await res.json().catch(() => null);
@@ -82,7 +83,7 @@ export interface ConversationMutations {
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   move: (opts: { name: string; projectKey: string; projectName: string }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code') => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', projectKey?: string) => void;
   forkTarget: Conversation | null;
   forkTargetMode: ForkModeOption | undefined;
   forkTargetFocus: string | undefined;
@@ -232,7 +233,7 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code') => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', projectKey?: string) => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
@@ -247,6 +248,7 @@ export function useConversationMutations(
       handoffAuthor,
       handoffAuthorModel,
       handoffAuthorHarness,
+      projectKey,
     });
     setForkTarget(null);
     setForkTargetMode(undefined);
