@@ -74,7 +74,7 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:55:14.437Z",
+  "updated": "2026-08-06T17:55:41.648Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -85,7 +85,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T17:55:11.245Z",
-    "updatedAt": "2026-08-06T17:55:11.839Z",
+    "updatedAt": "2026-08-06T17:55:41.341Z",
     "reviewNotes": "Docker enumeration failures still authorize destructive workspace removal",
     "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3577",
@@ -186,7 +186,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.195107,
-        "pricingAsOf": "2026-08-06T17:55:14.430Z"
+        "pricingAsOf": "2026-08-06T17:55:41.577Z"
       }
     },
     "merges": [
