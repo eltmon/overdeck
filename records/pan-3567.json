@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:42:42.115Z",
+  "updated": "2026-08-06T17:42:45.126Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -26,8 +26,38 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T16:59:43.796Z",
-    "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files)."
+    "updatedAt": "2026-08-06T17:42:45.124Z",
+    "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files).",
+    "reviewRequestedAt": "2026-08-06T17:42:45.124Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "CLAUDE.md",
+        "docs/EFFECT-BRIDGING.md",
+        "docs/INDEX.md",
+        "scripts/dashboard-types-baseline.txt",
+        "src/dashboard/server/routes/specialists/project-routes.ts",
+        "src/dashboard/server/routes/workspaces.ts",
+        "src/dashboard/server/routes/workspaces/stash-clean.ts",
+        "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "docs/EFFECT-BRIDGING.md",
+        "docs/INDEX.md",
+        "scripts/dashboard-types-baseline.txt",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/server/routes/specialists/project-routes.ts",
+        "src/dashboard/server/routes/workspaces.ts",
+        "src/dashboard/server/routes/workspaces/stash-clean.ts",
+        "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+      ],
+      "recordedAt": "2026-08-06T17:42:42.114Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3577"
   },
   "closeOut": {
     "usage": {
