@@ -124,17 +124,18 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:22:57.549Z",
+  "updated": "2026-08-06T01:27:41.422Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T01:15:21.625Z",
-    "updatedAt": "2026-08-06T01:22:55.334Z",
+    "updatedAt": "2026-08-06T01:27:41.391Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -182,9 +183,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 3095172,
-            "output": 124728,
-            "cacheRead": 29574144,
+            "input": 3096663,
+            "output": 124994,
+            "cacheRead": 30365184,
             "cacheWrite": 0
           }
         },
@@ -231,9 +232,9 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 4556662,
-          "output": 187091,
-          "cacheRead": 42438144,
+          "input": 4558153,
+          "output": 187357,
+          "cacheRead": 43229184,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -244,8 +245,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.410382,
-        "pricingAsOf": "2026-08-06T01:22:57.545Z"
+        "usd": 29.615861,
+        "pricingAsOf": "2026-08-06T01:27:41.418Z"
       }
     },
     "merges": [
