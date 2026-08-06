@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:44:24.116Z",
+  "updated": "2026-08-06T07:45:37.687Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-uat-relay": {
-        "writerId": "agent-pan-3575",
-        "agentId": "agent-pan-3575",
-        "pid": 691655,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T07:44:24.116Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3575",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Updated the UAT-failed sweeper recommendation to direct work-agent start after feedback delivery cannot find a target.",
         "releasedAt": "2026-08-06T07:44:14.586Z"
+      },
+      {
+        "writerId": "agent-pan-3575",
+        "agentId": "agent-pan-3575",
+        "pid": 691655,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T07:44:24.116Z",
+        "itemId": "docs-uat-relay",
+        "outcome": "completed",
+        "reason": "Documented UAT feedback routing, its parked-orbit ownership condition, and the recovery path.",
+        "releasedAt": "2026-08-06T07:45:37.687Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "sweeper-uat-recommendation": {
         "reason": "Updated the UAT-failed sweeper recommendation to direct work-agent start after feedback delivery cannot find a target.",
         "updatedAt": "2026-08-06T07:44:14.586Z"
+      },
+      "docs-uat-relay": {
+        "reason": "Documented UAT feedback routing, its parked-orbit ownership condition, and the recovery path.",
+        "updatedAt": "2026-08-06T07:45:37.687Z"
       }
     }
   },
@@ -148,6 +155,9 @@
     "sweeper-uat-recommendation": "completed",
     "sweeper-uat-recommendation.sweeper-uat-recommendation.ac1": "completed",
     "sweeper-uat-recommendation.sweeper-uat-recommendation.ac2": "completed",
-    "docs-uat-relay": "running"
+    "docs-uat-relay": "completed",
+    "docs-uat-relay.docs-uat-relay.ac1": "completed",
+    "docs-uat-relay.docs-uat-relay.ac2": "completed",
+    "docs-uat-relay.docs-uat-relay.ac3": "completed"
   }
 }
