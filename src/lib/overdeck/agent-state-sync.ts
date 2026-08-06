@@ -253,19 +253,6 @@ export function listOverdeckAgentStatesSync(): AgentState[] {
   return rows.map(overdeckRowToAgentState);
 }
 
-/**
- * Issue-scoped agent lookup through the `agents_issue_idx` index — unlike
- * listOverdeckAgentStatesSync(), which decodes every row in the table, this
- * only touches the rows for one issue (review finding, PAN-3362 UAT cycle 3:
- * a full-table scan on a server route delays concurrent HTTP/WS work).
- */
-export function listOverdeckAgentStatesByIssueSync(issueId: string): AgentState[] {
-  const rows = getOverdeckDatabaseSync()
-    .prepare(`${SELECT_AGENT_SQL} WHERE issue_id = ?`)
-    .all(issueId.toUpperCase()) as OverdeckAgentRow[];
-  return rows.map(overdeckRowToAgentState);
-}
-
 registerFeedbackAgentStateReader(listOverdeckAgentStatesSync);
 registerActiveReviewArtifactContextReader((issueId) => {
   const state = getOverdeckAgentStateSync(`agent-${issueId.toLowerCase()}-review`);

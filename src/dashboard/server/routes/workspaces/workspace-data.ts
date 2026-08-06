@@ -38,7 +38,6 @@ import {
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
-import { listOverdeckAgentStatesByIssueSync } from '../../../../lib/overdeck/agent-state-sync.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
 import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
@@ -144,10 +143,8 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
  * `branch` (written through the canonical agent-state write door) but no
  * on-disk checkout to shell against, so report that instead of nothing.
  *
- * Pure selection over an already issue-scoped agent list — the caller fetches
- * that list through listOverdeckAgentStatesByIssueSync()'s `agents_issue_idx`
- * lookup rather than decoding the whole table (review finding, PAN-3362 UAT
- * cycle 3).
+ * Pure selection over an already-resolved agent list — the caller supplies
+ * it. See getPersistedBranchFallbackAsync() for where that list comes from.
  */
 export function getPersistedBranchFallback(issueAgents: AgentState[]): {
   branch: string;
@@ -159,16 +156,23 @@ export function getPersistedBranchFallback(issueAgents: AgentState[]): {
 }
 
 /**
- * Async wrapper around the issue-scoped, indexed agent lookup so the branch
- * fallback composes with the route's other Promise.all-based I/O instead of
- * running as a separate blocking call (review finding, PAN-3362 UAT cycle 3).
+ * Reads through the same request-local, TTL-cached agent projection this
+ * route already uses for cost resolution (getCachedRunningAgents(), below)
+ * instead of a fresh per-request SQLite query. Most requests hit the 3-second
+ * in-memory cache directly; the rare cache miss is deduplicated across
+ * concurrent requests by that cache's own single-flight promise, so the
+ * synchronous decode of the agents table happens at most once per TTL window
+ * rather than once per workspace-detail request (review finding, PAN-3362
+ * UAT cycle 4 — the previous fix still ran a fresh synchronous SQLite read
+ * on every request that reached it).
  */
-async function getPersistedBranchFallbackAsync(issueId: string): Promise<{
+export async function getPersistedBranchFallbackAsync(issueId: string): Promise<{
   branch: string;
   uncommittedFiles: number;
   latestCommit: string;
 } | null> {
-  const issueAgents = listOverdeckAgentStatesByIssueSync(issueId);
+  const cachedAgents = await getCachedRunningAgents();
+  const issueAgents = cachedAgents.filter((a) => a.issueId.toUpperCase() === issueId.toUpperCase());
   return getPersistedBranchFallback(issueAgents);
 }
 async function getIndexStats(workspacePath: string): Promise<{
