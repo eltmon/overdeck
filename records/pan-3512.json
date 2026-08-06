@@ -914,21 +914,19 @@
     }
   ],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
+      "src/lib/cloister/orphan-restore-verdict.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
     "declaredScopeUntouched": [
       "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "packages/contracts/src/events.ts",
       "scripts/file-size-allowlist.txt",
       "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
       "src/cli/commands/specialists/done.ts",
       "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
       "src/dashboard/server/routes/specialists/legacy-routes.ts",
-      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
-      "src/lib/cloister/deacon-review-signals.ts",
-      "src/lib/cloister/deacon-review-status.ts",
-      "src/lib/cloister/deacon-review-unsignaled.ts",
-      "src/lib/cloister/deacon.ts",
       "src/lib/review-verdict-guards.ts"
     ],
     "declaredScope": [
@@ -953,16 +951,25 @@
       "src/lib/review-verdict-guards.ts"
     ],
     "actualChangedFiles": [
-      "packages/contracts/src/events.ts",
       "src/lib/__tests__/review-verdict-guards.test.ts",
+      "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
       "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
       "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
-      "src/lib/cloister/review-verdict-writer.ts"
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/deacon-review-unsignaled.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/orphan-restore-verdict.ts",
+      "src/lib/cloister/review-verdict-writer.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
-    "recordedAt": "2026-08-03T00:01:37.570Z"
+    "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:07:26.985Z",
+  "updated": "2026-08-06T22:07:28.510Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
