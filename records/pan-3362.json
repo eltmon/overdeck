@@ -338,7 +338,7 @@
     "recordedAt": "2026-08-06T12:28:47.930Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T12:36:56.993Z",
+  "updated": "2026-08-06T12:38:20.320Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -357,7 +357,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "dbe30a3ddaa97b9a8f61b516b79df0357ab509d0",
     "lastVerifiedCommit": "3bfc2e27aad34f7144bcc2353151d768fa8b0148",
-    "reviewRequestedAt": "2026-08-06T12:28:48.742Z",
+    "reviewRequestedAt": "2026-08-06T12:38:19.948Z",
     "reviewSpawnedAt": "2026-08-06T12:30:20.303Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -420,7 +420,8 @@
         "tests/unit/scripts/lint-state-writes.test.ts"
       ],
       "recordedAt": "2026-08-06T12:28:47.930Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-06T12:38:19.948Z"
   },
   "closeOut": {
     "usage": {
