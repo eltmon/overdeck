@@ -1433,3 +1433,24 @@ The corrected picture changes the fix, and I posted all three points to the issu
 **CI on `947a58f060` is nearly green** — lint, build (22), guard, smoke test, trailer gate and flake lane all success, `test` still running. PAN-3595's close-out should clear row 6 next tick without an override.
 
 **Unchanged:** PAN-3580 and PAN-3586 still carry `planned` without `released`; PAN-3512 waits in `uat/pan-flint-0806` for the operator's ship.
+
+### RUN-82 tick 13 — 2026-08-06T23:50Z — PAN-3595 closed out with no override; re-saturated the idle fleet
+
+**PAN-3595 closed out clean.** Row 6 passed on real evidence:
+
+```
+6  main-verify  required checks concluded successfully on 947a58f060cc…: test, lint, build (22), guard   PASS
+```
+
+That is the delayed-CI model from tick 12 confirmed end to end: the block was **transient and resolved by waiting**, not by an override. Two ticks ago the same row read MISS on the same commit. Holding out against `--accept-main-verify` cost one tick of patience and preserved a real verification record — worth remembering next time a gate blocks something I am confident about, because "I know this is fine" is exactly the feeling that makes an override tempting.
+
+**Sixth substrate fix landed, deployed and closed out this run** (PAN-3581, PAN-3583, PAN-3589, PAN-3582, PAN-3595, plus PAN-3512 carried to merge-ready).
+
+**Re-saturated an idle fleet.** With PAN-3512 awaiting the operator's UAT ship and both planned issues awaiting release, no work agent was running against a `minAgents` target of 2 — and a tick that only ranks suggestions is a failed tick. Struck the two highest-value filings from the backlog of my own findings:
+
+- **PAN-3593** — the idle-at-prompt agent problem. Chosen first because it is not merely filed, it is *actively blocking*: the self-aborted PAN-3586 strike still occupies its slot, which is why that issue had to be routed through planning instead of re-struck. A pipeline blocker in the live sense, not the label sense.
+- **PAN-3594** — the 84,574 false `stray writer` ERRORs. Cheap to fix, and the payoff is that deacon errors become meaningful again. This run found two real defects whose entire visible signal was one quiet log line each, while the loudest thing in that log was false.
+
+**Carry this: when the fleet idles behind operator gates, the right move is to work the substrate backlog I generated, not to report an empty queue.** Eleven issues filed this run and six landed; the remaining five are all real, diagnosed to `file:line`, and none needs an operator decision to start. An idle fleet with a full findings list is a scheduling failure, not a quiet period.
+
+**Unchanged:** PAN-3580 and PAN-3586 still carry `planned` without `released`; PAN-3512 still waits in `uat/pan-flint-0806`.
