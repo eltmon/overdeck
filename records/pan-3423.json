@@ -447,13 +447,10 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/cli/commands/parked.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
+      "src/cli/commands/parked.ts"
     ],
     "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
-      "src/lib/agents/__tests__/agent-health.test.ts",
-      "src/lib/agents/health.ts"
+      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx"
     ],
     "declaredScope": [
       "docs/RESOURCE-GOVERNOR.md",
@@ -472,12 +469,13 @@
       "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
       "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
       "src/dashboard/frontend/src/lib/system-health-attention.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
+      "src/lib/agents/__tests__/agent-health.test.ts",
+      "src/lib/agents/health.ts"
     ],
-    "recordedAt": "2026-08-04T18:51:45.736Z"
+    "recordedAt": "2026-08-06T00:10:05.676Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:10:01.392Z",
+  "updated": "2026-08-06T00:10:05.677Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "reviewing",
