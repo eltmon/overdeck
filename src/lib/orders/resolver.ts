@@ -3,7 +3,7 @@ import type { OrderBook } from '@overdeck/contracts';
 import type { SequenceNode } from '../backlog/types.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { LEGACY_PARKED_LABELS, PARKED_LABEL } from '../backlog/pickup.js';
-import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync } from './io.js';
+import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync, readOrderBookIndex } from './io.js';
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
 const COMPLETE_STATUS = 'complete';
@@ -108,6 +108,15 @@ export function getBook(stateRoot: string, bookId: string): OrderBook | null {
 
 export function getBookAsync(stateRoot: string, bookId: string): Promise<OrderBook | null> {
   return readOrderBookAsync(stateRoot, bookId);
+}
+
+/** The first 'ready' book in index.json queue order, or null if none is ready. */
+export function firstReadyBookInQueue(stateRoot: string): OrderBook | null {
+  for (const entry of readOrderBookIndex(stateRoot)) {
+    const book = getBook(stateRoot, entry.id);
+    if (book?.status === 'ready') return book;
+  }
+  return null;
 }
 
 export function membership(stateRoot: string): Map<string, string> {

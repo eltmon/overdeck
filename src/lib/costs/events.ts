@@ -4,7 +4,18 @@
  * Manages the append-only events.jsonl log that records all cost events.
  */
 
-import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from 'fs';
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -47,6 +58,7 @@ export interface EventMetadata {
   lastEventTs: string | null;
   lastEventLine: number;
   totalEvents: number;
+  byteOffset: number;
 }
 
 export interface ReadEventsOptions {
@@ -68,6 +80,147 @@ function getCostsDir(): string {
 
 function getEventsFile(): string {
   return join(getCostsDir(), 'events.jsonl');
+}
+
+const EVENT_READ_CHUNK_BYTES = 64 * 1024;
+
+type EventLineVisitor = (line: string, lineNumber: number, endOffset: number) => boolean | void;
+
+interface EventScanResult {
+  lineCount: number;
+  byteOffset: number;
+  lastLine: string | null;
+}
+
+/**
+ * Scan the append-only event log with memory bounded by one chunk and one line.
+ * Hot dashboard reads must never materialize the whole log: on a mature install
+ * events.jsonl is hundreds of megabytes, and readFileSync + split retained roughly
+ * 200 MB of garbage per request until V8 happened to run a major GC.
+ */
+function scanEventLinesSync(options: {
+  startOffset?: number;
+  startLine?: number;
+  includeTrailingLine?: boolean;
+  visitor?: EventLineVisitor;
+} = {}): EventScanResult {
+  const eventsFile = getEventsFile();
+  const startOffset = Math.max(0, options.startOffset ?? 0);
+  const startLine = Math.max(0, options.startLine ?? 0);
+  if (!existsSync(eventsFile)) {
+    return { lineCount: startLine, byteOffset: startOffset, lastLine: null };
+  }
+
+  const fd = openSync(eventsFile, 'r');
+  const readBuffer = Buffer.allocUnsafe(EVENT_READ_CHUNK_BYTES);
+  let carry = Buffer.alloc(0);
+  let carryOffset = startOffset;
+  let position = startOffset;
+  let lineCount = startLine;
+  let byteOffset = startOffset;
+  let lastLine: string | null = null;
+  let stopped = false;
+
+  const visit = (lineBuffer: Buffer, endOffset: number): void => {
+    byteOffset = endOffset;
+    const line = lineBuffer.toString('utf8');
+    if (!line.trim()) return;
+
+    const lineNumber = lineCount;
+    lineCount += 1;
+    lastLine = line;
+    if (options.visitor?.(line, lineNumber, endOffset) === false) stopped = true;
+  };
+
+  try {
+    while (!stopped) {
+      const bytesRead = readSync(fd, readBuffer, 0, readBuffer.length, position);
+      if (bytesRead === 0) break;
+      position += bytesRead;
+
+      const chunk = readBuffer.subarray(0, bytesRead);
+      const data = carry.length > 0 ? Buffer.concat([carry, chunk]) : chunk;
+      let lineStart = 0;
+      for (let index = 0; index < data.length; index += 1) {
+        if (data[index] !== 0x0a) continue;
+        visit(data.subarray(lineStart, index), carryOffset + index + 1);
+        lineStart = index + 1;
+        if (stopped) break;
+      }
+
+      if (stopped) break;
+      carry = Buffer.from(data.subarray(lineStart));
+      carryOffset += lineStart;
+    }
+
+    if (!stopped && options.includeTrailingLine && carry.length > 0) {
+      visit(carry, carryOffset + carry.length);
+    }
+  } finally {
+    closeSync(fd);
+  }
+
+  return { lineCount, byteOffset, lastLine };
+}
+
+function eventTimestampFromLine(line: string | null): string | null {
+  if (!line) return null;
+  try {
+    return (JSON.parse(line) as CostEvent).ts ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function getEventsFileSizeSync(): number {
+  try {
+    return statSync(getEventsFile()).size;
+  } catch {
+    return 0;
+  }
+}
+
+export function forEachCostEventSync(visitor: (event: CostEvent) => void): EventMetadata {
+  const scan = scanEventLinesSync({
+    visitor: (line) => {
+      try {
+        visitor(JSON.parse(line) as CostEvent);
+      } catch {
+        console.warn('Skipping malformed event line:', line.slice(0, 100));
+      }
+    },
+  });
+  return {
+    lastEventTs: eventTimestampFromLine(scan.lastLine),
+    lastEventLine: scan.lineCount,
+    totalEvents: scan.lineCount,
+    byteOffset: scan.byteOffset,
+  };
+}
+
+export function readEventsFromByteOffsetSync(startOffset: number): {
+  events: CostEvent[];
+  newOffset: number;
+  linesRead: number;
+  lastEventTs: string | null;
+} {
+  const events: CostEvent[] = [];
+  const scan = scanEventLinesSync({
+    startOffset,
+    visitor: (line) => {
+      try {
+        events.push(JSON.parse(line) as CostEvent);
+      } catch {
+        console.warn('Skipping malformed event line:', line.slice(0, 100));
+      }
+    },
+  });
+  return {
+    events,
+    newOffset: scan.byteOffset,
+    linesRead: scan.lineCount,
+    lastEventTs: eventTimestampFromLine(scan.lastLine),
+  };
 }
 
 // ============== Initialization ==============
@@ -132,80 +285,69 @@ export function appendCostEventSync(event: CostEvent): void {
  * Read all events from the log with optional filters
  */
 export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
-  if (!existsSync(getEventsFile())) {
-    return [];
-  }
+  const events: CostEvent[] = [];
+  const offset = options.offset ?? 0;
+  const limit = options.limit;
+  const canPageWhileScanning = offset >= 0 && (limit === undefined || limit > 0);
+  let matched = 0;
 
-  const content = readFileSync(getEventsFile(), 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim());
+  scanEventLinesSync({
+    includeTrailingLine: true,
+    visitor: (line) => {
+      let event: CostEvent;
+      try {
+        event = JSON.parse(line) as CostEvent;
+      } catch {
+        console.warn('Skipping malformed event line:', line.slice(0, 100));
+        return;
+      }
 
-  let events: CostEvent[] = [];
+      if (options.issueId && event.issueId.toLowerCase() !== options.issueId.toLowerCase()) return;
+      if (options.agentId && event.agentId !== options.agentId) return;
+      if (options.provider && event.provider !== options.provider) return;
+      if (options.startDate && event.ts < options.startDate) return;
+      if (options.endDate && event.ts > options.endDate) return;
 
-  for (const line of lines) {
-    try {
-      const event = JSON.parse(line) as CostEvent;
+      if (canPageWhileScanning && matched < offset) {
+        matched += 1;
+        return;
+      }
       events.push(event);
-    } catch (err) {
-      // Skip malformed lines
-      console.warn('Skipping malformed event line:', line.slice(0, 100));
-    }
-  }
+      matched += 1;
+      if (canPageWhileScanning && limit !== undefined && events.length >= limit) return false;
+    },
+  });
 
-  // Apply filters
-  if (options.issueId) {
-    events = events.filter(e => e.issueId.toLowerCase() === options.issueId!.toLowerCase());
-  }
+  if (canPageWhileScanning) return events;
 
-  if (options.agentId) {
-    events = events.filter(e => e.agentId === options.agentId);
-  }
-
-  if (options.provider) {
-    events = events.filter(e => e.provider === options.provider);
-  }
-
-  if (options.startDate) {
-    events = events.filter(e => e.ts >= options.startDate!);
-  }
-
-  if (options.endDate) {
-    events = events.filter(e => e.ts <= options.endDate!);
-  }
-
-  // Apply offset and limit
-  if (options.offset) {
-    events = events.slice(options.offset);
-  }
-
-  if (options.limit) {
-    events = events.slice(0, options.limit);
-  }
-
-  return events;
+  let paged = events;
+  if (options.offset) paged = paged.slice(options.offset);
+  if (options.limit) paged = paged.slice(0, options.limit);
+  return paged;
 }
 
 /**
  * Get the last N events from the log
  */
 export function tailEventsSync(n: number): CostEvent[] {
-  if (!existsSync(getEventsFile())) {
-    return [];
-  }
+  const lines: string[] = [];
+  scanEventLinesSync({
+    includeTrailingLine: true,
+    visitor: (line) => {
+      lines.push(line);
+      if (n > 0 && lines.length > n) lines.shift();
+    },
+  });
 
-  const content = readFileSync(getEventsFile(), 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim());
-
-  const lastLines = lines.slice(-n);
+  const selected = n > 0 ? lines : lines.slice(-n);
   const events: CostEvent[] = [];
-
-  for (const line of lastLines) {
+  for (const line of selected) {
     try {
       events.push(JSON.parse(line) as CostEvent);
     } catch {
-      // Skip malformed lines
+      // Skip malformed lines.
     }
   }
-
   return events;
 }
 
@@ -219,53 +361,32 @@ export function readEventsFromLineSync(startLine: number): { events: CostEvent[]
     return { events: [], newLine: startLine };
   }
 
-  const content = readFileSync(getEventsFile(), 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim());
-
   const events: CostEvent[] = [];
+  const scan = scanEventLinesSync({
+    includeTrailingLine: true,
+    visitor: (line, lineNumber) => {
+      if (lineNumber < startLine) return;
+      try {
+        events.push(JSON.parse(line) as CostEvent);
+      } catch {
+        console.warn(`Skipping malformed event at line ${lineNumber}`);
+      }
+    },
+  });
 
-  for (let i = startLine; i < lines.length; i++) {
-    try {
-      events.push(JSON.parse(lines[i]) as CostEvent);
-    } catch {
-      // Skip malformed lines but track position
-      console.warn(`Skipping malformed event at line ${i}`);
-    }
-  }
-
-  return { events, newLine: lines.length };
+  return { events, newLine: scan.lineCount };
 }
 
 /**
  * Get metadata about the event log
  */
 export function getLastEventMetadataSync(): EventMetadata {
-  if (!existsSync(getEventsFile())) {
-    return {
-      lastEventTs: null,
-      lastEventLine: 0,
-      totalEvents: 0,
-    };
-  }
-
-  const content = readFileSync(getEventsFile(), 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim());
-
-  let lastEventTs: string | null = null;
-
-  if (lines.length > 0) {
-    try {
-      const lastEvent = JSON.parse(lines[lines.length - 1]) as CostEvent;
-      lastEventTs = lastEvent.ts;
-    } catch {
-      // Can't parse last event
-    }
-  }
-
+  const scan = scanEventLinesSync({ includeTrailingLine: true });
   return {
-    lastEventTs,
-    lastEventLine: lines.length,
-    totalEvents: lines.length,
+    lastEventTs: eventTimestampFromLine(scan.lastLine),
+    lastEventLine: scan.lineCount,
+    totalEvents: scan.lineCount,
+    byteOffset: scan.byteOffset,
   };
 }
 

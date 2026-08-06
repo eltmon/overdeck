@@ -125,8 +125,25 @@ function isKnownModel(modelId: string): boolean {
   return knownModelIds.has(modelId);
 }
 
+type KnownModelsListener = () => void;
+const knownModelsListeners = new Set<KnownModelsListener>();
+
+/**
+ * Subscribe to catalog syncs. A composer's initial loadStoredModel runs at
+ * mount, before the available-models fetch completes — at that point only
+ * the FALLBACK ids are "known", so a stored catalog-only id (e.g.
+ * kimi-code/k3, an OpenRouter favorite) fails isKnownModel and the composer
+ * drops to the default. Subscribers re-run loadStoredModel after every sync
+ * so the stored pick restores once the catalog containing it has loaded.
+ */
+export function onKnownModelsSync(listener: KnownModelsListener): () => void {
+  knownModelsListeners.add(listener);
+  return () => { knownModelsListeners.delete(listener); };
+}
+
 function syncKnownModels(groups: readonly ModelGroup[]): void {
   knownModelIds = new Set(groups.flatMap((g) => g.models.map((m) => m.id)));
+  for (const listener of knownModelsListeners) listener();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -200,6 +217,8 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const liveConversationRef = useRef(liveConversation);
+  liveConversationRef.current = liveConversation;
   const { openUp, align, maxHeight } = usePickerPosition(open, ref);
 
   // Reset search when dropdown closes
@@ -293,11 +312,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             })),
           });
         }
-
         const effectiveGroups = newGroups.length > 0 ? newGroups : FALLBACK_GROUPS;
         syncKnownModels(effectiveGroups);
         if (newGroups.length > 0) setGroups(newGroups);
-
+        const resolved = loadStoredModel(getDefaultConversationModel());
+        if (!liveConversationRef.current && resolved && resolved !== value && isKnownModel(resolved)) onChange(resolved, effectiveGroups.flatMap((g) => g.models).find((m) => m.id === resolved)?.effortLevels ?? []);
         const modelIds = effectiveGroups.flatMap((g) => g.models.map((m) => m.id));
         if (modelIds.length > 0) {
           const policy = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)

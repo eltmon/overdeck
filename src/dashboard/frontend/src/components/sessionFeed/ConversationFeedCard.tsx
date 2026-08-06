@@ -21,6 +21,9 @@ const STATUS_DOT_COLORS: Record<AgentState, string> = {
 const AGENT_LABELS: Record<string, string> = {
   claude_code: 'Claude Code',
   pi: 'Pi',
+  ohmypi: 'oh-my-pi',
+  codex: 'Codex',
+  kimi_code: 'Kimi Code',
   acp: 'Kimi',
   unknown: 'Unknown',
 };
@@ -74,6 +77,7 @@ function harnessForFeedAgent(agent: string): Harness {
   if (agent === 'ohmypi' || agent === 'pi') return 'ohmypi';
   if (agent === 'codex') return 'codex';
   if (agent === 'acp') return 'acp';
+  if (agent === 'kimi_code' || agent === 'kimi-code') return 'kimi-code';
   return 'claude-code';
 }
 

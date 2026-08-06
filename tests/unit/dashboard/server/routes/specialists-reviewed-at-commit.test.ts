@@ -348,9 +348,10 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
     expect(
       mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
     ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
-    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')?.reviewedAtCommit).toBe(
-      'blocked-http-head',
-    );
+    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toMatchObject({
+      reviewStatus: 'blocked',
+      reviewedAtCommit: 'blocked-http-head',
+    });
   });
 
   it('reviewedAtCommit survives a subsequent partial update (not clobbered)', () => {

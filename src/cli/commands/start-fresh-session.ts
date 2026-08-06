@@ -46,6 +46,7 @@ export interface FreshSessionOptions {
 
 export interface FreshSessionDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
+  assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean; explicitFresh?: boolean }) => unknown;
 }
 
 export async function prepareFreshWorkAgentSession(
@@ -58,7 +59,9 @@ export async function prepareFreshWorkAgentSession(
 
   const { getAgentStateSync, stopAgentSync, wipeAgentStateDirs } = await import('../../lib/agents.js');
   const { sessionExistsSync } = await import('../../lib/tmux.js');
+  const { assertCanStartFreshSync } = await import('../../lib/work-agent-lifecycle.js');
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
+  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshSync;
 
   const priorState = getAgentStateSync(agentId);
 
@@ -72,6 +75,23 @@ export async function prepareFreshWorkAgentSession(
         error: `Agent ${agentId} is waiting on an operator decision (${reason}). Answer it with 'pan answer ${issueId}' or open the Decisions panel; pass --force to discard it deliberately.`,
       };
     }
+  }
+
+  // The lifecycle guard must run before stopping a live session or wiping the
+  // state dir. A durable session pointer can survive local cleanup, so a
+  // refused command must leave both the process and state files untouched.
+  try {
+    assertCanStartFresh(issueId, {
+      allowPausedForce: false,
+      allowLiveSessionReplacement: true,
+      explicitFresh: true,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      messages,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 
   if (sessionExistsSync(agentId)) {

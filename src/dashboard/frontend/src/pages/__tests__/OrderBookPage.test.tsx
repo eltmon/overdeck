@@ -1,8 +1,18 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrderBook } from '@overdeck/contracts';
 
 import { OrderBookPage } from '../OrderBookPage';
+
+// The page reads the project picker's options through react-query (PAN-3427), so
+// every render must sit under a QueryClientProvider.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
 
 const mocks = vi.hoisted(() => ({
   mutationHeaders: vi.fn(async () => ({ 'content-type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
@@ -53,13 +63,32 @@ const draining = book({
   },
 });
 
-function ordersResponse(books: BookFixture[]) {
-  return Response.json({ books });
+function ordersResponse(books: BookFixture[], project?: string) {
+  return Response.json(project ? { books, project } : { books });
+}
+
+const projects = [
+  { key: 'panopticon-cli', name: 'panopticon-cli', path: '/home/dev/overdeck' },
+  { key: 'mind-your-now', name: 'mind-your-now', path: '/home/dev/myn' },
+];
+
+/**
+ * Answers the picker's registered-projects read before delegating, so each test
+ * only has to describe the orders traffic it cares about.
+ */
+function stubFetch(handler: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
+  const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) === '/api/registered-projects') return Response.json(projects);
+    return handler(input, init);
+  });
+  vi.stubGlobal('fetch', mock);
+  return mock;
 }
 
 describe('OrderBookPage', () => {
   beforeEach(() => {
     mocks.mutationHeaders.mockClear();
+    window.history.replaceState(null, '', '/orders');
   });
 
   afterEach(() => {
@@ -68,11 +97,10 @@ describe('OrderBookPage', () => {
 
   it('lists active, queued, and drained books and creates a book from the strip', async () => {
     const created = book({ id: '2026-07-18-new-campaign', name: 'New campaign' });
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = stubFetch(async (_input, init) => {
       if (init?.method === 'POST') return Response.json(created);
       return ordersResponse([running, queued, drained]);
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     render(<OrderBookPage />);
 
@@ -95,7 +123,7 @@ describe('OrderBookPage', () => {
   });
 
   it('marks the current lifecycle status and advances completed books through every prior step', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ordersResponse([running, drained])));
+    stubFetch(async () => ordersResponse([running, drained]));
     render(<OrderBookPage />);
 
     expect(await screen.findByText('Active campaign')).toBeInTheDocument();
@@ -109,7 +137,7 @@ describe('OrderBookPage', () => {
   });
 
   it('renders DRAIN amber with attribution and OPEN as a neutral rest state', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ordersResponse([draining, queued])));
+    stubFetch(async () => ordersResponse([draining, queued]));
     render(<OrderBookPage />);
 
     expect(await screen.findByText('Drain hold')).toBeInTheDocument();
@@ -127,11 +155,11 @@ describe('OrderBookPage', () => {
   });
 
   it('toggles from setup controls to the live progress checklist', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    stubFetch(async (input) => {
       if (String(input) === '/api/flywheel/current') return Response.json(null);
       if (String(input) === '/api/orders/2026-07-18-active') return Response.json(running);
       return ordersResponse([running]);
-    }));
+    });
     render(<OrderBookPage />);
 
     expect(await screen.findByText('Active campaign')).toBeInTheDocument();
@@ -144,13 +172,12 @@ describe('OrderBookPage', () => {
   it('queues a valid draft through the lifecycle write route', async () => {
     const draft = book({ id: '2026-07-18-draft', name: 'Draft campaign', validation: { blocks: [], warns: [] } });
     const ready = { ...draft, status: 'ready' as const };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = stubFetch(async (input, init) => {
       const url = String(input);
       if (url === '/api/orders/2026-07-18-draft' && init?.method === 'PATCH') return Response.json(ready);
       if (url === '/api/orders/2026-07-18-draft') return Response.json(draft);
       return ordersResponse([draft]);
     });
-    vi.stubGlobal('fetch', fetchMock);
     render(<OrderBookPage />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Queue book/ }));
@@ -163,17 +190,104 @@ describe('OrderBookPage', () => {
     expect(screen.getByRole('button', { name: /Start run/ })).toBeEnabled();
   });
 
+  it('lists every registered project in the picker and defaults to the one the envelope names', async () => {
+    stubFetch(async () => ordersResponse([running], 'panopticon-cli'));
+    render(<OrderBookPage />);
+
+    const picker = await screen.findByLabelText<HTMLSelectElement>('Order book project');
+    await waitFor(() => expect([...picker.options].map((option) => option.value)).toEqual([
+      'panopticon-cli',
+      'mind-your-now',
+    ]));
+    await waitFor(() => expect(picker.value).toBe('panopticon-cli'));
+  });
+
+  it('scopes every orders fetch to the selected project and renders that project books', async () => {
+    const other = book({ id: '2026-07-18-myn', name: 'MYN campaign', status: 'ready', validation: { blocks: [], warns: [] } });
+    const fetchMock = stubFetch(async (input) => {
+      const url = String(input);
+      if (url.startsWith('/api/orders?project=mind-your-now')) return ordersResponse([other], 'mind-your-now');
+      if (url.startsWith('/api/orders/2026-07-18-myn?project=mind-your-now')) return Response.json(other);
+      return ordersResponse([running], 'panopticon-cli');
+    });
+    render(<OrderBookPage />);
+
+    expect(await screen.findByText('Active campaign')).toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText('Order book project'), { target: { value: 'mind-your-now' } });
+
+    expect(await screen.findByText('MYN campaign')).toBeInTheDocument();
+    expect(screen.queryByText('Active campaign')).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/orders?project=mind-your-now');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders/2026-07-18-myn?project=mind-your-now'));
+    expect(new URLSearchParams(window.location.search).get('project')).toBe('mind-your-now');
+
+    // Mutations must land in the same state root the books were read from.
+    fireEvent.click(screen.getByRole('button', { name: /Preview brief/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders/2026-07-18-myn/preview-brief?project=mind-your-now'));
+  });
+
+  it('scopes the first read to a deep-linked project and shows it as the current selection', async () => {
+    window.history.replaceState(null, '', '/orders?project=mind-your-now');
+    const other = book({ id: '2026-07-18-myn', name: 'MYN campaign', status: 'ready' });
+    const fetchMock = stubFetch(async (input) => {
+      if (String(input).startsWith('/api/orders/')) return Response.json(other);
+      return ordersResponse([other], 'mind-your-now');
+    });
+    render(<OrderBookPage />);
+
+    expect(await screen.findByText('MYN campaign')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/orders?project=mind-your-now');
+    await waitFor(() => expect(
+      screen.getByLabelText<HTMLSelectElement>('Order book project').value,
+    ).toBe('mind-your-now'));
+  });
+
+  it('ignores a stale project-A list response that resolves after switching to project B', async () => {
+    const projectABook = book({ id: '2026-07-18-a', name: 'Project A campaign' });
+    const projectBBook = book({ id: '2026-07-18-b', name: 'Project B campaign', status: 'ready' });
+    let resolveA: (() => void) | undefined;
+    let resolveB: (() => void) | undefined;
+
+    stubFetch(async (input) => {
+      const url = String(input);
+      if (url === '/api/orders') {
+        await new Promise<void>((resolve) => { resolveA = resolve; });
+        return ordersResponse([projectABook], 'panopticon-cli');
+      }
+      if (url === '/api/orders?project=mind-your-now') {
+        await new Promise<void>((resolve) => { resolveB = resolve; });
+        return ordersResponse([projectBBook], 'mind-your-now');
+      }
+      return ordersResponse([]);
+    });
+
+    render(<OrderBookPage />);
+    await waitFor(() => expect(resolveA).toBeDefined());
+
+    fireEvent.change(await screen.findByLabelText('Order book project'), { target: { value: 'mind-your-now' } });
+    await waitFor(() => expect(resolveB).toBeDefined());
+
+    // Resolve the new selection first, then let the superseded project-A
+    // request land late — it must not clobber project B's rendered books.
+    resolveB!();
+    expect(await screen.findByText('Project B campaign')).toBeInTheDocument();
+    resolveA!();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText('Project B campaign')).toBeInTheDocument();
+    expect(screen.queryByText('Project A campaign')).not.toBeInTheDocument();
+  });
+
   it('loads detail validation, previews the brief, and starts through order routes', async () => {
     const warning = { code: 'missing-prd', issue: 'PAN-3', message: 'PAN-3 will be planned at pickup' };
     const launchable = book({ id: '2026-07-18-launch', name: 'Launchable', status: 'ready', validation: { blocks: [], warns: [warning] } });
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = stubFetch(async (input, init) => {
       const url = String(input);
       if (url.endsWith('/preview-brief')) return Response.json({ brief: '# Special orders: Launchable' });
       if (url.endsWith('/start') && init?.method === 'POST') return Response.json({ runId: 'RUN-9' });
       if (url === '/api/orders/2026-07-18-launch') return Response.json(launchable);
       return ordersResponse([launchable]);
     });
-    vi.stubGlobal('fetch', fetchMock);
     render(<OrderBookPage />);
 
     expect(await screen.findByText(warning.message)).toBeInTheDocument();

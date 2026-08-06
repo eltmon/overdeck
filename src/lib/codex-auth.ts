@@ -4,6 +4,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
+import { getProviderForModelSync } from './providers.js';
 
 /**
  * Which store a codex auth status came from (PAN-2285). 'native' = the codex
@@ -178,11 +179,24 @@ function nativeCodexAuthMtimeSync(): number {
 // table — and read back through the agents-table door
 // (listOverdeckAgentStatesSync). No new store, no in-memory registry.
 
-/** The revoked-token markers that appear in a burned codex agent's pane. */
+/**
+ * The revoked-token markers that appear in a burned codex agent's pane.
+ *
+ * The first three are the NATIVE codex CLI's own error text. PAN-3528: a
+ * gpt-5.x agent on the claude-code harness never emits them — CLIProxy absorbs
+ * the upstream 401 and re-surfaces it as a 503 that reads like a transient
+ * server hiccup ("usually temporary — try again in a moment"), so the agent
+ * retries against a permanently dead credential while the pane detector sees
+ * nothing. The last two are that CLIProxy signature; `no auth available
+ * (providers=codex` means CLIProxy has disabled the codex provider outright,
+ * which is the same dead-credential condition as a native revoke.
+ */
 const CODEX_AUTH_BURN_MARKERS = [
   'could not be refreshed because your refresh token was revoked',
   'token_invalidated',
   'token_revoked',
+  'auth_unavailable',
+  'no auth available (providers=codex',
 ];
 
 /**
@@ -192,6 +206,31 @@ const CODEX_AUTH_BURN_MARKERS = [
  */
 export function paneShowsCodexAuthBurn(paneText: string): boolean {
   return CODEX_AUTH_BURN_MARKERS.some((marker) => paneText.includes(marker));
+}
+
+/**
+ * Is this agent's traffic authenticated by the codex credential family (PAN-3528)?
+ *
+ * Two routes share one credential: the native `codex` harness reads
+ * ~/.codex/auth.json directly, and an openai-provider model under any other
+ * harness reaches OpenAI through CLIProxy, which serves the SAME token bridged
+ * into codex-primary.json. A revoked refresh token kills both. The pane patrols
+ * used to check burn markers only for `harness === 'codex'`, so the CLIProxy
+ * route — the standing routing for GPT models on machines that set
+ * `openai.harness: claude-code` — was never scanned at all.
+ *
+ * An unset or unregistered model resolves to "not codex-routed" rather than
+ * throwing: this runs inside deacon patrols that sweep every tmux session, and
+ * one stale agent row must not kill the sweep.
+ */
+export function isCodexAuthRouted(harness: string | undefined, model: string | undefined): boolean {
+  if (harness === 'codex') return true;
+  if (!model) return false;
+  try {
+    return getProviderForModelSync(model).name === 'openai';
+  } catch {
+    return false;
+  }
 }
 
 /** lastFailureReason prefix that marks an agent as codex-auth-burned. */
@@ -475,7 +514,8 @@ const BURN_STALENESS_MS = 60 * 60 * 1000;
  * is actually burned. Exported for regression testing (PAN-1584).
  *
  * "Auth failure" evidence = either a refresh-token burn line
- * (`refresh token has already been used`) OR a `503` on `/v1/messages` /
+ * (`refresh token has already been used`, `refresh_token_reused`, or a
+ * non-retryable `token refresh failed with status 401`) OR a `503` on `/v1/messages` /
  * `/v1/chat/completions` (the live symptom the agent hits once cliproxy disables
  * the provider — and which keeps appearing after the burn line stops, since a
  * disabled provider no longer attempts refreshes). "Success" = a `200` on those
@@ -509,9 +549,15 @@ export function evaluateBurnedFromLog(
   // can still surface a later success.
   const lines = logRaw.split('\n').slice(-500);
 
-  // PAN-913 matched `refresh token has already been used`; PAN-1455 adds `refresh_token_reused`.
+  // PAN-913 matched `refresh token has already been used`; PAN-1455 adds
+  // `refresh_token_reused`. PAN-3528 adds the openai_auth.go line those two sit
+  // under: a non-retryable 401 on refresh is the definitive "this credential is
+  // dead" signal, it covers revocations whose JSON body says neither of the
+  // above, and — unlike the continuation lines — it carries its own timestamp.
   const isBurnLine = (l: string) =>
-    l.includes('refresh token has already been used') || l.includes('refresh_token_reused');
+    l.includes('refresh token has already been used')
+    || l.includes('refresh_token_reused')
+    || l.includes('token refresh failed with status 401');
   const isAuthFailure503 = (l: string) =>
     /\b503 \|/.test(l) && /POST\s+"\/v1\/(messages|chat\/completions)/.test(l);
   const isSuccess = (l: string) =>
@@ -520,11 +566,18 @@ export function evaluateBurnedFromLog(
   // The bracketed timestamp lives on the gin_logger/openai_auth line; burn
   // messages sit on a JSON continuation line with no prefix, so scan back a few
   // lines for the nearest one.
+  //
+  // PAN-3528: cliproxy stamps these in LOCAL time, not UTC. Parsing them with a
+  // trailing `Z` shifted every failure by the host's UTC offset — on a UTC-4
+  // host that made a burn look 4 hours OLDER than it was, so it fell before the
+  // credential-write cutoff below and the endpoint reported a dead token as
+  // "valid" while every gpt-5.6 agent 503'd. Omitting the offset makes
+  // Date.parse interpret the stamp in local time, which is what it is.
   const timestampAt = (idx: number): number | null => {
     for (let j = idx; j >= Math.max(0, idx - 10); j--) {
       const m = lines[j]?.match(/^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\]/);
       if (m) {
-        const t = Date.parse(`${m[1]}T${m[2]}Z`);
+        const t = Date.parse(`${m[1]}T${m[2]}`);
         if (Number.isFinite(t)) return t;
       }
     }

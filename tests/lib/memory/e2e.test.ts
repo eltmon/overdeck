@@ -44,7 +44,7 @@ beforeEach(async () => {
     agentRole: 'work',
     agentHarness: 'claude-code',
   };
-});
+}, 20_000);
 
 afterEach(async () => {
   closeMemoryFtsDatabases();

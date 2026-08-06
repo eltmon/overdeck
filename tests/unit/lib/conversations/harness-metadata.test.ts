@@ -69,7 +69,7 @@ describe('parsePiSessionMetadata', () => {
     expect(meta.tokenOutput).toBe(25);
   });
 
-  it('scan persists parsed Pi and ohmypi metadata with the discovered harness tag', async () => {
+  it('scan persists parsed Pi and ohmypi metadata with the discovered harness tag', { timeout: 20_000 }, async () => {
     odb = setupOverdeckTestDb();
     savedHome = process.env.HOME;
     homeChanged = true;

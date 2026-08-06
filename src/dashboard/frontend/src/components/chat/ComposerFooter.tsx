@@ -678,6 +678,7 @@ export function ComposerFooter({
             disabled={isDisabled || !canEditModelBeforeStart}
             harness={harness}
             onHarnessChange={handleHarnessChange}
+            liveConversation={conversation.sessionAlive}
           />
           {/*
             Model drift indicator. The picker holds the model that the

@@ -224,6 +224,24 @@ describe('resolveHarness — PAN-1984 + explicit-pick refinement: provider defau
       .rejects.toThrow(/Harness kimi-code.*no installed kimi binary.*refusing to silently fall back/);
   });
 
+  it('throws when the provider default is claude-code but policy denies it for a kimi-code/* native id', async () => {
+    // 2026-08-02 id-space rule: kimi-code/* ids exist only in the native kimi
+    // CLI catalog. A role config pairing one with a claude-code provider
+    // default must fail loud, not launch claude-code with a model id the
+    // Anthropic-compatible endpoint cannot serve.
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('kimi-code');
+    configMock.loadConfigSync.mockReturnValue({ config: { providerHarnesses: { kimi: 'claude-code' } } });
+    policyMocks.canUseHarnessSync.mockImplementation((h: string, m: string) =>
+      m.startsWith('kimi-code/') && h !== 'kimi-code' && h !== 'acp'
+        ? { allowed: false, reason: 'kimi-code/* ids exist only in the native catalog' }
+        : { allowed: true });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ model: 'kimi-code/k3', role: 'work' }))
+      .rejects.toThrow(/Harness claude-code denied for kimi-code\/k3.*refusing to silently fall back/);
+  });
+
   it.each(['k3', 'k3[1m]'])('routes Kimi %s through the claude-code provider default', async (model) => {
     providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
     providerMocks.getBuiltInDefaultHarness.mockReturnValue('claude-code');

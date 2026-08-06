@@ -14,8 +14,11 @@ import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import { resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import { refreshWorkStartReviewedAnchor, resetWorkStartPipelineVerdicts } from '../cloister/work-start-verdicts.js';
+import { recordAgentPlaneSpawn } from '../pan-dir/agents.js';
 import { shouldPreservePipelineVerdicts } from '../cloister/verdict-preservation.js';
+import { resetPostMergeState } from '../cloister/post-merge-state.js';
+import { isRoleTerminal, resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
@@ -63,7 +66,7 @@ import {
   runAgentId,
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
-  assertWorkspaceStackHealthyForSpawn,
+  prepareWorkspaceForAgentSpawn,
   type SpawnOptions,
   type SpawnRunOptions,
 } from './spawn-prep.js';
@@ -80,7 +83,7 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import { clearSessionResetMarker, createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import {
   withAutoSpawnConsentClaim,
@@ -89,7 +92,6 @@ import {
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
-
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
@@ -177,9 +179,7 @@ async function spawnRunWithoutConsentClaim(
       if (await Effect.runPromise(isPaneDead(agentId))) {
         reapWarmIdle = true;
       } else if (advancing) {
-        const { getReviewStatusSync } = await import('../review-status.js');
-        const { isRoleTerminal } = await import('../cloister/reap-terminal-sessions.js');
-        const status = getReviewStatusSync(issueId);
+        const { status } = resolveCanonicalReviewStatus(issueId);
         reapWarmIdle = !!status && isRoleTerminal(role as 'review' | 'test' | 'ship', status);
       }
     } catch { /* probe failure → conservative: treat as active */ }
@@ -190,7 +190,7 @@ async function spawnRunWithoutConsentClaim(
     const { killSession } = await import('../tmux.js');
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
-  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
+  await prepareWorkspaceForAgentSpawn(issueId, role, options.allowHost, workspace);
   initHookSync(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
@@ -239,7 +239,6 @@ async function spawnRunWithoutConsentClaim(
     reviewSynthesisAgentId: options.reviewSynthesisAgentId,
     reviewOutputPath: options.reviewOutputPath,
     reviewDeadlineAt: options.reviewDeadlineAt,
-    reviewForkedFromParent: options.reviewForkedFromParent,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -371,7 +370,7 @@ async function spawnRunWithoutConsentClaim(
       sessionId = rawSessionId;
     }
   }
-
+  await recordAgentPlaneSpawn(state, rawSessionId);
   // PAN-1557: interactive convoy wiring is already present in the initial
   // AgentState saved before launch, so the Stop-hook can always deliver
   // REVIEWER_READY even if a later running-state cache write is contended.
@@ -561,7 +560,7 @@ async function spawnAgentWithoutConsentClaim(
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
-  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost, options.workspace);
+  await prepareWorkspaceForAgentSpawn(options.issueId, role, options.allowHost, options.workspace);
 
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);
@@ -628,7 +627,8 @@ async function spawnAgentWithoutConsentClaim(
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
-
+  clearSessionResetMarker(agentId);
+  await recordAgentPlaneSpawn(state);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
@@ -636,11 +636,11 @@ async function spawnAgentWithoutConsentClaim(
     try {
       const preservation = await shouldPreservePipelineVerdicts(options.issueId, options.workspace);
       if (preservation.preserve) {
-        if (preservation.refreshedAnchor) setReviewStatusSync(options.issueId, { reviewedAtCommit: preservation.refreshedAnchor });
+        if (preservation.refreshedAnchor) refreshWorkStartReviewedAnchor(options.issueId, preservation.refreshedAnchor);
         console.log(`[spawn] Preserved pipeline verdicts for ${options.issueId} — ${preservation.reason}`);
       } else {
-        const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
-        if (resetStatus) (await import('../cloister/merge-agent.js')).resetPostMergeState(options.issueId);
+        const resetStatus = resetWorkStartPipelineVerdicts(options.issueId);
+        if (resetStatus) resetPostMergeState(options.issueId);
       }
     } catch (err) {
       console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);

@@ -109,6 +109,72 @@ export async function markRetainedTranscripts(dirPath: string): Promise<void> {
   }
 }
 
+async function collectAgentStateFilesForRemoval(
+  dirPath: string,
+  canonicalRoot: string,
+  candidateRoot: string,
+): Promise<string[]> {
+  const canonicalDir = await realpath(dirPath);
+  assertContained(canonicalRoot, canonicalDir);
+  const entries = await readdir(dirPath, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+    if (entry.isSymbolicLink()) {
+      files.push(relative(candidateRoot, entryPath));
+    } else if (entry.isDirectory()) {
+      files.push(...await collectAgentStateFilesForRemoval(
+        entryPath,
+        canonicalRoot,
+        candidateRoot,
+      ));
+    } else if (!entry.name.endsWith('.jsonl')) {
+      files.push(relative(candidateRoot, entryPath));
+    }
+  }
+  return files;
+}
+
+/** List the runtime files the sanctioned cleanup door would remove. */
+export async function listAgentStateFilesForRemoval(
+  dirPath: string,
+  agentsRootPath: string = AGENTS_DIR,
+): Promise<string[]> {
+  const agentsRoot = resolve(agentsRootPath);
+  const candidate = resolve(dirPath);
+  assertContained(agentsRoot, candidate);
+  if (relative(agentsRoot, candidate).includes(sep)) {
+    throw new Error(`listAgentStateFilesForRemoval: expected direct child of AGENTS_DIR: ${candidate}`);
+  }
+
+  try {
+    const candidateStat = await lstat(candidate);
+    if (candidateStat.isSymbolicLink()) {
+      throw new Error(`listAgentStateFilesForRemoval: refusing symbolic-link root: ${candidate}`);
+    }
+    if (!candidateStat.isDirectory()) {
+      throw new Error(`listAgentStateFilesForRemoval: expected directory: ${candidate}`);
+    }
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return [];
+    throw error;
+  }
+
+  const [canonicalRoot, canonicalCandidate] = await Promise.all([
+    realpath(agentsRoot),
+    realpath(candidate),
+  ]);
+  assertContained(canonicalRoot, canonicalCandidate);
+  if (relative(canonicalRoot, canonicalCandidate).includes(sep)) {
+    throw new Error(`listAgentStateFilesForRemoval: canonical path is not a direct child of AGENTS_DIR: ${canonicalCandidate}`);
+  }
+  return (await collectAgentStateFilesForRemoval(
+    candidate,
+    canonicalRoot,
+    candidate,
+  )).sort();
+}
+
 /**
  * The ONLY sanctioned way to delete or clean an agent state directory
  * (PAN-3357). Deletes runtime residue; preserves every transcript artifact

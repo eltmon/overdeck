@@ -533,6 +533,7 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
         echo: false,
       });
       expect(result.status).toBe(400);
+      expect(result.body).toContain(`content exceeds ${INPUT_PURGE_MAX_CHARS} chars`);
       expect(fake.writes).toEqual([]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

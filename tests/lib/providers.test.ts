@@ -144,7 +144,7 @@ describe('providers', () => {
   });
 
   it('routes DashScope Qwen models to the DashScope provider', () => {
-    for (const model of ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']) {
+    for (const model of ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']) {
       expect(getProviderForModelSync(model)).toBe(PROVIDERS.dashscope);
     }
     expect(getProviderForModelSync('qwen/qwen3.6-plus')).toBe(PROVIDERS.nous);

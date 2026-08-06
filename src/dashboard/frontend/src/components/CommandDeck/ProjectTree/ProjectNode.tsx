@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
 import type { PipelineBucket, SessionNode } from '@overdeck/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
+import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
@@ -235,7 +236,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
     mutationFn: async (newName: string) => {
       const response = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/rename`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ name: newName }),
       });
       const data = await response.json().catch(() => null) as { error?: string } | null;

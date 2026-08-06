@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type RefObject } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport'
 
 /**
  * Inline-rename controls for a project title. Everything a header needs to
@@ -47,7 +48,7 @@ export function useProjectRename(projectName: string, projectKey?: string): Proj
       const projectIdentifier = projectKey ?? projectName
       const res = await fetch(`/api/projects/${encodeURIComponent(projectIdentifier)}/rename`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ name }),
       })
       const data = await res.json().catch(() => null) as { error?: string } | null

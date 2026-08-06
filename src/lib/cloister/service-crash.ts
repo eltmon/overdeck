@@ -135,6 +135,15 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
     throw new Error(`No runtime found for agent ${agentId}`);
   }
 
+  // A stopped agent has no session to receive a poke, and its fingerprint can
+  // never change — so every cycle would count another "ineffective" poke until
+  // tier 3 paused it with a fabricated idle-alive reason. Boot gates
+  // (--no-resume) make that the normal post-reboot state for the whole fleet.
+  if (!(await runtime.isRunning(agentId))) {
+    host.pokeProgress.delete(agentId);
+    return;
+  }
+
   const fingerprint = await host.progressFingerprint(agentId);
   const prior = host.pokeProgress.get(agentId);
   const ineffective = prior && prior.fingerprint === fingerprint ? prior.ineffective + 1 : 0;
@@ -173,9 +182,14 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
       + '(3) lost context — re-read your xBRIEF item (`pan task show`), your latest .pan/feedback/ file, and git status, then resume. Act now.';
   }
 
-  await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
-    console.error(`Failed to send poke to ${agentId}:`, sendErr);
-  });
+  const delivered = await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).then(
+    () => true,
+    (sendErr) => {
+      console.error(`Failed to send poke to ${agentId}:`, sendErr);
+      return false;
+    },
+  );
+  if (!delivered) return;
   host.emit({ type: 'poked_agent', agentId });
   console.log(`🔔 Poked ${agentId}${ineffective > 0 ? ` (ineffective streak: ${ineffective})` : ''}`);
 }

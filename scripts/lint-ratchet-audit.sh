@@ -4,7 +4,7 @@
 # File-size exceptions carry their issue reference in each mandatory allowlist
 # row and are validated by lint-file-size.sh before this audit runs. Removing
 # ESLint allowlist entries and updating circular baseline paths to follow
-# source-file renames are always free. Raising either remaining ratchet must
+# source-file renames are always free. Raising any remaining ratchet must
 # happen in a commit whose message includes an issue reference matching
 # ([A-Z]+-[0-9]+|#[0-9]+).
 #
@@ -22,6 +22,7 @@ elif [[ $# -ne 0 ]]; then
 fi
 
 CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
+EFFECT_DIAG_BASELINE="scripts/effect-diagnostics-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
@@ -45,6 +46,18 @@ parent_circular_baseline_at() {
   done | sort -u
 }
 
+effect_diag_baseline_at() {
+  local rev="$1"
+  { git show "$rev:$EFFECT_DIAG_BASELINE" 2>/dev/null || true; } |
+    sed -E '/^[[:space:]]*(#|$)/d' | sort -u
+}
+
+parent_effect_diag_baseline_at() {
+  for parent in "$@"; do
+    effect_diag_baseline_at "$parent"
+  done | sort -u
+}
+
 parent_eslint_allowlist_at() {
   for parent in "$@"; do
     eslint_allowlist_at "$parent"
@@ -60,6 +73,31 @@ eslint_allowlist_increases_for_commit() {
   parent_eslint_allowlist_at "$@" > "$old_file"
   eslint_allowlist_at "$commit" > "$new_file"
   comm -13 "$old_file" "$new_file" | sed 's/^/allowlist added: /'
+  rm -f "$old_file" "$new_file"
+}
+
+effect_diag_baseline_increases_for_commit() {
+  local commit="$1"
+  shift
+  local parent has_parent_baseline=false
+  for parent in "$@"; do
+    if git cat-file -e "$parent:$EFFECT_DIAG_BASELINE" 2>/dev/null; then
+      has_parent_baseline=true
+      break
+    fi
+  done
+  # The first baseline is an initialization, not a ratchet increase. Subsequent
+  # additions compare against it and require an issue reference.
+  if [[ "$has_parent_baseline" != true ]]; then
+    return 0
+  fi
+
+  local old_file new_file
+  old_file=$(mktemp)
+  new_file=$(mktemp)
+  parent_effect_diag_baseline_at "$@" > "$old_file"
+  effect_diag_baseline_at "$commit" > "$new_file"
+  comm -13 "$old_file" "$new_file" | sed 's/^/effect diagnostics baseline added: /'
   rm -f "$old_file" "$new_file"
 }
 
@@ -153,6 +191,7 @@ audit_commit() {
   increases=$(
     eslint_allowlist_increases_for_commit "$commit" "${parents[@]}"
     circular_baseline_increases_for_commit "$commit" "${parents[@]}"
+    effect_diag_baseline_increases_for_commit "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -180,11 +219,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited ESLint/circular ratchet increases)"
+echo "✓ ratchet audit passed (no unaudited ESLint/circular/Effect ratchet increases)"

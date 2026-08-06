@@ -221,8 +221,8 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 `packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan done`):
-- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, and both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`)
-- `npm run lint` — ESLint
+- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh` — and `typecheck:acp` for `packages/effect-acp`)
+- `npm run lint` — ESLint plus `lint:effect-diagnostics`; see [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md)
 - `npm test` — Vitest (root + frontend)
 
 ## tmux Socket — CRITICAL
@@ -392,12 +392,26 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Effect bridging
+
+When a callee returns an Effect, yield it directly; reserve `Effect.promise` and
+`Effect.tryPromise` for Promise-returning thunks. See
+[docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md) for error handling and valid bridges.
+
 ## Verification Gate (PAN-174)
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
 before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
+
+## Verdict feedback routing
+
+Review `blocked`/`failed`, test `failed`, and UAT `failed` verdicts all return work to
+the work agent through the same feedback doors: `writeFeedbackFile()` persists the
+feedback, `resolveIssueFeedbackTarget()` finds or resurrects the work target, and
+`surfaceIssueFeedbackNeedsYou()` creates a durable escalation when no target resolves.
+The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`.
 
 ## Review Convergence Gate (PAN-3151)
 
@@ -610,10 +624,9 @@ green. A red guard test means you've reopened the loop. Adding new work to the
 post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
 idempotent and the test stays green.
 
-A merge to `main` doesn't just complete `postMergeLifecycle` for the merged issue —
-it can silently invalidate every *other* open branch touching the same files; the
-branch-invalidation deacon sweep (PAN-3154) detects, marks, and notifies those
-branches within one patrol cycle, see [`docs/MERGE-WORKFLOW.md`](docs/MERGE-WORKFLOW.md#branch-invalidation-sweep).
+A merge to `main` can make another open branch stale, but no background sibling
+scan acts on it. Reconcile an affected workspace explicitly with `pan sync-main <id>`
+before it proceeds through review or merge.
 
 ## postMergeLifecycle Verify Handoff and Docker Cleanup
 
@@ -675,36 +688,18 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 
 ## TLDR: Token-Efficient Code Analysis
 
-**If your workspace has a `.venv` directory, you have access to TLDR tools for code analysis.**
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-TLDR provides structured code summaries using 500-1,200 tokens per file instead of 10-25k, extending how much work you can accomplish per session.
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-### Available MCP Tools
-
-When TLDR is available, you'll have these MCP tools:
-- `tldr_context <file>` - File structure, exports, imports, key functions
-- `tldr_structure <directory>` - Directory layout and relationships
-- `tldr_calls <function> <file>` - Call graph (what calls this function)
-- `tldr_impact <function> <file>` - Impact analysis (what this function calls)
-- `tldr_semantic <query>` - Natural language code search
-
-### Recommended Workflow
-
-1. **Explore with TLDR first:**
-   - Use `tldr_context` to understand file structure before reading
-   - Use `tldr_semantic` to find relevant code by description
-   - Use `tldr_calls` and `tldr_impact` for dependency analysis
-
-2. **Read full files only when editing:**
-   - TLDR shows you the structure and what to edit
-   - Read the full file to get exact line numbers and implementation
-   - Edit the specific sections you identified
-
-3. **Avoid reading everything:**
-   - 20 files × 15k tokens = 300k tokens (exhausts context)
-   - 20 files × 800 tokens (TLDR) = 16k tokens (94% savings)
-
-**Use TLDR liberally to maximize your session effectiveness.**
 
 ## Bash Output Compression (RTK)
 

@@ -179,8 +179,6 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   inspectNotes?: string;
   mergeNotes?: string;
   blockerReasons?: unknown[];
-  /** PAN-3154: main-head SHA/paths that first made this branch conflict. */
-  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   prUrl?: string;
   prNumber?: number;
   prHeadSha?: string;
@@ -200,8 +198,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   /** PAN-2207: durable tombstone set when deacon recovers a stuck-pending completion; cleared by re-run of `pan done`. */
   panDoneRecoveredAt?: string;
   closedOut?: boolean;
-  closedOutAt?: string;
-  reviewerVerdicts?: unknown;
+  closedOutAt?: string; reopenedAt?: string;
   reviewCycleHistory?: unknown;
   updatedAt: string;
 }
@@ -229,8 +226,6 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
-  /** PAN-1874: per-issue re-review scope override; beats project/global config. */
-  reReviewScope?: 'all' | 'changed' | 'blockers';
   /** Per-issue convoy model override; beats roles.review for every reviewer. */
   reviewModel?: string;
   /** Per-issue tiered execution override; beats plan-metadata and global config. */
@@ -759,7 +754,6 @@ export async function appendSessionEntry(
     queueIssueRecordCommit(project, issueId, recordPath);
   }
 }
-
 /** Append a feedback entry to the per-issue record. */
 export async function appendFeedbackEntry(
   project: ProjectConfig,
@@ -768,6 +762,7 @@ export async function appendFeedbackEntry(
   opts: WriteStatusOverrideOptions = {},
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
+  if (JSON.stringify(record.feedback?.at(-1)) === JSON.stringify(entry)) return;
   record.feedback = [...(record.feedback ?? []), entry];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
@@ -858,7 +853,6 @@ export function appendSessionEntrySync(
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
-
 /** Append a feedback entry to the per-issue record (sync). */
 export function appendFeedbackEntrySync(
   project: ProjectConfig,
@@ -866,6 +860,7 @@ export function appendFeedbackEntrySync(
   entry: ContinueFeedbackEntry,
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
+  if (JSON.stringify(record.feedback?.at(-1)) === JSON.stringify(entry)) return;
   record.feedback = [...(record.feedback ?? []), entry];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);

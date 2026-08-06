@@ -383,12 +383,9 @@ optional:
         const absent = yield* renderPrompt({ name: 'planning', vars: baseVars });
 
         expect(enabled).toContain('### TLDR: Token-Efficient Code Discovery');
-        expect(enabled).toContain('tldr_context');
-        expect(enabled).toContain('tldr_structure');
-        expect(enabled).toContain('tldr_semantic');
-        expect(enabled).toContain('tldr_calls');
-        expect(enabled).toContain('tldr_impact');
-        expect(enabled).toContain('Prefer these summaries during exploration');
+        expect(enabled).toContain('PreToolUse hook on `Read`');
+        expect(enabled).toContain('.venv/bin/tldr context');
+        expect(enabled).toContain('not registered in agent');
         expect(disabled).not.toContain('### TLDR: Token-Efficient Code Discovery');
         expect(absent).not.toContain('### TLDR: Token-Efficient Code Discovery');
       })
@@ -411,11 +408,8 @@ optional:
         const absent = yield* renderPrompt({ name: 'resume-work', vars: baseVars });
 
         expect(enabled).toContain('## TLDR: Fast Re-Orientation');
-        expect(enabled).toContain('tldr_context');
-        expect(enabled).toContain('tldr_structure');
-        expect(enabled).toContain('tldr_semantic');
-        expect(enabled).toContain('tldr_calls');
-        expect(enabled).toContain('tldr_impact');
+        expect(enabled).toContain('PreToolUse hook on `Read`');
+        expect(enabled).toContain('.venv/bin/tldr context');
         expect(disabled).not.toContain('## TLDR: Fast Re-Orientation');
         expect(absent).not.toContain('## TLDR: Fast Re-Orientation');
       })
@@ -445,11 +439,8 @@ optional:
         const absent = yield* renderPrompt({ name: 'review', vars: baseVars });
 
         expect(enabled).toContain('## TLDR: Efficient Review Context');
-        expect(enabled).toContain('tldr_context');
-        expect(enabled).toContain('tldr_structure');
-        expect(enabled).toContain('tldr_semantic');
-        expect(enabled).toContain('tldr_calls');
-        expect(enabled).toContain('tldr_impact');
+        expect(enabled).toContain('PreToolUse hook on `Read`');
+        expect(enabled).toContain('.venv/bin/tldr context');
         expect(disabled).not.toContain('## TLDR: Efficient Review Context');
         expect(absent).not.toContain('## TLDR: Efficient Review Context');
       })
@@ -481,11 +472,8 @@ optional:
         const absent = yield* renderPrompt({ name: 'test', vars: baseVars });
 
         expect(enabled).toContain('## TLDR: Efficient Failure Diagnosis');
-        expect(enabled).toContain('tldr_context');
-        expect(enabled).toContain('tldr_structure');
-        expect(enabled).toContain('tldr_semantic');
-        expect(enabled).toContain('tldr_calls');
-        expect(enabled).toContain('tldr_impact');
+        expect(enabled).toContain('PreToolUse hook on `Read`');
+        expect(enabled).toContain('.venv/bin/tldr context');
         expect(disabled).not.toContain('## TLDR: Efficient Failure Diagnosis');
         expect(absent).not.toContain('## TLDR: Efficient Failure Diagnosis');
       })

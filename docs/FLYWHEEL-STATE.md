@@ -828,7 +828,7 @@ Monitor tripped at 3383MB/52min (predicted). System had 32GB headroom so no cris
 
 ## RUN-79 interstitial (~20:55Z) — PAN-3338 convoy dead-end root-caused (PAN-3446) + unblocked
 
-Agent reported discovery-ready failing to launch reviewers. Verified on disk: parent `state.json` has `reviewRunId: null` (status `starting`) while the run dir `.pan/review/agent-pan-3338-review-6130a234/` EXISTS. **Two defects: (1) reviewRunId never durably persisted at discovery-ready — plausibly erased by one of today's restarts; (2) dispatch (`project-routes.ts:665`) 409s instead of deriving the run id from the artifact sitting in the workspace.** Filed **PAN-3446** with both, + the derivation-with-repair fix and its ambiguity guard; **struck**. PAN-3338 unblocked via abort + request (fresh verification → convoy). The agent correctly refused to mutate state — right call, that's how the defect stayed diagnosable.
+Agent reported a convoy launch failing to start reviewers. Verified on disk: parent `state.json` has `reviewRunId: null` (status `starting`) while the run dir `.pan/review/agent-pan-3338-review-6130a234/` EXISTS. **Two defects: (1) reviewRunId was never durably persisted at launch — plausibly erased by one of today's restarts; (2) dispatch (`project-routes.ts:665`) 409s instead of deriving the run id from the artifact sitting in the workspace.** Filed **PAN-3446** with both, + the derivation-with-repair fix and its ambiguity guard; **struck**. PAN-3338 unblocked via abort + request (fresh verification → convoy). The agent correctly refused to mutate state — right call, that's how the defect stayed diagnosable.
 
 ## RUN-79 tick 39 (2026-08-01 ~21:00Z) — P0 PAN-3436 CLOSED OUT (26 total); campaign Lane A item 2 in work
 

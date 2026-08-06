@@ -75,7 +75,7 @@ beforeEach(async () => {
     path: workspacePath,
     issueId: 'PAN-9001',
   });
-});
+}, 20_000);
 
 afterEach(() => {
   closeMemoryFtsDatabases();

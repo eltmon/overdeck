@@ -8,6 +8,7 @@ import type { AgentState } from '../../agents/agent-state.js';
 import {
   COMPACTION_CONTINUE_COOLDOWN_MS,
   buildCompactionContinueMessage,
+  continueCompactedAgentAfterHook,
   maybeContinueCompactedAgent,
   resetCompactionContinuationState,
   shouldContinueAfterCompaction,
@@ -223,6 +224,51 @@ describe('maybeContinueCompactedAgent', () => {
     expect(await call(1_000_000 + COMPACTION_CONTINUE_COOLDOWN_MS - 1)).toBeNull();
     expect(await call(1_000_000 + COMPACTION_CONTINUE_COOLDOWN_MS + 1)).not.toBeNull();
     expect(send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('continueCompactedAgentAfterHook', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits for the idle prompt and re-drives from the PostCompact event', async () => {
+    vi.useFakeTimers();
+    const capturePane = vi.fn()
+      .mockResolvedValueOnce(BUSY_PANE)
+      .mockResolvedValueOnce(IDLE_PANE);
+    const continueAgent = vi.fn(async ({ tmuxOutput }: { tmuxOutput: string }) => (
+      tmuxOutput.includes('❯') ? 'continued from hook' : null
+    ));
+
+    const result = continueCompactedAgentAfterHook({
+      agentId: 'agent-min-901-review',
+      capturePane,
+      send: vi.fn(async () => undefined),
+      findBoundary: vi.fn(async () => 1),
+      readState: () => agentState(),
+      continueAgent: continueAgent as typeof maybeContinueCompactedAgent,
+      attempts: 2,
+      intervalMs: 250,
+    });
+
+    await vi.waitFor(() => expect(capturePane).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(result).resolves.toBe('continued from hook');
+    expect(capturePane).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not poll a gated agent after PostCompact', async () => {
+    const capturePane = vi.fn(async () => IDLE_PANE);
+
+    await expect(continueCompactedAgentAfterHook({
+      agentId: 'agent-min-901-review',
+      capturePane,
+      send: vi.fn(async () => undefined),
+      findBoundary: vi.fn(async () => 1),
+      readState: () => agentState({ paused: true }),
+    })).resolves.toBeNull();
+    expect(capturePane).not.toHaveBeenCalled();
   });
 });
 

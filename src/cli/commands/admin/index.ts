@@ -23,6 +23,7 @@ import { migrateConfigCommand } from '../migrate-config.js';
 import { registerStateMigrationCommand } from './state-migrate.js';
 import { registerReconcileLabelsCommand } from './reconcile-labels.js';
 import { registerMigrateLegacyAgentDirsCommand } from './migrate-legacy-agent-dirs.js';
+import { registerSeedUatFixturesCommand } from './seed-uat-fixtures.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -47,6 +48,7 @@ export function registerAdminCommands(program: Command): void {
   registerStateMigrationCommand(admin);
   registerReconcileLabelsCommand(admin);
   registerMigrateLegacyAgentDirsCommand(admin);
+  registerSeedUatFixturesCommand(admin);
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);

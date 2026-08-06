@@ -8,6 +8,7 @@ CREATE TABLE `agents` (
 	`session_id` text,
 	`harness` text NOT NULL,
 	`model` text NOT NULL,
+	`branch` text,
 	`host_override` text,
 	`delivery_method` text,
 	`started_at` integer,
@@ -42,12 +43,7 @@ CREATE TABLE `agents` (
 	`review_deadline_at` integer,
 	`review_monitor_signaled` text,
 	`review_retry_attempt` integer,
-	`review_discovery_pending` integer,
 	`review_context_manifest_path` text,
-	`review_discovery_ready_at` integer,
-	`review_convoy_forked_at` integer,
-	`review_fork_cache_checked` integer,
-	`review_forked_from_parent` integer,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -99,6 +95,7 @@ CREATE TABLE `conversations` (
 	`delivery_method` text,
 	`spawn_error` text,
 	`workspace_id` text,
+	`project_key` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
 );

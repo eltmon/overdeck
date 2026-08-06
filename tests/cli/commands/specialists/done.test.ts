@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../src/lib/internal-token.js';
 
 const {
   mockSetReviewStatus,
+  mockGetReviewStatus,
   mockDeliverReviewVerdictFeedback,
   mockResolveProject,
   mockReadWorkspacePlan,
@@ -13,6 +15,7 @@ const {
   mockVerdictFallbackPath,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
@@ -28,8 +31,8 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     setReviewStatus: mockSetReviewStatus,
     setReviewStatusSync: mockSetReviewStatus,
-    getReviewStatus: vi.fn(),
-    getReviewStatusSync: vi.fn(),
+    getReviewStatus: mockGetReviewStatus,
+    getReviewStatusSync: mockGetReviewStatus,
   };
 });
 
@@ -61,10 +64,14 @@ vi.mock('node:fs', async (importOriginal) => ({
   existsSync: vi.fn(() => true),
 }));
 
+let currentReviewStatus: Record<string, unknown> | undefined;
+
 describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
+    vi.stubEnv('OVERDECK_INTERNAL_TOKEN', 'test-token');
+    _resetInternalTokenCacheForTests();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
@@ -73,16 +80,20 @@ describe('specialists done command', () => {
     mockVerdictFallbackPath.mockReturnValue(
       '/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json',
     );
+    currentReviewStatus = undefined;
+    mockGetReviewStatus.mockImplementation(() => currentReviewStatus);
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
-      return {
+      currentReviewStatus = {
         issueId: 'PAN-1059',
         reviewStatus: 'blocked',
         testStatus: 'pending',
         updatedAt: new Date().toISOString(),
         readyForMerge: false,
         prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+        ...currentReviewStatus,
         ...update,
       };
+      return currentReviewStatus;
     });
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -99,6 +110,7 @@ describe('specialists done command', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    _resetInternalTokenCacheForTests();
     vi.restoreAllMocks();
   });
 
@@ -297,7 +309,10 @@ describe('specialists done command', () => {
     expect(mockReadWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059');
     expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/done', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-token',
+      },
       body: JSON.stringify({
         specialist: 'inspect',
         issueId: 'PAN-1059',
