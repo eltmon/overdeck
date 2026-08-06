@@ -24,7 +24,8 @@
   dashboard halves, where server and frontend are shrink-only ratchets
   (`scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`) — note
   those two ratchets live in the **typecheck** chain, not the lint chain.
-  `packages/effect-acp` and `packages/contracts` are typechecked by no root gate.
+  `packages/effect-acp` is checked by the root `typecheck:acp` lane; `packages/contracts`
+  remains typechecked by no root gate.
 - **Agent substrate:** tmux on a dedicated `overdeck` socket
   (`tmux -L overdeck`); per-agent state under `~/.overdeck/agents/`;
   harnesses: claude-code, pi, and codex with persistent transports.
