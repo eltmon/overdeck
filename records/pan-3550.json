@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:37:59.168Z",
+  "updated": "2026-08-06T00:38:11.166Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "oom-canary": {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1522854,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:38:11.166Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3550",
@@ -157,6 +165,7 @@
     "top-consumer-attribution.top-consumer-attribution.ac2": "completed",
     "top-consumer-attribution.top-consumer-attribution.ac3": "completed",
     "top-consumer-attribution.top-consumer-attribution.ac4": "completed",
-    "top-consumer-attribution.top-consumer-attribution.ac5": "completed"
+    "top-consumer-attribution.top-consumer-attribution.ac5": "completed",
+    "oom-canary": "running"
   }
 }
