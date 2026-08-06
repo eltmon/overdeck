@@ -38,6 +38,7 @@ import {
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
 import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
@@ -123,10 +124,56 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
     const branchName = `feature/${issueLower}`;
     const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], { cwd: workspacePath, encoding: 'utf-8' });
     const url = stdout.trim();
-    return url || null;
+    if (url) return url;
   } catch {
-    return null;
+    // fall through to the DB fallback below
   }
+  // `gh pr view` needs a real GitHub-backed remote and workspace checkout —
+  // neither exists for the obviously-fake FIX-1 UAT fixture (PAN-3362), whose
+  // review_status row carries a real prUrl written directly through the
+  // canonical write door. Fall back to it whenever the shell lookup finds
+  // nothing, rather than reporting no PR when a persisted one exists.
+  return getReviewStatusSync(issueId)?.prUrl ?? null;
+}
+
+/**
+ * Fallback branch info for a workspace with no real `.git` checkout —
+ * `getGitStatusAsync()` shells real git and returns null there. The
+ * obviously-fake FIX-1 UAT fixture (PAN-3362) has a persisted work-agent
+ * `branch` (written through the canonical agent-state write door) but no
+ * on-disk checkout to shell against, so report that instead of nothing.
+ *
+ * Pure selection over an already-resolved agent list — the caller supplies
+ * it. See getPersistedBranchFallbackAsync() for where that list comes from.
+ */
+export function getPersistedBranchFallback(issueAgents: AgentState[]): {
+  branch: string;
+  uncommittedFiles: number;
+  latestCommit: string;
+} | null {
+  const workAgent = issueAgents.find((a) => a.role === 'work' && a.branch);
+  return workAgent?.branch ? { branch: workAgent.branch, uncommittedFiles: 0, latestCommit: '' } : null;
+}
+
+/**
+ * Reads through the same request-local, TTL-cached agent projection this
+ * route already uses for cost resolution (getCachedRunningAgents(), below)
+ * instead of a fresh per-request SQLite query. Most requests hit the 3-second
+ * in-memory cache directly; the rare cache miss is deduplicated across
+ * concurrent requests by that cache's own single-flight promise, so the
+ * synchronous decode of the agents table happens at most once per TTL window
+ * rather than once per workspace-detail request (review finding, PAN-3362
+ * UAT cycle 4 — the previous fix still ran a fresh synchronous SQLite read
+ * on every request that reached it).
+ */
+export async function getPersistedBranchFallbackAsync(issueId: string): Promise<{
+  branch: string;
+  uncommittedFiles: number;
+  latestCommit: string;
+} | null> {
+  const cachedAgents = await getCachedRunningAgents();
+  const issueAgents = cachedAgents.filter((a) => a.issueId.toUpperCase() === issueId.toUpperCase());
+  return getPersistedBranchFallback(issueAgents);
 }
 async function getIndexStats(workspacePath: string): Promise<{
   fileCount?: number;
@@ -597,13 +644,18 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
+        const [shellGit, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
         ]));
+        // The issue-scoped DB read only runs when Git inspection actually
+        // found nothing — every request with a real .git checkout skips it
+        // entirely (review finding, PAN-3362 UAT cycle 4: it previously ran
+        // unconditionally inside the Promise.all above, on every request).
+        const git = shellGit ?? (yield* Effect.promise(() => getPersistedBranchFallbackAsync(issueId)));
         const sessionNames = yield* listSessionNames();
         const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 

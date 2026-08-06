@@ -17,6 +17,7 @@ type OverdeckAgentRow = {
   session_id: string | null;
   harness: string | null;
   model: string | null;
+  branch: string | null;
   host_override: string | null;
   delivery_method: string | null;
   started_at: number | null;
@@ -66,6 +67,7 @@ export const AGENT_COLUMNS_FOR_DB = [
   'session_id',
   'harness',
   'model',
+  'branch',
   'host_override',
   'delivery_method',
   'started_at',
@@ -138,6 +140,7 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     workspaceId: row.workspace_id ?? undefined,
     role: row.role as Role,
     model: row.model ?? '',
+    branch: row.branch ?? undefined,
     status: row.status as AgentState['status'],
     startedAt: isoFromMillis(row.started_at) ?? isoFromMillis(row.updated_at) ?? new Date().toISOString(),
     harness: row.harness ? (row.harness as RuntimeName) : undefined,
@@ -196,6 +199,7 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.sessionId ?? null,
     state.harness ?? '',
     state.model ?? '',
+    state.branch ?? null,
     hostOverrideToRow(state.hostOverride),
     deliveryMethod,
     millisFromIso(state.startedAt),

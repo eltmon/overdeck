@@ -175,4 +175,52 @@ describe('lint-state-writes.sh', () => {
     expect(ok).toBe(false);
     expect(output).toContain('ad-hoc write to the workspace/project continue file');
   });
+
+  // PAN-3362 review cycle 3: a narrow, documented, path-specific exception
+  // replaces the earlier evasion (splitting the 'continue.json' literal so
+  // the guard could not see it). These three tests prove the exception is
+  // exactly as narrow as claimed: the one declared fixture path is exempt,
+  // any OTHER file — including a same-directory sibling — is still caught,
+  // and the exception list itself cannot silently grow.
+  it('allows the declared UAT fixture continue.json exception at its exact path', () => {
+    const root = makeTempRepo();
+    installScript(root);
+
+    mkdirSync(join(root, 'src', 'lib', 'uat-fixtures'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'lib', 'uat-fixtures', 'seed.ts'),
+      `import { writeFile } from 'node:fs/promises';\nimport { join } from 'node:path';\nexport async function seedUatFixturesLocal(dir: string) {\n  const fixtureContinueFilePath = join(dir, 'continue.json');\n  await writeFile(fixtureContinueFilePath, '{}');\n}\n`,
+    );
+
+    commitAll(root);
+    const { ok, output } = runLint(root);
+    expect(ok).toBe(true);
+    expect(output).toContain('✓ state-write lint passed');
+  });
+
+  it('still fails a continue.json write from a different file in the same uat-fixtures directory', () => {
+    const root = makeTempRepo();
+    installScript(root);
+
+    mkdirSync(join(root, 'src', 'lib', 'uat-fixtures'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'lib', 'uat-fixtures', 'other.ts'),
+      `import { writeFile } from 'node:fs/promises';\nimport { join } from 'node:path';\nexport async function sneakyFixtureWrite(dir: string) {\n  const continuePath = join(dir, 'continue.json');\n  await writeFile(continuePath, '{}');\n}\n`,
+    );
+
+    commitAll(root);
+    const { ok, output } = runLint(root);
+    expect(ok).toBe(false);
+    expect(output).toContain('ad-hoc write to the workspace/project continue file');
+    expect(output).toContain('other.ts');
+  });
+
+  it('CONTINUE_FIXTURE_EXCEPTIONS contains exactly the one declared fixture path', () => {
+    const scriptSrc = readFileSync(SCRIPT_PATH, 'utf-8');
+    const match = scriptSrc.match(/CONTINUE_FIXTURE_EXCEPTIONS=\(([\s\S]*?)\)/);
+    expect(match).not.toBeNull();
+    const body = match![1];
+    const entries = body.split('\n').map((l) => l.trim()).filter((l) => l.startsWith("':!"));
+    expect(entries).toEqual(["':!src/lib/uat-fixtures/seed.ts'"]);
+  });
 });

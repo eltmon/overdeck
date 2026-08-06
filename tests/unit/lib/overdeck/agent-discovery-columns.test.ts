@@ -60,5 +60,26 @@ describe('agents-table review recovery metadata', () => {
       expect(readBack?.startedBy).toBe('flywheel:RUN-71');
       expect(readBack?.reviewContextManifestPath).toBe('/tmp/ws/.pan/review/run/context.json');
     });
+
+    // PAN-3362 UAT: `branch` was a real `agents` column that AGENT_COLUMNS_FOR_DB
+    // never wired up, so it was silently dropped for every agent, not just
+    // fixtures — GET /api/agents always reported branch: null.
+    it('branch survives state → row → state', () => {
+      const state: AgentState = {
+        id: 'agent-pan-9998-work',
+        issueId: 'PAN-9998',
+        workspace: '/tmp/ws-9998',
+        role: 'work',
+        model: 'sonnet',
+        status: 'stopped',
+        startedAt: '2026-08-06T00:00:00.000Z',
+        branch: 'feature/pan-9998',
+      };
+      saveOverdeckAgentStateSync(state);
+
+      const readBack = getOverdeckAgentStateSync('agent-pan-9998-work');
+      expect(readBack).not.toBeNull();
+      expect(readBack?.branch).toBe('feature/pan-9998');
+    });
   });
 });
