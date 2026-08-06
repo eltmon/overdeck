@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:32:49.328Z",
+  "updated": "2026-08-06T00:33:44.480Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,7 +47,7 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
+    "sequence": 9,
     "claims": {
       "top-consumer-attribution": {
         "writerId": "agent-pan-3550",
@@ -55,13 +55,6 @@
         "pid": 1395930,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-06T00:30:39.115Z"
-      },
-      "docs-governor-signals": {
-        "writerId": "agent-pan-3550",
-        "agentId": "agent-pan-3550",
-        "pid": 1428146,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T00:32:49.328Z"
       }
     },
     "claimHistory": [
@@ -97,6 +90,17 @@
         "outcome": "completed",
         "reason": "Memory patrol timer integrated into deacon. 15-second interval with proper cleanup and error handling.",
         "releasedAt": "2026-08-06T00:32:43.181Z"
+      },
+      {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1428146,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:32:49.328Z",
+        "itemId": "docs-governor-signals",
+        "outcome": "completed",
+        "reason": "Documentation updated with activity-feed signals, config table entry, and eviction-ladder correction.",
+        "releasedAt": "2026-08-06T00:33:44.479Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +115,10 @@
       "deacon-memory-timer": {
         "reason": "Memory patrol timer integrated into deacon. 15-second interval with proper cleanup and error handling.",
         "updatedAt": "2026-08-06T00:32:43.181Z"
+      },
+      "docs-governor-signals": {
+        "reason": "Documentation updated with activity-feed signals, config table entry, and eviction-ladder correction.",
+        "updatedAt": "2026-08-06T00:33:44.479Z"
       }
     }
   },
@@ -133,6 +141,10 @@
     "deacon-memory-timer.deacon-memory-timer.ac2": "completed",
     "deacon-memory-timer.deacon-memory-timer.ac3": "completed",
     "deacon-memory-timer.deacon-memory-timer.ac4": "completed",
-    "docs-governor-signals": "running"
+    "docs-governor-signals": "completed",
+    "docs-governor-signals.docs-governor-signals.ac1": "completed",
+    "docs-governor-signals.docs-governor-signals.ac2": "completed",
+    "docs-governor-signals.docs-governor-signals.ac3": "completed",
+    "docs-governor-signals.docs-governor-signals.ac4": "completed"
   }
 }
