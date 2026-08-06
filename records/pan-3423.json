@@ -480,7 +480,7 @@
     "recordedAt": "2026-08-06T00:10:05.676Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:13:58.269Z",
+  "updated": "2026-08-06T00:14:57.306Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -502,7 +502,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewRequestedAt": "2026-08-06T00:10:06.582Z",
+    "reviewRequestedAt": "2026-08-06T00:14:56.918Z",
     "reviewSpawnedAt": "2026-08-06T00:08:27.163Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -532,7 +532,8 @@
         "src/lib/agents/health.ts"
       ],
       "recordedAt": "2026-08-06T00:10:05.676Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-06T00:14:56.918Z"
   },
   "closeOut": {
     "usage": {
