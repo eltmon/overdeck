@@ -392,6 +392,12 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Effect bridging
+
+When a callee returns an Effect, yield it directly; reserve `Effect.promise` and
+`Effect.tryPromise` for Promise-returning thunks. See
+[docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md) for error handling and valid bridges.
+
 ## Verification Gate (PAN-174)
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
