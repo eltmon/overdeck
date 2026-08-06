@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:42:38.452Z",
+  "updated": "2026-08-06T17:42:42.115Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -261,5 +261,33 @@
     "document-effect-bridging.ac3": "completed",
     "document-effect-bridging.ac4": "completed",
     "document-effect-bridging.ac5": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/EFFECT-BRIDGING.md",
+      "docs/INDEX.md",
+      "scripts/dashboard-types-baseline.txt",
+      "src/dashboard/server/routes/specialists/project-routes.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/dashboard/server/routes/workspaces/stash-clean.ts",
+      "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/EFFECT-BRIDGING.md",
+      "docs/INDEX.md",
+      "scripts/dashboard-types-baseline.txt",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/server/routes/specialists/project-routes.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/dashboard/server/routes/workspaces/stash-clean.ts",
+      "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+    ],
+    "recordedAt": "2026-08-06T17:42:42.114Z"
   }
 }
