@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:23:00.780Z",
+  "updated": "2026-08-06T00:23:14.142Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "pressure-level-patrol": {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1282288,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:23:14.142Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3550",
@@ -74,6 +82,7 @@
     "watch-reserve-config.watch-reserve-config.ac1": "completed",
     "watch-reserve-config.watch-reserve-config.ac2": "completed",
     "watch-reserve-config.watch-reserve-config.ac3": "completed",
-    "watch-reserve-config.watch-reserve-config.ac4": "completed"
+    "watch-reserve-config.watch-reserve-config.ac4": "completed",
+    "pressure-level-patrol": "running"
   }
 }
