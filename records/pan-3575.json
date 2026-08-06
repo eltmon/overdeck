@@ -12,11 +12,53 @@
       "timestamp": "2026-08-06T07:21:45.566Z",
       "reason": "start",
       "agentModel": "gpt-5.6-terra"
+    },
+    {
+      "timestamp": "2026-08-06T08:08:46.787Z",
+      "reason": "end",
+      "note": "Anomaly: full npm test ran 1,415 files and timed out in 27 unrelated SQLite setup hooks; the failing files pass in an isolated 3-file run. No deviations. Added the UAT feedback relay, canonical review-status wiring, parked-orbit ownership, sweeper copy, tests, and documentation."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/PARKED-POPULATION.md",
+      "src/lib/__tests__/review-status-uat-failure.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/uat-failure-feedback.ts",
+      "src/lib/parked/__tests__/resolver.test.ts",
+      "src/lib/parked/resolver.ts",
+      "src/lib/review-status.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/PARKED-POPULATION.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "src/lib/__tests__/review-status-uat-failure.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/uat-failure-feedback.ts",
+      "src/lib/parked/__tests__/resolver.test.ts",
+      "src/lib/parked/resolver.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+    ],
+    "recordedAt": "2026-08-06T08:08:19.232Z"
+  },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:08:43.223Z",
+  "updated": "2026-08-06T08:08:46.843Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -25,7 +67,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T08:08:22.729Z",
+    "updatedAt": "2026-08-06T08:08:46.783Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "reviewRequestedAt": "2026-08-06T08:08:22.729Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -63,19 +106,36 @@
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "recordedAt": "2026-08-06T08:08:19.232Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3576"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-terra": {
+            "input": 659518,
+            "output": 49257,
+            "cacheRead": 26925056,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-terra": {
+          "input": 659518,
+          "output": 49257,
+          "cacheRead": 26925056,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-06T07:21:36.384Z"
+        "usd": 9.118941,
+        "pricingAsOf": "2026-08-06T08:08:46.810Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3576"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -198,42 +258,5 @@
     "docs-uat-relay.docs-uat-relay.ac1": "completed",
     "docs-uat-relay.docs-uat-relay.ac2": "completed",
     "docs-uat-relay.docs-uat-relay.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt",
-      "scripts/source-introspection-baseline.txt",
-      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts"
-    ],
-    "declaredScope": [
-      "CLAUDE.md",
-      "docs/PARKED-POPULATION.md",
-      "src/lib/__tests__/review-status-uat-failure.test.ts",
-      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
-      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts",
-      "src/lib/cloister/stall-sweeper.ts",
-      "src/lib/cloister/uat-failure-feedback.ts",
-      "src/lib/parked/__tests__/resolver.test.ts",
-      "src/lib/parked/resolver.ts",
-      "src/lib/review-status.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "docs/PARKED-POPULATION.md",
-      "scripts/file-size-allowlist.txt",
-      "scripts/source-introspection-baseline.txt",
-      "src/lib/__tests__/review-status-uat-failure.test.ts",
-      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
-      "src/lib/cloister/stall-sweeper.ts",
-      "src/lib/cloister/uat-failure-feedback.ts",
-      "src/lib/parked/__tests__/resolver.test.ts",
-      "src/lib/parked/resolver.ts",
-      "src/lib/review-status.ts",
-      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
-    ],
-    "recordedAt": "2026-08-06T08:08:19.232Z"
   }
 }
