@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:39:33.793Z",
+  "updated": "2026-08-06T07:41:52.267Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "parked-orbit-owner": {
-        "writerId": "agent-pan-3575",
-        "agentId": "agent-pan-3575",
-        "pid": 581542,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T07:39:33.793Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3575",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Wired failed UAT status writes through the dynamic feedback relay and added the circular-import regression coverage.",
         "releasedAt": "2026-08-06T07:39:24.819Z"
+      },
+      {
+        "writerId": "agent-pan-3575",
+        "agentId": "agent-pan-3575",
+        "pid": 581542,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T07:39:33.793Z",
+        "itemId": "parked-orbit-owner",
+        "outcome": "completed",
+        "reason": "Suppressed the UAT-failed parked orbit while a live work agent owns rework, with coverage for both ownership states.",
+        "releasedAt": "2026-08-06T07:41:52.267Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "wire-review-status-uat": {
         "reason": "Wired failed UAT status writes through the dynamic feedback relay and added the circular-import regression coverage.",
         "updatedAt": "2026-08-06T07:39:24.819Z"
+      },
+      "parked-orbit-owner": {
+        "reason": "Suppressed the UAT-failed parked orbit while a live work agent owns rework, with coverage for both ownership states.",
+        "updatedAt": "2026-08-06T07:41:52.267Z"
       }
     }
   },
@@ -111,6 +118,9 @@
     "wire-review-status-uat.wire-review-status-uat.ac3": "completed",
     "wire-review-status-uat.wire-review-status-uat.ac4": "completed",
     "wire-review-status-uat.wire-review-status-uat.ac5": "completed",
-    "parked-orbit-owner": "running"
+    "parked-orbit-owner": "completed",
+    "parked-orbit-owner.parked-orbit-owner.ac1": "completed",
+    "parked-orbit-owner.parked-orbit-owner.ac2": "completed",
+    "parked-orbit-owner.parked-orbit-owner.ac3": "completed"
   }
 }
