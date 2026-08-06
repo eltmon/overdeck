@@ -64,10 +64,10 @@
       "src/lib/config-yaml/schema.ts",
       "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
     ],
-    "recordedAt": "2026-08-06T00:40:37.808Z"
+    "recordedAt": "2026-08-06T01:01:02.668Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:00:58.603Z",
+  "updated": "2026-08-06T01:01:02.669Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "blocked",
