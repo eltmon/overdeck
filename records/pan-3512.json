@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T01:32:21.485Z",
+  "updated": "2026-08-06T01:33:00.054Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -2080,28 +2080,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T00:01:06.964Z",
+    "updatedAt": "2026-08-06T01:33:00.031Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-08-05T23:59:36.830Z"
-      },
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 7260c8a (3 paths): packages/contracts/src/events.ts, src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts",
-        "detectedAt": "2026-08-06T00:00:31.905Z"
+        "detectedAt": "2026-08-06T01:33:00.031Z"
       }
     ],
-    "conflictsSince": {
-      "sha": "7260c8afde053f5c82404d673780cbaebe2cc6b6",
-      "detectedAt": "2026-08-06T00:00:31.905Z",
-      "paths": [
-        "packages/contracts/src/events.ts",
-        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-        "src/lib/cloister/review-verdict-writer.ts"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "bbd19558daddaf94e79a206507b204b34362136a",
     "reviewSpawnedAt": "2026-08-03T00:29:14.386Z"
@@ -2202,7 +2188,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.9107007,
-        "pricingAsOf": "2026-08-06T00:01:06.974Z"
+        "pricingAsOf": "2026-08-06T01:33:00.046Z"
       }
     },
     "merges": [
