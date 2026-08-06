@@ -302,6 +302,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T08:01:36.686Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-06T08:15:00.749Z"
     }
   ],
   "feedback": [],
@@ -346,7 +351,7 @@
     "recordedAt": "2026-08-04T18:22:51.745Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-06T08:14:37.259Z",
+  "updated": "2026-08-06T08:15:00.750Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "passed",
@@ -357,7 +362,7 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-04T18:29:48.357Z",
-    "updatedAt": "2026-08-06T08:14:37.070Z",
+    "updatedAt": "2026-08-06T08:15:00.500Z",
     "reviewNotes": "Agent re-review request (2/25): Re-dispatching after clearing a review_infrastructure_failure stuck gate: the convoy machinery that failed has since been replaced on main (PAN-3552 simplification + PAN-3511 verdict-of-record). Fresh review cycle against current head.",
     "testNotes": "Verified HEAD e00985f0004f6f0d2e6f4151594d1f2c6ff5c0fb (clean, feature/pan-3418, workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418). Ran the full configured quality_gates from projects.yaml: install (`bun install --frozen-lockfile`) PASSES. `npm run typecheck` PASSES (root tsc, hooks, evals, dashboard-types guard 47 known/0 new, frontend-types guard 0 known/0 new). `npx tsc --noEmit` in src/dashboard/frontend PASSES with 0 errors. `npm run lint` PASSES all 12 sub-checks (skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 56 baselined/0 new, ratchet-audit, quarantine-audit 12 entries). `npm run build` PASSES (contracts, CLI, dashboard frontend+server bundle, dist-externals lint: 21 external packages across 2866 dist files, all declared/resolvable). `npm run build:dashboard:server:bundle` PASSES standalone. Test gate `OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main` for root and frontend run in parallel per the configured command: root 577/579 test files passed (2 pre-existing skips), 5522/5549 tests passed (20 pre-existing skips), zero failures; frontend 43/43 files, 648/648 tests passed, zero failures. All 5 in-scope xBRIEF items (server-coerce-empty-fields, db-writes-null-for-empty, widen-backfill-predicate, harness-chip-independent-of-model, picker-reseeds-after-model-list-load) have their dedicated regression test files passing within this run: tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts, tests/unit/lib/overdeck/conversations-empty-model.test.ts, tests/unit/lib/overdeck/conversations-model-backfill.test.ts, src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx, src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx. The 6th xBRIEF item verify-live-data-repair is explicitly deferred to verify-on-main/close-out per its own narrative (readiness: sequential — cannot execute before this branch merges and deploys); it is not part of pre-merge scope and its child ACs are marked cancelled in statusOverrides. No code, tests, fixtures, or config were modified by this test run. UAT judged not required: no xBRIEF item declares playwright/browser verify_commands, the PRD draft (drafts/pan-3418.md on overdeck-state) contains no browser/UAT/manual-verification wording (grep confirmed), the GitHub issue body and comments contain none either, and every acceptance criterion across all 5 in-scope items is stated as an observable unit/component-level Given/When/Then already covered by passing tests, including real-DOM RTL assertions that the harness chip renders independently of model and that the picker re-seeds after model-list load.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
@@ -489,10 +494,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2499,
-            "output": 141454,
-            "cacheRead": 52014234,
-            "cacheWrite": 1047387
+            "input": 2501,
+            "output": 141905,
+            "cacheRead": 52194911,
+            "cacheWrite": 1048685
           }
         },
         "work": {
@@ -524,15 +529,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2499,
-          "output": 141454,
-          "cacheRead": 52014234,
-          "cacheWrite": 1047387
+          "input": 2501,
+          "output": 141905,
+          "cacheRead": 52194911,
+          "cacheWrite": 1048685
         }
       },
       "costAtCloseOut": {
-        "usd": 277.4730441,
-        "pricingAsOf": "2026-08-06T08:14:37.223Z"
+        "usd": 277.5169381,
+        "pricingAsOf": "2026-08-06T08:15:00.563Z"
       }
     },
     "merges": [
