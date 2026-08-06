@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:59:49.057Z",
+  "updated": "2026-08-06T17:01:08.914Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "test-container-guard": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2458677,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:59:49.057Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Extracted a direct Effect-based container guard that returns fail-closed 409 or 500 verdicts before backups or deletion.",
         "releasedAt": "2026-08-06T16:58:26.436Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2458677,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:59:49.057Z",
+        "itemId": "test-container-guard",
+        "outcome": "completed",
+        "reason": "Added three isolated regression cases for empty, non-empty, and failed Docker container enumeration.",
+        "releasedAt": "2026-08-06T17:01:08.914Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "extract-container-guard": {
         "reason": "Extracted a direct Effect-based container guard that returns fail-closed 409 or 500 verdicts before backups or deletion.",
         "updatedAt": "2026-08-06T16:58:26.436Z"
+      },
+      "test-container-guard": {
+        "reason": "Added three isolated regression cases for empty, non-empty, and failed Docker container enumeration.",
+        "updatedAt": "2026-08-06T17:01:08.914Z"
       }
     }
   },
@@ -189,6 +196,10 @@
     "extract-container-guard.ac3": "completed",
     "extract-container-guard.ac4": "completed",
     "extract-container-guard.ac5": "completed",
-    "test-container-guard": "running"
+    "test-container-guard": "completed",
+    "test-container-guard.ac1": "completed",
+    "test-container-guard.ac2": "completed",
+    "test-container-guard.ac3": "completed",
+    "test-container-guard.ac4": "completed"
   }
 }
