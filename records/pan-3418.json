@@ -336,18 +336,18 @@
     "recordedAt": "2026-08-04T18:22:51.745Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-06T07:26:14.499Z",
+  "updated": "2026-08-06T07:26:20.627Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T18:29:48.357Z",
-    "updatedAt": "2026-08-06T07:26:14.455Z",
+    "updatedAt": "2026-08-06T07:26:14.988Z",
     "reviewNotes": "Agent re-review request (2/25): Re-dispatching after clearing a review_infrastructure_failure stuck gate: the convoy machinery that failed has since been replaced on main (PAN-3552 simplification + PAN-3511 verdict-of-record). Fresh review cycle against current head.",
     "testNotes": "Verified HEAD ec8b850ddfa0ad517db48dfa4c23a7bf39c3f465 (clean, feature/pan-3418, workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418; contains a clean local merge of origin/main plus a follow-up fix(cli) commit for the done-preflight cancelled-item cascade). Ran the full configured quality_gates from projects.yaml: install (`bun install --frozen-lockfile`) PASSES. `npm run typecheck` PASSES (root tsc, hooks, evals, dashboard-types guard 55 known/0 new, frontend-types guard 0 known/0 new) -- re-run against this exact HEAD after a late in-flight commit landed mid-gate-run, to avoid a mixed-tree result. `npx tsc --noEmit` in src/dashboard/frontend PASSES -- also re-run against this exact HEAD for the same reason. `npm run lint` PASSES all 19 sub-checks (skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 76 baselined/0 new, ratchet-audit, quarantine-audit 12 entries) -- also re-run against this exact HEAD. `npm run build` PASSES (contracts, pi/ohmypi extensions, CLI, dashboard frontend+server bundle, dist-externals lint). `npm run build:dashboard:server:bundle` PASSES standalone. Test gate `OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main` for root and frontend in parallel per the configured command: frontend 42/42 files, 631/631 tests PASS; root 567/569 files (2 pre-existing skips), 5459/5486 tests PASS (20 pre-existing skips), zero failures -- clean run, no flakes this time. All 5 in-scope xBRIEF items (server-coerce-empty-fields, db-writes-null-for-empty, widen-backfill-predicate, harness-chip-independent-of-model, picker-reseeds-after-model-list-load) have their dedicated regression test files passing within this run: tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts, tests/unit/lib/overdeck/conversations-empty-model.test.ts, tests/unit/lib/overdeck/conversations-model-backfill.test.ts, src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx, src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx. The 6th xBRIEF item verify-live-data-repair is explicitly deferred to verify-on-main/close-out per its own narrative (readiness: sequential -- cannot execute before this branch merges and deploys); not part of pre-merge scope. NOTE: this workspace's work agent (agent-pan-3418) was still active during this run and landed one additional commit (ec8b850ddfa, fix(cli): ignore cancelled criteria at done preflight, 2 files/24 lines) partway through gate execution. typecheck/frontend-typecheck/lint were re-run after that commit landed to guarantee every gate reflects the identical final HEAD; build/server-bundle/test already postdated it. No code, tests, fixtures, or config were modified by this test run. UAT judged not required: no xBRIEF item declares playwright/browser verify_commands, the PRD draft (drafts/pan-3418.md) contains no browser/UAT/manual-verification wording, and every acceptance criterion across all 5 in-scope items is stated as an observable unit/component-level Given/When/Then already covered by passing tests, including real-DOM component assertions that the harness chip renders independently of model and that the picker re-seeds after model-list load.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
@@ -484,7 +484,7 @@
       },
       "costAtCloseOut": {
         "usd": 265.4436261,
-        "pricingAsOf": "2026-08-06T07:26:14.493Z"
+        "pricingAsOf": "2026-08-06T07:26:17.714Z"
       }
     },
     "merges": [
