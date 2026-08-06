@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:15:17.035Z",
+  "updated": "2026-08-06T18:15:20.202Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -26,8 +26,53 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T17:11:40.080Z",
-    "inspectNotes": "All 5 ACs verified: four diag tsconfigs extend their sibling ./tsconfig.json (identical blob 8e78f192e9) with includeSuggestionsInTsc=false and both ignoreEffect*InTscExitCode=true; git grep '\"plugins\"' over real tsconfigs prints nothing; acp base-vs-diag tsc --listFiles diff is empty (both exit 0); root diag lane exits 0 with no TS5058/TS5024, other three resolve cleanly. NFR-1 holds: dashboard ratchet 47 known/none new, frontend ratchet 0/none new."
+    "updatedAt": "2026-08-06T18:15:20.199Z",
+    "inspectNotes": "All 5 ACs verified: four diag tsconfigs extend their sibling ./tsconfig.json (identical blob 8e78f192e9) with includeSuggestionsInTsc=false and both ignoreEffect*InTscExitCode=true; git grep '\"plugins\"' over real tsconfigs prints nothing; acp base-vs-diag tsc --listFiles diff is empty (both exit 0); root diag lane exits 0 with no TS5058/TS5024, other three resolve cleanly. NFR-1 holds: dashboard ratchet 47 known/none new, frontend ratchet 0/none new.",
+    "reviewRequestedAt": "2026-08-06T18:15:20.199Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".overdeck/context/codebase/stack.md"
+      ],
+      "declaredScopeUntouched": [
+        "scripts/postinstall.mjs"
+      ],
+      "declaredScope": [
+        "CLAUDE.md",
+        "bun.lock",
+        "docs/EFFECT-DIAGNOSTICS.md",
+        "package.json",
+        "packages/contracts/tsconfig.effect-diag.json",
+        "packages/effect-acp/tsconfig.effect-diag.json",
+        "roles/review-correctness.md",
+        "scripts/effect-diagnostics-baseline.txt",
+        "scripts/lint-effect-diagnostics.sh",
+        "scripts/lint-ratchet-audit.sh",
+        "scripts/postinstall.mjs",
+        "src/dashboard/server/tsconfig.effect-diag.json",
+        "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+        "tests/unit/scripts/lint-ratchet-audit.test.ts",
+        "tsconfig.effect-diag.json"
+      ],
+      "actualChangedFiles": [
+        ".overdeck/context/codebase/stack.md",
+        "CLAUDE.md",
+        "bun.lock",
+        "docs/EFFECT-DIAGNOSTICS.md",
+        "package.json",
+        "packages/contracts/tsconfig.effect-diag.json",
+        "packages/effect-acp/tsconfig.effect-diag.json",
+        "roles/review-correctness.md",
+        "scripts/effect-diagnostics-baseline.txt",
+        "scripts/lint-effect-diagnostics.sh",
+        "scripts/lint-ratchet-audit.sh",
+        "src/dashboard/server/tsconfig.effect-diag.json",
+        "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+        "tests/unit/scripts/lint-ratchet-audit.test.ts",
+        "tsconfig.effect-diag.json"
+      ],
+      "recordedAt": "2026-08-06T18:15:17.034Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3578"
   },
   "closeOut": {
     "usage": {
