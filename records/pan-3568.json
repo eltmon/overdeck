@@ -99,7 +99,7 @@
     "recordedAt": "2026-08-06T18:15:17.034Z"
   },
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T19:28:41.995Z",
+  "updated": "2026-08-06T19:28:44.564Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "passed",
@@ -107,11 +107,11 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T18:16:15.623Z",
-    "updatedAt": "2026-08-06T19:28:41.962Z",
+    "updatedAt": "2026-08-06T19:28:42.167Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issue: corrected the codebase stack context to identify the root typecheck:acp lane.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -226,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.544057,
-        "pricingAsOf": "2026-08-06T19:28:41.965Z"
+        "pricingAsOf": "2026-08-06T19:28:44.559Z"
       }
     },
     "merges": [
