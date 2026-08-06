@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:33:44.480Z",
+  "updated": "2026-08-06T00:37:59.168Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "top-consumer-attribution": {
-        "writerId": "agent-pan-3550",
-        "agentId": "agent-pan-3550",
-        "pid": 1395930,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T00:30:39.115Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3550",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Documentation updated with activity-feed signals, config table entry, and eviction-ladder correction.",
         "releasedAt": "2026-08-06T00:33:44.479Z"
+      },
+      {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1395930,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:30:39.115Z",
+        "itemId": "top-consumer-attribution",
+        "outcome": "completed",
+        "reason": "topMemoryConsumers() implemented with upward parent-chain walk for session attribution. All ACs met.",
+        "releasedAt": "2026-08-06T00:37:59.168Z"
       }
     ],
     "statusReasons": {
@@ -119,6 +122,10 @@
       "docs-governor-signals": {
         "reason": "Documentation updated with activity-feed signals, config table entry, and eviction-ladder correction.",
         "updatedAt": "2026-08-06T00:33:44.479Z"
+      },
+      "top-consumer-attribution": {
+        "reason": "topMemoryConsumers() implemented with upward parent-chain walk for session attribution. All ACs met.",
+        "updatedAt": "2026-08-06T00:37:59.168Z"
       }
     }
   },
@@ -135,7 +142,7 @@
     "pressure-level-patrol.pressure-level-patrol.ac4": "completed",
     "pressure-level-patrol.pressure-level-patrol.ac5": "completed",
     "pressure-level-patrol.pressure-level-patrol.ac6": "completed",
-    "top-consumer-attribution": "running",
+    "top-consumer-attribution": "completed",
     "deacon-memory-timer": "completed",
     "deacon-memory-timer.deacon-memory-timer.ac1": "completed",
     "deacon-memory-timer.deacon-memory-timer.ac2": "completed",
@@ -145,6 +152,11 @@
     "docs-governor-signals.docs-governor-signals.ac1": "completed",
     "docs-governor-signals.docs-governor-signals.ac2": "completed",
     "docs-governor-signals.docs-governor-signals.ac3": "completed",
-    "docs-governor-signals.docs-governor-signals.ac4": "completed"
+    "docs-governor-signals.docs-governor-signals.ac4": "completed",
+    "top-consumer-attribution.top-consumer-attribution.ac1": "completed",
+    "top-consumer-attribution.top-consumer-attribution.ac2": "completed",
+    "top-consumer-attribution.top-consumer-attribution.ac3": "completed",
+    "top-consumer-attribution.top-consumer-attribution.ac4": "completed",
+    "top-consumer-attribution.top-consumer-attribution.ac5": "completed"
   }
 }
