@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:39:51.108Z",
+  "updated": "2026-08-06T17:44:28.920Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "ratchet-audit-wiring": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 3215502,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:39:51.107Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -147,6 +139,17 @@
         "outcome": "completed",
         "reason": "Seeded the 308-finding Effect diagnostics baseline, wired it into npm run lint, and verified lint plus existing typecheck ratchets remain green.",
         "releasedAt": "2026-08-06T17:39:42.084Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3215502,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:39:51.107Z",
+        "itemId": "ratchet-audit-wiring",
+        "outcome": "completed",
+        "reason": "Audited Effect diagnostics baseline growth with issue-reference enforcement, a first-baseline bootstrap exemption, and coverage for growth, shrink, and header-only edits.",
+        "releasedAt": "2026-08-06T17:44:28.920Z"
       }
     ],
     "statusReasons": {
@@ -173,6 +176,10 @@
       "lint-chain-wiring": {
         "reason": "Seeded the 308-finding Effect diagnostics baseline, wired it into npm run lint, and verified lint plus existing typecheck ratchets remain green.",
         "updatedAt": "2026-08-06T17:39:42.084Z"
+      },
+      "ratchet-audit-wiring": {
+        "reason": "Audited Effect diagnostics baseline growth with issue-reference enforcement, a first-baseline bootstrap exemption, and coverage for growth, shrink, and header-only edits.",
+        "updatedAt": "2026-08-06T17:44:28.920Z"
       }
     }
   },
@@ -210,6 +217,10 @@
     "lint-chain-wiring.ac2": "completed",
     "lint-chain-wiring.ac3": "completed",
     "lint-chain-wiring.ac4": "completed",
-    "ratchet-audit-wiring": "running"
+    "ratchet-audit-wiring": "completed",
+    "ratchet-audit-wiring.ac1": "completed",
+    "ratchet-audit-wiring.ac2": "completed",
+    "ratchet-audit-wiring.ac3": "completed",
+    "ratchet-audit-wiring.ac4": "completed"
   }
 }
