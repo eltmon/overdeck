@@ -485,7 +485,7 @@
     "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T15:03:08.868Z",
+  "updated": "2026-08-06T15:16:44.390Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
@@ -498,7 +498,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T13:03:52.466Z",
-    "updatedAt": "2026-08-06T15:03:05.997Z",
+    "updatedAt": "2026-08-06T15:16:44.306Z",
     "testNotes": "Ran from workspace feature-pan-3362 at HEAD ecb64320f0 (branch fully caught up with origin/main). All gates per projects.yaml green: install, typecheck (root+hooks+evals+dashboard/frontend guards), lint (all sub-checks incl. skills/slash-commands/prompt-trailer/file-size/circular/ratchet/quarantine), build, server-bundle, and test (root 7297 passed/20 skipped, frontend 3058/3058 passed) on the changed-base gate against merge-base 036e90b9a6.",
     "uatNotes": "Restarted workspace's own container to HEAD ecb64320f0, ran pan admin seed-uat-fixtures pan-3362 successfully, and verified FIX-1's issue detail in Playwright against https://feature-pan-3362.overdeck.localhost/issues/FIX-1. All 6 elements cli-command.ac2 requires are now met: phase (crew spine), branch feature/fix-1 (Overview tab Workspace section), PR link (View PR opens github.com/uat-fixtures/repo/pull/1), 4 review-convoy rows (all Done), Tasks tab non-zero badge with 3 tasks listed (previously diverged from Overview, now consistent), and non-empty Activity feed (4 fixture entries). The branch/PR-link/tasks-badge gaps from the prior UAT cycle are resolved.",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
@@ -569,7 +569,9 @@
         "tests/unit/scripts/lint-state-writes.test.ts"
       ],
       "recordedAt": "2026-08-06T13:03:16.599Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-06T15:16:44.306Z"
   },
   "closeOut": {
     "usage": {
@@ -689,7 +691,86 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3402"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-06T15:16:44.389Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at ecb64320f01d671703c40608190497cb6c2c3a10",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; forge metadata unavailable: GitHub App PR lookup failed: GitHub API GET /repos/eltmon/overdeck/pulls?head=eltmon%3Afeature%2Fpan-3362&state=all failed: 403 {\n\t\"message\": \"API rate limit exceeded for installation ID 144090266. If you reach out to GitHub Support for help, please include the request ID 9BE2:2F379B:2B0E31:922A13:6A74A546 and timestamp 2026-08-06 15:16:22 UTC. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https:\\/\\/docs.github.com\\/en\\/site-policy\\/github-terms\\/github-terms-of-service)\",\n\t\"documentation_url\": \"https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api#rate-limiting\",\n\t\"status\": \"403\"\n}\n",
+          "status": "pass"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
+          "status": "skip"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)",
+          "status": "skip"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 9 agent state directories (9 transcript files preserved); No strike branch strike/pan-3362 found; Pruned 710 checkpoint ref(s) for agent-pan-3362, planning-pan-3362, strike-pan-3362; No specialist registry entries for PAN-3362"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
