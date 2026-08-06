@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:55:44.901Z",
+  "updated": "2026-08-06T08:57:24.144Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -102,7 +102,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z",
     "updatedAt": "2026-08-06T08:55:44.874Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
