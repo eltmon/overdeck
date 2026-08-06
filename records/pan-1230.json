@@ -48,7 +48,7 @@
   ],
   "feedback": [],
   "created": "2026-08-03T03:40:59.452Z",
-  "updated": "2026-08-06T21:19:29.981Z",
+  "updated": "2026-08-06T22:20:25.801Z",
   "pipeline": {
     "issueId": "PAN-1230",
     "reviewStatus": "passed",
@@ -57,8 +57,10 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T21:19:29.969Z",
-    "testNotes": "Skipped: issue is already merged"
+    "updatedAt": "2026-08-06T22:20:25.787Z",
+    "testNotes": "Skipped: issue is already merged",
+    "closedOut": true,
+    "closedOutAt": "2026-08-06T22:20:25.787Z"
   },
   "closeOut": {
     "usage": {
@@ -70,7 +72,88 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-06T22:20:25.797Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing; verification satisfied by green main CI after landing",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #1239 MERGED at 2026-05-21T02:46:28Z",
+          "status": "pass",
+          "mergedAt": "2026-05-21T02:46:28Z",
+          "mergeCommit": "c0ac01befdc7a44f533048fd2e3dc9329f5a190b"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on c0ac01befdc7a44f533048fd2e3dc9329f5a190b: guard; verified on main by later green CI run cc366a3a97fadc2ef659bbb03faef057527c9c48 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit cc366a3a contains merge c0ac01be",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No strike worktree found; No agent state directories found; No strike branch strike/pan-1230 found; Pruned 0 checkpoint ref(s) for agent-pan-1230, planning-pan-1230, strike-pan-1230; No specialist registry entries for PAN-1230"
+        }
+      ],
+      "accepted": []
+    }
   },
   "recoveryTrips": [
     {
