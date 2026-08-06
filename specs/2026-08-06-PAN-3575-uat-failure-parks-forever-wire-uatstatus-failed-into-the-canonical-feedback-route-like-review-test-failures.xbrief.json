@@ -4,17 +4,17 @@
     "created": "2026-08-06T07:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3575: UAT failure parks forever — wire uatStatus=failed into the canonical feedback route like review/test failures",
-    "updated": "2026-08-06T07:20:58.682Z"
+    "updated": "2026-08-06T07:21:43.470Z"
   },
   "plan": {
     "id": "pan-3575",
     "title": "UAT failure parks forever — wire uatStatus=failed into the canonical feedback route like review/test failures",
-    "status": "proposed",
+    "status": "running",
     "uid": "27b41c4c-c9b4-42f7-b95f-8b9555c2ea04",
     "author": "agent:claude-opus-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-06T07:40:00.000Z",
-    "updated": "2026-08-06T07:20:58.682Z",
+    "updated": "2026-08-06T07:21:43.470Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3575",
@@ -443,5 +443,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
