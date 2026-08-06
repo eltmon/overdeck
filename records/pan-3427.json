@@ -226,7 +226,7 @@
     "recordedAt": "2026-08-02T21:47:33.880Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-06T09:22:07.832Z",
+  "updated": "2026-08-06T09:26:54.259Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "passed",
@@ -239,10 +239,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-06T09:22:06.705Z",
+    "updatedAt": "2026-08-06T09:26:54.247Z",
     "mergeNotes": "Work agent did not push the rebased branch within 30 minutes",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
-    "reviewedAtCommit": "0da53b0d6a1432e4a66c2b3eeed3b3506c0d9e64",
+    "reviewedAtCommit": "b06dbc928901cfd65bb652ccc650bf7883079b9b",
     "reviewSpawnedAt": "2026-08-02T21:46:04.830Z"
   },
   "closeOut": {
@@ -306,10 +306,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5963,
-            "output": 226209,
-            "cacheRead": 175887421,
-            "cacheWrite": 9409938
+            "input": 5989,
+            "output": 234952,
+            "cacheRead": 178482408,
+            "cacheWrite": 9608677
           }
         }
       },
@@ -327,15 +327,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6117,
-          "output": 251323,
-          "cacheRead": 191524309,
-          "cacheWrite": 9654809
+          "input": 6143,
+          "output": 260066,
+          "cacheRead": 194119296,
+          "cacheWrite": 9853548
         }
       },
       "costAtCloseOut": {
-        "usd": 159.3978523,
-        "pricingAsOf": "2026-08-06T09:22:07.738Z"
+        "usd": 160.5011783,
+        "pricingAsOf": "2026-08-06T09:26:54.252Z"
       }
     },
     "merges": [
