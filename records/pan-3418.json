@@ -314,6 +314,8 @@
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+      "src/lib/pan-dir/__tests__/task-door.test.ts",
+      "src/lib/pan-dir/task-door.ts",
       "src/lib/work/__tests__/done-preflight-checklist.test.ts",
       "src/lib/work/done-preflight.ts",
       "tests/unit/lib/agents/spawn-flywheel-provenance.test.ts",
@@ -340,6 +342,8 @@
       "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
       "src/lib/overdeck/conversation-runtime.ts",
       "src/lib/overdeck/conversations.ts",
+      "src/lib/pan-dir/__tests__/task-door.test.ts",
+      "src/lib/pan-dir/task-door.ts",
       "src/lib/work/__tests__/done-preflight-checklist.test.ts",
       "src/lib/work/done-preflight.ts",
       "tests/unit/lib/agents/spawn-flywheel-provenance.test.ts",
@@ -348,10 +352,10 @@
       "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
       "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
     ],
-    "recordedAt": "2026-08-04T18:22:51.745Z"
+    "recordedAt": "2026-08-06T09:11:11.873Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-06T09:11:08.496Z",
+  "updated": "2026-08-06T09:11:11.874Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "passed",
