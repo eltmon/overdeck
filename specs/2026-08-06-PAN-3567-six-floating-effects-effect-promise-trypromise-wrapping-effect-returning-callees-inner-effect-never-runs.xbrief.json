@@ -4,17 +4,17 @@
     "created": "2026-08-06T16:45:11.955Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3567: Six floating Effects: Effect.promise/tryPromise wrapping Effect-returning callees — inner Effect never runs",
-    "updated": "2026-08-06T16:50:03.640Z"
+    "updated": "2026-08-06T16:50:37.432Z"
   },
   "plan": {
     "id": "pan-3567",
     "title": "Six floating Effects: Effect.promise/tryPromise wrapping Effect-returning callees — inner Effect never runs",
-    "status": "proposed",
+    "status": "running",
     "uid": "6d32ceeb-fa6c-4599-b387-df68c2cace37",
     "author": "agent:claude-opus-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-06T16:45:11.955Z",
-    "updated": "2026-08-06T16:50:03.640Z",
+    "updated": "2026-08-06T16:50:37.432Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3567",
@@ -763,5 +763,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
