@@ -114,7 +114,7 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:15:27.564Z",
+  "updated": "2026-08-06T01:15:30.060Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -124,7 +124,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T01:15:21.625Z",
-    "updatedAt": "2026-08-06T01:15:27.484Z",
+    "updatedAt": "2026-08-06T01:15:29.297Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3574",
     "reviewedAtCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
@@ -233,7 +233,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.462498,
-        "pricingAsOf": "2026-08-06T01:15:27.558Z"
+        "pricingAsOf": "2026-08-06T01:15:29.982Z"
       }
     },
     "merges": [
