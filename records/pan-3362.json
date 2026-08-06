@@ -172,6 +172,11 @@
       "timestamp": "2026-08-06T07:39:52.372Z",
       "reason": "end",
       "note": "Fixed UAT-reported bug: seeded FIX-1 workspace was missing every marker (.git/.devcontainer/CLAUDE.md) that GET /api/workspaces/FIX-1 checks for validity, so it always reported corrupted:true and the Plan tab 404'd on /plan and /tasks even though the xBRIEF was correctly seeded on disk. Fix writes an obviously-fake CLAUDE.md at the fixture workspace root. No deviations from the requested fix."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T08:01:40.745Z"
     }
   ],
   "feedback": [],
@@ -210,7 +215,7 @@
     "recordedAt": "2026-08-06T07:39:46.028Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T08:01:39.314Z",
+  "updated": "2026-08-06T08:01:40.760Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "reviewing",
@@ -386,7 +391,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
