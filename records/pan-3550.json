@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:30:28.694Z",
+  "updated": "2026-08-06T00:30:39.115Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "top-consumer-attribution": {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1395930,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:30:39.115Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3550",
@@ -96,6 +104,7 @@
     "pressure-level-patrol.pressure-level-patrol.ac3": "completed",
     "pressure-level-patrol.pressure-level-patrol.ac4": "completed",
     "pressure-level-patrol.pressure-level-patrol.ac5": "completed",
-    "pressure-level-patrol.pressure-level-patrol.ac6": "completed"
+    "pressure-level-patrol.pressure-level-patrol.ac6": "completed",
+    "top-consumer-attribution": "running"
   }
 }
