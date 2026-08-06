@@ -103,6 +103,21 @@ describe('Definition-of-Done status rows', () => {
     });
   });
 
+  it('accepts missing verification verdicts when merged work is green on main', async () => {
+    // An out-of-band landing bypasses merge-ops, which normally writes the
+    // verdict for CI-green skip. Merge plus main-CI evidence is still sufficient.
+    const row = await checkVerificationRow(
+      issueId,
+      deps(live({ verificationStatus: undefined, lastVerifiedCommit: undefined })),
+      { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
+    );
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: 'verificationStatus: missing; verification satisfied by green main CI after landing',
+    });
+  });
+
   it('falls back to durable pipeline journal verdicts after live status is cleared', async () => {
     const source = deps(null, journal());
     for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
