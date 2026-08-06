@@ -4,17 +4,17 @@
     "created": "2026-08-01T07:25:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3362: No way to seed tracker-backed issue fixtures in workspace containers — every UI-redesign UAT is environment-blocked and needs an operator override",
-    "updated": "2026-08-01T10:19:12.322Z"
+    "updated": "2026-08-06T15:16:23.061Z"
   },
   "plan": {
     "id": "pan-3362",
     "title": "Seed tracker-backed issue fixtures into workspace containers for UI UAT",
-    "status": "running",
+    "status": "completed",
     "uid": "611defa2-c287-4d6f-a8e2-cf6e9785665f",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T07:25:00.000Z",
-    "updated": "2026-08-01T10:19:12.322Z",
+    "updated": "2026-08-06T15:16:23.061Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3362",
@@ -355,5 +355,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
