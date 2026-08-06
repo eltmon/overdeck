@@ -124,18 +124,18 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:27:41.422Z",
+  "updated": "2026-08-06T01:27:43.867Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merging",
-    "mergeStep": "validating-pr",
+    "mergeStep": "stripping-planning",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T01:15:21.625Z",
-    "updatedAt": "2026-08-06T01:27:41.391Z",
+    "updatedAt": "2026-08-06T01:27:43.026Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -246,7 +246,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.615861,
-        "pricingAsOf": "2026-08-06T01:27:41.418Z"
+        "pricingAsOf": "2026-08-06T01:27:43.861Z"
       }
     },
     "merges": [
