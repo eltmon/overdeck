@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:22:21.946Z",
+  "updated": "2026-08-06T07:34:04.706Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,18 +53,34 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "uat-relay-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3575",
         "agentId": "agent-pan-3575",
         "pid": 4114359,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T07:22:21.945Z"
+        "claimedAt": "2026-08-06T07:22:21.945Z",
+        "itemId": "uat-relay-module",
+        "outcome": "completed",
+        "reason": "Added the deduplicating UAT feedback relay with target-door delivery, needs-you escalation, and unit coverage.",
+        "releasedAt": "2026-08-06T07:34:04.706Z"
+      }
+    ],
+    "statusReasons": {
+      "uat-relay-module": {
+        "reason": "Added the deduplicating UAT feedback relay with target-door delivery, needs-you escalation, and unit coverage.",
+        "updatedAt": "2026-08-06T07:34:04.706Z"
       }
     }
   },
   "statusOverrides": {
-    "uat-relay-module": "running"
+    "uat-relay-module": "completed",
+    "uat-relay-module.uat-relay-module.ac1": "completed",
+    "uat-relay-module.uat-relay-module.ac2": "completed",
+    "uat-relay-module.uat-relay-module.ac3": "completed",
+    "uat-relay-module.uat-relay-module.ac4": "completed",
+    "uat-relay-module.uat-relay-module.ac5": "completed"
   }
 }
