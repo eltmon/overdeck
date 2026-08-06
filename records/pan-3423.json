@@ -452,6 +452,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T00:15:38.553Z"
+    },
+    {
+      "timestamp": "2026-08-06T00:17:28.618Z",
+      "reason": "end",
+      "note": "Fixed System Health singleton attention audit: the singleton row deliberately names its agent rather than the grouped reason label, so the audit now verifies the subject, duration, Open, and Kill actions."
     }
   ],
   "feedback": [],
@@ -485,7 +490,7 @@
     "recordedAt": "2026-08-06T00:17:20.709Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:17:21.840Z",
+  "updated": "2026-08-06T00:17:28.667Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -496,7 +501,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T00:17:21.838Z",
+    "updatedAt": "2026-08-06T00:17:28.614Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (100506ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (13 tests | 1 failed) 302ms\n     × shows singleton identity, duration, Open, and Kill actions when critical 15ms\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 79 passed (80)\n   Start at  20:14:57\n   Duration  3.01s (transform 1.67s, setup 527ms, import 3.48s, tests 963ms, environment 872ms)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-liWJWI/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace alread\n…(416 chars elided)…\n] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agen\n...(truncated)",
     "conflictsSince": {
@@ -554,9 +559,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 27321674,
-            "output": 365912,
-            "cacheRead": 106793472,
+            "input": 27517668,
+            "output": 368266,
+            "cacheRead": 108470784,
             "cacheWrite": 0
           }
         },
@@ -568,9 +573,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 333296,
-            "output": 8389,
-            "cacheRead": 1991168,
+            "input": 350721,
+            "output": 12741,
+            "cacheRead": 3704832,
             "cacheWrite": 0
           }
         },
@@ -638,9 +643,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 582024,
-            "output": 19681,
-            "cacheRead": 7767040,
+            "input": 639563,
+            "output": 25196,
+            "cacheRead": 11701760,
             "cacheWrite": 0
           }
         }
@@ -653,15 +658,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38134286,
-          "output": 873233,
-          "cacheRead": 294007296,
+          "input": 38330280,
+          "output": 875587,
+          "cacheRead": 295684608,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 2178971,
-          "output": 96834,
-          "cacheRead": 16671744,
+          "input": 2253935,
+          "output": 106701,
+          "cacheRead": 22320128,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -678,8 +683,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 387.7256333,
-        "pricingAsOf": "2026-08-06T00:15:48.919Z"
+        "usd": 391.3624043,
+        "pricingAsOf": "2026-08-06T00:17:28.640Z"
       }
     },
     "merges": [
