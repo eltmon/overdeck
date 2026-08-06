@@ -11,6 +11,10 @@ import { MemoryPressureBand, MemoryVerdict, assessMemoryPressure, readGovernorRe
 import { RuntimeCensus, getRuntimeCensus } from '../runtime-census.js';
 import { emitActivityEntrySync, EmitActivityOptions } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { homedir } from 'os';
+import { resolve } from 'path';
 
 export type MemoryFeedLevel = 'ok' | 'watch' | 'holding' | 'shedding';
 
@@ -62,11 +66,54 @@ export interface MemoryPressurePatrolDeps {
   readHardReserveBytes: () => number;
   readRecoveryReserveBytes: () => number;
   census: () => Promise<RuntimeCensus>;
+  readNewKernelJournal: () => Promise<string>;
   emit: (entry: EmitActivityOptions) => void;
 }
 
 // Module-level state for transition-only emission
 let lastLevel: MemoryFeedLevel | null = null;
+
+// Module-level state for OOM canary: disabled if journal reading fails
+let oomCanaryDisabled = false;
+
+/**
+ * WI-4: Read new kernel journal entries via journalctl with cursor-file persistence.
+ * On first call (cursor file absent), uses -n 0 to initialize and returns empty string.
+ * On ANY error, disables the canary permanently and returns empty string.
+ */
+async function readNewKernelJournal(): Promise<string> {
+  if (oomCanaryDisabled) return '';
+
+  try {
+    const overdeckHome = process.env.OVERDECK_HOME || resolve(homedir(), '.overdeck');
+    const cursorFile = resolve(overdeckHome, 'oom-canary.cursor');
+
+    // Check if cursor file exists to determine if we should use -n 0
+    const fs = await import('fs/promises');
+    let cursorExists = false;
+    try {
+      await fs.stat(cursorFile);
+      cursorExists = true;
+    } catch {
+      // Cursor doesn't exist yet
+    }
+
+    const execFileAsync = promisify(execFile);
+    const args = ['-k', '--cursor-file', cursorFile, '--no-pager', '-o', 'cat'];
+
+    // On first run (no cursor), use -n 0 to initialize without replaying
+    if (!cursorExists) {
+      args.push('-n', '0');
+    }
+
+    const result = await execFileAsync('journalctl', args, { timeout: 10000 });
+    return result.stdout;
+  } catch (err) {
+    console.warn('[memory-pressure-patrol] Journal reader failed, disabling OOM canary:', err);
+    oomCanaryDisabled = true;
+    return '';
+  }
+}
 
 /**
  * Patrol memory pressure once and emit a transition-only activity entry if the level changed.
@@ -81,6 +128,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     readHardReserveBytes: deps.readHardReserveBytes || (() => readGovernorReserves().hardBytes),
     readRecoveryReserveBytes: deps.readRecoveryReserveBytes || (() => readGovernorReserves().recoveryBytes),
     census: deps.census || (() => getRuntimeCensus()),
+    readNewKernelJournal: deps.readNewKernelJournal || readNewKernelJournal,
     emit: deps.emit || emitActivityEntrySync,
   };
 
@@ -89,24 +137,64 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   const softBytes = d.readSoftReserveBytes();
   const hardBytes = d.readHardReserveBytes();
   const recoveryBytes = d.readRecoveryReserveBytes();
+  const actions: string[] = [];
+
+  // WI-4: Check for new OOM kills in the journal (runs even if level unchanged)
+  const journalText = await d.readNewKernelJournal();
+  const oomKills = parseOomKills(journalText);
+
+  // Emit OOM kills regardless of level transition
+  for (const kill of oomKills) {
+    const message = `Kernel OOM: Killed process ${kill.pid} (${kill.comm}), ${formatGib(kill.rssBytes)} RSS${kill.inOverdeckTree ? ' in Overdeck tmux-server' : ''}`;
+
+    d.emit({
+      level: kill.inOverdeckTree ? 'error' : 'warn',
+      source: 'cloister',
+      link: '/resources',
+      message,
+      details: `Cgroup: ${kill.cgroup || '(unknown)'}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
+      desktop: kill.inOverdeckTree,
+    });
+
+    const action = `memory-pressure-patrol: oom-kill (pid ${kill.pid} ${kill.comm} ${formatGib(kill.rssBytes)})`;
+    actions.push(action);
+    logDeaconEventSync(`[deacon] ${action}`);
+  }
 
   const level = memoryFeedLevel(verdict.band, verdict.availableBytes, watchBytes);
 
-  // Transition-only: if level hasn't changed, emit nothing
+  // Transition-only: if level hasn't changed, emit nothing for level transition
   if (level === lastLevel) {
-    return [];
+    return oomKills.length > 0 ? actions : [];
   }
 
   lastLevel = level;
-  const actions: string[] = [];
 
-  const details = buildMemoryDetails(
+  // Fetch the runtime census for top-consumer attribution
+  const census = await d.census();
+
+  // Build details with the base reserves and top consumers
+  let details = buildMemoryDetails(
     verdict.availableBytes,
     watchBytes,
     softBytes,
     hardBytes,
     recoveryBytes,
   );
+
+  // WI-3: Append top memory consumers to details
+  if (!census.processAvailable) {
+    details += '\n\nTop memory consumers: unavailable (process census could not be read)';
+  } else {
+    const topConsumers = topMemoryConsumers(census, 5);
+    if (topConsumers.length > 0) {
+      const consumerLines = topConsumers.map(
+        (c) =>
+          `  ${formatGib(c.rssBytes)} | pid ${c.pid} (${c.command.substring(0, 80)}) in session ${c.sessionName || '(host)'}`,
+      );
+      details += '\n\nTop memory consumers:\n' + consumerLines.join('\n');
+    }
+  }
 
   // Build the activity entry based on level
   if (level === 'watch') {
@@ -189,6 +277,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
  */
 export function __resetMemoryPressurePatrolState(): void {
   lastLevel = null;
+  oomCanaryDisabled = false;
 }
 
 /**

@@ -216,7 +216,6 @@ describe('memory-pressure-patrol', () => {
       expect(details).toContain('Watch reserve');
     });
   });
-});
 
   describe('topMemoryConsumers', () => {
     it('returns top N processes by RSS', async () => {
