@@ -291,7 +291,7 @@
     "recordedAt": "2026-08-06T10:06:09.706Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T10:06:59.137Z",
+  "updated": "2026-08-06T10:09:55.200Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -307,7 +307,7 @@
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "lastVerifiedCommit": "c36f8d4693424225f310d6fee476acf17cfe0ffd",
-    "reviewRequestedAt": "2026-08-06T10:06:10.941Z",
+    "reviewRequestedAt": "2026-08-06T10:09:54.850Z",
     "reviewSpawnedAt": "2026-08-06T10:05:44.834Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -358,7 +358,8 @@
         "tests/unit/scripts/lint-state-writes.test.ts"
       ],
       "recordedAt": "2026-08-06T10:06:09.706Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-06T10:09:54.850Z"
   },
   "closeOut": {
     "usage": {
