@@ -107,17 +107,17 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:53:07.964Z",
+  "updated": "2026-08-06T08:53:34.741Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z",
-    "updatedAt": "2026-08-06T08:53:07.923Z",
+    "updatedAt": "2026-08-06T08:53:34.719Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
@@ -208,24 +208,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 2747749,
-            "output": 189597,
-            "cacheRead": 58952192,
+            "input": 2753017,
+            "output": 190150,
+            "cacheRead": 59609088,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 4369439,
-          "output": 270795,
-          "cacheRead": 75687936,
+          "input": 4374707,
+          "output": 271348,
+          "cacheRead": 76344832,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.907622,
-        "pricingAsOf": "2026-08-06T08:53:07.951Z"
+        "usd": 34.093311,
+        "pricingAsOf": "2026-08-06T08:53:34.732Z"
       }
     },
     "merges": [
