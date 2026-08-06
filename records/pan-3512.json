@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:01:31.450Z",
+  "updated": "2026-08-06T21:04:42.894Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,16 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "migrate-orphan-restore": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1881628,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:01:31.450Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2487,6 +2479,17 @@
         "outcome": "completed",
         "reason": "Already landed on main via fd48e3af39; docs/REVIEW-AGENT-ARCHITECTURE.md documents the write door. In branch via merge 27e9314aa0.",
         "releasedAt": "2026-08-06T21:00:16.794Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1881628,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:01:31.450Z",
+        "itemId": "migrate-orphan-restore",
+        "outcome": "completed",
+        "reason": "Both terminal restores (completed-review after coordinator exit; orphaned-reviewing snapshot) now route through recordReviewVerdict with writer 'orphan-restore' via a new orphan-restore-verdict.ts adapter; stuck/retry/test fields carried as extra. 7 tests.",
+        "releasedAt": "2026-08-06T21:04:42.894Z"
       }
     ],
     "statusReasons": {
@@ -2525,6 +2528,10 @@
       "migrate-coordinator": {
         "reason": "Already landed on main via fd48e3af39; legacy-routes.ts:264 routes through recordReviewVerdict with landed-gated delivery. In branch via merge 27e9314aa0.",
         "updatedAt": "2026-08-06T21:00:13.692Z"
+      },
+      "migrate-orphan-restore": {
+        "reason": "Both terminal restores (completed-review after coordinator exit; orphaned-reviewing snapshot) now route through recordReviewVerdict with writer 'orphan-restore' via a new orphan-restore-verdict.ts adapter; stuck/retry/test fields carried as extra. 7 tests.",
+        "updatedAt": "2026-08-06T21:04:42.894Z"
       }
     }
   },
@@ -2568,7 +2575,11 @@
     "docs-write-door.ac1": "completed",
     "docs-write-door.ac2": "completed",
     "docs-write-door.ac3": "completed",
-    "migrate-orphan-restore": "running"
+    "migrate-orphan-restore": "completed",
+    "migrate-orphan-restore.ac1": "completed",
+    "migrate-orphan-restore.ac2": "completed",
+    "migrate-orphan-restore.ac3": "completed",
+    "migrate-orphan-restore.ac4": "completed"
   },
   "workModel": "claude-opus-5"
 }
