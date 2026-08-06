@@ -278,7 +278,7 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T08:04:33.630Z",
+  "updated": "2026-08-06T08:08:59.736Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "passed",
@@ -290,13 +290,13 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T08:01:53.607Z",
+    "updatedAt": "2026-08-06T08:08:49.395Z",
     "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
     "testNotes": "Reconciled from green GitHub Actions CI on d8b4dbb6: lint (https://github.com/eltmon/overdeck/actions/runs/30733578185/job/91458036596)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
-    "reviewedAtCommit": "1bacdb8a574bb52fe61b293e88ffff6f685be559",
+    "reviewedAtCommit": "cd522a9c3ddf8a207268b8c1d8d8ba180b8e2014",
     "lastVerifiedCommit": "4b3c72d8a6cd2ad6c90c49d78f72c700367c9df2",
     "reviewSpawnedAt": "2026-08-06T07:31:34.435Z",
     "scopeDrift": {
@@ -361,9 +361,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 209664,
-            "output": 7183,
-            "cacheRead": 3787776,
+            "input": 522231,
+            "output": 23923,
+            "cacheRead": 7987200,
             "cacheWrite": 0
           }
         },
@@ -425,10 +425,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 4752,
-            "output": 18769,
-            "cacheRead": 4646745,
-            "cacheWrite": 146962
+            "input": 4754,
+            "output": 18883,
+            "cacheRead": 4815949,
+            "cacheWrite": 148078
           }
         },
         "work": {
@@ -454,21 +454,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 1848159,
-          "output": 81539,
-          "cacheRead": 15360512,
+          "input": 2160726,
+          "output": 98279,
+          "cacheRead": 19559936,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4752,
-          "output": 18769,
-          "cacheRead": 4646745,
-          "cacheWrite": 146962
+          "input": 4754,
+          "output": 18883,
+          "cacheRead": 4815949,
+          "cacheWrite": 148078
         }
       },
       "costAtCloseOut": {
-        "usd": 238.93008079999998,
-        "pricingAsOf": "2026-08-06T08:01:53.625Z"
+        "usd": 241.0502368,
+        "pricingAsOf": "2026-08-06T08:08:49.408Z"
       }
     },
     "merges": [
@@ -477,7 +477,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
