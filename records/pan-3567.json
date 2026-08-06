@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:54:35.172Z",
+  "updated": "2026-08-06T16:55:58.003Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "fix-review-feedback-effect": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2380704,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:54:35.172Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Ran the token refresh Effect directly and returned its typed failures as the route's existing failure JSON shape.",
         "releasedAt": "2026-08-06T16:54:26.177Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2380704,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:54:35.172Z",
+        "itemId": "fix-review-feedback-effect",
+        "outcome": "completed",
+        "reason": "Yielded review feedback writes directly and converted Effect failures or defects into the existing non-fatal log path.",
+        "releasedAt": "2026-08-06T16:55:58.003Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "fix-refresh-token-effect": {
         "reason": "Ran the token refresh Effect directly and returned its typed failures as the route's existing failure JSON shape.",
         "updatedAt": "2026-08-06T16:54:26.177Z"
+      },
+      "fix-review-feedback-effect": {
+        "reason": "Yielded review feedback writes directly and converted Effect failures or defects into the existing non-fatal log path.",
+        "updatedAt": "2026-08-06T16:55:58.003Z"
       }
     }
   },
@@ -109,6 +116,11 @@
     "fix-refresh-token-effect.ac2": "completed",
     "fix-refresh-token-effect.ac3": "completed",
     "fix-refresh-token-effect.ac4": "completed",
-    "fix-review-feedback-effect": "running"
+    "fix-review-feedback-effect": "completed",
+    "fix-review-feedback-effect.ac1": "completed",
+    "fix-review-feedback-effect.ac2": "completed",
+    "fix-review-feedback-effect.ac3": "completed",
+    "fix-review-feedback-effect.ac4": "completed",
+    "fix-review-feedback-effect.ac5": "completed"
   }
 }
