@@ -124,22 +124,22 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:20:26.062Z",
+  "updated": "2026-08-06T01:22:55.381Z",
   "pipeline": {
     "issueId": "PAN-3550",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T01:15:21.625Z",
-    "updatedAt": "2026-08-06T01:20:22.392Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
+    "updatedAt": "2026-08-06T01:22:55.329Z",
+    "reviewNotes": "All current-cycle blockers are resolved; remaining test and documentation findings are advisory",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3574",
-    "reviewedAtCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
+    "reviewedAtCommit": "96f890427adbbf1595b9bfc6c395aeae89286680",
     "lastVerifiedCommit": "96f890427adbbf1595b9bfc6c395aeae89286680",
-    "reviewRequestedAt": "2026-08-06T01:15:21.625Z",
     "reviewSpawnedAt": "2026-08-06T01:20:11.171Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -180,9 +180,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 1658619,
-            "output": 92633,
-            "cacheRead": 19206144,
+            "input": 3095172,
+            "output": 124728,
+            "cacheRead": 29574144,
             "cacheWrite": 0
           }
         },
@@ -229,9 +229,9 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 3120109,
-          "output": 154996,
-          "cacheRead": 32070144,
+          "input": 4556662,
+          "output": 187091,
+          "cacheRead": 42438144,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -242,8 +242,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 22.745566,
-        "pricingAsOf": "2026-08-06T01:20:26.043Z"
+        "usd": 29.410382,
+        "pricingAsOf": "2026-08-06T01:22:55.372Z"
       }
     },
     "merges": [
