@@ -4,17 +4,17 @@
     "created": "2026-08-01T22:10:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3450: pan sync never prunes removed skills/rules from cache and harness dirs (beads survived removal for weeks)",
-    "updated": "2026-08-01T22:17:30.717Z"
+    "updated": "2026-08-06T09:58:46.809Z"
   },
   "plan": {
     "id": "pan-3450",
     "title": "pan sync never prunes removed skills/rules from cache and harness dirs (beads survived removal for weeks)",
-    "status": "running",
+    "status": "completed",
     "uid": "5a52a22a-b843-4e9e-a46d-243f0c122bec",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T22:10:00.000Z",
-    "updated": "2026-08-01T22:17:30.717Z",
+    "updated": "2026-08-06T09:58:46.809Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3450",
@@ -537,5 +537,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
