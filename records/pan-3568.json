@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:39:42.084Z",
+  "updated": "2026-08-06T17:39:51.108Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "ratchet-audit-wiring": {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3215502,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:39:51.107Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -201,6 +209,7 @@
     "lint-chain-wiring.ac1": "completed",
     "lint-chain-wiring.ac2": "completed",
     "lint-chain-wiring.ac3": "completed",
-    "lint-chain-wiring.ac4": "completed"
+    "lint-chain-wiring.ac4": "completed",
+    "ratchet-audit-wiring": "running"
   }
 }
