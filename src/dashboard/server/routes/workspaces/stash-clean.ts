@@ -391,19 +391,17 @@ const postWorkspaceCleanRoute = HttpRouter.add(
 
     console.log(`Removing corrupted workspace: ${workspacePath}`);
 
-    try {
-      yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
-        encoding: 'utf-8',
-        maxBuffer: 50 * 1024 * 1024,
-      }));
-    } catch {
+    yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
+    })).pipe(Effect.catchCause(() => Effect.gen(function* () {
       console.log('Regular rm failed, using Docker to clean up root-owned files...');
       yield* Effect.promise(() => execAsync(
         `docker run --rm -v "${workspacePath}:/cleanup" alpine sh -c "rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?* 2>/dev/null || true"`,
         { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
       ));
       yield* Effect.promise(() => execAsync(`rmdir "${workspacePath}"`, { encoding: 'utf-8' }));
-    }
+    })));
 
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
