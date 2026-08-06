@@ -13,7 +13,7 @@ import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
 import { appendAgentPlaneSession, readAgentPlaneRecordSync } from '../pan-dir/agents.js';
-import { appendSessionIdToHistory, persistCurrentSessionId } from '../session-history.js';
+import { appendSessionIdToHistory, isSessionResetMarker, persistCurrentSessionId } from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
 export interface ActivityEntry {
@@ -177,6 +177,7 @@ export interface SessionResolutionResult {
 
 export interface ClaudeSessionRecoveryDeps {
   getAgentState?: typeof getAgentStateSync;
+  isSessionReset?: (agentId: string) => boolean;
   readAgentPlaneRecord: typeof readAgentPlaneRecordSync;
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
@@ -190,6 +191,7 @@ function claudeProjectDir(workspace: string): string {
 
 function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
   return {
+    isSessionReset: isSessionResetMarker,
     readAgentPlaneRecord: readAgentPlaneRecordSync,
     readEventSessionId: readLatestAgentClaudeSessionIdEventSync,
     transcriptExists: (workspace, sessionId) => existsSync(join(claudeProjectDir(workspace), `${sessionId}.jsonl`)),
@@ -261,6 +263,11 @@ export function resolveLatestSessionIdSync(
   agentId: string,
   recoveryDeps?: ClaudeSessionRecoveryDeps,
 ): SessionResolutionResult {
+  const isSessionReset = recoveryDeps?.isSessionReset ?? isSessionResetMarker;
+  if (isSessionReset(agentId)) {
+    return { sessionId: null, checked: ['session reset marker'] };
+  }
+
   const checked: string[] = ['Codex rollout/thread id'];
   // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
   //    returning it would make resumeAgent target a non-existent thread and codex would drift into

@@ -21,7 +21,7 @@ vi.mock('../../agent-runtime.js', () => ({
   emitAgentEvent: mocks.emitAgentEvent,
 }));
 
-import { clearAgentSessionPointers } from '../session-pointers.js';
+import { clearAgentSessionPointers, isAgentSessionReset } from '../session-pointers.js';
 
 describe('clearAgentSessionPointers', () => {
   let root: string;
@@ -55,6 +55,7 @@ describe('clearAgentSessionPointers', () => {
     for (const name of ['session.id', 'sessions.json', 'codex-thread-id', 'launcher.sh']) {
       expect(existsSync(join(mocks.agentDir, name))).toBe(false);
     }
+    expect(isAgentSessionReset('agent-pan-2895-review')).toBe(true);
     expect(JSON.parse(readFileSync(join(mocks.agentDir, 'runtime.json'), 'utf-8'))).toEqual({ state: 'stopped' });
     expect(mocks.state?.sessionId).toBeUndefined();
     expect(mocks.saveAgentStateSync).toHaveBeenCalledWith(mocks.state);
