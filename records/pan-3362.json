@@ -315,6 +315,7 @@
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
       "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
       "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+      "src/dashboard/server/__tests__/read-model-agent-source.test.ts",
       "src/dashboard/server/read-model.ts",
       "src/dashboard/server/routes/agents/listing.ts",
       "src/dashboard/server/routes/workspaces/workspace-data.ts",
@@ -351,6 +352,7 @@
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
       "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
       "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+      "src/dashboard/server/__tests__/read-model-agent-source.test.ts",
       "src/dashboard/server/read-model.ts",
       "src/dashboard/server/routes/agents/listing.ts",
       "src/dashboard/server/routes/workspaces/workspace-data.ts",
@@ -365,10 +367,10 @@
       "tests/unit/lib/uat-fixtures/seed.test.ts",
       "tests/unit/scripts/lint-state-writes.test.ts"
     ],
-    "recordedAt": "2026-08-06T12:28:47.930Z"
+    "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T13:03:12.525Z",
+  "updated": "2026-08-06T13:03:16.600Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
