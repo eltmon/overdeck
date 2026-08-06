@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-06T19:31:50.463Z",
-  "updated": "2026-08-06T20:14:04.835Z",
+  "updated": "2026-08-06T20:14:15.252Z",
   "pipeline": {
     "issueId": "PAN-3582",
     "reviewStatus": "pending",
@@ -13,14 +13,22 @@
     "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T20:12:41.024Z",
-    "mergeNotes": "github merge failed: GitHub API GET /repos/eltmon/overdeck/pulls/3588 failed: 403 {\n\t\"message\": \"API rate limit exceeded for installation ID 144090266. If you reach out to GitHub Support for help, please include the request ID 9D2C:3D9AB5:2CBE3D3:95C61B6:6A74EAB8 and timestamp 2026-08-06 20:12:40 UTC. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https:\\/\\/docs.github.com\\/en\\/site-policy\\/github-terms\\/github-terms-of-service)\",\n\t\"documentation_url\": \"https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api#rate-limiting\",\n\t\"status\": \"403\"\n}\n",
+    "updatedAt": "2026-08-06T20:14:15.245Z",
+    "mergeNotes": "Stale strike signal: recorded HEAD c83f7c99860b66c0ffb610f944138660564b7b5f differs from origin/strike/pan-3582 at 86ac15064f3c17731c79380ef64babccec8dc7a0",
     "lastVerifiedCommit": "86ac15064f3c17731c79380ef64babccec8dc7a0",
     "strikeReadyHead": "c83f7c99860b66c0ffb610f944138660564b7b5f",
     "strikeReadyAt": "2026-08-06T20:04:23.187Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-06T20:14:15.241Z",
+        "strikeHead": "c83f7c99860b66c0ffb610f944138660564b7b5f",
+        "mainHead": "d20c97c49c97e805fd231cb4f9a90e47b124fd16",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD c83f7c99860b66c0ffb610f944138660564b7b5f differs from origin/strike/pan-3582 at 86ac15064f3c17731c79380ef64babccec8dc7a0"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -44,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.201086,
-        "pricingAsOf": "2026-08-06T20:14:04.827Z"
+        "pricingAsOf": "2026-08-06T20:14:15.247Z"
       }
     },
     "merges": [],
