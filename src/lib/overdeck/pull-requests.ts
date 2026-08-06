@@ -84,11 +84,19 @@ export interface IssuePullRequestData {
   body: string;
 }
 
+export interface CommitCheckRuns {
+  total: number;
+  names: string[];
+  successful: string[];
+  failed: string[];
+  pending: string[];
+}
+
 export async function fetchCommitCheckRuns(
   owner: string,
   repo: string,
   commit: string,
-): Promise<{ total: number; failed: string[]; pending: string[] }> {
+): Promise<CommitCheckRuns> {
   const { stdout } = await execFileAsync(
     'gh',
     ['api', `repos/${owner}/${repo}/commits/${encodeURIComponent(commit)}/check-runs?per_page=100`,
@@ -97,8 +105,13 @@ export async function fetchCommitCheckRuns(
   );
   const payload = JSON.parse(stdout) as { check_runs?: Array<{ name?: string; status?: string; conclusion?: string | null }> };
   const runs = payload.check_runs ?? [];
+  const names = runs.map(run => run.name ?? 'unnamed check');
   return {
     total: runs.length,
+    names,
+    successful: runs
+      .filter(run => run.status === 'completed' && run.conclusion === 'success')
+      .map(run => run.name ?? 'unnamed check'),
     failed: runs
       .filter(run => run.conclusion != null && !['success', 'skipped', 'neutral'].includes(run.conclusion))
       .map(run => run.name ?? 'unnamed check'),
@@ -106,6 +119,41 @@ export async function fetchCommitCheckRuns(
       .filter(run => run.status !== 'completed')
       .map(run => run.name ?? 'unnamed check'),
   };
+}
+
+/**
+ * Branch protection is the source of truth when present. Repositories without
+ * protection return 404, so callers must supply their configured fallback.
+ */
+export async function fetchRequiredStatusChecks(
+  owner: string,
+  repo: string,
+  branch: string,
+  fallback: string[],
+): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}/protection/required_status_checks`,
+        '-H',
+        'Accept: application/vnd.github+json',
+      ],
+      { encoding: 'utf-8', timeout: 15000, maxBuffer: 1024 * 1024 },
+    );
+    const payload = JSON.parse(stdout) as { contexts?: unknown };
+    if (
+      Array.isArray(payload.contexts)
+      && payload.contexts.length > 0
+      && payload.contexts.every(context => typeof context === 'string')
+    ) {
+      return payload.contexts;
+    }
+  } catch {
+    // Unprotected branches and unavailable branch-protection reads use config.
+  }
+  return fallback;
 }
 
 export interface IssuePrEndpointResponse {
