@@ -64,17 +64,17 @@
     "recordedAt": "2026-08-06T18:15:17.034Z"
   },
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:15:29.132Z",
+  "updated": "2026-08-06T18:15:31.067Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T18:15:22.784Z",
+    "updatedAt": "2026-08-06T18:15:31.042Z",
     "inspectNotes": "All 5 ACs verified: four diag tsconfigs extend their sibling ./tsconfig.json (identical blob 8e78f192e9) with includeSuggestionsInTsc=false and both ignoreEffect*InTscExitCode=true; git grep '\"plugins\"' over real tsconfigs prints nothing; acp base-vs-diag tsc --listFiles diff is empty (both exit 0); root diag lane exits 0 with no TS5058/TS5024, other three resolve cleanly. NFR-1 holds: dashboard ratchet 47 known/none new, frontend ratchet 0/none new.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3578",
     "reviewRequestedAt": "2026-08-06T18:15:20.199Z",
@@ -144,7 +144,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.998787,
-        "pricingAsOf": "2026-08-06T18:15:28.804Z"
+        "pricingAsOf": "2026-08-06T18:15:31.057Z"
       }
     },
     "merges": [
