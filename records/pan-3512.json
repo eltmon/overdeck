@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:13:32.968Z",
+  "updated": "2026-08-06T21:18:35.916Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2082,7 +2082,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "updatedAt": "2026-08-06T20:50:49.320Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3514"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
+    "reviewRequestedAt": "2026-08-06T21:18:35.418Z",
+    "panDoneRecoveredAt": "2026-08-06T21:18:35.418Z"
   },
   "closeOut": {
     "usage": {
