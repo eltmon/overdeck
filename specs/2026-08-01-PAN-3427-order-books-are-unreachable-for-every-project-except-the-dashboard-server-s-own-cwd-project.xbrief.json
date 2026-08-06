@@ -4,17 +4,17 @@
     "created": "2026-08-01T22:45:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3427: Order books are unreachable for every project except the dashboard server's own cwd project",
-    "updated": "2026-08-02T02:51:44.255Z"
+    "updated": "2026-08-06T11:33:40.257Z"
   },
   "plan": {
     "id": "pan-3427",
     "title": "Order books are unreachable for every project except the dashboard server's own cwd project",
-    "status": "running",
+    "status": "completed",
     "uid": "d0967214-d95b-419c-ab46-90d175f68316",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T22:45:00.000Z",
-    "updated": "2026-08-02T02:51:44.255Z",
+    "updated": "2026-08-06T11:33:40.257Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3427",
@@ -706,5 +706,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
