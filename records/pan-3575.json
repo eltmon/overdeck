@@ -47,6 +47,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T08:53:39.607Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T08:54:08.526Z"
     }
   ],
   "feedback": [],
@@ -88,24 +93,24 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:54:06.395Z",
+  "updated": "2026-08-06T08:54:08.526Z",
   "pipeline": {
     "issueId": "PAN-3575",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z",
-    "updatedAt": "2026-08-06T08:54:04.987Z",
+    "updatedAt": "2026-08-06T08:54:06.434Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "reviewedAtCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "reviewRequestedAt": "2026-08-06T08:52:21.853Z",
-    "reviewSpawnedAt": "2026-08-06T08:08:50.106Z",
+    "reviewSpawnedAt": "2026-08-06T08:54:06.434Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -206,7 +211,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.093311,
-        "pricingAsOf": "2026-08-06T08:54:04.998Z"
+        "pricingAsOf": "2026-08-06T08:54:06.555Z"
       }
     },
     "merges": [
