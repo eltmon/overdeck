@@ -485,7 +485,7 @@
     "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T14:58:51.134Z",
+  "updated": "2026-08-06T14:58:54.280Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
@@ -493,12 +493,12 @@
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
-    "mergeStep": "squash-merging",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T13:03:52.466Z",
-    "updatedAt": "2026-08-06T14:58:41.919Z",
+    "updatedAt": "2026-08-06T14:58:45.138Z",
     "testNotes": "Ran from workspace feature-pan-3362 at HEAD ecb64320f0 (branch fully caught up with origin/main). All gates per projects.yaml green: install, typecheck (root+hooks+evals+dashboard/frontend guards), lint (all sub-checks incl. skills/slash-commands/prompt-trailer/file-size/circular/ratchet/quarantine), build, server-bundle, and test (root 7297 passed/20 skipped, frontend 3058/3058 passed) on the changed-base gate against merge-base 036e90b9a6.",
     "uatNotes": "Restarted workspace's own container to HEAD ecb64320f0, ran pan admin seed-uat-fixtures pan-3362 successfully, and verified FIX-1's issue detail in Playwright against https://feature-pan-3362.overdeck.localhost/issues/FIX-1. All 6 elements cli-command.ac2 requires are now met: phase (crew spine), branch feature/fix-1 (Overview tab Workspace section), PR link (View PR opens github.com/uat-fixtures/repo/pull/1), 4 review-convoy rows (all Done), Tasks tab non-zero badge with 3 tasks listed (previously diverged from Overview, now consistent), and non-empty Activity feed (4 fixture entries). The branch/PR-link/tasks-badge gaps from the prior UAT cycle are resolved.",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
@@ -683,7 +683,7 @@
       },
       "costAtCloseOut": {
         "usd": 369.015949,
-        "pricingAsOf": "2026-08-06T14:58:51.129Z"
+        "pricingAsOf": "2026-08-06T14:58:54.274Z"
       }
     },
     "merges": [
