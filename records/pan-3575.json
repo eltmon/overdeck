@@ -139,7 +139,7 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T09:28:43.843Z",
+  "updated": "2026-08-06T10:34:31.908Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "passed",
@@ -150,7 +150,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:57:39.599Z",
-    "updatedAt": "2026-08-06T09:28:39.382Z",
+    "updatedAt": "2026-08-06T10:34:31.885Z",
     "reviewNotes": "all in-PR-scope findings resolved; remaining findings are advisory or pre-existing",
     "testNotes": "typecheck: npm run typecheck clean (root tsc, hooks, evals, dashboard-types guard, frontend-types guard, 0 new errors). lint: npm run lint clean (eslint, effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/park-exits/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/circular/ratchet-audit/quarantine-audit all green). tests: npm test first pass = 1408 files/13367 tests passed, 9 files failed with uniform 'Hook timed out in 5000ms' on setupOverdeckTestDb() beforeEach -- none of the 9 files (overdeck-test-db.test.ts, cost-reconcile-harnesses.integration.test.ts, target-search.test.ts, agent-discovery-columns.test.ts, merge-sync-pending-auto-merges.test.ts, review-status-timestamp-units.test.ts, create-workspace-row.test.ts, conversations/list.test.ts, conversations/show.test.ts) are in this PR's diff (20 changed files, all in src/lib/cloister, src/lib/parked, src/lib/review-status.ts, src/dashboard/server/routes, CLAUDE.md, docs). Root-caused to CPU contention from ~12-18 concurrently running Overdeck pipeline agents on this box (matches the known cpu-storms-gate-runs pattern), not a code regression. Reran all 9 files in isolation with zero code changes: 9/9 files, 54/54 tests passed in 9.55s. Frontend gate (short-circuited out of the first npm test run by the failing root vitest exit code, under the && chain) run separately: src/dashboard/frontend issueActions.test.ts + issueActions.no-actions-lost.test.ts + issueActions.parity.test.tsx + fr7-conversation-pending-input.test.tsx = 4/4 files, 63/63 tests passed. Review already APPROVED with 0 blocking findings (see .pan/review/agent-pan-3575-review-3e0c9c3b/synthesis.md). UAT not required: xBRIEF items are all kind=backend/docs, verify_commands are vitest+typecheck+grep only, no dashboard/frontend files touched in the diff, and the PRD's own Testing section specifies only vitest+typecheck+lint (no browser verification step).",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
@@ -211,7 +211,9 @@
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "recordedAt": "2026-08-06T08:57:33.900Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-06T10:34:31.885Z"
   },
   "closeOut": {
     "usage": {
@@ -295,7 +297,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3576"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-06T10:34:31.904Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 3e0c9c3b7322a45b652de2f1c3a7550e97550a56",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3576 MERGED at 2026-08-06T09:27:30Z",
+          "status": "pass",
+          "mergedAt": "2026-08-06T09:27:30Z",
+          "mergeCommit": "054efe37b46fceb9132c4afaa62218ea44ace9e4"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 054efe37b46fceb9132c4afaa62218ea44ace9e4",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 036e90b9 contains merge 054efe37",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (8 transcript files preserved); No strike branch strike/pan-3575 found; Pruned 140 checkpoint ref(s) for agent-pan-3575, planning-pan-3575, strike-pan-3575; No specialist registry entries for PAN-3575"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
