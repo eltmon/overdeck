@@ -5,6 +5,7 @@ import { Stream } from 'effect';
 
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore, selectIssues, selectAgents, selectReviewStatus } from '../../lib/store';
+import { useTasksQuery } from '../Stage/cockpit/TasksRail';
 import type { Agent, Issue } from '../../types';
 
 export type DrawerActivityPhase = 'work' | 'review' | 'ship' | 'done' | 'info';
@@ -73,10 +74,6 @@ type TaskTask = {
   startedAt?: string;
   updatedAt?: string;
   closedAt?: string;
-};
-
-type IssueWithTasks = Issue & {
-  tasks?: TaskTask[];
 };
 
 type DrawerIssueSubscription = {
@@ -232,12 +229,6 @@ function taskTitle(task: TaskTask, issueId: string) {
   return title.replace(new RegExp(`^${escapeRegExp(issueId)}:\\s*`, 'i'), '');
 }
 
-function issueTasks(issue: Issue | null): TaskTask[] | undefined {
-  if (!issue) return undefined;
-  const issueWithTasks = issue as IssueWithTasks;
-  return issueWithTasks.tasks ?? issueWithTasks.tasks;
-}
-
 function normalizeTasks(tasks: TaskTask[] | undefined, issueId: string): DrawerTaskItem[] {
   return (tasks ?? []).map((task) => {
     const status = taskStatus(task.status);
@@ -348,6 +339,11 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
+  // Live-fetched, not derived from the Issue store snapshot — the server
+  // never populates an `issue.tasks` field, so the tab-band badge shares the
+  // same `/api/issues/:id/tasks` query TasksRail/TasksPanel already use for
+  // the task list itself (per TasksRail's useTasksQuery doc comment).
+  const tasksQuery = useTasksQuery(drawerIssueId ?? '');
 
   useEffect(() => {
     if (!drawerIssueId) return;
@@ -419,14 +415,14 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
       issue,
       agents: issueAgents,
       reviewStatus,
-      tasks: normalizeTasks(issueTasks(issue), drawerIssueId),
+      tasks: normalizeTasks(tasksQuery.data?.tasks, drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: verificationGates(reviewStatus),
       phaseTimeline: phaseTimeline(issue, reviewStatus),
       activityRail,
       activityFull,
     };
-  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
+  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus, tasksQuery.data]);
 }
 
 /**

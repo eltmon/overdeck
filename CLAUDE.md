@@ -221,8 +221,8 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 `packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan done`):
-- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, and both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`)
-- `npm run lint` — ESLint
+- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh` — and `typecheck:acp` for `packages/effect-acp`)
+- `npm run lint` — ESLint plus `lint:effect-diagnostics`; see [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md)
 - `npm test` — Vitest (root + frontend)
 
 ## tmux Socket — CRITICAL
@@ -391,6 +391,12 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - The planning launcher script MUST export TERM/COLORTERM/LANG for Claude Code rendering.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
+
+## Effect bridging
+
+When a callee returns an Effect, yield it directly; reserve `Effect.promise` and
+`Effect.tryPromise` for Promise-returning thunks. See
+[docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md) for error handling and valid bridges.
 
 ## Verification Gate (PAN-174)
 

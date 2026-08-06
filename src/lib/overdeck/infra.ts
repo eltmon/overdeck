@@ -57,6 +57,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'agents', column: 'yielded_at' },
     { table: 'agents', column: 'last_yield_resume_at' },
     { table: 'agents', column: 'started_by' },
+    { table: 'agents', column: 'branch' },
     { table: 'uat_generation_repos', column: 'target_branch' },
     { table: 'uat_generation_repos', column: 'merge_sha' },
     { table: 'uat_generation_resolutions', column: 'kind' },
@@ -192,6 +193,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
+  // PAN-3362: the init migration's `agents` table never carried `branch`, so it
+  // was silently dropped on every DB round-trip (fixture and real agents alike).
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `branch` text');
   ensureWorkspaceTablesSync(db);
   // PAN-1577: explicit project assignment override for moving a conversation
   // between projects without relying on cwd-derived grouping.

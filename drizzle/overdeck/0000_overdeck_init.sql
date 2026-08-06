@@ -8,6 +8,7 @@ CREATE TABLE `agents` (
 	`session_id` text,
 	`harness` text NOT NULL,
 	`model` text NOT NULL,
+	`branch` text,
 	`host_override` text,
 	`delivery_method` text,
 	`started_at` integer,
