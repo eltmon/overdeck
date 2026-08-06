@@ -109,12 +109,18 @@ describe('classifyParked — one orbit at a time', () => {
     expect(stopped[0]?.details?.gate).toBe('stopped-by-user');
   });
 
-  it('uat-failed: failed UAT with merge pending parks; merged or ready does not', () => {
+  it('uat-failed: parks only when no live work agent owns the rework', () => {
     const parked = classifyParked(signals({ reviewStatus: baseStatus({ reviewStatus: 'passed', testStatus: 'passed', uatStatus: 'failed' }) }));
     expect(parked).toHaveLength(1);
     expect(parked[0].orbit).toBe('uat-failed');
-    expect(parked[0].parkReason).toContain('UAT failed');
+    expect(parked[0].parkReason).toContain('UAT-failure relay found no delivery target');
+    expect(parked[0].unparkCondition).toContain('pan start');
 
+    const workAgent = [{ ...baseAgent({ role: 'work' }), tmuxActive: true }];
+    expect(classifyParked(signals({
+      reviewStatus: baseStatus({ reviewStatus: 'passed', testStatus: 'passed', uatStatus: 'failed' }),
+      liveAgents: workAgent,
+    })).find((row) => row.orbit === 'uat-failed')).toBeUndefined();
     expect(classifyParked(signals({ reviewStatus: baseStatus({ uatStatus: 'failed', mergeStatus: 'merged' }) }))).toHaveLength(0);
     expect(classifyParked(signals({ reviewStatus: baseStatus({ uatStatus: 'failed', readyForMerge: true }) }))).toHaveLength(0);
   });
