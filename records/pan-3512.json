@@ -947,17 +947,14 @@
       "reason": "feedback",
       "note": "[2026-08-06T22:15Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-06T22:15:31.831Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-06T22:15:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3512\n\n# Review Synthesis — PAN-3512 — 2026-08-06T18:14:55-04:00\n\n## Verdict: CHANGES REQUESTED — fresh-head orphan restores can reinstate a historical passed or skipped test gate when the current row is pending\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/context.json\n- Branch: feature/pan-3512\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512\n- HEAD reviewed: a63150255d34ef88c774450cb0703e2d84a27b6e\n- Cycle number: 4\n- Prior cycle SHA: 8eed74d4c4eb476878f487d1e945085543845cac\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness, requirements] Historical test status bypasses re-gating when the current row is pending — `src/lib/cloister/review-verdict-writer.ts:230`\n\nThe revised ordering prevents `input.extra` from overwriting a reset only when the existing row has `testStatus: 'passed'` or `'skipped'`. The orphan-restore adapter still forwards a historical terminal test result through `extra`, and a row already marked `pending` makes `testGateReset` false. The update then persists that historical `passed` or `skipped` status against the fresh evidence head, allowing it to advance without a new test run.\n\nThis finding is PR-scoped and cycle-scoped: `src/lib/cloister/review-verdict-writer.ts` changed after the prior reviewed SHA. Treat terminal `input.extra.testStatus` values as re-gateable whenever evidence differs from the row anchor, and add a regression that starts with `status.testStatus: 'pending'`, supplies `extra.testStatus: 'passed'` or `'skipped'`, and asserts the persisted update remains pending with re-gate notes.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-a6315025/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3512 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T22:24:25.151Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
@@ -1014,21 +1011,21 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:24:22.662Z",
+  "updated": "2026-08-06T22:24:25.166Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:24:22.611Z",
+    "updatedAt": "2026-08-06T22:24:23.483Z",
     "reviewNotes": "Fresh-head orphan restores can reinstate historical passed or skipped test status when the row is pending",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
-    "reviewSpawnedAt": "2026-08-06T22:12:44.980Z",
+    "reviewSpawnedAt": "2026-08-06T22:24:23.481Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
@@ -1211,7 +1208,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.2968787,
-        "pricingAsOf": "2026-08-06T22:24:22.654Z"
+        "pricingAsOf": "2026-08-06T22:24:24.857Z"
       }
     },
     "merges": [
@@ -1220,7 +1217,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
