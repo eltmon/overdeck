@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:08:05.893Z",
+  "updated": "2026-08-06T21:13:32.968Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,16 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "migrate-infra-bypass": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 2002298,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:08:05.893Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2509,6 +2501,17 @@
         "outcome": "completed",
         "reason": "Both auto-completes (alive-unresponsive, dead-session) now route through recordReviewVerdict with writer 'unsignaled-recovery'. reconcileUnappliedReviewVerdicts already converged via convergeRowFromVerdictOfRecord on main; the :82 write is a non-terminal reset to pending, out of scope. 3 tests.",
         "releasedAt": "2026-08-06T21:08:02.588Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 2002298,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:08:05.893Z",
+        "itemId": "migrate-infra-bypass",
+        "outcome": "completed",
+        "reason": "checkVerificationReviewContradiction (deacon.ts:1560, was :1557 in the spec) now routes through recordReviewVerdict with writer 'infra-bypass', live head as evidenceHead, four stuck-clearing fields via extra. No allowlist change (file stays at 3571 ceiling). 5 tests.",
+        "releasedAt": "2026-08-06T21:13:32.968Z"
       }
     ],
     "statusReasons": {
@@ -2555,6 +2558,10 @@
       "migrate-unsignaled": {
         "reason": "Both auto-completes (alive-unresponsive, dead-session) now route through recordReviewVerdict with writer 'unsignaled-recovery'. reconcileUnappliedReviewVerdicts already converged via convergeRowFromVerdictOfRecord on main; the :82 write is a non-terminal reset to pending, out of scope. 3 tests.",
         "updatedAt": "2026-08-06T21:08:02.588Z"
+      },
+      "migrate-infra-bypass": {
+        "reason": "checkVerificationReviewContradiction (deacon.ts:1560, was :1557 in the spec) now routes through recordReviewVerdict with writer 'infra-bypass', live head as evidenceHead, four stuck-clearing fields via extra. No allowlist change (file stays at 3571 ceiling). 5 tests.",
+        "updatedAt": "2026-08-06T21:13:32.968Z"
       }
     }
   },
@@ -2607,7 +2614,10 @@
     "migrate-unsignaled.ac1": "completed",
     "migrate-unsignaled.ac2": "completed",
     "migrate-unsignaled.ac3": "completed",
-    "migrate-infra-bypass": "running"
+    "migrate-infra-bypass": "completed",
+    "migrate-infra-bypass.ac1": "completed",
+    "migrate-infra-bypass.ac2": "completed",
+    "migrate-infra-bypass.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
