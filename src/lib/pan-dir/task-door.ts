@@ -149,7 +149,7 @@ export async function applyTaskStatusChange(
     record.statusOverrides = { ...(record.statusOverrides ?? {}), [operation.itemId]: nextStatus };
     const subIds = operation.subItemIds?.length
       ? new Set(operation.subItemIds)
-      : new Set(operation.type === 'done' ? subItemsOf(item).map(({ id }) => id) : []);
+      : new Set((operation.type === 'done' || operation.type === 'cancel') ? subItemsOf(item).map(({ id }) => id) : []);
     for (const subId of subIds) record.statusOverrides[`${operation.itemId}.${subId}`] = nextStatus;
 
     if (operation.type === 'claim') {
