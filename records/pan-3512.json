@@ -962,18 +962,17 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:45:25.560Z",
+  "updated": "2026-08-06T21:47:42.945Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T21:18:35.418Z",
-    "updatedAt": "2026-08-06T21:45:25.551Z",
-    "reviewNotes": "Orphan restore can overwrite the fresh-head test-gate reset with historical passed test status",
+    "updatedAt": "2026-08-06T21:47:42.846Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
@@ -998,9 +997,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 288986,
-            "output": 10665,
-            "cacheRead": 3810304,
+            "input": 289634,
+            "output": 10763,
+            "cacheRead": 4044800,
             "cacheWrite": 0
           }
         },
@@ -1091,9 +1090,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 3023241,
-          "output": 64724,
-          "cacheRead": 13832704,
+          "input": 3023889,
+          "output": 64822,
+          "cacheRead": 14067200,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1104,8 +1103,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 63.3547997,
-        "pricingAsOf": "2026-08-06T21:45:25.554Z"
+        "usd": 63.4165137,
+        "pricingAsOf": "2026-08-06T21:47:42.931Z"
       }
     },
     "merges": [
