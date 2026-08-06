@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:47:54.378Z",
+  "updated": "2026-08-06T17:48:43.006Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "reviewer-prompt": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 3350693,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:47:54.378Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -169,6 +161,17 @@
         "outcome": "completed",
         "reason": "Added the Effect ACP typecheck lane to the root chain, verified it passes cleanly, and proved the root chain rejects a deliberate ACP type error.",
         "releasedAt": "2026-08-06T17:47:42.631Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3350693,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:47:54.378Z",
+        "itemId": "reviewer-prompt",
+        "outcome": "completed",
+        "reason": "Made correctness review run the Effect diagnostics ratchet and block NEW findings while treating known findings as pre-existing debt.",
+        "releasedAt": "2026-08-06T17:48:43.006Z"
       }
     ],
     "statusReasons": {
@@ -203,6 +206,10 @@
       "acp-typecheck-gate": {
         "reason": "Added the Effect ACP typecheck lane to the root chain, verified it passes cleanly, and proved the root chain rejects a deliberate ACP type error.",
         "updatedAt": "2026-08-06T17:47:42.631Z"
+      },
+      "reviewer-prompt": {
+        "reason": "Made correctness review run the Effect diagnostics ratchet and block NEW findings while treating known findings as pre-existing debt.",
+        "updatedAt": "2026-08-06T17:48:43.006Z"
       }
     }
   },
@@ -249,6 +256,9 @@
     "acp-typecheck-gate.ac1": "completed",
     "acp-typecheck-gate.ac2": "completed",
     "acp-typecheck-gate.ac3": "completed",
-    "reviewer-prompt": "running"
+    "reviewer-prompt": "completed",
+    "reviewer-prompt.ac1": "completed",
+    "reviewer-prompt.ac2": "completed",
+    "reviewer-prompt.ac3": "completed"
   }
 }
