@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:00:07.624Z",
+  "updated": "2026-08-06T21:00:10.352Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,15 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 21,
+    "sequence": 22,
     "claims": {
-      "migrate-quick-signal": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1854855,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:00:00.419Z"
-      },
       "migrate-coordinator": {
         "writerId": "agent-pan-3512",
         "agentId": "agent-pan-3512",
@@ -2468,6 +2461,17 @@
         "outcome": "completed",
         "reason": "Fallback already routed through recordReviewVerdict on main (fd48e3af39); remaining gap was the unconditional killSession. Not-landed now skips feedback + kill and records the rejection reason. 3 tests in deacon-review-signals-verdict-door.test.ts.",
         "releasedAt": "2026-08-06T20:59:30.639Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1854855,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:00:00.419Z",
+        "itemId": "migrate-quick-signal",
+        "outcome": "completed",
+        "reason": "Already landed on main via fd48e3af39 (PAN-3512 strike); src/cli/commands/specialists/done.ts:227 routes through recordReviewVerdict. In this branch via merge 27e9314aa0.",
+        "releasedAt": "2026-08-06T21:00:10.352Z"
       }
     ],
     "statusReasons": {
@@ -2498,6 +2502,10 @@
       "docs-write-door": {
         "reason": "stale claim released (agent-pan-3512 dead)",
         "updatedAt": "2026-08-02T23:44:25.598Z"
+      },
+      "migrate-quick-signal": {
+        "reason": "Already landed on main via fd48e3af39 (PAN-3512 strike); src/cli/commands/specialists/done.ts:227 routes through recordReviewVerdict. In this branch via merge 27e9314aa0.",
+        "updatedAt": "2026-08-06T21:00:10.352Z"
       }
     }
   },
@@ -2530,8 +2538,11 @@
     "migrate-fallback.ac2": "completed",
     "migrate-fallback.ac3": "completed",
     "migrate-fallback.ac4": "completed",
-    "migrate-quick-signal": "running",
-    "migrate-coordinator": "running"
+    "migrate-quick-signal": "completed",
+    "migrate-coordinator": "running",
+    "migrate-quick-signal.ac1": "completed",
+    "migrate-quick-signal.ac2": "completed",
+    "migrate-quick-signal.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
