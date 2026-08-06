@@ -159,7 +159,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
-import { recreatedStateWarnings, reconcileProjectStatePlanes } from './state-recreation-patrol.js';
+import { recreatedStateWarnings, reconcileProjectStatePlanes, statePlaneReconcileEveryCycles } from './state-recreation-patrol.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -3110,7 +3110,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
   const projectConfigs = listProjectsSync();
-  for (const result of await reconcileProjectStatePlanes(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
+  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileProjectStatePlanes(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);

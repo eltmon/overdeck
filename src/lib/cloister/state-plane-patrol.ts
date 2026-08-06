@@ -12,6 +12,10 @@ export interface StatePlaneReconcileAction {
   level: 'action' | 'warn';
 }
 
+export function statePlaneReconcileEveryCycles(patrolIntervalMs: number): number {
+  return Math.max(1, Math.ceil((60 * 60 * 1000) / patrolIntervalMs));
+}
+
 export interface StatePlanePatrolDeps {
   listRecords: (project: ProjectConfig) => Promise<PanIssueRecord[]>;
   readTrackerState: (issueId: string) => Promise<LiveTrackerIssueState>;

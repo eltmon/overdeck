@@ -4,6 +4,7 @@ import type { PanIssueRecord } from '../../pan-dir/record.js';
 import type { ProjectConfig } from '../../projects.js';
 import {
   reconcileProjectStatePlanes,
+  statePlaneReconcileEveryCycles,
   type StatePlanePatrolDeps,
 } from '../state-plane-patrol.js';
 
@@ -36,6 +37,14 @@ function deps(overrides: Partial<StatePlanePatrolDeps> = {}): StatePlanePatrolDe
     ...overrides,
   };
 }
+
+describe('state-plane reconciliation cadence', () => {
+  it('runs no more often than hourly', () => {
+    expect(statePlaneReconcileEveryCycles(60_000)).toBe(60);
+    expect(statePlaneReconcileEveryCycles(10 * 60_000)).toBe(6);
+    expect(statePlaneReconcileEveryCycles(2 * 60 * 60_000)).toBe(1);
+  });
+});
 
 describe('PAN-3513 reopened issue reconciliation', () => {
   it('clears a poisoned closedOut record when the live tracker is active', async () => {
