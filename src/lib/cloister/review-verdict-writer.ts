@@ -226,8 +226,15 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     return { landed: false, reason: 'stale-evidence-head' };
   }
 
-  // Fresh or indeterminate: land the verdict
-  const testGateReset = (status.testStatus === 'passed' || status.testStatus === 'skipped')
+  // Fresh or indeterminate: land the verdict.
+  // The re-gate keys off the test status this write would actually PERSIST, not
+  // just the one already on the row. Orphan restore forwards a historical
+  // terminal test result through `extra`, so a row sitting at 'pending' would
+  // otherwise let that stale 'passed'/'skipped' land against fresh evidence and
+  // advance without a new test run.
+  const incomingTestStatus = input.extra?.['testStatus'];
+  const effectiveTestStatus = incomingTestStatus ?? status.testStatus;
+  const testGateReset = (effectiveTestStatus === 'passed' || effectiveTestStatus === 'skipped')
     && input.evidenceHead !== status.lastVerifiedCommit;
   const update: ReviewStatusUpdate = {
     reviewStatus: input.verdict,
