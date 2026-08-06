@@ -1,10 +1,24 @@
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
+
+export const SESSION_RESET_MARKER = 'session-reset';
+
+export function isSessionResetMarker(agentId: string): boolean {
+  return existsSync(join(getOverdeckHome(), 'agents', agentId, SESSION_RESET_MARKER));
+}
+
+export function clearSessionResetMarker(agentId: string): void {
+  try {
+    unlinkSync(join(getOverdeckHome(), 'agents', agentId, SESSION_RESET_MARKER));
+  } catch {
+    // The marker is absent for normal launches.
+  }
+}
 
 /**
  * PAN-1989: durably record a Claude session id in the agent's append-only

@@ -83,7 +83,7 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import { clearSessionResetMarker, createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import {
   withAutoSpawnConsentClaim,
@@ -627,6 +627,7 @@ async function spawnAgentWithoutConsentClaim(
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
+  clearSessionResetMarker(agentId);
   await recordAgentPlaneSpawn(state);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
