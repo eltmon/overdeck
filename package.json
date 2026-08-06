@@ -137,7 +137,7 @@
     "docs:watch": "typedoc --watch",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.mjs || true",
-    "prepare": "husky",
+    "prepare": "husky && effect-language-service patch",
     "typecheck:dashboard": "bash scripts/lint-dashboard-types.sh",
     "typecheck:frontend": "bash scripts/lint-frontend-types.sh"
   },
