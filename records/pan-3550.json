@@ -62,6 +62,11 @@
       "timestamp": "2026-08-06T01:12:42.457Z",
       "reason": "end",
       "note": "Implementation complete: fixed security (comm vs args), performance (bounded OOM writes), and documentation (hard-band accuracy) issues"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T01:20:11.981Z"
     }
   ],
   "feedback": [],
@@ -99,7 +104,7 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:20:11.118Z",
+  "updated": "2026-08-06T01:20:12.028Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -227,7 +232,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3550",
