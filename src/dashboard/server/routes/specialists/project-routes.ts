@@ -432,7 +432,7 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
 
     const { regenerateContextDigest } =
       yield* Effect.promise(() => import('../../../../lib/cloister/specialist-context.js'));
-    const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));
+    const digest = yield* regenerateContextDigest(project, type);
 
     if (digest) {
       return jsonResponse({ digest, message: 'Context digest regenerated' });

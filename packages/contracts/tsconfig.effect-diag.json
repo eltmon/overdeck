@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "includeSuggestionsInTsc": false,
+        "ignoreEffectErrorsInTscExitCode": true,
+        "ignoreEffectWarningsInTscExitCode": true
+      }
+    ]
+  }
+}

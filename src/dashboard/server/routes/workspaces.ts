@@ -53,7 +53,7 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
 
-import { Effect, Layer, Option } from 'effect';
+import { Cause, Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import {
@@ -1505,19 +1505,19 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
           const wsInfo = getWorkspaceInfoForIssue(issueId);
-          const fileResult = yield* Effect.promise(() => writeFeedbackFile({
+          const fileResult = yield* writeFeedbackFile({
             issueId,
             workspacePath: wsInfo.localPath,
             specialist: 'review-agent',
             outcome: reviewStatus === 'blocked' ? 'changes-requested' : 'failed',
             summary: `Review ${reviewStatus.toUpperCase()}: ${(reviewNotes || '').slice(0, 80)}`,
             markdownBody: feedbackBody,
-          }));
+          });
           if (!fileResult.success) {
             console.error(
               `[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`
@@ -1530,9 +1530,9 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchCause((cause) => Effect.sync(() => {
+          console.error(`[review-status] Failed to send feedback to ${agentId}:\n${Cause.pretty(cause)}`);
+        })));
       }
 
       if (reviewStatus === 'passed') {
@@ -1571,19 +1571,19 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
       if (testStatus === 'failed' && testNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures, then invoke the /rebase-and-submit skill\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite locally to verify your fixes pass\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
           const wsInfo = getWorkspaceInfoForIssue(issueId);
-          const fileResult = yield* Effect.promise(() => writeFeedbackFile({
+          const fileResult = yield* writeFeedbackFile({
             issueId,
             workspacePath: wsInfo.localPath,
             specialist: 'test-agent',
             outcome: 'failed',
             summary: `Tests FAILED: ${(testNotes || '').slice(0, 80)}`,
             markdownBody: feedbackBody,
-          }));
+          });
           if (!fileResult.success) {
             console.error(
               `[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`
@@ -1595,9 +1595,9 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchCause((cause) => Effect.sync(() => {
+          console.error(`[review-status] Failed to send test feedback to ${agentId}:\n${Cause.pretty(cause)}`);
+        })));
       }
 
       if (testStatus === 'passed') {
@@ -1704,7 +1704,14 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'GitHub App not configured' }, { status: 400 });
     }
 
-    yield* Effect.promise(() => refreshWorkspaceToken(workspacePath));
+    const refreshResult = yield* refreshWorkspaceToken(workspacePath).pipe(
+      Effect.as({ ok: true } as const),
+      Effect.catch((error) => Effect.succeed({ ok: false as const, error: error.message })),
+    );
+    if (!refreshResult.ok) {
+      return jsonResponse({ success: false, error: refreshResult.error }, { status: 500 });
+    }
+
     return jsonResponse({ success: true, message: `Token refreshed for ${issueId}` });
   })),
 );
