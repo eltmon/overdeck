@@ -139,18 +139,19 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T09:14:53.137Z",
+  "updated": "2026-08-06T09:14:56.064Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-06T08:57:39.599Z",
-    "updatedAt": "2026-08-06T09:14:51.765Z",
+    "updatedAt": "2026-08-06T09:14:52.993Z",
     "reviewNotes": "all in-PR-scope findings resolved; remaining findings are advisory or pre-existing",
+    "testNotes": "typecheck: npm run typecheck clean (root tsc, hooks, evals, dashboard-types guard, frontend-types guard, 0 new errors). lint: npm run lint clean (eslint, effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/park-exits/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/circular/ratchet-audit/quarantine-audit all green). tests: npm test first pass = 1408 files/13367 tests passed, 9 files failed with uniform 'Hook timed out in 5000ms' on setupOverdeckTestDb() beforeEach -- none of the 9 files (overdeck-test-db.test.ts, cost-reconcile-harnesses.integration.test.ts, target-search.test.ts, agent-discovery-columns.test.ts, merge-sync-pending-auto-merges.test.ts, review-status-timestamp-units.test.ts, create-workspace-row.test.ts, conversations/list.test.ts, conversations/show.test.ts) are in this PR's diff (20 changed files, all in src/lib/cloister, src/lib/parked, src/lib/review-status.ts, src/dashboard/server/routes, CLAUDE.md, docs). Root-caused to CPU contention from ~12-18 concurrently running Overdeck pipeline agents on this box (matches the known cpu-storms-gate-runs pattern), not a code regression. Reran all 9 files in isolation with zero code changes: 9/9 files, 54/54 tests passed in 9.55s. Frontend gate (short-circuited out of the first npm test run by the failing root vitest exit code, under the && chain) run separately: src/dashboard/frontend issueActions.test.ts + issueActions.no-actions-lost.test.ts + issueActions.parity.test.tsx + fr7-conversation-pending-input.test.tsx = 4/4 files, 63/63 tests passed. Review already APPROVED with 0 blocking findings (see .pan/review/agent-pan-3575-review-3e0c9c3b/synthesis.md). UAT not required: xBRIEF items are all kind=backend/docs, verify_commands are vitest+typecheck+grep only, no dashboard/frontend files touched in the diff, and the PRD's own Testing section specifies only vitest+typecheck+lint (no browser verification step).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "reviewedAtCommit": "3e0c9c3b7322a45b652de2f1c3a7550e97550a56",
     "lastVerifiedCommit": "3e0c9c3b7322a45b652de2f1c3a7550e97550a56",
@@ -255,10 +256,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 94,
-            "output": 15754,
-            "cacheRead": 7222173,
-            "cacheWrite": 184504
+            "input": 96,
+            "output": 17752,
+            "cacheRead": 7428919,
+            "cacheWrite": 185115
           }
         },
         "work": {
@@ -278,15 +279,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 94,
-          "output": 15754,
-          "cacheRead": 7222173,
-          "cacheWrite": 184504
+          "input": 96,
+          "output": 17752,
+          "cacheRead": 7428919,
+          "cacheWrite": 185115
         }
       },
       "costAtCloseOut": {
-        "usd": 51.704935,
-        "pricingAsOf": "2026-08-06T09:14:51.783Z"
+        "usd": 51.767796,
+        "pricingAsOf": "2026-08-06T09:14:56.059Z"
       }
     },
     "merges": [
