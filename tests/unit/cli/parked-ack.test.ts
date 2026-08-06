@@ -13,8 +13,6 @@ function row(issueId: string, orbit: string, ageDays: number): ParkedRow {
     parkedAt: new Date(NOW - ageDays * DAY).toISOString(),
     parkReason: `parked ${issueId}`,
     unparkCondition: 'release',
-    lastActionAt: null,
-    actionCount: 0,
   };
 }
 

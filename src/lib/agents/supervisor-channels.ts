@@ -139,9 +139,9 @@ export function decideSupervisorForWorkAgent(
     console.log(`[${agentId}] ${tag}`);
   };
 
-  if (state.role !== 'work') {
-    log(false, 'not-a-work-agent');
-    return { eligible: false, reason: 'not-a-work-agent' };
+  if (state.role !== 'work' && state.role !== 'strike') {
+    log(false, 'not-a-work-or-strike-agent');
+    return { eligible: false, reason: 'not-a-work-or-strike-agent' };
   }
 
   if (process.env.OVERDECK_DOCKER_WORKSPACE === '1' || process.env.PAN_DOCKER === '1') {

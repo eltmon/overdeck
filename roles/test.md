@@ -84,13 +84,18 @@ Emit the sentinel and stop; repeated signals add lock pressure and burn tokens f
 
 ## TLDR: prefer code summaries over full reads
 
-When reading test fixtures, helpers, or app source to diagnose a failure, use TLDR MCP tools instead of full `Read` if `<workspace>/.venv` exists:
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
-- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — trace what a failing function touches
-- `tldr_semantic <query>` — find where a behavior is implemented when an acceptance criterion fails
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-Test logs, error output, and stack traces are still read directly. The PreToolUse hook will auto-substitute summaries for large source-file `Read`s. See the `pan-tldr` skill for details.
 
 ## Browser UAT Contract
 

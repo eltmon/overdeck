@@ -229,6 +229,10 @@ export interface SettingsConfig {
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };
+  /** Overdeck Theme design language (PAN-3410). Owned by useDesignLanguage, not the Settings form — see saveSettings' pre-save refetch. */
+  ui?: {
+    theme?: 'ledger' | 'broadsheet';
+  };
   conversations?: {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'overdeck-native';

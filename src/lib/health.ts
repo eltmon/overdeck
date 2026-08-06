@@ -13,6 +13,7 @@ import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgentSync, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
 import { capturePane, listSessionNames, sessionExists } from './tmux.js';
+import { getAgentEffectiveLastActivityMs } from './cloister/agent-idle.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 export class HealthError extends Data.TaggedError('HealthError')<{
@@ -140,7 +141,17 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
   const alive = await Effect.runPromise(isAgentAlive(agentId));
   const runtimeLastActivity = runtime?.lastActivity ? new Date(runtime.lastActivity) : null;
   const stateLastActivity = state?.lastActivity ? new Date(state.lastActivity) : null;
-  const lastActivity = runtimeLastActivity ?? stateLastActivity;
+  // PAN-3546: prefer the effective activity resolver (runtime mirror + tmux
+  // window_activity + runtime heartbeat) — the same oracle the deacon's
+  // stuck-remediation uses. The raw runtime/state lastActivity fields refresh
+  // only through activity-hook paths that textless transcripts (GPT via
+  // CLIProxy emit thinking/tool_use blocks only) never fire, so the weak read
+  // froze at spawn and classified a hard-at-work agent stuck (agent-pan-3511,
+  // 2026-08-04: 213 min "no activity" while its transcript grew 8MB).
+  const effectiveLastActivityMs = getAgentEffectiveLastActivityMs(agentId);
+  const lastActivity = effectiveLastActivityMs !== null
+    ? new Date(effectiveLastActivityMs)
+    : (runtimeLastActivity ?? stateLastActivity);
   health.lastActivity = lastActivity?.toISOString();
   health.reason = undefined;
 

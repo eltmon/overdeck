@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon, SunMoon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
+import { useDesignLanguage } from '../hooks/useDesignLanguage';
 import {
   createReconnectJitter,
   nextReconnectDelay,
@@ -39,6 +40,18 @@ function xtermTheme(isDark: boolean): ITheme {
     brightBlack: '#959da5', brightRed: '#cb2431', brightGreen: '#28a745', brightYellow: '#dbab09',
     brightBlue: '#2188ff', brightMagenta: '#8a63d2', brightCyan: '#3192aa', brightWhite: '#24292e',
   };
+}
+
+// xterm renders glyphs into its own canvas (WebGL) or DOM cells it styles
+// itself — it needs a concrete font-family string at Terminal construction
+// time and cannot consume a CSS custom property directly. Reading the
+// resolved --font-mono value here (PAN-3410 NFR-3) keeps this in sync with
+// the active Ledger/Broadsheet theme instead of hardcoding one theme's value;
+// the literal fallback only applies if the token isn't defined yet.
+function resolveMonoFontFamily(): string {
+  const fallback = "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace";
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
+  return resolved || fallback;
 }
 
 // Debounce utility to prevent resize spam
@@ -113,6 +126,7 @@ const isMac = navigator.platform.toLowerCase().includes('mac');
 
 export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
   const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
+  const designLanguage = useDesignLanguage((s) => s.designLanguage);
   // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
   // pin this one pane. Sessions spawned before a dashboard theme change keep
   // rendering their old Claude theme (Claude only detects via OSC 11 once, at
@@ -447,7 +461,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         cursorStyle: 'bar',
         cursorInactiveStyle: 'none',
         fontSize: 14,
-        fontFamily: "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+        fontFamily: resolveMonoFontFamily(),
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
         scrollback: 0,  // tmux is the source of truth for history; local scrollback duplicates content
@@ -835,6 +849,16 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       terminalInstance.current.options.theme = xtermTheme(effectiveIsDark);
     }
   }, [effectiveIsDark]);
+
+  // Re-font a live terminal when the Overdeck Theme (Ledger/Broadsheet)
+  // changes — resolveMonoFontFamily() only ran once, at Terminal construction,
+  // so without this effect an open terminal kept the font of whichever theme
+  // was active when it was created (PAN-3410 review finding — correctness).
+  useEffect(() => {
+    if (terminalInstance.current) {
+      terminalInstance.current.options.fontFamily = resolveMonoFontFamily();
+    }
+  }, [designLanguage]);
 
   const handleClick = () => {
     terminalInstance.current?.focus();

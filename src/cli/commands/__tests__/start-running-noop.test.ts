@@ -244,7 +244,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     expect(lifecycleMocks.getWorkAgentLifecycleStateSync).not.toHaveBeenCalled();
   });
 
-  it('preserves the resume/fresh refusal for a stopped agent with a resumable session', async () => {
+  it('preserves the resume/reset refusal for a stopped agent with a resumable session', async () => {
     createWorkspace('PAN-X');
     findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.xbrief.json');
     agentMocks.getAgentStateSync.mockReturnValue({
@@ -256,13 +256,13 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     });
     mockLifecycle({ isRunning: false, isRunningButStuck: false });
     lifecycleMocks.assertCanStartFreshSync.mockImplementation(() => {
-      throw new Error('use pan resume or --fresh');
+      throw new Error('use pan resume or pan reset-session');
     });
 
     const { issueCommand } = await import('../start.js');
     await expect(issueCommand('PAN-X', { model: '', plan: 'auto' } as any)).rejects.toThrow(/__exit__:1/);
 
-    expect(oraMocks.spinner.fail).toHaveBeenCalledWith(expect.stringContaining('use pan resume or --fresh'));
+    expect(oraMocks.spinner.fail).toHaveBeenCalledWith(expect.stringContaining('use pan resume or pan reset-session'));
   });
 
   // PAN-3150: an inert-but-alive agent had no recovery door — the already-running
@@ -282,18 +282,14 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       mockLifecycle({ isRunning: true, isRunningButStuck: false });
       // Live going in; gone once stopAgentSync has run.
       tmuxMocks.sessionExistsSync.mockImplementation(() => agentMocks.stopAgentSync.mock.calls.length === 0);
-      // Stop the run right after the --fresh block so the assertions stay on the
-      // recovery path rather than the full spawn.
-      lifecycleMocks.assertCanStartFreshSync.mockImplementation(() => {
-        throw new Error('__stop_after_fresh__');
-      });
+      lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true });
     }
 
     it('does not no-op on an already-running agent when --fresh is passed', async () => {
       arrangeLiveFreshStart();
 
       const { issueCommand } = await import('../start.js');
-      await expect(issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any)).rejects.toThrow(/__exit__:1/);
+      await issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any).catch(() => undefined);
 
       expect(allConsoleOutput(consoleLogSpy)).not.toMatch(/already running/);
     });
@@ -302,13 +298,16 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       arrangeLiveFreshStart();
 
       const { issueCommand } = await import('../start.js');
-      await expect(issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any)).rejects.toThrow(/__exit__:1/);
+      await issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any).catch(() => undefined);
 
       expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-x');
       expect(agentMocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-X');
       expect(allConsoleOutput(consoleErrorSpy)).not.toMatch(/pan kill/);
-      // It reached the post-wipe guard, i.e. the --fresh block completed.
-      expect(oraMocks.spinner.fail).toHaveBeenCalledWith(expect.stringContaining('__stop_after_fresh__'));
+      expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-X', {
+        allowPausedForce: false,
+        allowLiveSessionReplacement: true,
+        explicitFresh: true,
+      });
     });
 
     it('refuses only when the session survives the stop', async () => {
@@ -316,7 +315,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       tmuxMocks.sessionExistsSync.mockReturnValue(true); // never dies
 
       const { issueCommand } = await import('../start.js');
-      await expect(issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any)).rejects.toThrow(/__exit__:1/);
+      await issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any).catch(() => undefined);
 
       expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-x');
       expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled();

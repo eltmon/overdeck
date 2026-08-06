@@ -94,6 +94,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'qwen3-coder-plus': 'dashscope',
   'qwen3-plus': 'dashscope',
   'qwen3.7-max': 'dashscope',
+  'qwen3.8-max': 'dashscope',
 
   // xAI models
   'grok-build-0.1': 'xai',
@@ -181,6 +182,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'qwen3-coder-plus': 'claude-sonnet-5',
   'qwen3-plus': 'claude-haiku-4-5',
   'qwen3.7-max': 'claude-sonnet-5',
+  'qwen3.8-max': 'claude-sonnet-5',
 
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5', // Coding flagship → Sonnet

@@ -13,8 +13,19 @@ export class OpenAICompatibleProxyError extends Data.TaggedError('OpenAICompatib
 
 const UPSTREAMS: Record<string, string> = {
   nous: 'https://inference-api.nousresearch.com/v1',
-  dashscope: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
 };
+
+const DASHSCOPE_DEFAULT_UPSTREAM = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+
+/**
+ * DashScope API keys are region-locked: a key minted in the US (Virginia)
+ * console 401s against the Singapore intl endpoint and vice versa.
+ * DASHSCOPE_BASE_URL overrides the upstream region, e.g.
+ * https://dashscope-us.aliyuncs.com/compatible-mode/v1 for US-region keys.
+ */
+export function getDashScopeUpstreamBaseUrl(): string {
+  return process.env.DASHSCOPE_BASE_URL?.trim() || DASHSCOPE_DEFAULT_UPSTREAM;
+}
 
 let server: http.Server | null = null;
 let started = false;
@@ -94,7 +105,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   const [, provider, route] = match;
-  const upstream = UPSTREAMS[provider];
+  const upstream = provider === 'dashscope' ? getDashScopeUpstreamBaseUrl() : UPSTREAMS[provider];
   if (!upstream) {
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: { message: `Unknown provider: ${provider}` } }));

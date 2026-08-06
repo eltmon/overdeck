@@ -126,7 +126,7 @@ describe('probeTranscriptSince (PAN-1635 / PAN-1769 eaten-message detection)', (
 
     await expect(
       probeTranscriptSince(workspace, sessionId, 0, 'Ok  please fix it\nimmediately here on main.'),
-    ).resolves.toEqual({ matchedUserRecord: true, compactBoundaryCount: 0 });
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
   });
 
   it('only scans records past the given byte offset', async () => {
@@ -136,7 +136,7 @@ describe('probeTranscriptSince (PAN-1635 / PAN-1769 eaten-message detection)', (
 
     await expect(
       probeTranscriptSince(workspace, sessionId, offset, 'older message'),
-    ).resolves.toEqual({ matchedUserRecord: false, compactBoundaryCount: 0 });
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
   });
 
   it('counts compact boundaries and refuses to treat compaction meta user records as a landing', async () => {
@@ -150,12 +150,23 @@ describe('probeTranscriptSince (PAN-1635 / PAN-1769 eaten-message detection)', (
 
     await expect(
       probeTranscriptSince(workspace, sessionId, 0, 'deploy the fix now'),
-    ).resolves.toEqual({ matchedUserRecord: false, compactBoundaryCount: 1 });
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 1 });
+  });
+
+  it('counts a real assistant response but ignores synthetic compaction bookkeeping', async () => {
+    writeSession([
+      { type: 'assistant', message: { role: 'assistant', model: '<synthetic>', content: 'No response requested.' } },
+      { type: 'assistant', message: { role: 'assistant', model: 'gpt-5.6-sol', content: 'Continuing now.' } },
+    ]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, 'continue'),
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 1, compactBoundaryCount: 0 });
   });
 
   it('returns safe defaults for a missing session file', async () => {
     await expect(
       probeTranscriptSince(workspace, sessionId, 0, 'anything'),
-    ).resolves.toEqual({ matchedUserRecord: false, compactBoundaryCount: 0 });
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
   });
 });

@@ -26,10 +26,10 @@ import * as pty from '@lydell/node-pty';
 import { execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { appendFile, chmod, mkdir, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from '../paths.js';
 import {
@@ -604,6 +604,52 @@ function proxyPtyToStdout(child: pty.IPty): void {
   });
 }
 
+/**
+ * PAN-3512-crashloop: tee every byte of child output into the supervisor log
+ * (rolling tail, ~4 MiB cap). Claude prints its fatal errors to the PANE, not
+ * the JSONL transcript — so when an agent's session dies, the reason dies with
+ * it and every crash loop becomes unanswerable forensics. The supervisor owns
+ * the child's PTY master; this is the only place the last words can survive.
+ */
+const CHILD_TEE_MAX_BYTES = 4 * 1024 * 1024;
+const CHILD_TEE_TRIM_BYTES = 2 * 1024 * 1024;
+
+interface ChildTee {
+  bytes: number;
+  logPath: string;
+}
+
+function teeChildOutputToLog(child: pty.IPty, agentId: string): ChildTee {
+  const logPath = getPtySupervisorLogPath(agentId);
+  mkdirSync(dirname(logPath), { recursive: true });
+  const tee: ChildTee = { bytes: 0, logPath };
+  child.onData((data) => {
+    appendChildTeeChunk(tee, data);
+  });
+  return tee;
+}
+
+function appendChildTeeChunk(tee: ChildTee, data: string): void {
+  try {
+    appendFileSync(tee.logPath, data);
+    tee.bytes += Buffer.byteLength(data);
+    if (tee.bytes > CHILD_TEE_MAX_BYTES) {
+      const content = readFileSync(tee.logPath, 'utf-8');
+      writeFileSync(tee.logPath, content.slice(-CHILD_TEE_TRIM_BYTES));
+      tee.bytes = CHILD_TEE_TRIM_BYTES;
+    }
+  } catch {
+    // Forensics must never kill the child path — a log write failure is silent.
+  }
+}
+
+function noteChildExitInLog(tee: ChildTee | null, exitCode: number | undefined, signal: number | undefined): void {
+  if (!tee) return;
+  try {
+    appendFileSync(tee.logPath, `\n[pty-supervisor] child exited code=${exitCode ?? 'null'} signal=${signal ?? 'none'} at ${new Date().toISOString()}\n`);
+  } catch { /* best-effort */ }
+}
+
 function proxyStdinToPty(child: pty.IPty): void {
   process.stdin.on('data', (chunk) => child.write(chunk.toString()));
   if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
@@ -646,6 +692,7 @@ async function main(): Promise<void> {
   });
 
   proxyPtyToStdout(child);
+  const childTee = teeChildOutputToLog(child, agentId);
   proxyStdinToPty(child);
   proxyResizeToPty(child);
 
@@ -686,6 +733,7 @@ async function main(): Promise<void> {
   await bindSocket(server, socketPath);
 
   const result = await childExited;
+  noteChildExitInLog(childTee, result.exitCode, result.signal as number | undefined);
   if (shuttingDown) return;
   shuttingDown = true;
   await cleanup();

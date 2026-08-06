@@ -109,7 +109,7 @@ export async function handleBackfillTitlesBody(
       );
 
       let candidate = '';
-      let reason: string;
+      let reason = 'no transcript';
       if (firstUser) {
         candidate = derivePromptTitle(firstUser.text);
         reason = 'transcript';

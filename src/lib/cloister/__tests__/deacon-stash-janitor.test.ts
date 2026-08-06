@@ -12,6 +12,7 @@ vi.mock('../merge-verification.js', () => ({
 }));
 
 const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
+const mockRecordReviewVerdict = vi.hoisted(() => vi.fn());
 const mockSnapshotWorkspaceHeads = vi.hoisted(() => vi.fn());
 vi.mock('../review-verdict-feedback.js', async () => {
   const { Effect } = await import('effect');
@@ -23,6 +24,9 @@ vi.mock('../review-verdict-feedback.js', async () => {
     deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
   };
 });
+vi.mock('../review-verdict-writer.js', () => ({
+  recordReviewVerdict: mockRecordReviewVerdict,
+}));
 
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
@@ -248,6 +252,7 @@ describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
+    mockRecordReviewVerdict.mockResolvedValue({ landed: true, classification: 'no-evidence' });
     mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
     mockSpawnReviewSubRole.mockReturnValue(Effect.succeed({ success: true, message: 'respawned', sessionId: 'agent-pan-879-review-security' }) as any);
   });
@@ -466,18 +471,13 @@ describe('monitorReviewConvoySignals', () => {
       `${reviewDir}/synthesis.md`,
       expect.stringContaining('## Verdict: CHANGES REQUESTED — [correctness] Missing null check — `src/example.ts:42`'),
     );
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-880', {
-      reviewStatus: 'blocked',
-      reviewNotes: '[correctness] Missing null check — `src/example.ts:42`',
-      // PAN-1862/PAN-3148: the fallback synthesis anchors both the per-reviewer
-      // verdicts and the blocked aggregate verdict to the same reviewed HEAD.
-      reviewerVerdicts: {
-        security: { status: 'passed', findingsPath: `${reviewDir}/security.md`, atCommit: 'fallback-head' },
-        correctness: { status: 'blocked', findingsPath: `${reviewDir}/correctness.md`, atCommit: 'fallback-head' },
-        performance: { status: 'passed', findingsPath: `${reviewDir}/performance.md`, atCommit: 'fallback-head' },
-        requirements: { status: 'passed', findingsPath: `${reviewDir}/requirements.md`, atCommit: 'fallback-head' },
-      },
-      reviewedAtCommit: 'fallback-head',
+    expect(mockRecordReviewVerdict).toHaveBeenCalledWith('PAN-880', {
+      verdict: 'blocked',
+      notes: '[correctness] Missing null check — `src/example.ts:42`',
+      evidenceHead: 'fallback-head',
+      extra: { reviewedAtCommit: 'fallback-head' },
+      runId,
+      writer: 'fallback',
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-880',

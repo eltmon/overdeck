@@ -240,3 +240,28 @@ describe('groupPipelineEntries stalled bucket', () => {
     expect(groups.filter(g => g.key === 'work')).toHaveLength(0);
   });
 });
+
+describe('pipelineChipFor verification vs test labels', () => {
+  it('labels a running verification gate as running checks, not testing', () => {
+    const chip = pipelineChipFor({
+      feature: makeFeature(),
+      reviewStatus: { verificationStatus: 'running' } as any,
+      phase: 'review',
+    });
+
+    expect(chip.key).toBe('verification');
+    expect(chip.label).toBe('running checks');
+    expect(chip.animate).toBe(true);
+  });
+
+  it('keeps the testing label for a live test specialist', () => {
+    const chip = pipelineChipFor({
+      feature: makeFeature(),
+      reviewStatus: { testStatus: 'testing' } as any,
+      phase: 'review',
+    });
+
+    expect(chip.key).toBe('testing');
+    expect(chip.label).toBe('testing');
+  });
+});

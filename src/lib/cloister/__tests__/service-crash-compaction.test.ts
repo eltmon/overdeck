@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   spawnAgent: vi.fn(),
   saveAgentStateSync: vi.fn(),
   getAgentStateSync: vi.fn(() => null as any),
+  isRunning: vi.fn(() => true),
+  setAgentPausedSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -32,7 +34,12 @@ vi.mock('../../../lib/runtimes/index.js', () => ({
     name: 'claude-code',
     sendMessage: mocks.sendMessage,
     spawnAgent: mocks.spawnAgent,
+    isRunning: mocks.isRunning,
   })),
+}));
+
+vi.mock('../../agents/agent-state.js', () => ({
+  setAgentPausedSync: mocks.setAgentPausedSync,
 }));
 
 vi.mock('../../../lib/tmux.js', () => ({
@@ -45,6 +52,7 @@ import { orchestratedCompactionContinuations } from '../orchestrated-compaction.
 describe('idle-alive compaction escalation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isRunning.mockReturnValue(true);
     orchestratedCompactionContinuations.clear();
   });
 
@@ -88,5 +96,53 @@ describe('idle-alive compaction escalation', () => {
     expect(lastMessage).not.toBe('/compact');
     // No orchestrated compact was delivered, so no continuation is registered.
     expect(orchestratedCompactionContinuations.has('agent-pan-2899')).toBe(false);
+  });
+
+  it('never pokes or escalates a stopped agent — a boot gate is not an idle-alive stall', async () => {
+    mocks.isRunning.mockReturnValue(false);
+    const host = {
+      config: {},
+      crashTrackers: new Map(),
+      deathTimestamps: [],
+      spawnsPaused: false,
+      pokeProgress: new Map([['agent-pan-2899', { fingerprint: 'same', ineffective: 4 }]]),
+      eventStore: null,
+      progressFingerprint: vi.fn().mockResolvedValue('same'),
+      pokeAgentWithEscalation: vi.fn(),
+      checkForMassDeaths: vi.fn(),
+      pauseSpawns: vi.fn(),
+      emit: vi.fn(),
+    } as any;
+
+    // Five cycles: enough to trip tier 3 if the escalation counted them.
+    for (let i = 0; i < 5; i++) await pokeAgentWithEscalation(host, 'agent-pan-2899');
+
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(mocks.setAgentPausedSync).not.toHaveBeenCalled();
+    expect(host.emit).not.toHaveBeenCalled();
+    // The stale ineffective streak is cleared, not carried into the next run.
+    expect(host.pokeProgress.has('agent-pan-2899')).toBe(false);
+  });
+
+  it('does not report a poke that failed to deliver', async () => {
+    mocks.sendMessage.mockRejectedValueOnce(new Error('blocked choice menu'));
+    const host = {
+      config: {},
+      crashTrackers: new Map(),
+      deathTimestamps: [],
+      spawnsPaused: false,
+      pokeProgress: new Map(),
+      eventStore: null,
+      progressFingerprint: vi.fn().mockResolvedValue('fp'),
+      pokeAgentWithEscalation: vi.fn(),
+      checkForMassDeaths: vi.fn(),
+      pauseSpawns: vi.fn(),
+      emit: vi.fn(),
+    } as any;
+
+    await pokeAgentWithEscalation(host, 'agent-pan-2899');
+
+    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(host.emit).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'poked_agent' }));
   });
 });

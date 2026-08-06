@@ -1,11 +1,18 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { existsSync } from 'fs';
 import { getAgentStateSync, getAgentDir, getLatestSessionIdSync } from '../../lib/agents.js';
 import { clearAgentSessionPointers } from '../../lib/agents/session-pointers.js';
 import { listAgentIdsByPrefixSync } from '../../lib/overdeck/agents.js';
 import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
+
+export function registerResetSessionCommand(program: Command): void {
+  program.command('reset-session <id>')
+    .description('Clear saved session pointers so the next start creates a fresh session')
+    .action(resetSessionCommand);
+}
 
 async function resetAgentSessions(agentIds: string[]): Promise<void> {
   const targets = [...new Set(agentIds)];

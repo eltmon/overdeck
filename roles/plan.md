@@ -70,7 +70,7 @@ If two items are independent, leave them unconnected. The work agent reads the D
 ## Process
 
 1. Read the issue and the PRD draft at `drafts/<ISSUE-ID>.md` on `overdeck-state` through the read door if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `specs/` directly.
-2. Explore the codebase. **Prefer TLDR MCP tools over full `Read` whenever possible** — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
+2. Explore the codebase. Large-file `Read`s return TLDR summaries automatically — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach; write each question self-contained (situation, decision, option consequences) — the operator answers from a dialog without the transcript
 5. **Write the PRD draft** to `.pan/drafts/<ISSUE-ID>.md` in your workspace if no canonical PRD exists (see Outputs #1 for the standard). Do not proceed to the xBRIEF until the PRD is on disk — `pan plan finalize` refuses to run without it and promotes it to `overdeck-state`.
@@ -80,14 +80,18 @@ If two items are independent, leave them unconnected. The work agent reads the D
 
 ## TLDR: prefer code summaries over full reads
 
-Planning means broad exploration — exactly where TLDR pays off most. If `<workspace>/.venv` exists, you have these MCP tools:
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
-- `tldr_structure <directory>` — directory layout, useful when orienting in unfamiliar code
-- `tldr_semantic <query>` — natural-language search; great for "where is X handled?"
-- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — dependency analysis when scoping a refactor
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-Read full files only when you need exact line numbers for a citation in the plan. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for the full workflow.
 
 ## State model
 

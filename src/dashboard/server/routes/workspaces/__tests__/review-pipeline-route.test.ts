@@ -14,6 +14,7 @@ const routeMocks = vi.hoisted(() => ({
   flyExecCmd: vi.fn(),
   getReviewStatusSync: vi.fn(),
   clearFeedbackDeliveryStuck: vi.fn(),
+  registerReviewVerdictFeedbackDelivery: vi.fn(),
   getCachedConflictGateMergeability: vi.fn(),
   transitionIssueToInReview: vi.fn(),
   spawnRun: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock('../../workspaces.js', async (importOriginal) => {
 vi.mock('../../../../../lib/review-status.js', () => ({
   getReviewStatusSync: routeMocks.getReviewStatusSync,
   clearFeedbackDeliveryStuck: routeMocks.clearFeedbackDeliveryStuck,
+  registerReviewVerdictFeedbackDelivery: routeMocks.registerReviewVerdictFeedbackDelivery,
 }));
 
 vi.mock('../../../../../lib/cloister/conflict-gate.js', () => ({

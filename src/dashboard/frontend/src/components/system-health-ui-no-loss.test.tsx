@@ -220,8 +220,13 @@ describe('system health UI no-loss audit', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
 
-    // Summary line (new header box)
-    expect(within(dialog).getByText(/All clear.*spawn headroom.*relay running.*0 stalled/)).toBeInTheDocument();
+    // Summary line (new header box). getAllBy*: summaryLine() renders one
+    // string into a leaf div inside a bordered wrapper whose only child it is,
+    // so the wrapper's textContent matches identically — two nodes, one
+    // affordance. Anchoring cannot separate them; presence is the audited
+    // property, and getBy* would fail on the nesting, not on a loss.
+    expect(within(dialog).getAllByText(/^All clear .* spawn headroom .* relay running .* 0 stalled agents$/).length)
+      .toBeGreaterThan(0);
 
     // Chip row (new top status row, replaces old 8-tile status grid)
     expect(within(dialog).getByText('Admitted work agents')).toBeInTheDocument();
@@ -285,9 +290,14 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Top consumers section with kind badges
-    expect(within(dialog).getByText(/Work|Specialist|Container/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/agent-pan-1|specialist-review-agent|container-1/)).toBeInTheDocument();
+    // Top consumers section with every kind badge and consumer label. getAllBy*
+    // tolerates repeated labels while preserving the no-loss check for each row.
+    for (const kind of ['agent', 'specialist', 'container']) {
+      expect(within(dialog).getAllByText(kind).length).toBeGreaterThan(0);
+    }
+    for (const label of ['agent-pan-1', 'specialist-review-agent', 'container-1']) {
+      expect(within(dialog).getAllByText(new RegExp(label)).length).toBeGreaterThan(0);
+    }
   });
 
   it('displays attention section with severity dots and grouped agent rows when critical', () => {
@@ -313,8 +323,10 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Attention section should exist with agent activity issue
-    expect(within(dialog).getByText(/agent-stalled|activity stalled/)).toBeInTheDocument();
+    // Attention section should retain both the grouped reason and the affected
+    // agent. Both values may occur more than once, so assert presence separately.
+    expect(within(dialog).getAllByText(/activity stalled/).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText(/agent-stalled/).length).toBeGreaterThan(0);
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {

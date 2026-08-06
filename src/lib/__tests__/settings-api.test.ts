@@ -15,6 +15,9 @@ vi.mock('fs/promises', () => ({
 }));
 
 vi.mock('../config-yaml.js', () => ({
+  DEFAULT_CONFIG: {
+    ui: { openInEditorCommand: null, theme: 'broadsheet' },
+  },
   PARENT_MODEL_REF: 'parent',
   DEFAULT_MODEL_REFS: {
     plan: 'workhorse:expensive',
@@ -108,6 +111,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       defaultConversationModel: 'claude-sonnet-4-6',
       trackerKeys: {},
       tmux: { configMode: 'managed' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
       conversations: {
         compactionModel: 'claude-haiku-4-5',
         manualCompactMode: 'claude-code',
@@ -219,6 +223,15 @@ describe('loadSettingsApi', () => {
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(true);
     expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(true);
     expect(loadSettingsApi().experimental?.experimentalFeatures).toBe(true);
+  });
+
+  it('resolves ui.theme, defaulting to broadsheet when unset (PAN-3410)', async () => {
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().ui?.theme).toBe('broadsheet');
+
+    mockLoadConfig.mockReturnValue(baseConfig({ ui: { openInEditorCommand: null, theme: 'ledger' } }));
+    expect(loadSettingsApi().ui?.theme).toBe('ledger');
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -699,6 +712,111 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('mutedSources:');
     expect(written).toContain('PAN-123');
   });
+
+  it('saveDesignLanguage persists a valid ui.theme value (PAN-3410)', async () => {
+    const { saveDesignLanguage } = await import('../settings-api.js');
+
+    await Effect.runPromise(saveDesignLanguage('ledger'));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('ui:');
+    expect(written).toContain('theme: ledger');
+  });
+
+  it('the general saveSettingsApi never honors a caller-supplied ui.theme — only saveDesignLanguage may write it (PAN-3410 review finding, cycle 8)', async () => {
+    // A whole-document PUT /api/settings payload can carry a `ui.theme`
+    // snapshot materialized before a since-completed theme save (another
+    // tab, or the top-level Settings form's own pre-save refetch losing a
+    // race). Trusting it would silently revert the newer theme once this
+    // save's queued turn runs — saveSettingsApi must always carry forward
+    // whatever theme is *currently* on disk instead, regardless of what
+    // the caller's own `ui.theme` says.
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'ledger' },
+    }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      ui: { theme: 'broadsheet' },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('theme: ledger');
+    expect(written).not.toContain('theme: broadsheet');
+  });
+
+  it('preserves an existing open_in_editor_command when saveDesignLanguage changes only the theme (no-loss, PAN-3410)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger' },
+    }));
+    const { saveDesignLanguage } = await import('../settings-api.js');
+
+    await Effect.runPromise(saveDesignLanguage('broadsheet'));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('open_in_editor_command: cursor {path}');
+    expect(written).toContain('theme: broadsheet');
+  });
+
+  it('saveDesignLanguage preserves a settings field changed by a concurrent save instead of overwriting it with a stale snapshot (no-loss regression, PAN-3410 FR-7)', async () => {
+    // Models the exact race the review finding described: a concurrent
+    // settings save (another tab, or the top-level Settings form) commits
+    // workhorses.mid = 'gpt-5.5' to config.yaml. saveDesignLanguage must not
+    // hold a stale pre-concurrent-save snapshot of that field — it reads
+    // `loadSettingsApi()` fresh, in the same call, with no client round trip
+    // in between where staleness could creep in.
+    mockLoadConfig.mockReturnValue(baseConfig({
+      workhorses: { mid: 'gpt-5.5' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+    }));
+    const { saveDesignLanguage } = await import('../settings-api.js');
+
+    await Effect.runPromise(saveDesignLanguage('ledger'));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('mid: gpt-5.5');
+    expect(written).toContain('theme: ledger');
+  });
+
+  it('a theme save and a full-document save fired concurrently both survive — the second write reads the first write\'s result, never a pre-write snapshot (real overlapping-writes regression, PAN-3410 FR-7 cycle-6)', async () => {
+    // Unlike the previous test (the concurrent change is already committed
+    // *before* saveDesignLanguage is even called), this drives the two saves
+    // through Promise.all so their reads and writes can genuinely interleave.
+    // mockLoadConfig/mockWriteFile model a real config.yaml: every write
+    // replaces `state` with exactly what that write's content says for
+    // `mid`/`theme` (never leaves a field untouched the way "if includes X"
+    // checks would), and every read reflects the current `state`. Two
+    // independent protections are exercised here: `workhorses.mid` surviving
+    // proves runSettingsWriteSerialized defers the second call's read until
+    // the first call's write has landed (cycle 6); `theme` surviving proves
+    // saveSettingsApi's `honorThemeFromSettings` gate (cycle 8) — this is
+    // the general full-document path, so its own `ui.theme` snapshot must
+    // never reach disk regardless of write ordering.
+    let state = { workhorses: { mid: 'claude-sonnet-4-6' }, ui: { openInEditorCommand: null, theme: 'broadsheet' as const } };
+    mockLoadConfig.mockImplementation(() => baseConfig(state));
+    mockWriteFile.mockImplementation(async (_path: string, content: string) => {
+      const mid = /mid: (\S+)/.exec(content)?.[1];
+      const theme = /theme: (\S+)/.exec(content)?.[1];
+      state = {
+        workhorses: { mid: mid ?? state.workhorses.mid },
+        ui: { ...state.ui, theme: (theme as 'ledger' | 'broadsheet' | undefined) ?? state.ui.theme },
+      };
+    });
+
+    const { loadSettingsApi, saveSettingsApi, saveDesignLanguage } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Promise.all([
+      Effect.runPromise(saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } })),
+      Effect.runPromise(saveDesignLanguage('ledger')),
+    ]);
+
+    expect(state.workhorses.mid).toBe('gpt-5.5');
+    expect(state.ui.theme).toBe('ledger');
+    expect(mockWriteFile).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('validateSettingsApi', () => {
@@ -940,6 +1058,39 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('memory.rollup_pending_threshold must be a positive integer');
     expect(result.errors).toContain('memory.sidebar_refresh_interval_ms must be a positive integer');
   });
+
+  it('accepts an ui.theme value that matches the current on-disk theme and rejects an invalid enum value (PAN-3410)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'ledger' },
+    }));
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'ledger' } }).valid).toBe(true);
+
+    const result = validateSettingsApi({ ...validSettings, ui: { theme: 'neon' as never } });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('ui.theme must be ledger or broadsheet');
+  });
+
+  it('rejects PUT /api/settings attempting to change ui.theme away from the current on-disk value instead of silently discarding it (PAN-3410 review finding, cycle 9)', async () => {
+    // A valid enum value that does NOT match what's currently on disk means
+    // the caller is trying to CHANGE the theme through the general endpoint
+    // — saveSettingsApiPromiseUnlocked's honorThemeFromSettings gate would
+    // silently drop it and report success; reject it here instead, at
+    // validation time, with a message pointing at the correct endpoint.
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+    }));
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({ ...validSettings, ui: { theme: 'ledger' } });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('ui.theme cannot be changed through PUT /api/settings — use PUT /api/settings/design-language instead');
+
+    // Echoing back the theme unchanged (the ordinary whole-document round
+    // trip) is unaffected.
+    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'broadsheet' } }).valid).toBe(true);
+  });
 });
 
 describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-up)', () => {
@@ -983,6 +1134,67 @@ describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-u
     expect(openaiIds).not.toContain('gpt-4o');
     expect(openaiIds).not.toContain('gpt-5.5-pro');
     expect(openaiIds).not.toContain('o4-mini');
+
+    vi.doUnmock('../model-capabilities.js');
+    vi.resetModules();
+  });
+});
+
+describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness-labeled rows)', () => {
+  // The model picker renders one row per (model, harness) launch route. The
+  // API marks each Kimi id with the harness family its id space belongs to —
+  // bare ids are the claude-code route, kimi-code/* ids are the native CLI
+  // catalog (shared with ACP) — plus the effort levels that route offers, and
+  // suffixes native names so flat config panels never show two identical
+  // "Kimi K3 (1M)" rows with different launch validity.
+  it('annotates kimi entries with harness, effort levels, and a CLI-marked name for native ids', async () => {
+    vi.resetModules();
+    vi.doMock('../model-capabilities.js', () => ({
+      MODEL_CAPABILITIES: {
+        'k3': { provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'k3[1m]': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'kimi-code/k3': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'] },
+        'kimi-code/kimi-for-coding': { provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'] },
+        'gpt-5.5': { provider: 'openai', displayName: 'GPT-5.5', costPer1MTokens: 1 },
+      },
+      MODEL_DEPRECATIONS: {},
+      getModelCapability: vi.fn(),
+      getModelCapabilitySync: vi.fn(),
+      hasModelCapability: () => true,
+      hasModelCapabilitySync: () => true,
+      resolveModelId: (modelId: string) => modelId,
+      resolveModelIdSync: (modelId: string) => modelId,
+    }));
+
+    const { getAvailableModelsApi } = await import('../settings-api.js');
+    const kimi = getAvailableModelsApi().kimi;
+
+    const bare = kimi.find((m) => m.id === 'k3[1m]');
+    expect(bare).toMatchObject({
+      name: 'Kimi K3 (1M)',
+      baseName: 'Kimi K3 (1M)',
+      harness: 'claude-code',
+      effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    });
+
+    const native = kimi.find((m) => m.id === 'kimi-code/k3');
+    expect(native).toMatchObject({
+      name: 'Kimi K3 (1M) — Kimi Code CLI',
+      baseName: 'Kimi K3 (1M)',
+      harness: 'kimi-code',
+      effortLevels: ['low', 'high', 'max'],
+    });
+
+    const coding = kimi.find((m) => m.id === 'kimi-code/kimi-for-coding');
+    expect(coding?.name).toBe('Kimi K2.7 Coding — Kimi Code CLI');
+    expect(coding?.harness).toBe('kimi-code');
+
+    // No entry may carry the retired "(native)" marker.
+    expect(kimi.some((m) => m.name.includes('(native)'))).toBe(false);
+
+    // Non-kimi providers stay unannotated.
+    const openai = getAvailableModelsApi().openai;
+    expect(openai[0]).not.toHaveProperty('harness');
 
     vi.doUnmock('../model-capabilities.js');
     vi.resetModules();

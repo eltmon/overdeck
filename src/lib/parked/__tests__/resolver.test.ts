@@ -3,6 +3,9 @@
  * One test per orbit, plus the overlap rules (yield ≠ park, warm-idle ≠ park,
  * idle-running is the orbit of last resort) and population-level sort/dedup.
  */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyParked,
@@ -123,15 +126,6 @@ describe('classifyParked — one orbit at a time', () => {
     expect(rows[0].parkReason).toContain('exhausted');
   });
 
-  it('conflicts: a conflicts_since mark parks until resolution', () => {
-    const rows = classifyParked(signals({
-      reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 4 * HOUR).toISOString(), paths: ['src/a.ts'] } }),
-    }));
-    expect(rows).toHaveLength(1);
-    expect(rows[0].orbit).toBe('conflicts');
-    expect(rows[0].parkReason).toContain('c8a911e6fa');
-  });
-
   it('zombie-session: a live agent on a merged issue parks; on an open issue does not', () => {
     const live = [{ ...baseAgent({}), tmuxActive: true }];
     const zombie = classifyParked(signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: live }));
@@ -189,9 +183,9 @@ describe('classifyParked — one orbit at a time', () => {
 describe('summarizeParked', () => {
   it('counts by orbit and picks the most severe primary per issue', () => {
     const summary = summarizeParked([
-      { issueId: 'PAN-1', orbit: 'operator-gate', parkedAt: '2026-08-02T00:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
-      { issueId: 'PAN-1', orbit: 'zombie-session', parkedAt: '2026-08-02T01:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
-      { issueId: 'PAN-2', orbit: 'stuck-flag', parkedAt: '2026-08-02T02:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
+      { issueId: 'PAN-1', orbit: 'operator-gate', parkedAt: '2026-08-02T00:00:00Z', parkReason: '', unparkCondition: '' },
+      { issueId: 'PAN-1', orbit: 'zombie-session', parkedAt: '2026-08-02T01:00:00Z', parkReason: '', unparkCondition: '' },
+      { issueId: 'PAN-2', orbit: 'stuck-flag', parkedAt: '2026-08-02T02:00:00Z', parkReason: '', unparkCondition: '' },
     ]);
     expect(summary.total).toBe(2);
     expect(summary.byOrbit).toEqual({ 'operator-gate': 1, 'zombie-session': 1, 'stuck-flag': 1 });
@@ -202,7 +196,7 @@ describe('summarizeParked', () => {
 
 describe('guard-exit inventory (PAN-3488)', () => {
   it('every orbit in the taxonomy has a fixture producing non-empty park + release copy', () => {
-    // One fixture per orbit — the taxonomy is ten entries and each must
+    // One fixture per orbit — the taxonomy is nine entries and each must
     // classify with both sentences populated. A new orbit added to
     // PARKED_ORBITS without a classifier branch (or without copy) fails here.
     const fixtures: Record<string, ParkedSignals> = {
@@ -212,7 +206,6 @@ describe('guard-exit inventory (PAN-3488)', () => {
       'operator-gate': signals({ agents: [baseAgent({ paused: true })] }),
       'uat-failed': signals({ reviewStatus: baseStatus({ reviewStatus: 'passed', testStatus: 'passed', uatStatus: 'failed' }) }),
       'merge-failed': signals({ reviewStatus: baseStatus({ mergeStatus: 'failed' }) }),
-      conflicts: signals({ reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 60_000).toISOString(), paths: [] } }) }),
       'zombie-session': signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: [{ ...baseAgent({}), tmuxActive: true }] }),
       'idle-running': signals({ reviewStatus: baseStatus({}), liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }] }),
       'circuit-breaker': signals({ reviewStatus: baseStatus({ autoRequeueCount: 30 }) }),
@@ -235,5 +228,19 @@ describe('orchestrator idle exemption (first-night flywheel kill)', () => {
       const rows = classifyParked(signals({ reviewStatus: baseStatus({}), liveAgents: idleAgent }));
       expect(rows, `role ${role} must never be idle-running`).toHaveLength(0);
     }
+  });
+});
+
+describe('completed-handoff is not an operator park (pan done suppression)', () => {
+  it('a stoppedByUser agent WITH a completed marker never reports operator-gate', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agents-dir-'));
+    mkdirSync(join(dir, 'agents', 'agent-pan-9'), { recursive: true });
+    writeFileSync(join(dir, 'agents', 'agent-pan-9', 'completed'), '');
+    process.env.OVERDECK_HOME = dir;
+    const rows = classifyParked(signals({
+      agents: [baseAgent({ id: 'agent-pan-9', stoppedByUser: true, status: 'stopped', stoppedAt: new Date(NOW - HOUR).toISOString() })],
+    }));
+    expect(rows).toHaveLength(0);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

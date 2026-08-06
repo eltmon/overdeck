@@ -207,14 +207,23 @@ export interface PaletteConversationHit {
   rank: number;
 }
 
-function routeableConversationName(sessionId: string, cache: Map<string, string>): string {
+interface RouteableConversation {
+  name: string;
+  projectKey: string | null;
+}
+
+function routeableConversation(sessionId: string, cache: Map<string, RouteableConversation>): RouteableConversation {
   const cached = cache.get(sessionId);
   if (cached) return cached;
-  let routeable = sessionId;
+  let routeable: RouteableConversation = { name: sessionId, projectKey: null };
   try {
-    routeable = getConversationByClaudeSessionId(sessionId)?.name ?? sessionId;
+    const conversation = getConversationByClaudeSessionId(sessionId);
+    routeable = {
+      name: conversation?.name ?? sessionId,
+      projectKey: conversation?.projectKey ?? null,
+    };
   } catch {
-    routeable = sessionId;
+    routeable = { name: sessionId, projectKey: null };
   }
   cache.set(sessionId, routeable);
   return routeable;
@@ -223,6 +232,7 @@ function routeableConversationName(sessionId: string, cache: Map<string, string>
 interface ProjectDirMatch {
   enc: string;
   key: string;
+  yamlKey: string;
 }
 
 /**
@@ -236,6 +246,7 @@ function registeredProjectDirs(): ProjectDirMatch[] {
     return listProjectsSync().map((p) => ({
       enc: p.config.path.replace(/[/.]/g, '-'),
       key: p.config.name ?? p.key,
+      yamlKey: p.key,
     }));
   } catch (error) {
     console.error('[palette] failed to list projects for conversation routing:', error);
@@ -262,14 +273,18 @@ function resolveConversationProjectKey(projectId: string, dirs: ProjectDirMatch[
 
 function toPaletteConversationHit(
   hit: ConversationSearchHit,
-  routeableNames: Map<string, string>,
+  routeableConversations: Map<string, RouteableConversation>,
   projectDirs: ProjectDirMatch[],
 ): PaletteConversationHit {
+  const conversation = routeableConversation(hit.sessionId, routeableConversations);
+  const explicitProject = conversation.projectKey
+    ? projectDirs.find((dir) => dir.yamlKey === conversation.projectKey || dir.key === conversation.projectKey)
+    : undefined;
   return {
     sessionId: hit.sessionId,
-    conversationId: routeableConversationName(hit.sessionId, routeableNames),
+    conversationId: conversation.name,
     projectId: hit.projectId,
-    projectKey: resolveConversationProjectKey(hit.projectId, projectDirs),
+    projectKey: explicitProject?.key ?? resolveConversationProjectKey(hit.projectId, projectDirs),
     role: hit.role,
     ts: hit.ts,
     byteOffset: hit.byteOffset,
@@ -282,9 +297,9 @@ function toPaletteConversationHit(
 
 async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
   const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
-  const routeableNames = new Map<string, string>();
+  const routeableConversations = new Map<string, RouteableConversation>();
   const projectDirs = registeredProjectDirs();
-  return hits.map((hit) => toPaletteConversationHit(hit, routeableNames, projectDirs));
+  return hits.map((hit) => toPaletteConversationHit(hit, routeableConversations, projectDirs));
 }
 
 async function searchProjectMemory(

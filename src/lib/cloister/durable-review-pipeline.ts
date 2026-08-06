@@ -29,7 +29,11 @@ export type DurableReviewPipelineHandler = (
   input: DurableReviewPipelineInput,
 ) => Promise<boolean>;
 
+export type DurableReviewDispatcher = DurableReviewPipelineInput['dispatchReview'];
+export type DurableReviewPipelineHostInput = Omit<DurableReviewPipelineInput, 'dispatchReview'>;
+
 let handler: DurableReviewPipelineHandler | null = null;
+let dispatcher: DurableReviewDispatcher | null = null;
 
 export function registerDurableReviewPipelineHandler(
   nextHandler: DurableReviewPipelineHandler,
@@ -37,11 +41,29 @@ export function registerDurableReviewPipelineHandler(
   handler = nextHandler;
 }
 
+/** Registers the dashboard-owned review role dispatcher without coupling status reads to a role module. */
+export function registerDurableReviewDispatcher(
+  nextDispatcher: DurableReviewDispatcher,
+): void {
+  dispatcher = nextDispatcher;
+}
+
 export function hasDurableReviewPipelineHandler(): boolean {
   return handler !== null;
 }
 
-/** Re-enters the dashboard-owned verification → push → review path. */
+export function hasDurableReviewPipelineDispatch(): boolean {
+  return handler !== null && dispatcher !== null;
+}
+
+/** Re-enters the dashboard-owned verification → push → review path with its registered dispatcher. */
+export async function startRegisteredDurableReviewPipelineHostSide(
+  input: DurableReviewPipelineHostInput,
+): Promise<boolean> {
+  return handler && dispatcher ? handler({ ...input, dispatchReview: dispatcher }) : false;
+}
+
+/** Runs a supplied pipeline input, primarily for explicitly composed callers and tests. */
 export async function startDurableReviewPipelineHostSide(
   input: DurableReviewPipelineInput,
 ): Promise<boolean> {

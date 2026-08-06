@@ -9,11 +9,13 @@ import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
 import {
   backfillAgentsSync,
-  getIssueStageSync,
-  isTerminalIssueStage,
   listAllAgentsSync,
 } from '../../lib/overdeck/agents.js';
-import { pruneAgentRowsAfterTranscriptCleanup } from '../../lib/cloister/agent-gc.js';
+import {
+  pruneTerminalStoppedAgents,
+  type AgentGcResult,
+  type AgentGcRow,
+} from '../../lib/cloister/agent-gc.js';
 import {
   DatabaseProvisionerError,
   getDatabaseProvisioner,
@@ -29,14 +31,24 @@ import {
 } from '../../lib/workspaces/rebuild.js';
 import { resolveTerminalIssueIds } from '../../lib/overdeck/terminal-issues.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
-import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
-
 const execAsync = promisify(exec);
 
 // Extended project config that includes the full workspace config
 interface ExtendedProjectConfig extends FullProjectConfig {
   key: string;
 }
+
+export interface DbCommandDeps {
+  pruneTerminalAgents: (
+    agents: AgentGcRow[],
+    options: { dryRun: boolean },
+  ) => Promise<AgentGcResult>;
+}
+
+const defaultDbCommandDeps: DbCommandDeps = {
+  pruneTerminalAgents: (agents, options) =>
+    pruneTerminalStoppedAgents(agents, undefined, options),
+};
 
 /**
  * Load all projects with their full configuration (including workspace)
@@ -83,7 +95,10 @@ function spinnerLogger(spinner: ReturnType<typeof ora>): DatabaseProvisionerLogg
   };
 }
 
-export function registerDbCommands(program: Command): void {
+export function registerDbCommands(
+  program: Command,
+  deps: DbCommandDeps = defaultDbCommandDeps,
+): void {
   const db = program.command('db').description('Database seeding and management');
 
   db.command('snapshot')
@@ -130,7 +145,7 @@ export function registerDbCommands(program: Command): void {
   db.command('gc-agents')
     .description('Remove stopped work-agent rows for terminal issues')
     .option('--dry-run', 'Show what would be removed without writing')
-    .action(gcAgentsCommand);
+    .action((options: { dryRun?: boolean }) => gcAgentsCommand(options, deps));
 
   db.command('rebuild')
     .description('Reconstruct the dashboard cache from git + GitHub sources (PAN-1920)')
@@ -159,23 +174,19 @@ export function registerDbCommands(program: Command): void {
     .action(reconcileMergesCommand);
 }
 
-async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
-  const candidates = listAllAgentsSync()
-    .filter((agent) =>
-      agent.status === 'stopped'
-      && ((agent.workspace && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true)
-        || isTerminalIssueStage(getIssueStageSync(agent.issueId))),
-    );
-  const ids = candidates.map((agent) => agent.id);
+async function gcAgentsCommand(
+  options: { dryRun?: boolean },
+  deps: DbCommandDeps,
+): Promise<void> {
+  const result = await deps.pruneTerminalAgents(listAllAgentsSync(), {
+    dryRun: options.dryRun === true,
+  });
 
   if (options.dryRun) {
-    console.log(`Would reap ${ids.length} agent(s).`);
-    for (const id of ids) console.log(`  ${id}`);
-    return;
+    console.log(`Would reap ${result.removed.length} agent(s) after live terminality checks.`);
+  } else {
+    console.log(`Reaped ${result.removed.length} agent(s); preserved ${result.preserved.length} agent(s).`);
   }
-
-  const result = await pruneAgentRowsAfterTranscriptCleanup(candidates);
-  console.log(`Reaped ${result.removed.length} agent(s); preserved ${result.preserved.length} transcript-bearing row(s).`);
   for (const id of result.removed) console.log(`  ${id}`);
 }
 

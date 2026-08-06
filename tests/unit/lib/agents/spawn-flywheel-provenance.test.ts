@@ -33,7 +33,10 @@ vi.mock('../../../../src/lib/agents/agent-state.js', async () => {
 
 vi.mock('../../../../src/lib/agents/spawn-prep.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../src/lib/agents/spawn-prep.js')>(),
-  assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
+  // spawn.ts calls the prepareWorkspaceForAgentSpawn wrapper (clearStaleClosedOutBeforeSpawn +
+  // assertWorkspaceStackHealthyForSpawn), not assertWorkspaceStackHealthyForSpawn directly —
+  // mocking only the inner function doesn't intercept it (same-module internal call).
+  prepareWorkspaceForAgentSpawn: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../../src/lib/tmux.js', async () => {

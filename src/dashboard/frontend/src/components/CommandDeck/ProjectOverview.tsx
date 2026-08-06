@@ -532,7 +532,7 @@ function HeroBillboard({ metrics }: { metrics: HeroMetric[] }) {
               }}
             >
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
-              <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+              <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-mono), "SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
               {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
             </div>
           );

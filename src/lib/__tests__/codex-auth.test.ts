@@ -50,6 +50,17 @@ const proseBurnBlock = (ts: string) =>
 const reusedCodeBurnBlock = (ts: string) =>
   `[${ts}] [--------] [warn ] [openai_auth.go:295] Token refresh attempt 1 failed with non-retryable error: token refresh failed with status 401: {\n` +
   `    "code": "refresh_token_reused"\n  }`;
+// PAN-3528: the openai_auth.go line the burn JSON hangs off. On a revocation
+// whose body carries neither of the phrases above, this is the only evidence.
+const nonRetryable401Block = (ts: string) =>
+  `[${ts}] [--------] [warn ] [openai_auth.go:317] Token refresh attempt 1 failed with non-retryable error: token refresh failed with status 401: {\n` +
+  `    "error": "invalid_grant"\n  }`;
+/** Format an epoch as cliproxy's log stamp — which is LOCAL time (PAN-3528). */
+const localStamp = (epochMs: number) => {
+  const d = new Date(epochMs);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
 const fail503 = (ts: string) =>
   `[${ts}] [0b68fa22] [error] [gin_logger.go:97] 503 |           2ms |       127.0.0.1 | POST    "/v1/messages?beta=true"`;
 const ok200 = (ts: string) =>
@@ -197,11 +208,66 @@ describe('evaluateBurnedFromLog', () => {
   });
 
   it('without a credential cutoff, a recent failure is burned but a stale one is dismissed', () => {
-    const recent = evalLog([reusedCodeBurnBlock('2026-06-02 03:30:00')], { now: ms('2026-06-02T03:40:00Z') });
+    // PAN-3528: the staleness backstop compares a LOCAL-time log stamp against
+    // `now`, so build both stamps from the same epoch — a literal string would
+    // make this assertion pass or fail depending on the host's UTC offset.
+    const now = ms('2026-06-02T03:40:00Z');
+    const recent = evalLog([reusedCodeBurnBlock(localStamp(now - 10 * 60_000))], { now });
     expect(recent.status).toBe('burned');
 
-    const stale = evalLog([reusedCodeBurnBlock('2026-06-02 01:00:00')], { now: ms('2026-06-02T03:40:00Z') });
+    const stale = evalLog([reusedCodeBurnBlock(localStamp(now - 160 * 60_000))], { now });
     expect(stale.status).toBe('valid'); // > 1h old, no cutoff → staleness backstop
+  });
+});
+
+/**
+ * PAN-3528 — the live 2026-08-03 case: every gpt-5.6-sol agent 503'd for hours
+ * while GET /api/settings/codex-auth kept answering {status: valid}. Two holes,
+ * both locked in here.
+ */
+describe('evaluateBurnedFromLog CLIProxy-route coverage (PAN-3528)', () => {
+  const originalTz = process.env.TZ;
+  beforeEach(() => { process.env.TZ = 'America/New_York'; });
+  afterEach(() => {
+    if (originalTz === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  it('THE REGRESSION: a failure logged seconds after the credential write is burned in a UTC-4 zone', () => {
+    // Real shape: cliproxy re-bridged the credential at 19:59:32 local, the
+    // refresh 401'd at 19:59:34 local, and 503s ran until 21:25. Parsing the
+    // stamps as UTC made every one of them look 4h OLDER than the credential
+    // write, so they fell before the cutoff and were dismissed as "re-authed
+    // since" — the token was dead and the banner never fired.
+    const credWriteMs = new Date(2026, 7, 3, 19, 59, 32).getTime();
+    const status = evalLog(
+      [nonRetryable401Block('2026-08-03 19:59:34'), fail503('2026-08-03 21:25:03')],
+      { ignoreBurnBefore: credWriteMs, now: new Date(2026, 7, 3, 21, 30, 0).getTime() },
+    );
+
+    expect(status.status).toBe('burned');
+  });
+
+  it('still dismisses failures that genuinely predate the credential write', () => {
+    // Same zone — the cutoff must keep working, not just always report burned.
+    const credWriteMs = new Date(2026, 7, 3, 20, 0, 0).getTime();
+    const status = evalLog([fail503('2026-08-03 17:10:00')], {
+      ignoreBurnBefore: credWriteMs,
+      now: new Date(2026, 7, 3, 21, 30, 0).getTime(),
+    });
+
+    expect(status.status).toBe('valid');
+  });
+
+  it('treats a non-retryable 401 refresh failure as burned even when the body names no known code', () => {
+    // Fires at cliproxy startup, before any agent has made a request — earlier
+    // and more definitive than the 503 symptom.
+    const status = evalLog([nonRetryable401Block('2026-08-03 19:59:34')], {
+      ignoreBurnBefore: new Date(2026, 7, 3, 19, 0, 0).getTime(),
+      now: new Date(2026, 7, 3, 20, 0, 0).getTime(),
+    });
+
+    expect(status.status).toBe('burned');
   });
 });
 
@@ -214,6 +280,7 @@ import {
   codexAuthBurnFlaggedAtMs,
   filterCodexAuthBurnedAgentIds,
   combineCodexAuthStatuses,
+  isCodexAuthRouted,
   CODEX_AUTH_BURNED_REASON_PREFIX,
   type CodexAuthBurnFlagState,
 } from '../codex-auth.js';
@@ -274,6 +341,36 @@ describe('paneShowsCodexAuthBurn (PAN-2285)', () => {
 
   it('does not match a clean pane', () => {
     expect(paneShowsCodexAuthBurn('❯ working on the task, all good')).toBe(false);
+  });
+
+  it('matches the CLIProxy 503 wrapper a gpt-5.x agent actually shows (PAN-3528)', () => {
+    // Verbatim from the burned 2026-08-03 pane. None of the native codex
+    // markers appear in it — CLIProxy absorbs the upstream 401 and re-surfaces
+    // it as a 503 that reads like a transient hiccup, so the agent retried 10×
+    // against a dead credential and nothing flagged it.
+    const pane =
+      'API Error: 503 auth_unavailable: no auth available (providers=codex, model=gpt-5.6-sol).\n' +
+      'This is a server-side issue, usually temporary — try again in a moment.';
+    expect(paneShowsCodexAuthBurn(pane)).toBe(true);
+  });
+});
+
+describe('isCodexAuthRouted (PAN-3528)', () => {
+  it('covers the native codex harness regardless of model', () => {
+    expect(isCodexAuthRouted('codex', 'gpt-5.6-sol')).toBe(true);
+  });
+
+  it('covers an openai-provider model under claude-code (the CLIProxy route)', () => {
+    expect(isCodexAuthRouted('claude-code', 'gpt-5.6-sol')).toBe(true);
+  });
+
+  it('excludes an Anthropic agent — its pane text is not codex-auth evidence', () => {
+    expect(isCodexAuthRouted('claude-code', 'claude-opus-5')).toBe(false);
+  });
+
+  it('returns false for an unset or unregistered model instead of throwing', () => {
+    expect(isCodexAuthRouted('claude-code', undefined)).toBe(false);
+    expect(isCodexAuthRouted('claude-code', 'model-that-no-longer-exists')).toBe(false);
   });
 });
 

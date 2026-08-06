@@ -40,6 +40,7 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
         tmux: {
           configMode: 'managed',
         },
+        ui: { openInEditorCommand: null, theme: 'broadsheet' },
         conversations: {
           compactionModel: 'claude-haiku-4-5',
           manualCompactMode: 'claude-code',
@@ -63,6 +64,7 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
         tmux: {
           configMode: 'managed',
         },
+        ui: { openInEditorCommand: null, theme: 'broadsheet' },
         conversations: {
           compactionModel: 'claude-haiku-4-5',
           manualCompactMode: 'claude-code',
@@ -148,6 +150,7 @@ describe('settings-api', () => {
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' },
           conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -176,6 +179,7 @@ describe('settings-api', () => {
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' },
           conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -199,6 +203,7 @@ describe('settings-api', () => {
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' },
           conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -245,6 +250,7 @@ describe('settings-api', () => {
           },
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' },
           conversations: {
             compactionModel: 'claude-haiku-4-5',
             manualCompactMode: 'claude-code',
@@ -628,6 +634,7 @@ describe('settings-api', () => {
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -838,6 +845,7 @@ models:
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -859,6 +867,7 @@ models:
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
+          ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
           tts: makeTtsConfig(),
@@ -881,6 +890,7 @@ describe('OpenRouter favorites', () => {
     overrides: {},
     geminiThinkingLevel: 3,
     tmux: { configMode: 'managed' as const },
+    ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
     conversations: {
       compactionModel: 'claude-haiku-4-5' as any,
       manualCompactMode: 'claude-code' as const,

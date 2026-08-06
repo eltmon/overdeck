@@ -1,28 +1,24 @@
 /**
- * Stall-sweeper per-row state (PAN-3485 phase 2).
+ * Stall-sweeper per-row reporting state (PAN-3485 phase 2).
  *
  * One small JSON file per (issueId, orbit) under ~/.overdeck/stall-sweeper/.
- * Tracks the current park episode: how many autonomous actions the sweeper has
- * taken, when the last one ran (cooldown), and when the row was last
- * re-surfaced to the operator (TTL). Runtime-plane residue — deleting the
- * directory only resets cooldowns, never loses pipeline state.
+ * Tracks a parked episode's recommendation cooldown, recommendation count, and
+ * operator re-surface TTL. Runtime-plane residue — deleting the directory only
+ * resets reporting cadence and never loses pipeline state.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
 
 export interface StallSweeperRowState {
-  /** Total autonomous actions taken for the current park episode. */
-  actionCount: number;
-  /** ISO of the last autonomous action (drives cooldowns). */
-  lastActionAt?: string;
-  /** ISO the sweeper first saw this park episode. */
+  /** Total recommendations emitted for the current park episode. */
+  recommendationCount: number;
+  /** ISO timestamp of the last recommendation (drives cooldowns). */
+  lastRecommendedAt?: string;
+  /** ISO timestamp when the sweeper first saw this park episode. */
   episodeStartedAt: string;
-  /** ISO of the last operator re-surface (drives the escalation TTL). */
+  /** ISO timestamp of the last operator re-surface (drives the escalation TTL). */
   lastEscalatedAt?: string;
-  /** idle-running only: ISO of the last nudge + the activity stamp it targeted. */
-  lastNudgedAt?: string;
-  nudgedActivityAt?: string;
 }
 
 function sweeperDir(): string {
