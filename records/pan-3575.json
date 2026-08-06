@@ -109,26 +109,34 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:57:33.900Z",
+  "updated": "2026-08-06T08:57:34.727Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T08:55:44.874Z",
+    "updatedAt": "2026-08-06T08:57:34.725Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
-    "reviewRequestedAt": "2026-08-06T08:52:21.853Z",
+    "reviewRequestedAt": "2026-08-06T08:57:34.725Z",
     "reviewSpawnedAt": "2026-08-06T08:54:06.434Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
         "scripts/source-introspection-baseline.txt",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/dashboard/server/routes/workspaces.ts",
+        "src/dashboard/server/routes/workspaces/__tests__/review-status-auth.test.ts",
+        "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+        "src/lib/cloister/test-agent-queue.ts",
+        "tests/cli/commands/specialists/done.test.ts",
+        "tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts",
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "declaredScopeUntouched": [
@@ -151,16 +159,24 @@
         "docs/PARKED-POPULATION.md",
         "scripts/file-size-allowlist.txt",
         "scripts/source-introspection-baseline.txt",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/dashboard/server/routes/workspaces.ts",
+        "src/dashboard/server/routes/workspaces/__tests__/review-status-auth.test.ts",
         "src/lib/__tests__/review-status-uat-failure.test.ts",
         "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+        "src/lib/cloister/__tests__/test-agent-queue.test.ts",
         "src/lib/cloister/stall-sweeper.ts",
+        "src/lib/cloister/test-agent-queue.ts",
         "src/lib/cloister/uat-failure-feedback.ts",
         "src/lib/parked/__tests__/resolver.test.ts",
         "src/lib/parked/resolver.ts",
         "src/lib/review-status.ts",
+        "tests/cli/commands/specialists/done.test.ts",
+        "tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts",
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
-      "recordedAt": "2026-08-06T08:08:19.232Z"
+      "recordedAt": "2026-08-06T08:57:33.900Z"
     }
   },
   "closeOut": {
