@@ -991,21 +991,21 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:10:31.046Z",
+  "updated": "2026-08-06T22:12:43.465Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:10:24.288Z",
+    "updatedAt": "2026-08-06T22:12:43.404Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: the test-gate re-gate now lands after caller extras in the verdict write door, so an orphan restore's historical passed test result can no longer overwrite the fresh-head reset; added the regression the reviewer asked for. Also completed the remaining verdict-door migrations (fallback kill-conditional, orphan-restore, unsignaled auto-completes, infra-bypass).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
-    "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
+    "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
     "reviewRequestedAt": "2026-08-06T22:07:29.659Z",
     "reviewSpawnedAt": "2026-08-06T22:10:24.286Z",
     "scopeDrift": {
@@ -1083,9 +1083,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 289634,
-            "output": 10763,
-            "cacheRead": 4044800,
+            "input": 4693863,
+            "output": 53143,
+            "cacheRead": 9410560,
             "cacheWrite": 0
           }
         },
@@ -1176,9 +1176,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 3023889,
-          "output": 64822,
-          "cacheRead": 14067200,
+          "input": 7428118,
+          "output": 107202,
+          "cacheRead": 19432960,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1189,8 +1189,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 63.4165137,
-        "pricingAsOf": "2026-08-06T22:10:24.296Z"
+        "usd": 76.4042297,
+        "pricingAsOf": "2026-08-06T22:12:43.443Z"
       }
     },
     "merges": [
@@ -1199,7 +1199,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
