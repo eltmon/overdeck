@@ -53,7 +53,7 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
 
-import { Effect, Layer, Option } from 'effect';
+import { Cause, Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import {
@@ -1505,19 +1505,19 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
           const wsInfo = getWorkspaceInfoForIssue(issueId);
-          const fileResult = yield* Effect.promise(() => writeFeedbackFile({
+          const fileResult = yield* writeFeedbackFile({
             issueId,
             workspacePath: wsInfo.localPath,
             specialist: 'review-agent',
             outcome: reviewStatus === 'blocked' ? 'changes-requested' : 'failed',
             summary: `Review ${reviewStatus.toUpperCase()}: ${(reviewNotes || '').slice(0, 80)}`,
             markdownBody: feedbackBody,
-          }));
+          });
           if (!fileResult.success) {
             console.error(
               `[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`
@@ -1530,9 +1530,9 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchCause((cause) => Effect.sync(() => {
+          console.error(`[review-status] Failed to send feedback to ${agentId}:\n${Cause.pretty(cause)}`);
+        })));
       }
 
       if (reviewStatus === 'passed') {
