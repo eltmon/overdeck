@@ -24,6 +24,11 @@
       "id": "25f96343-130f-49de-a116-ffd233737149",
       "startedAt": "2026-08-06T07:34:54.750Z",
       "reason": "spawn"
+    },
+    {
+      "id": "5cdbfc15-c5ac-48ba-a900-dcb1d77bfd0d",
+      "startedAt": "2026-08-06T09:21:40.398Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
@@ -46,6 +51,14 @@
     {
       "at": "2026-08-06T07:34:54.750Z",
       "event": "spawned"
+    },
+    {
+      "at": "2026-08-06T09:21:40.398Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-06T08:36:32.703Z",
+      "event": "stopped"
     }
   ],
   "archiveRef": null,
