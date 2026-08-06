@@ -11,6 +11,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 import { observeActiveReviewArtifact } from './verdict-restore.js';
+import { recordOrphanRestoreVerdict } from './orphan-restore-verdict.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -401,8 +402,8 @@ export async function handleReviewCoordinatorDied(
 
   const completedSnapshot = completedReviewSnapshotAfterCoordinatorExit(status);
   if (completedSnapshot) {
-    setReviewStatusSync(issueId, completedSnapshot);
-    actions.push(`Restored completed review for ${issueId} after coordinator exit; no re-dispatch`);
+    const restored = await recordOrphanRestoreVerdict(issueId, completedSnapshot);
+    actions.push(restored.landed ? `Restored completed review for ${issueId} after coordinator exit; no re-dispatch` : `Completed-review restore for ${issueId} not recorded (${restored.reason})`);
     return actions;
   }
 
@@ -595,9 +596,9 @@ async function reconcileReviewStatusOrphan(
           reviewUpdate['mergeStatus'] = 'pending';
         }
       }
-      setReviewStatusSync(issueId, reviewUpdate);
+      const restored = await recordOrphanRestoreVerdict(issueId, reviewUpdate);
       actions.push(
-        `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
+        (restored.landed ? `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` : `Orphaned review snapshot for ${issueId} not recorded (${restored.reason})`) +
         (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
       );
       return actions;
