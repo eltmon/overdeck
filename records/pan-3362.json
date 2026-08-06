@@ -272,9 +272,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T12:30:25.688Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T12:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T12:44:42.208Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-06T12:44:42.308Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T12:44:42Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3362\n\n# Review Synthesis — PAN-3362 — 2026-08-06T12:44:00Z\n\n## Verdict: CHANGES REQUESTED — stale review-status rows survive in the dashboard read model after closed-issue cleanup\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/context.json\n- Branch: feature/pan-3362\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362\n- HEAD reviewed: 3bfc2e27aad34f7144bcc2353151d768fa8b0148\n- Cycle number: 9\n- Prior cycle SHA: dbe30a3ddaa97b9a8f61b516b79df0357ab509d0\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] DB-only review-status bootstrap permanently retains stale closed rows — `src/dashboard/server/read-model.ts:548`\n\n`mergeDbOnlyReviewStatuses()` hydrates every `review_status` row absent from the tracker-derived snapshot. Closed issues are deliberately absent from that tracker reconstruction, so their stale rows enter the in-memory projection. The closed-status cleanup later deletes the SQLite row but emits no removal event, leaving the dashboard snapshot to display the closed issue as reviewing or ready to merge until restart. The cited bootstrap is in both the PR and cycle diffs, so it remains promotable in cycle 9. Restrict hydration to live issue IDs or add a read-model removal event during cleanup.\n\n### [performance] Persisted branch fallback performs synchronous full-table I/O in a server route — `src/dashboard/server/routes/workspaces/workspace-data.ts:151`\n\nWhen Git inspection is unavailable, `GET /api/workspaces/:issueId` calls `listOverdeckAgentStatesSync().find(...)`, which synchronously reads and decodes every agent row on the dashboard Node event loop. The work grows with unrelated historical agents and delays concurrent HTTP and WebSocket work. The cited fallback is in both the PR and cycle diffs, so it remains promotable in cycle 9. Replace it with an asynchronous, issue-scoped work-agent query through the existing index.\n\n## Non-blocking Findings\n\n### [correctness] Manual `--local` seeding still needs a separate restart — `src/cli/commands/admin/seed-uat-fixtures.ts:134`\n\nThe container-local CLI process persists its fixture data but cannot refresh an already-running peer dashboard's in-memory IssueDataService or read model. The documentation describes this limitation and host mode restarts the server, so the reviewer classified this as an advisory.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-3bfc2e27/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3362 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -338,7 +356,7 @@
     "recordedAt": "2026-08-06T12:28:47.930Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T12:44:41.443Z",
+  "updated": "2026-08-06T12:44:42.308Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "blocked",
