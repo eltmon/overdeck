@@ -490,18 +490,18 @@
     "recordedAt": "2026-08-06T00:17:20.709Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:18:45.733Z",
+  "updated": "2026-08-06T00:18:59.746Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-06T00:18:43.793Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-06T00:18:59.722Z",
     "reviewNotes": "Verification failed at test",
     "testNotes": "Automated gates on feature/pan-3423 at HEAD 5e2735f1597e06cc2434e504ab2105799fa9ca0c (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423), re-run fresh since lastVerifiedCommit (2d6872f) was stale relative to HEAD (SystemHealthPill.tsx changed 49 lines and system-health-ui-no-loss.test.tsx changed 106 lines since then via the 'fix(dashboard): prove system health no-loss criteria' commit). npm run typecheck PASSED (root, hooks, evals, dashboard guard 55 known/0 new, frontend guard 0 known/0 new). npm run lint PASSED (exit 0) including lint:file-size — the previously-reported merge-ops.ts file-size ratchet failure is resolved now that this branch has merged current origin/main. Scoped tests: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention (frontend workspace) -> 3 files / 34 tests passed. npx vitest run src/lib/agents/__tests__/agent-health.test.ts (FR-3 server change) -> 1 file / 12 tests passed. Full frontend suite (src/dashboard/frontend, npx vitest run) -> 306 files / 3003 tests passed. Full root-level npm test (npx vitest run from repo root) -> 1399 files / 13263 tests passed, 3 files / 50 tests skipped, 0 failures (the DB-fixture-timeout flakiness seen in a prior run under heavier host contention did not reproduce this run).",
     "conflictsSince": {
@@ -559,9 +559,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 27553038,
-            "output": 373327,
-            "cacheRead": 110184960,
+            "input": 27556612,
+            "output": 375131,
+            "cacheRead": 110699008,
             "cacheWrite": 0
           }
         },
@@ -658,9 +658,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38365650,
-          "output": 880648,
-          "cacheRead": 297398784,
+          "input": 38369224,
+          "output": 882452,
+          "cacheRead": 297912832,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -683,8 +683,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 392.8101523,
-        "pricingAsOf": "2026-08-06T00:18:45.728Z"
+        "usd": 393.1391663,
+        "pricingAsOf": "2026-08-06T00:18:59.731Z"
       }
     },
     "merges": [
