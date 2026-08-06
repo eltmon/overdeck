@@ -303,6 +303,12 @@ describe('setProjectVersionSync', () => {
     next.release();
   });
 
+  it('assigns lock ports below default operating-system ephemeral ranges', () => {
+    const port = projectsConfigLockPort(PROJECTS_CONFIG_FILE);
+    expect(port).toBeGreaterThanOrEqual(10_000);
+    expect(port).toBeLessThan(30_000);
+  });
+
   it('recovers automatically after a lock-owning process exits', async () => {
     const port = projectsConfigLockPort(PROJECTS_CONFIG_FILE);
     const child = spawn(process.execPath, ['-e', [

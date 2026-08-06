@@ -179,8 +179,6 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   inspectNotes?: string;
   mergeNotes?: string;
   blockerReasons?: unknown[];
-  /** PAN-3154: main-head SHA/paths that first made this branch conflict. */
-  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   prUrl?: string;
   prNumber?: number;
   prHeadSha?: string;
@@ -201,7 +199,6 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   panDoneRecoveredAt?: string;
   closedOut?: boolean;
   closedOutAt?: string; reopenedAt?: string;
-  reviewerVerdicts?: unknown;
   reviewCycleHistory?: unknown;
   updatedAt: string;
 }
@@ -229,8 +226,6 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
-  /** PAN-1874: per-issue re-review scope override; beats project/global config. */
-  reReviewScope?: 'all' | 'changed' | 'blockers';
   /** Per-issue convoy model override; beats roles.review for every reviewer. */
   reviewModel?: string;
   /** Per-issue tiered execution override; beats plan-metadata and global config. */

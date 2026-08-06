@@ -1,103 +1,88 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-// PAN-1577: a conversation is grouped under a project by its cwd, set once at
-// creation. setConversationProjectKey persists an explicit override so a
-// conversation can be moved to a different project without relocating its
-// backing session file or its cwd.
+// OVERDECK_HOME is captured when projects.ts loads, so set it before the first
+// dynamic import of the project and conversation modules.
+const TEST_HOME = join(tmpdir(), `project-key-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+process.env.OVERDECK_HOME = TEST_HOME;
 
-async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../infra.js');
-  closeOverdeckDatabaseSync();
-}
+const ROOT_PATH = join(TEST_HOME, 'projects', 'root');
+const NESTED_PATH = join(ROOT_PATH, 'packages', 'nested');
 
-let TEST_HOME: string;
+const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } = await import('../infra.js');
+const { createConversation, getConversationByName, setConversationProjectKey } = await import('../conversations.js');
+const { resolveRegisteredProject } = await import('../conversation-runtime.js');
+const { resolveProjectKeyForCwdAsync } = await import('../../projects.js');
 
-beforeEach(async () => {
-  await resetDb();
-  TEST_HOME = join(tmpdir(), `project-key-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(TEST_HOME, { recursive: true });
-  process.env.OVERDECK_HOME = TEST_HOME;
+beforeAll(() => {
+  mkdirSync(NESTED_PATH, { recursive: true });
+  writeFileSync(
+    join(TEST_HOME, 'projects.yaml'),
+    [
+      'projects:',
+      '  root-key:',
+      '    name: Root Project',
+      `    path: ${ROOT_PATH}`,
+      '  nested-key:',
+      '    name: Nested Project',
+      `    path: ${NESTED_PATH}`,
+      '',
+    ].join('\n'),
+    'utf-8',
+  );
 });
 
-afterEach(async () => {
-  await resetDb();
+afterAll(() => {
+  closeOverdeckDatabaseSync();
+  rmSync(TEST_HOME, { recursive: true, force: true });
   delete process.env.OVERDECK_HOME;
 });
 
-describe('setConversationProjectKey (overdeck store)', () => {
-  it('defaults to null (falls back to cwd-derived grouping) for a new conversation', async () => {
-    const { createConversation, getConversationByName } = await import('../conversations.js');
+describe('conversation project association (PAN-3419)', () => {
+  it('adds a nullable project_key column to conversations', () => {
+    const columns = getOverdeckDatabaseSync()
+      .prepare('PRAGMA table_info(conversations)')
+      .all() as Array<{ name: string; notnull: number }>;
 
-    createConversation({
-      name: 'conv-project-key-default',
-      tmuxSession: 'conv-project-key-default',
-      cwd: TEST_HOME,
-      claudeSessionId: 'sess-project-key-default',
-      title: 'New conversation',
-      harness: 'pi',
-      model: 'glm-5.2',
-    });
-
-    expect(getConversationByName('conv-project-key-default')?.projectKey).toBeNull();
+    expect(columns).toContainEqual(expect.objectContaining({ name: 'project_key', notnull: 0 }));
   });
 
-  it('sets the project assignment override', async () => {
-    const { createConversation, setConversationProjectKey, getConversationByName } = await import('../conversations.js');
-
-    createConversation({
-      name: 'conv-project-key-set',
-      tmuxSession: 'conv-project-key-set',
-      cwd: TEST_HOME,
-      claudeSessionId: 'sess-project-key-set',
-      title: 'New conversation',
-      harness: 'pi',
-      model: 'glm-5.2',
-    });
-
-    setConversationProjectKey('conv-project-key-set', 'krux');
-    expect(getConversationByName('conv-project-key-set')?.projectKey).toBe('krux');
+  it('resolves yaml keys and display names to one canonical project record', async () => {
+    await expect(resolveRegisteredProject('root-key')).resolves.toEqual(expect.objectContaining({
+      key: 'root-key',
+      config: expect.objectContaining({ name: 'Root Project', path: ROOT_PATH }),
+    }));
+    await expect(resolveRegisteredProject('Root Project')).resolves.toEqual(expect.objectContaining({
+      key: 'root-key',
+      config: expect.objectContaining({ name: 'Root Project', path: ROOT_PATH }),
+    }));
+    await expect(resolveRegisteredProject('missing')).resolves.toEqual({ error: 'Unknown project: missing' });
   });
 
-  it('overwrites an existing project assignment override', async () => {
-    const { createConversation, setConversationProjectKey, getConversationByName } = await import('../conversations.js');
+  it('persists and updates an explicit project association through the conversation write door', async () => {
+    const resolved = await resolveRegisteredProject('Nested Project');
+    if ('error' in resolved) throw new Error(resolved.error);
 
     createConversation({
-      name: 'conv-project-key-overwrite',
-      tmuxSession: 'conv-project-key-overwrite',
-      cwd: TEST_HOME,
-      claudeSessionId: 'sess-project-key-overwrite',
-      title: 'New conversation',
-      harness: 'pi',
-      model: 'glm-5.2',
+      name: 'project-associated',
+      tmuxSession: 'conv-project-associated',
+      cwd: join(TEST_HOME, 'isolated-worktree'),
+      projectKey: resolved.key,
     });
+    expect(getConversationByName('project-associated')?.projectKey).toBe('nested-key');
 
-    setConversationProjectKey('conv-project-key-overwrite', 'krux');
-    expect(getConversationByName('conv-project-key-overwrite')?.projectKey).toBe('krux');
+    setConversationProjectKey('project-associated', 'root-key');
+    expect(getConversationByName('project-associated')?.projectKey).toBe('root-key');
 
-    setConversationProjectKey('conv-project-key-overwrite', 'mind-your-now');
-    expect(getConversationByName('conv-project-key-overwrite')?.projectKey).toBe('mind-your-now');
+    setConversationProjectKey('project-associated', null);
+    expect(getConversationByName('project-associated')?.projectKey).toBeNull();
   });
 
-  it('clears the project assignment override when passed null', async () => {
-    const { createConversation, setConversationProjectKey, getConversationByName } = await import('../conversations.js');
-
-    createConversation({
-      name: 'conv-project-key-clear',
-      tmuxSession: 'conv-project-key-clear',
-      cwd: TEST_HOME,
-      claudeSessionId: 'sess-project-key-clear',
-      title: 'New conversation',
-      harness: 'pi',
-      model: 'glm-5.2',
-    });
-
-    setConversationProjectKey('conv-project-key-clear', 'krux');
-    expect(getConversationByName('conv-project-key-clear')?.projectKey).toBe('krux');
-
-    setConversationProjectKey('conv-project-key-clear', null);
-    expect(getConversationByName('conv-project-key-clear')?.projectKey).toBeNull();
+  it('resolves cwd ownership asynchronously by the longest registered project path prefix', async () => {
+    await expect(resolveProjectKeyForCwdAsync(join(NESTED_PATH, 'src'))).resolves.toBe('nested-key');
+    await expect(resolveProjectKeyForCwdAsync(join(ROOT_PATH, 'other'))).resolves.toBe('root-key');
+    await expect(resolveProjectKeyForCwdAsync(join(TEST_HOME, 'outside'))).resolves.toBeNull();
   });
 });

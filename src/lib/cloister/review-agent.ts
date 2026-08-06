@@ -50,25 +50,23 @@ import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { clearSupersededReviewInfrastructureFailure } from '../review-verdict-guards.js';
-import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { createPromiseCoalescer } from './in-flight-guard.js';
-import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
+import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
-  computeConvoyScope,
-  handleReviewDiscoveryReady,
+  recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 const execAsync = promisify(exec);
@@ -121,77 +119,22 @@ export function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
-  /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
-  inScopeSubRoles?: ReviewSubRole[];
-  /** PAN-1862 (FR-9): sub-roles whose passed verdicts are carried forward this cycle. */
-  carriedSubRoles?: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
-  /**
-   * PAN-1862 Phase A: when true, the parent performs SHARED DISCOVERY first and
-   * signals `pan admin specialists discovery-ready review <id>`; the server then
-   * forks this session into the convoy so the reviewers inherit the warm cache.
-   */
-  discovery?: boolean;
 }): string {
-  const inScope = opts.inScopeSubRoles && opts.inScopeSubRoles.length > 0 ? opts.inScopeSubRoles : [...REVIEW_SUB_ROLES];
-  const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
-  const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
+  const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = reviewSynthesisPath(opts.reviewDir);
-  const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
-    ? 'the four convoy reviewers (security, correctness, performance, requirements)'
-    : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
-  const carriedSection = carried.length > 0
-    ? [
-        '',
-        `CARRIED-FORWARD VERDICTS (PAN-1862 selective re-review): ${carried.map(c => c.subRole).join(', ')}.`,
-        'These reviewers PASSED the prior cycle and none of their domain files changed',
-        'since, so they were NOT re-run. Their stub reports are already written in the',
-        'review directory — treat each as a passed verdict. Do NOT wait for signals',
-        'from them; they will never arrive.',
-      ].join('\n')
-    : '';
-  const discoverySection = opts.discovery
-    ? [
-        `DISCOVERY + SYNTHESIS — REVIEW for ${opts.issueId}`,
-        '',
-        'PHASE 1 — SHARED DISCOVERY (do this FIRST):',
-        'Read the code the whole review convoy will need so it lives in THIS',
-        "session's history. WHY: after you signal readiness the server FORKS this",
-        'session into the convoy reviewers, and because the prompt cache is',
-        'content-addressed, everything you read here becomes a ~90%-discounted',
-        'cache read for every forked reviewer instead of four independent',
-        'full-price re-reads. Reviewers also review better when they all see the',
-        'same curated context and understand the change as a whole.',
-        '',
-        '1. Read the context manifest (path below): risk ranking + acceptance criteria.',
-        '2. Read the committed diff for the branch (git diff against the merge base).',
-        '3. Read the FULL contents of the HIGH-risk changed files and the immediately',
-        '   surrounding code they depend on. Stay within the manifest scope — this is',
-        '   curation for the convoy, not an open-ended crawl.',
-        '',
-        'Then signal readiness EXACTLY ONCE (repeat signals are a server-side no-op):',
-        `  pan admin specialists discovery-ready review ${opts.issueId}`,
-        '',
-        'PHASE 2 — STANDBY (after the signal):',
-        `The server forks this session into ${runningDesc}.`,
-        'Your work resumes only once they finish.',
-        '',
-      ]
-    : [
-        `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
-        '',
-        `Do NOT do anything yet. The Overdeck server has already spawned ${runningDesc}`,
-        'and they are running in parallel right now. Your work begins only once they finish.',
-        '',
-      ];
+  const runningDesc = 'the four convoy reviewers (security, correctness, performance, requirements)';
   const prompt = [
-    ...discoverySection,
+    `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
+    '',
+    `Do NOT do anything yet. The Overdeck server has already spawned ${runningDesc}`,
+    'and they are running in parallel right now. Your work begins only once they finish.',
+    '',
     `You will receive exactly one \`pan tell\` signal per RUNNING sub-role as each`,
     'reviewer finishes — these are delivered to you as user messages:',
     expectedSignals,
-    carriedSection,
     '',
-    `Until all ${inScope.length} terminal signal(s) have arrived: do nothing. Do not read the`,
+    `Until all ${REVIEW_SUB_ROLES.length} terminal signal(s) have arrived: do nothing. Do not read the`,
     'reviewer output files, do not run git, do not inspect tmux sessions, do not',
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
@@ -206,8 +149,8 @@ export function buildReviewRolePrompt(opts: {
     'Stale signals describe lanes that no longer exist; the current lanes are',
     'still running and their signals arrive later.',
     '',
-    `Once you have all ${inScope.length} terminal signal(s), follow roles/review.md exactly to`,
-    'read the reports (including any carried-forward stubs), synthesize the verdict,',
+    `Once you have all ${REVIEW_SUB_ROLES.length} terminal signal(s), follow roles/review.md exactly to`,
+    'read the reports, synthesize the verdict,',
     'write the synthesis report, and signal the status.',
     '',
     '── Review context ──',
@@ -235,12 +178,9 @@ export function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Overdeck CLI,',
-    'including a per-reviewer verdict for each sub-role that RAN this cycle',
-    '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
-    'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
+    'After writing the synthesis report, signal the verdict with Overdeck CLI:',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
@@ -473,6 +413,18 @@ async function spawnReviewRoleForIssuePromise(
       }
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
+        const convergence = currentRunId
+          ? await convergeRowFromVerdictOfRecord(opts.issueId, {
+            runId: currentRunId,
+            workspacePath: opts.workspace,
+            writer: 'dispatch-converge',
+          })
+          : { converged: false };
+        if (convergence.converged) {
+          const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
+          emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+          return { success: true, message };
+        }
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
@@ -540,6 +492,17 @@ async function spawnReviewRoleForIssuePromise(
   // pan review request before reaching here. If callers somehow bypass the
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
+  const convergence = await convergeRowFromVerdictOfRecord(opts.issueId, {
+    runId: getAgentStateSync(reviewSessionName)?.reviewRunId,
+    workspacePath: opts.workspace,
+    writer: 'dispatch-converge',
+  });
+  if (convergence.converged) {
+    const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
+    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    return { success: true, message };
+  }
+
   try {
     const currentStatus = getReviewStatusSync(opts.issueId);
     setReviewStatusSync(opts.issueId, {
@@ -598,85 +561,21 @@ async function spawnReviewRoleForIssuePromise(
 
     const fullReview = isExtendedReviewEnabled(opts.issueId);
 
-    // PAN-1862 (FR-7/FR-8/NFR-1): selective re-review — which convoy reviewers run
-    // this cycle vs carry their prior passed verdict forward (computeConvoyScope).
-    const { inScope: inScopeSubRoles, carried: carriedSubRoles, scope: reReviewScope } = fullReview
-      ? await computeConvoyScope(opts.issueId, opts.workspace)
-      : { inScope: [...REVIEW_SUB_ROLES], carried: [], scope: 'changed' as ReReviewScope };
-
-    // PAN-1862 Phase A: discovery-then-fork mode. When the full-convoy review will
-    // run on claude-code, the parent does the shared discovery reads FIRST, signals
-    // `pan admin specialists discovery-ready review <id>`, and the server forks its
-    // session into the convoy — the reviewers replay the discovery prefix as warm
-    // cache reads instead of four independent full-price re-reads. Any other
-    // harness keeps the inline convoy spawn (the fork machinery is Claude Code's
-    // --resume; NFR-2 explicitly degrades to independent reads there). Per-reviewer
-    // model mismatches are handled at fork time, not here — a mismatched reviewer
-    // simply spawns fresh while the rest fork.
-    const cfgReviewHarness = loadYamlConfig().config.roles?.review?.harness;
-    // PAN-2585: decide from the harness that will ACTUALLY run — the saved review
-    // agent is the resume target, and model routing (not config) usually picks the
-    // harness. Falling through to the 'claude-code' literal put codex parents into
-    // discovery mode, where they stand by forever for a fork that can never happen.
-    // PAN-2697: first reviews have no saved state, so resolve the provider-default
-    // harness from the review model instead of ever defaulting to the literal.
-    const savedReviewHarness = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}-review`)?.harness;
-    const modelDefaultHarness = (() => {
-      try {
-        const cfg = loadYamlConfig().config;
-        const reviewModel = opts.model ?? resolveModel('review', undefined, cfg, `review:${opts.issueId.toLowerCase()}`);
-        return reviewModel ? providerDefaultHarnessSync(reviewModel, cfg) : undefined;
-      } catch {
-        return undefined;
-      }
-    })();
-    const discoveryForkMode = fullReview
-      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? modelDefaultHarness ?? 'claude-code') === 'claude-code';
-
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
-    // PAN-1862: in discovery-fork mode the convoy is NOT spawned here — the parent
-    // signals discovery-ready and handleReviewDiscoveryReady launches (and forks)
-    // the convoy. markDiscoveryPending records what the handler needs on the
-    // parent's state; the deacon's stalled-discovery backstop covers a parent that
-    // never signals.
-    const markDiscoveryPending = async (synthesisAgentId: string) => {
-      try {
-        const parent = getAgentStateSync(synthesisAgentId);
-        if (parent) {
-          parent.reviewDiscoveryPending = true;
-          parent.reviewContextManifestPath = contextManifestPath;
-          parent.reviewDiscoveryReadyAt = undefined;
-          parent.reviewConvoyForkedAt = undefined;
-          parent.reviewForkCacheChecked = undefined;
-          await Effect.runPromise(saveAgentState(parent));
-        }
-      } catch (stateErr) {
-        console.warn(`[review-agent] Could not mark discovery pending on ${synthesisAgentId}:`, stateErr);
-      }
-    };
-    const spawnConvoyReviewers = async (synthesisAgentId: string) => {
-      if (discoveryForkMode) {
-        await markDiscoveryPending(synthesisAgentId);
-        console.log(`[review-agent] ${opts.issueId}: parent spawned in discovery mode — convoy defers to the discovery-ready signal (PAN-1862)`);
-        return [];
-      }
-      return launchConvoyReviewersPromise({
+    const spawnConvoyReviewers = (synthesisAgentId: string) =>
+      launchConvoyReviewersPromise({
         issueId: opts.issueId,
         workspace: opts.workspace,
         runId,
         synthesisAgentId,
-        inScope: inScopeSubRoles,
-        carried: carriedSubRoles,
-        scope: reReviewScope,
         contextManifestPath,
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.harness ? { harness: opts.harness } : {}),
         allowHost,
       });
-    };
 
     // PAN-1862: RESUME the saved review session by default. The review agent keeps the prior
     // review's context (the files it read, the findings it raised), so a re-review checks the
@@ -713,7 +612,7 @@ async function spawnReviewRoleForIssuePromise(
             // PAN-3368: this is recovery of the current run, not a new review cycle.
             // Re-dispatch only lanes with neither a live session nor a report; completed
             // siblings stay intact and the synthesis parent can proceed immediately.
-            const recovery = await handleReviewDiscoveryReady(opts.issueId, {
+            const recovery = await recoverMissingConvoyReviewers(opts.issueId, {
               source: 'same-run parent resume',
               ...(opts.model ? { model: opts.model } : {}),
               ...(opts.harness ? { harness: opts.harness } : {}),
@@ -942,8 +841,7 @@ export { reviewResumeDecision } from './review-resume-decision.js';
 export {
   buildConvoyPrompt,
   spawnReviewSubRoleForIssue,
-  handleReviewDiscoveryReady,
-  resolveReReviewScope,
+  recoverMissingConvoyReviewers,
 } from './review-convoy.js';
 
 /**

@@ -359,8 +359,6 @@ export interface RoleSubConfig {
 export type RoleEffort = EffortLevel;
 export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ReviewMode = 'quick' | 'full' | 'none';
-/** PAN-1862 (FR-7): which convoy reviewers re-run on a re-review cycle. */
-export type ReReviewScope = 'all' | 'changed' | 'blockers';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
@@ -370,8 +368,6 @@ export interface RoleConfig {
   harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
   effort?: RoleEffort;
   mode?: ReviewMode;
-  /** PAN-1862 (FR-7): re-review scope for the review role (default 'changed'). */
-  reReviewScope?: ReReviewScope;
   /**
    * Target minimum concurrent agents the role should keep launched. The
    * orchestrator MUST be aggressive about reaching this number — if the active
@@ -405,6 +401,8 @@ export interface ResourcesConfig {
   governor_hard_reserve_gb?: number;
   /** PAN-2500: deacon memory governor — re-admit only past this reserve; must exceed governor_soft_reserve_gb */
   governor_recovery_reserve_gb?: number;
+  /** PAN-3550: deacon memory governor — warn in the activity feed at this reserve; must exceed governor_soft_reserve_gb */
+  governor_watch_reserve_gb?: number;
   /** PAN-2500: cold-start footprint estimate (GiB) for a work agent with no live per-project docker-stack data yet */
   governor_footprint_default_work_gb?: number;
   /** PAN-2500: cold-start footprint estimate (GiB) for a review agent */
@@ -919,6 +917,8 @@ export interface NormalizedConfig {
     governorSoftReserveGb: number;
     governorHardReserveGb: number;
     governorRecoveryReserveGb: number;
+    /** PAN-3550: activity-feed warn reserve, GiB. Always normalized above governorSoftReserveGb. */
+    governorWatchReserveGb: number;
     /** PAN-2500: cold-start per-role footprint defaults, GiB (used when no live per-project stack data exists). */
     governorFootprintDefaultWorkGb: number;
     governorFootprintDefaultReviewGb: number;

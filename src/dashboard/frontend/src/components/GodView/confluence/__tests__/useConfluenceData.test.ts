@@ -369,8 +369,6 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
         parkedAt: new Date(NOW.getTime() - 16 * 60 * 60_000).toISOString(),
         parkReason: 'stuck flag set (feedback_delivery_needs_you)',
         unparkCondition: 'resume the work agent',
-        lastActionAt: null,
-        actionCount: 0,
       }],
       summary: { total: 1, byOrbit: { 'stuck-flag': 1 }, primaryByIssue: { 'PAN-77': 'stuck-flag' } },
     };
@@ -398,8 +396,6 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
         parkedAt: new Date(NOW.getTime() - 4 * 60 * 60_000).toISOString(),
         parkReason: 'branch invalidated',
         unparkCondition: 'resolve conflicts',
-        lastActionAt: null,
-        actionCount: 0,
       }],
       summary: { total: 1, byOrbit: { conflicts: 1 }, primaryByIssue: { 'PAN-3': 'conflicts' } },
     };
@@ -425,8 +421,6 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
         parkedAt: new Date(NOW.getTime() - 60_000).toISOString(),
         parkReason: 'stuck',
         unparkCondition: 'unstick',
-        lastActionAt: null,
-        actionCount: 0,
       }],
       summary: { total: 1, byOrbit: { 'stuck-flag': 1 }, primaryByIssue: { 'PAN-78': 'stuck-flag' } },
     };

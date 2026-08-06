@@ -532,10 +532,6 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (mode !== undefined && mode !== 'quick' && mode !== 'full' && mode !== 'none') {
     errors.push(`${fieldPath}.mode must be quick, full, or none`);
   }
-  const reReviewScope = roleConfig.reReviewScope;
-  if (reReviewScope !== undefined && reReviewScope !== 'all' && reReviewScope !== 'changed' && reReviewScope !== 'blockers') {
-    errors.push(`${fieldPath}.reReviewScope must be all, changed, or blockers`);
-  }
 }
 
 /** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */

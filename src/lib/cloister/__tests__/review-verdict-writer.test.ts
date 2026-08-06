@@ -132,6 +132,25 @@ describe('recordReviewVerdict', () => {
       expect(result).toEqual({ landed: true, classification: 'no-evidence' });
       expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
     });
+
+    it('Given a fallback blocked verdict with evidence and no verified row head, the door preserves its reviewed anchor through extra fields', async () => {
+      const evidenceHead = 'b'.repeat(40);
+      const status = reviewStatus({ lastVerifiedCommit: undefined });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+
+      await recordReviewVerdict('PAN-3512', {
+        verdict: 'blocked',
+        writer: 'fallback',
+        evidenceHead,
+        extra: { reviewedAtCommit: evidenceHead },
+      });
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', expect.objectContaining({
+        reviewStatus: 'blocked',
+        reviewedAtCommit: evidenceHead,
+      }), status);
+    });
   });
 
   describe('anchor-match path', () => {
@@ -151,6 +170,10 @@ describe('recordReviewVerdict', () => {
 
       expect(result).toEqual({ landed: true, classification: 'anchor-match' });
       expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', expect.objectContaining({
+        reviewStatus: 'passed',
+        reviewedAtCommit: commitSha,
+      }), status);
     });
   });
 
@@ -214,7 +237,7 @@ describe('recordReviewVerdict', () => {
 
       const input: VerdictInput = {
         verdict: 'passed',
-        writer: 'coordinator',
+        writer: 'dispatch-converge',
         evidenceHead,
       };
 
@@ -236,7 +259,7 @@ describe('recordReviewVerdict', () => {
           type: 'review.verdict_dispatched',
           payload: expect.objectContaining({
             issueId: 'PAN-3512',
-            writer: 'coordinator',
+            writer: 'dispatch-converge',
             verdict: 'passed',
             classification: 'fresh',
             testGateReset: false,
@@ -310,9 +333,13 @@ describe('recordReviewVerdict', () => {
       );
     });
 
-    it('Given equal evidence and row anchors, or no evidence head at all, the update contains no testStatus key and the emitted event reports testGateReset false', async () => {
+    it('Given a passed test verdict at the same evidence head, the update preserves its notes and the event reports testGateReset false', async () => {
       const rowHead = 'b'.repeat(40);
-      const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'passed' });
+      const status = reviewStatus({
+        lastVerifiedCommit: rowHead,
+        testStatus: 'passed',
+        testNotes: 'CI passed at current head',
+      });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);
 
@@ -331,8 +358,18 @@ describe('recordReviewVerdict', () => {
         'PAN-3512',
         expect.not.objectContaining({
           testStatus: expect.anything(),
+          testNotes: expect.anything(),
         }),
         status,
+      );
+      expect(eventStore.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'review.verdict_dispatched',
+          payload: expect.objectContaining({
+            classification: 'anchor-match',
+            testGateReset: false,
+          }),
+        }),
       );
     });
   });

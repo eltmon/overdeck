@@ -92,7 +92,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-vi.mock('../origin-validation.js', () => ({
+vi.mock('../origin-validation.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../origin-validation.js')>()),
   validateOrigin: vi.fn(() => ({ ok: true })),
   _resetTrustedOriginsForTests: vi.fn(),
 }));

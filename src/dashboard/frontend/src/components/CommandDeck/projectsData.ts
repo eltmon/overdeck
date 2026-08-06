@@ -36,6 +36,15 @@ export function resolveEffectiveProjectKey(
   return matched?.key ?? null;
 }
 
+/** Resolve a conversation's effective project record for consumers that need its display name. */
+export function resolveConversationProject(
+  conv: { cwd?: string | null; projectKey?: string | null },
+  registeredProjects: readonly RegisteredProjectLite[],
+): RegisteredProjectLite | null {
+  const key = resolveEffectiveProjectKey(conv, registeredProjects);
+  return key ? registeredProjects.find((project) => project.key === key) ?? null : null;
+}
+
 /** True when a conversation doesn't resolve to any registered project — i.e. it
  * belongs in the No-project bucket. */
 export function isUnscopedConversation(

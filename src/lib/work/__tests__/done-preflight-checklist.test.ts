@@ -77,6 +77,19 @@ describe('plan checklist evaluation', () => {
     expect(planMocks.readWorkspacePlan).not.toHaveBeenCalled();
   });
 
+  it('treats pending children of a cancelled item as satisfied', () => {
+    const doc = planWithStatus('completed');
+    doc.plan.items = [{
+      id: 'cancelled-item',
+      title: 'Deliberately deferred',
+      status: 'cancelled',
+      created: '2026-08-01T00:00:00.000Z',
+      items: [{ id: 'ac-1', title: 'Pending acceptance criterion', status: 'pending' }],
+    }];
+
+    expect(evaluateIncompletePlanItems(doc)).toEqual([]);
+  });
+
   it('reports a missing plan consistently through the shared evaluator', () => {
     expect(evaluateIncompletePlanItems(null)).toEqual([
       '  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.',

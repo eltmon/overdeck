@@ -46,6 +46,10 @@ import { httpHandler } from './http-handler.js';
 
 type ProjectEntry = { key: string; config: ProjectConfig };
 type ResolvedLayer = ContextEditableLayerRecord & { dir: string };
+type ContextLayerRecordBase =
+  | { kind: 'global' }
+  | { kind: 'project'; projectKey: string }
+  | { kind: 'workspace'; projectKey: string; workspacePath: string };
 
 type ContextCatalog = {
   projects: ProjectEntry[];
@@ -220,7 +224,7 @@ function applicableLayers(state: ContextLayerState, selectedLayer: ContextLayerT
 
 async function layerRecord(
   file: string,
-  base: Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
+  base: ContextLayerRecordBase,
 ): Promise<ResolvedLayer> {
   const { exists, content } = await readOptionalFile(file);
   return {
@@ -549,10 +553,7 @@ export async function saveContextLayer(
     await rm(tempFile, { force: true }).catch(() => undefined);
     throw err;
   }
-  const savedLayer = await layerRecord(
-    layer.file,
-    targetForLayer(layer) as Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
-  );
+  const savedLayer = await layerRecord(layer.file, targetForLayer(layer));
   const { dir: _dir, ...responseLayer } = savedLayer;
   return {
     operation: 'save',

@@ -392,7 +392,7 @@ export const TranscriptsWriterLive = Layer.succeed(
 export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly create: (opts: {
     name: ConversationName; cwd: string; model?: string; effort?: string;
-    harness?: Harness; issueId?: string; title?: string;
+    harness?: Harness; issueId?: string; projectKey?: string; title?: string;
   }) => Effect.Effect<Conversation>;
   readonly archive:       (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | AlreadyArchived>;
   readonly unarchive:     (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | NotArchived>;
@@ -424,7 +424,7 @@ export const ConversationWriterLive = Layer.effect(
 
     const create = (opts: {
       name: ConversationName; cwd: string; model?: string; effort?: string;
-      harness?: Harness; issueId?: string; title?: string;
+      harness?: Harness; issueId?: string; projectKey?: string; title?: string;
     }): Effect.Effect<Conversation> =>
       Effect.gen(function* () {
         const id = randomUUID() as unknown as ConversationId;
@@ -435,6 +435,7 @@ export const ConversationWriterLive = Layer.effect(
             name:        opts.name,
             cwd:         opts.cwd,
             issueId:     opts.issueId ?? null,
+            projectKey:  opts.projectKey ?? null,
             harness:     opts.harness ?? null,
             model:       opts.model ?? null,
             effort:      opts.effort ?? null,
@@ -446,12 +447,12 @@ export const ConversationWriterLive = Layer.effect(
         yield* bus.emit({ type: 'conversation.created', payload: { name: opts.name } });
         return decodeConversation({
           id, name: opts.name, cwd: opts.cwd,
-          issueId: opts.issueId ?? null, harness: opts.harness ?? null,
+          issueId: opts.issueId ?? null, projectKey: opts.projectKey ?? null,
+          harness: opts.harness ?? null,
           model: opts.model ?? null, effort: opts.effort ?? null,
           title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
           createdAt: ts, archivedAt: null,
           handoffDocPath: null, handoffTargetConvId: null, clearedToConvId: null,
-          projectKey: null,
           files: [],
         });
       });
@@ -1231,6 +1232,8 @@ export function createConversation(opts: {
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
   /** PAN-1990: explicit workspace id. Falls back to resolveWorkspaceForCwd(cwd) when omitted. */
   workspaceId?: string | null;
+  /** Explicit registered-project association; never inferred from cwd at write time. */
+  projectKey?: string | null;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -1245,8 +1248,8 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -1263,6 +1266,7 @@ export function createConversation(opts: {
       opts.deliveryMethod ?? null,
       null,  // spawn_error starts null
       workspaceId,
+      opts.projectKey ?? null,
     );
     if (opts.claudeSessionId) {
       db.prepare(`

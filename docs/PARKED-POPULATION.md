@@ -14,9 +14,9 @@ its escalation once and went silent forever — the operator was the only
 un-parker, and the flywheel parks structural blockers by design. The measured
 steady state (2026-08-02): of ~18 post-work in-flight rows, 12+ were parked in
 terminal orbits, and pipeline velocity tracked one conversation's aliveness
-1:1. The Stall Sweeper makes un-parking mechanical: one resolver answers
-"what is stalled, why, and what releases it," and one patrol executes the
-release.
+1:1. The Stall Sweeper makes the release path visible: one resolver answers
+"what is stalled, why, and what releases it," and one patrol records the
+recommended release without acting on it.
 
 ## Glossary
 
@@ -30,20 +30,27 @@ release.
 - **Terminal residue** — a closed issue's leftover rows. Never parked; the
   only row a closed issue can produce is `zombie-session`.
 
-## The ten orbits
+## The nine orbits
 
-| # | Orbit | Detection (read doors only) | Release |
+| # | Orbit | Detection (read doors only) | Recommended release |
 | --- | --- | --- | --- |
-| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | recommendation: `pan unstick` + rework resume / `pan review restart` (flavor-dependent) |
+| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | recommendation: consult active-run artifact evidence first (PAN-3511), then `pan unstick` + rework resume / `pan review restart` by flavor |
 | 2 | `needs-you` | open recovery trip in the per-issue permanent record | operator answers; sweeper re-surfaces on TTL |
 | 3 | `deacon-ignored` | `review_status.deaconIgnored` | operator clears the flag; sweeper re-surfaces on TTL |
 | 4 | `operator-gate` | agent `paused` (not yield) / `troubled` / `stoppedByUser` | `pan unpause` / `pan untroubled` / `pan start` — operator-only; re-surfaced on TTL |
 | 5 | `uat-failed` | `uatStatus=failed` with merge pending | recommendation: `pan resume <agent>` with the UAT feedback (`pan start` if stopped) |
 | 6 | `merge-failed` | `mergeStatus=failed`, no retry in flight | recommendation: `pan review resync` for merge re-evaluation |
-| 7 | `conflicts` | `conflictsSince` branch-invalidation mark | recommendation: `pan sync-main` + rework, then `pan done` |
-| 8 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
-| 9 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
-| 10 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+| 7 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
+| 8 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
+| 9 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+
+The `stuck-flag` orbit consults the **verdict of record** from the
+host-recorded active review run before making a recommendation. The sweeper is
+observability-only: it never restores a verdict, clears a stuck flag, or
+re-drives an agent. A fresh artifact changes its recommendation to preserve the
+review evidence and await the canonical `pan admin specialists done review`
+signal; with no artifact, it emits the existing flavor-specific recommendation.
+See "Verdict of record" in `docs/REVIEW-AGENT-ARCHITECTURE.md`.
 
 A **scheduler yield** (`yieldedByScheduler`) is NOT a park — it is
 self-clearing. **Warm-idle on a pipeline-owned issue** (PAN-2579) is NOT a
@@ -87,6 +94,8 @@ trailer. Guardrails:
 - **Operator gates are never overridden.** `operator-gate`, `deacon-ignored`,
   `needs-you`, and `circuit-breaker` rows are only re-surfaced to the operator
   on a 24h TTL — the anti-silence property.
+- **Idempotent reporting**: recommendation and escalation state flows through
+  the sweeper-state writer so the feed is not flooded.
 - **Recurring stalls flag substrate.** A stall that recurs across an episode
   appends a substrate-bug note so the flywheel's intake files *why* the issue
   keeps parking, instead of the symptom being swept forever.
@@ -117,6 +126,6 @@ per-stage tooltip; the sidebar shows FLOW/HOUR with per-stage counts.
 `scripts/guard-park-exits.sh` (wired into `npm run lint` as `lint:park-exits`)
 fails the build when a stuck flavor is parked without operator copy in
 `STUCK_REASON_COPY`. The fixture meta-test in
-`src/lib/parked/__tests__/resolver.test.ts` proves all ten orbits classify
+`src/lib/parked/__tests__/resolver.test.ts` proves all nine orbits classify
 with non-empty `parkReason` + `unparkCondition`. Adding an orbit or a stuck
 flavor without its exit documentation is unmergeable.
