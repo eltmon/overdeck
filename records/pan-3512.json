@@ -1036,16 +1036,16 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:28:24.816Z",
+  "updated": "2026-08-06T22:28:32.584Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T22:28:23.748Z",
+    "updatedAt": "2026-08-06T22:28:32.571Z",
     "reviewNotes": "All convoy reviewers passed; fresh-head re-gating now covers historical passed and skipped orphan test state",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
@@ -1128,9 +1128,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 10184541,
-            "output": 83074,
-            "cacheRead": 24342016,
+            "input": 10185857,
+            "output": 83172,
+            "cacheRead": 24726016,
             "cacheWrite": 0
           }
         },
@@ -1221,9 +1221,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 12918796,
-          "output": 137133,
-          "cacheRead": 34364416,
+          "input": 12920112,
+          "output": 137231,
+          "cacheRead": 34748416,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1234,8 +1234,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 94.3127747,
-        "pricingAsOf": "2026-08-06T22:28:23.790Z"
+        "usd": 94.4135347,
+        "pricingAsOf": "2026-08-06T22:28:32.576Z"
       }
     },
     "merges": [
@@ -1244,7 +1244,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
