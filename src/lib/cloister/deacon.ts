@@ -1524,7 +1524,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
 export async function checkVerificationReviewContradiction(): Promise<string[]> {
   const actions: string[] = [];
   try {
-    const { loadReviewStatuses, setReviewStatusSync } = await import('../review-status.js');
+    const { loadReviewStatuses } = await import('../review-status.js');
     const { resolveProjectFromIssueSync } = await import('../projects.js');
     const statuses = loadReviewStatuses();
 
@@ -1557,16 +1557,16 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
         // Clearing the stuck marker is mandatory: the bypass *resolves* the
         // review-infra failure, so the issue must no longer be skipped by the
         // deacon's stuck-issue guards or it deadlocks at passed+stuck.
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'passed',
-          reviewNotes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
-          ...(reviewedAtCommit ? { reviewedAtCommit } : {}),
-          stuck: false,
-          stuckReason: undefined,
-          stuckAt: undefined,
-          stuckDetails: undefined,
+        // PAN-3512: this carries a LIVE head, so dispatch-not-drop lands and re-gates it rather than silently rejecting it against a stale row anchor — intended.
+        const { recordReviewVerdict } = await import('./review-verdict-writer.js');
+        const bypass = await recordReviewVerdict(issueId, {
+          verdict: 'passed',
+          notes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
+          ...(reviewedAtCommit ? { evidenceHead: reviewedAtCommit } : {}),
+          extra: { stuck: false, stuckReason: undefined, stuckAt: undefined, stuckDetails: undefined },
+          writer: 'infra-bypass',
         });
-        const msg = `Bypassed review for ${issueId}: verification passed, review infra failed`;
+        const msg = bypass.landed ? `Bypassed review for ${issueId}: verification passed, review infra failed` : `Review bypass for ${issueId} not recorded (${bypass.reason})`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
       }
