@@ -124,7 +124,7 @@
     "recordedAt": "2026-08-06T01:12:37.001Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:45:08.805Z",
+  "updated": "2026-08-06T01:45:11.590Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "passed",
@@ -135,7 +135,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T01:15:21.625Z",
-    "updatedAt": "2026-08-06T01:30:39.956Z",
+    "updatedAt": "2026-08-06T01:45:11.402Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -176,7 +176,9 @@
         "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
       ],
       "recordedAt": "2026-08-06T01:12:37.001Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-06T01:45:11.402Z"
   },
   "closeOut": {
     "usage": {
@@ -252,7 +254,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3574"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-06T01:45:11.589Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 96f890427adbbf1595b9bfc6c395aeae89286680",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3574 MERGED at 2026-08-06T01:27:47Z",
+          "status": "pass",
+          "mergedAt": "2026-08-06T01:27:47Z",
+          "mergeCommit": "c622977b4bc580e26fdb36b6b999660c2ce415ab"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on c622977b4bc580e26fdb36b6b999660c2ce415ab",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit c622977b contains merge c622977b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (7 transcript files preserved); No strike branch strike/pan-3550 found; Pruned 131 checkpoint ref(s) for agent-pan-3550, planning-pan-3550, strike-pan-3550; No specialist registry entries for PAN-3550"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
