@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T16:58:43.739Z",
+  "updated": "2026-08-06T16:59:26.584Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "root-devdep": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3568",
         "agentId": "agent-pan-3568",
         "pid": 2441547,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:58:43.739Z"
+        "claimedAt": "2026-08-06T16:58:43.739Z",
+        "itemId": "root-devdep",
+        "outcome": "completed",
+        "reason": "Hoisted @effect/language-service to root devDependencies, refreshed bun.lock, and verified root binary resolution.",
+        "releasedAt": "2026-08-06T16:59:26.584Z"
+      }
+    ],
+    "statusReasons": {
+      "root-devdep": {
+        "reason": "Hoisted @effect/language-service to root devDependencies, refreshed bun.lock, and verified root binary resolution.",
+        "updatedAt": "2026-08-06T16:59:26.584Z"
       }
     }
   },
   "statusOverrides": {
-    "root-devdep": "running"
+    "root-devdep": "completed",
+    "root-devdep.ac1": "completed",
+    "root-devdep.ac2": "completed",
+    "root-devdep.ac3": "completed",
+    "root-devdep.ac4": "completed"
   }
 }
