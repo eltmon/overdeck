@@ -217,3 +217,57 @@ describe('memory-pressure-patrol', () => {
     });
   });
 });
+
+  describe('topMemoryConsumers', () => {
+    it('returns top N processes by RSS', async () => {
+      const { topMemoryConsumers } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const mockCensus = {
+        processAvailable: true,
+        panesBySession: new Map([['agent-test', [{ panePid: 100, sessionName: 'agent-test' }]]]),
+        processesByPid: new Map([
+          [1000, { pid: 1000, ppid: 1, rssBytes: 5 * GIB, command: 'python' }],
+          [1001, { pid: 1001, ppid: 1, rssBytes: 3 * GIB, command: 'java' }],
+          [1002, { pid: 1002, ppid: 100, rssBytes: 2 * GIB, command: 'node' }],
+        ]),
+      };
+      const top = topMemoryConsumers(mockCensus, 2);
+      expect(top).toHaveLength(2);
+      expect(top[0].pid).toBe(1000);
+      expect(top[1].pid).toBe(1001);
+    });
+
+    it('attributes process to session via parent chain', async () => {
+      const { topMemoryConsumers } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const mockCensus = {
+        processAvailable: true,
+        panesBySession: new Map([['agent-test', [{ panePid: 50, sessionName: 'agent-test' }]]]),
+        processesByPid: new Map([
+          [100, { pid: 100, ppid: 50, rssBytes: 4 * GIB, command: 'work-agent' }],
+        ]),
+      };
+      const top = topMemoryConsumers(mockCensus, 1);
+      expect(top[0].sessionName).toBe('agent-test');
+    });
+  });
+
+  describe('parseOomKills', () => {
+    it('parses kernel OOM lines and joins on pid', async () => {
+      const { parseOomKills } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const journal = `oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=docker-0647,mems_allowed=0,global_oom,task_memcg=/app.slice/overdeck-tmux-server.service,task=python,pid=2230723,uid=1000
+Out of memory: Killed process 2230723 (python) total-vm:349473036kB, anon-rss:41321032kB, file-rss:66872kB, shmem-rss:8744kB, UID:1000 pgtables:85936kB oom_score_adj:200`;
+      const kills = parseOomKills(journal);
+      expect(kills).toHaveLength(1);
+      expect(kills[0].pid).toBe(2230723);
+      expect(kills[0].comm).toBe('python');
+      expect(kills[0].inOverdeckTree).toBe(true);
+      expect(kills[0].rssBytes).toBe((41321032 + 66872 + 8744) * 1024);
+    });
+
+    it('handles cgroup outside Overdeck tree', async () => {
+      const { parseOomKills } = await import('../../../../src/lib/cloister/memory-pressure-patrol.js');
+      const journal = `oom-kill:constraint=CONSTRAINT_NONE,task_memcg=/user.slice/user-1000.slice/user@1000.service/app.slice/Chrome.scope,task=Chrome,pid=5956,uid=1000`;
+      const kills = parseOomKills(journal);
+      expect(kills[0].inOverdeckTree).toBe(false);
+    });
+  });
+});

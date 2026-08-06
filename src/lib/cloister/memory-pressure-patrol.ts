@@ -190,3 +190,113 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 export function __resetMemoryPressurePatrolState(): void {
   lastLevel = null;
 }
+
+/**
+ * WI-3: Top consumer attribution
+ */
+export interface TopConsumer {
+  pid: number;
+  rssBytes: number;
+  command: string;
+  sessionName: string | null;
+}
+
+/**
+ * Pure: the N largest-RSS processes in the census, each attributed to a tmux session.
+ */
+export function topMemoryConsumers(census: RuntimeCensus, limit: number): TopConsumer[] {
+  if (!census.processAvailable) return [];
+  
+  const sessionByPanePid = new Map<number, string>();
+  for (const [sessionName, panes] of census.panesBySession) {
+    for (const pane of panes) {
+      sessionByPanePid.set(pane.panePid, sessionName);
+    }
+  }
+
+  const topProcs = [...census.processesByPid.values()]
+    .sort((a, b) => b.rssBytes - a.rssBytes)
+    .slice(0, limit);
+
+  return topProcs.map((proc) => {
+    const visited = new Set<number>();
+    let current = proc.pid;
+    let sessionName: string | null = null;
+
+    while (current > 1 && !visited.has(current)) {
+      visited.add(current);
+      if (sessionByPanePid.has(current)) {
+        sessionName = sessionByPanePid.get(current)!;
+        break;
+      }
+      const parent = census.processesByPid.get(current);
+      if (!parent?.ppid) break;
+      current = parent.ppid;
+    }
+
+    return {
+      pid: proc.pid,
+      rssBytes: proc.rssBytes,
+      command: proc.command.slice(0, 80),
+      sessionName,
+    };
+  });
+}
+
+/**
+ * WI-4: OOM kill detection
+ */
+export interface OomKillRecord {
+  pid: number;
+  comm: string;
+  rssBytes: number;
+  cgroup: string | null;
+  inOverdeckTree: boolean;
+}
+
+const OOM_OVERDECK_TREE_REGEX = /overdeck-tmux-server\.service|overdeck-/;
+
+export function parseOomKills(journalText: string): OomKillRecord[] {
+  const kills = new Map<number, OomKillRecord>();
+
+  const oomkillPattern = /task_memcg=(\S+?),task=([^,]+),pid=(\d+)/g;
+  let match;
+  while ((match = oomkillPattern.exec(journalText)) !== null) {
+    const [_, cgroup, comm, pidStr] = match;
+    const pid = parseInt(pidStr, 10);
+    kills.set(pid, {
+      pid,
+      comm,
+      rssBytes: 0,
+      cgroup,
+      inOverdeckTree: OOM_OVERDECK_TREE_REGEX.test(cgroup),
+    });
+  }
+
+  const victimPattern = /Out of memory: Killed process (\d+) \(([^)]+)\)(.*?)$/gm;
+  while ((match = victimPattern.exec(journalText)) !== null) {
+    const [_, pidStr, comm, tail] = match;
+    const pid = parseInt(pidStr, 10);
+
+    let rssBytes = 0;
+    const rssPattern = /(?:anon|file|shmem)-rss:(\d+)kB/g;
+    let rssMatch;
+    while ((rssMatch = rssPattern.exec(tail)) !== null) {
+      rssBytes += parseInt(rssMatch[1], 10) * 1024;
+    }
+
+    if (kills.has(pid)) {
+      kills.get(pid)!.rssBytes = rssBytes;
+    } else {
+      kills.set(pid, {
+        pid,
+        comm,
+        rssBytes,
+        cgroup: null,
+        inOverdeckTree: false,
+      });
+    }
+  }
+
+  return Array.from(kills.values());
+}
