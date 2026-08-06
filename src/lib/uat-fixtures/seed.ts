@@ -13,6 +13,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { DomainEvent } from '@overdeck/contracts';
+
 import { getOverdeckHome } from '../paths.js';
 import { registerProjectSync } from '../projects.js';
 import { saveOverdeckAgentStateSync } from '../overdeck/agent-state-sync.js';
@@ -111,10 +113,32 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
     saveOverdeckAgentStateSync(agent);
   }
 
-  upsertReviewStatusSync(fixtureReviewStatus());
-
-  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  const { initEventStore, getEventStore } = await import('../../dashboard/server/event-store.js');
   await initEventStore();
+  const store = getEventStore();
+  const { emitReviewStatusChanged } = await import('../../dashboard/server/review-status-emit.js');
+
+  const reviewStatus = fixtureReviewStatus();
+  upsertReviewStatusSync(reviewStatus);
+  // upsertReviewStatusSync() is a raw DB upsert — it never appends the
+  // review.status_changed event the rest of the pipeline relies on to push
+  // review status into the server's in-memory read model (and from there,
+  // over the RPC snapshot/stream, into the frontend Issue store). Without
+  // this, GET /api/review/FIX-1/status reads the fresh DB row correctly, but
+  // the drawer's PR-link action (bound to the Issue store's reviewStatus, not
+  // a live fetch) never learns prUrl exists. The container's own reconciler
+  // (review-status-reconcile-service.ts) can't backstop this — it only runs
+  // in 'primary' dashboard mode, and workspace containers always run 'peer'
+  // (OVERDECK_DISABLE_DEACON=1, the single-deacon invariant). Emit the same
+  // way review-status-reconcile-service.ts does, reusing the exact status
+  // object just written so the DB row and the event agree byte-for-byte
+  // (review finding, PAN-3362 UAT cycle 2).
+  emitReviewStatusChanged(
+    (event) => store.append(event as Omit<DomainEvent, 'sequence'>),
+    FIXTURE_ISSUE_ID,
+    reviewStatus,
+  );
+
   const activityEntries = fixtureActivityEntries();
   for (const entry of activityEntries) {
     // At-most-once by stable id: a re-seed must not append duplicate visible

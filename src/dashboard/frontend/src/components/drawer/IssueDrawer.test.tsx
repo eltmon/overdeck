@@ -44,6 +44,8 @@ type TestBead = {
   createdAt: string;
   updatedAt?: string;
   closedAt?: string;
+  labels?: string[];
+  blockedBy?: string[];
 };
 
 function createQueryClient() {
@@ -84,6 +86,9 @@ function mockFetch() {
       return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
     }
     if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', hasDocker: true, path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/api/issues/') && url.endsWith('/tasks')) {
+      return Response.json({ issueId: 'PAN-1', workspacePath: '/tmp/pan-1', tasks: [] });
+    }
     if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
     return Response.json({ success: true });
   });
@@ -100,12 +105,17 @@ function drawerUi(queryClient: QueryClient) {
 }
 
 function renderDrawer(tasks: TestBead[] = []) {
-  if (tasks.length > 0) {
-    useDashboardStore.setState({
-      issuesRaw: [{ ...issue, tasks }],
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-  }
   const queryClient = createQueryClient();
+  if (tasks.length > 0) {
+    // The tab-band badge reads a live `/api/issues/:id/tasks` query (shared
+    // with TasksPanel via the same ['tasks', issueId] key), not an
+    // `issue.tasks` store field the server never populates — pre-seed the
+    // cache so the badge is correct on the very first synchronous render.
+    // TasksPanel's TaskItem reads task.labels unconditionally, so default it
+    // for this shared cache entry.
+    const fullTasks = tasks.map((task) => ({ labels: [], blockedBy: [], ...task }));
+    queryClient.setQueryData(['tasks', 'PAN-1'], { issueId: 'PAN-1', workspacePath: '/tmp/pan-1', tasks: fullTasks });
+  }
   return { queryClient, ...render(drawerUi(queryClient)) };
 }
 

@@ -128,7 +128,12 @@ export const getAgentsRoute = HttpRouter.add(
                 killCount: health.killCount || 0,
                 workspace: state.workspace || null,
                 workspaceLocation: isRemote ? 'remote' : 'local',
-                git: null,
+                // A stopped agent never shells `git` against its workspace (no
+                // process cost for a row nobody is actively watching), so this
+                // can only report the persisted branch, not live uncommitted/
+                // commit detail — better than the unconditional null every
+                // stopped agent used to report regardless of what it stored.
+                git: state.branch ? { branch: state.branch, uncommittedFiles: 0, latestCommit: '' } : null,
                 type: 'agent',
                 role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: needsInput,

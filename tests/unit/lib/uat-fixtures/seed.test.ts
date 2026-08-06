@@ -139,4 +139,28 @@ describe('seedUatFixturesLocal', () => {
     expect(existsSync(claudeMdPath)).toBe(true);
     expect(readFileSync(claudeMdPath, 'utf-8').length).toBeGreaterThan(0);
   });
+
+  it('appends a review.status_changed event with prUrl, and every agent row carries a branch (AC-6, review finding UAT cycle 2)', async () => {
+    const { seed, agentStateSync } = await importSeedModules();
+
+    await seed.seedUatFixturesLocal({ detectContainer: () => true });
+
+    // The event is what the server's in-memory read model (and from there the
+    // frontend Issue store's reviewStatus, which the drawer's PR-link action
+    // reads) actually learns from — a raw DB upsert alone never reaches it.
+    const { getEventStore } = await import('../../../../src/dashboard/server/event-store.js');
+    const events = getEventStore()
+      .queryByType('review.status_changed', 1000)
+      .filter((event) => (event.payload as { issueId?: string }).issueId === 'FIX-1');
+    expect(events.length).toBeGreaterThan(0);
+    const latest = events[events.length - 1]?.payload as { status?: { prUrl?: string } };
+    expect(latest.status?.prUrl).toBeTruthy();
+
+    // The work agent's seeded branch must survive the write door round-trip
+    // (AGENT_COLUMNS_FOR_DB previously dropped `branch` for every agent).
+    const workAgent = agentStateSync
+      .listOverdeckAgentStatesSync()
+      .find((a) => a.issueId === 'FIX-1' && a.role === 'work');
+    expect(workAgent?.branch).toBe('feature/fix-1');
+  });
 });
