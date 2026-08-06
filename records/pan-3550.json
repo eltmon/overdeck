@@ -109,17 +109,17 @@
     "recordedAt": "2026-08-06T01:01:02.668Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:09:55.340Z",
+  "updated": "2026-08-06T01:12:01.646Z",
   "pipeline": {
     "issueId": "PAN-3550",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T01:09:48.624Z",
-    "reviewNotes": "activity details persist host command-line arguments that can contain credentials",
+    "updatedAt": "2026-08-06T01:12:01.610Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: security (comm vs args), performance (bounded OOM writes), documentation (hard band accuracy)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3574",
     "reviewedAtCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
     "lastVerifiedCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
@@ -203,10 +203,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 941,
-            "output": 53426,
-            "cacheRead": 21990410,
-            "cacheWrite": 951859
+            "input": 1129,
+            "output": 61397,
+            "cacheRead": 25828991,
+            "cacheWrite": 1195226
           }
         }
       },
@@ -218,15 +218,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 941,
-          "output": 53426,
-          "cacheRead": 21990410,
-          "cacheWrite": 951859
+          "input": 1129,
+          "output": 61397,
+          "cacheRead": 25828991,
+          "cacheWrite": 1195226
         }
       },
       "costAtCloseOut": {
-        "usd": 21.516684,
-        "pricingAsOf": "2026-08-06T01:09:55.333Z"
+        "usd": 22.244793,
+        "pricingAsOf": "2026-08-06T01:12:01.640Z"
       }
     },
     "merges": [
