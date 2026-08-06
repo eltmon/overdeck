@@ -1014,7 +1014,7 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:15:31.832Z",
+  "updated": "2026-08-06T22:15:37.885Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -1024,10 +1024,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:15:31.171Z",
+    "updatedAt": "2026-08-06T22:15:37.876Z",
     "reviewNotes": "Fresh-head orphan restores can reinstate historical passed or skipped test status when the row is pending",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
-    "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
+    "reviewedAtCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
     "reviewSpawnedAt": "2026-08-06T22:12:44.980Z",
     "scopeDrift": {
@@ -1212,7 +1212,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.2134387,
-        "pricingAsOf": "2026-08-06T22:15:31.187Z"
+        "pricingAsOf": "2026-08-06T22:15:37.880Z"
       }
     },
     "merges": [
