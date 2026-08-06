@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T07:31:39.891Z",
+  "updated": "2026-08-06T07:38:13.294Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -2278,6 +2278,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-06T01:48:58.378Z"
+    },
+    {
+      "issue": "PAN-3512",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-08-06T07:31:38.340Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-06T07:38:13.292Z"
     }
   ],
   "tasks": {
