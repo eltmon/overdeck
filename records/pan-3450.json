@@ -278,23 +278,24 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T07:33:21.774Z",
+  "updated": "2026-08-06T07:47:59.790Z",
   "pipeline": {
     "issueId": "PAN-3450",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T07:31:34.436Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3450-review already running. Use 'pan tell' to message it.",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "updatedAt": "2026-08-06T07:47:59.690Z",
+    "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
+    "reviewedAtCommit": "1bacdb8a574bb52fe61b293e88ffff6f685be559",
     "lastVerifiedCommit": "4b3c72d8a6cd2ad6c90c49d78f72c700367c9df2",
     "reviewSpawnedAt": "2026-08-06T07:31:34.435Z",
     "scopeDrift": {
@@ -357,6 +358,12 @@
             "output": 117796,
             "cacheRead": 36173312,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 208216,
+            "output": 7083,
+            "cacheRead": 3551232,
+            "cacheWrite": 0
           }
         },
         "review.correctness": {
@@ -364,6 +371,12 @@
             "input": 3168180,
             "output": 56353,
             "cacheRead": 16166400,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 424929,
+            "output": 28545,
+            "cacheRead": 3922944,
             "cacheWrite": 0
           }
         },
@@ -373,6 +386,12 @@
             "output": 42650,
             "cacheRead": 15123968,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 274333,
+            "output": 8771,
+            "cacheRead": 1581056,
+            "cacheWrite": 0
           }
         },
         "review.requirements": {
@@ -381,6 +400,12 @@
             "output": 56781,
             "cacheRead": 16316416,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 614994,
+            "output": 25587,
+            "cacheRead": 3826176,
+            "cacheWrite": 0
           }
         },
         "review.security": {
@@ -388,6 +413,12 @@
             "input": 2801493,
             "output": 56956,
             "cacheRead": 14894592,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 324239,
+            "output": 11453,
+            "cacheRead": 2242560,
             "cacheWrite": 0
           }
         },
@@ -412,11 +443,17 @@
           "output": 479035,
           "cacheRead": 173883392,
           "cacheWrite": 0
+        },
+        "openai/gpt-5.6-terra": {
+          "input": 1846711,
+          "output": 81439,
+          "cacheRead": 15123968,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 227.7524978,
-        "pricingAsOf": "2026-08-06T07:31:34.468Z"
+        "usd": 237.3718768,
+        "pricingAsOf": "2026-08-06T07:47:59.771Z"
       }
     },
     "merges": [
@@ -425,7 +462,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
