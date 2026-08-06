@@ -1414,3 +1414,22 @@ This is the same shape as PAN-3595 from last tick and PAN-3594 two ticks before:
 **The encouraging half: PAN-3589's hardened row 6 caught the recurrence within minutes**, blocking PAN-3595's close-out with `missing required checks on 947a58f060cc…: test, lint, build (22), guard`. Before that fix this would have been invisible — the commit carries a Mintlify check and the old counting logic would have passed it as verified. What remains missing is the proactive half: nothing raises a needs-you when a merge lands without CI, so you only discover it when someone tries to close out.
 
 **Two fixes now sit merged, deployed, working and un-closable** behind PAN-3586 — PAN-3595 and, earlier, the pattern that PAN-3582 escaped only because CI happened to fire once at 22:00. Still not using `--accept-main-verify`.
+
+### RUN-82 tick 12 — 2026-08-06T23:38Z — push CI is not absent, it is ~25 minutes late, and that explains the "7-hour outage"
+
+**A push run did fire for `947a58f060` — I called it absent last tick because I checked too early.**
+
+| commit | pushed to main | push run created | delay |
+| --- | --- | --- | --- |
+| `cc366a3a` | 21:30:43Z | 22:00:44Z | 30 min |
+| `947a58f060` | 23:04:09Z | 23:27:43Z | 23.5 min |
+
+**This reframes the whole issue and explains the outage I reported at tick 2.** Between 19:13Z and 21:30Z five commits landed on `main` in rapid succession (`e9265ceeed`, `2ad258fb7f`, `e3983d9248`, `d20c97c49c`, `8a9ad3e7b7`). Each was superseded by the next well inside the ~25-minute window, so none ever got a run — only `cc366a3a`, which sat as the tip long enough. What looked like a total outage was **a burst of merges outpacing a slow run-creation path**.
+
+**That is three wrong readings of the same issue: the promote path, then a billing limit, now "intermittent absence".** Every one came from a snapshot too small for the timescale involved. Tick 2 sampled an unfiltered run list containing no PR activity; tick 11 checked for a push run minutes after a merge whose run takes half an hour. The rule I keep rediscovering the hard way: **size the observation window to the phenomenon before drawing a conclusion, and when the answer is "nothing is there", first ask whether the sample could have shown it.** RUN-79 learned this same lesson about a GC sawtooth and wrote it down; I did not carry it across.
+
+The corrected picture changes the fix, and I posted all three points to the issue. Proactive detection must wait out a configured window (~45 min) and report "no run yet after N minutes" rather than "no run", or it false-positives on every merge. The **superseded-commit case is the real defect** and is worse than the delay: in a busy merge window `main` accumulates commits that will never be verified individually. And `workflow_dispatch` becomes *more* valuable, since it is the only way to verify a commit that lost its window.
+
+**CI on `947a58f060` is nearly green** — lint, build (22), guard, smoke test, trailer gate and flake lane all success, `test` still running. PAN-3595's close-out should clear row 6 next tick without an override.
+
+**Unchanged:** PAN-3580 and PAN-3586 still carry `planned` without `released`; PAN-3512 waits in `uat/pan-flint-0806` for the operator's ship.
