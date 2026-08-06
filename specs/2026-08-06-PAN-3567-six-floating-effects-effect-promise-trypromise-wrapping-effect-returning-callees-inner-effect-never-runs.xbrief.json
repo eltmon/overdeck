@@ -1,0 +1,767 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-06T16:45:11.955Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3567: Six floating Effects: Effect.promise/tryPromise wrapping Effect-returning callees — inner Effect never runs",
+    "updated": "2026-08-06T16:50:03.640Z"
+  },
+  "plan": {
+    "id": "pan-3567",
+    "title": "Six floating Effects: Effect.promise/tryPromise wrapping Effect-returning callees — inner Effect never runs",
+    "status": "proposed",
+    "uid": "6d32ceeb-fa6c-4599-b387-df68c2cace37",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-06T16:45:11.955Z",
+    "updated": "2026-08-06T16:50:03.640Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3567",
+        "label": "PAN-3567",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3568",
+        "label": "PAN-3568 — mechanical gate for this bug class",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effect",
+      "dashboard-server",
+      "type-safety",
+      "bug",
+      "ratchet"
+    ],
+    "narratives": {
+      "Problem": "Five call sites in src/dashboard/server hand an Effect-returning callee to Effect.promise / Effect.tryPromise, which exist to bridge Promise-returning thunks. Measured against effect@4.0.0-beta.73 on 2026-08-06: Effect's runtime calls .then() on the thunk result, an Effect has no .then, so a TypeError is raised inside the fiber. The inner Effect never runs and the enclosing route dies — httpHandler's catchCause turns it into HTTP 500 { error: 'internalCall(...).then is not a function' }, and no statement after the bad yield* executes. The affected endpoints are the specialist context-digest regenerate, the workspace GitHub-token refresh, the review-agent and test-agent feedback-file writes inside POST /api/workspaces/:issueId/review-status, and the corrupted-workspace container guard in POST /api/workspaces/:issueId/clean. These are exactly the 5 TS2741 plus 12 cascading TS18046 errors — 17 of the 47 entries in scripts/dashboard-types-baseline.txt. A second, independent defect rides along: JavaScript try/catch around a yield* catches neither typed failures nor defects, so the three try/catch blocks wrapped around these sites (two feedback blocks plus the rm -rf fallback) are inert.",
+      "Proposal": "yield* each Effect-returning callee directly, then discharge the now-live typed error channel to the behavior each site actually intends. Site 5 (empty error channel) is a one-line direct yield*. Site 4 returns { success: false, error } with status 500 instead of unconditionally claiming the token was refreshed. Sites 2 and 3 replace their dead JS try/catch with Effect.catchCause so a feedback-write failure logs and lets the request continue rather than 500ing the whole review-status POST. Site 6's guard is extracted into an exported Effect helper checkWorkspaceRemovalGuard that fails closed — an enumeration failure returns a refusal verdict (500), never an allow — giving the one destructive-path site a real unit-test seam. The same dead-try/catch fix is applied to the rm -rf root-owned-file fallback in the same route. Then lower scripts/dashboard-types-baseline.txt from 47 to the post-fix count (expected 30) and write down the convention in a new docs/EFFECT-BRIDGING.md so the next author does not repeat it. Full detail, before/after snippets, and verified line numbers: .pan/drafts/PAN-3567.md.",
+      "NonGoals": "- Do NOT modify src/dashboard/server/routes/costs.ts:328. The issue lists it as a sixth site, but PAN-3552 (commit 7260c8afde, 2026-08-05) already changed it to Effect.runPromise(syncWalFromAllProjects()) inside the tryPromise; the inner Effect runs and tsc reports no error there. Making it idiomatic would change an error channel with no bug to justify it.\n- Do NOT change any Effect.promise(() => import('...')) dynamic-import bridge anywhere. import() genuinely returns a Promise; those are correct.\n- Do NOT change the Effect.promise bridges around deliverQueuedFeedback or execAsync. Those callees return real Promises.\n- Do NOT audit src/lib or any package outside src/dashboard/server for the same bug class. The dashboard-types ratchet is this issue's scope boundary; PAN-3568 builds the sweep tool.\n- Do NOT install, configure, or baseline @effect/language-service. That is PAN-3568 in full.\n- Do NOT lower scripts/dashboard-types-baseline.txt below the count that follows mechanically from these fixes. The other ~30 errors are pre-existing and unrelated.\n- Do NOT add route-level HTTP integration tests for sites 2-5. Only the container guard gets a regression test, because it is the only site whose failure gates a destructive operation.\n- Do NOT change the operator-facing 409 message text for 'containers still reference compose paths'.\n- Do NOT restart or redeploy the live dashboard from this workspace.",
+      "Risks": "The adjacent correct bridges look identical to the broken ones — tsc is the oracle, and AC-10 checks that every '=> import(' line is byte-identical to origin/main. Fixing sites 2 and 3 promotes fileResult from unknown to WriteFeedbackResult, which can surface fresh errors on its four downstream property reads; the interface at src/lib/cloister/feedback-writer.ts:25 declares all four, so it should not, but re-run the dashboard typecheck per site rather than only at the end."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope is five sites, not six: costs.ts:328 is excluded because PAN-3552 already fixed it.",
+        "rationale": "Verified against the tree at 036e90b9a6 — the line now reads Effect.runPromise(syncWalFromAllProjects()) and produces no TS2741. Rewriting an already-working call site to be more idiomatic would change its error channel without a bug to justify it, which the surgical-changes rule forbids."
+      },
+      {
+        "summary": "The PRD corrects the issue body's runtime claim: these sites return HTTP 500, they are not silently inert.",
+        "rationale": "Measured directly against the installed effect@4.0.0-beta.73 rather than reasoned from JS await semantics. Effect.promise calls .then() on the thunk result, so an Effect argument raises TypeError inside the fiber. This matters for site 6: the destructive removal is not proceeding past a bypassed guard as the issue predicted — the route dies before it, so the endpoint is broken rather than dangerous."
+      },
+      {
+        "summary": "Explicit Effect-level error handling is added only at sites 2, 3, 4, and 6; site 5 gets a bare yield*.",
+        "rationale": "httpHandler is generic over the error type and ends in catchCause, so an undischarged error already degrades to a 500 JSON body. Adding handlers where the current code has no specific intent would be speculative code the Karpathy simplicity rule forbids. Site 5's callee has an empty error channel, so there is nothing to discharge."
+      },
+      {
+        "summary": "Sites 2 and 3 use Effect.catchCause rather than Effect.catch.",
+        "rationale": "The behavior being preserved is the (currently dead) try/catch intent: a feedback-write failure must not fail the request. That block can produce both a typed FeedbackWriteError and a defect from a rejected Effect.promise(() => deliverQueuedFeedback(...)). Effect.catch sees only the former; catchCause sees both."
+      },
+      {
+        "summary": "Site 6's guard is extracted into an exported checkWorkspaceRemovalGuard helper returning a verdict value, and enumeration failure maps to 500 rather than 409.",
+        "rationale": "The route body is a module-private HttpRouter.add with no exported seam, so the fail-closed behavior is otherwise untestable; a verdict return value lets a unit test assert the refusal directly without a DI framework. 409 already means 'containers exist, stop them first' — an actionable operator state — whereas 'we could not determine whether containers exist' is a server-side failure and belongs at 500."
+      },
+      {
+        "summary": "The dead JS try/catch around the rm -rf fallback (stash-clean.ts:375-387) is pulled into scope beyond the issue's listed sites.",
+        "rationale": "Same bug class, same function this issue already edits, six lines. Its failure mode is that a root-owned workspace silently loses its Alpine-container cleanup path and 500s instead. The repo's standing no-bandaids / never-walk-past-the-trash doctrine outweighs the surgical-diff preference at this size."
+      },
+      {
+        "summary": "Documentation lands as a new docs/EFFECT-BRIDGING.md plus a short CLAUDE.md pointer, not in PAN-3568's docs/EFFECT-DIAGNOSTICS.md.",
+        "rationale": "This issue lands first and the two documents cover different things — the authoring convention here, the mechanical gate that enforces it there. Pre-creating 3568's file would make both issues fight over one path."
+      },
+      {
+        "summary": "The expected post-fix baseline is 30, from a current 47 — not the 54 quoted in the issue body.",
+        "rationale": "scripts/dashboard-types-baseline.txt reads 47 today and a fresh tsc run against src/dashboard/server/tsconfig.json produces exactly 47 errors, of which 17 belong to these five sites. The issue's 54 predates PAN-3552."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-context-digest-effect",
+        "title": "Run the context-digest Effect directly in the specialist regenerate route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists/project-routes.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p src/dashboard/server/tsconfig.json 2>&1 | grep 'project-routes.ts(435' || echo CLEAN"
+          ],
+          "expected_outputs": [
+            "the grep prints CLEAN — no TS2741 remains at project-routes.ts line 435"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-1 in .pan/drafts/PAN-3567.md. In src/dashboard/server/routes/specialists/project-routes.ts, replace `const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));` (line 435) with `const digest = yield* regenerateContextDigest(project, type);`. The callee returns Effect.Effect<string | null> with an empty error channel, so nothing else is needed. Leave the `yield* Effect.promise(() => import('../../../../lib/cloister/specialist-context.js'))` line directly above it untouched — dynamic import genuinely returns a Promise."
+        },
+        "items": [
+          {
+            "id": "fix-context-digest-effect.ac1",
+            "title": "Given POST /api/specialists/:project/:type/context/regenerate, the route yields regenerateContextDigest(project, type) directly with no Effect.promise wrapper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-context-digest-effect.ac2",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits no error at project-routes.ts line 435",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-context-digest-effect.ac3",
+            "title": "The `digest` binding is typed `string | null`, so the existing if/else still returns the digest JSON on success and status 500 with 'Failed to generate context digest' when it is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-context-digest-effect.ac4",
+            "title": "The change preserves the adjacent dynamic-import line: `git diff origin/main -- src/dashboard/server/routes/specialists/project-routes.ts | grep '=> import('` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-refresh-token-effect",
+        "title": "Run the workspace token refresh and stop reporting success for a refresh that failed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p src/dashboard/server/tsconfig.json 2>&1 | grep 'workspaces.ts(170' || echo CLEAN"
+          ],
+          "expected_outputs": [
+            "the grep prints CLEAN — no TS2741 remains at workspaces.ts line 1707"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-2 in .pan/drafts/PAN-3567.md. In src/dashboard/server/routes/workspaces.ts line 1707, replace `yield* Effect.promise(() => refreshWorkspaceToken(workspacePath));` with a direct yield* piped through Effect.as({ ok: true }) and Effect.catch mapping FsError | GitHubApiError | ConfigError to { ok: false, error: err.message }; when ok is false return jsonResponse({ success: false, error }, { status: 500 }) before the existing success response. All three error classes carry a usable .message (src/lib/errors.ts:40, :104, :136). The { success: false, error } shape matches the route's own existing 'GitHub App not configured' failure response. Leave the `yield* Effect.promise(() => import('../../../lib/github-app.js'))` line above untouched. The exact before/after snippet is in the PRD."
+        },
+        "items": [
+          {
+            "id": "fix-refresh-token-effect.ac1",
+            "title": "Given refreshWorkspaceToken fails with FsError, GitHubApiError, or ConfigError, POST /api/workspaces/:issueId/refresh-token returns { success: false, error: <err.message> } with HTTP status 500",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-refresh-token-effect.ac2",
+            "title": "The route returns { success: true, message: 'Token refreshed for <id>' } only after refreshWorkspaceToken's Effect has actually run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-refresh-token-effect.ac3",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits no error at workspaces.ts line 1707",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-refresh-token-effect.ac4",
+            "title": "The pre-existing 'GitHub App not configured' branch still returns { success: false, error } with status 400, unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-review-feedback-effect",
+        "title": "Write the review-agent feedback file and replace its dead try/catch with Effect.catchCause",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p src/dashboard/server/tsconfig.json 2>&1 | grep -E 'workspaces.ts\\((151[0-9]|152[0-9]|153[0-9])' || echo CLEAN"
+          ],
+          "expected_outputs": [
+            "the grep prints CLEAN — the TS2741 at line 1513 and the five TS18046 'fileResult is of type unknown' errors are gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-3 in .pan/drafts/PAN-3567.md. In src/dashboard/server/routes/workspaces.ts, the review-blocked/failed feedback block starting at line 1508: change `try {` to `yield* Effect.gen(function* () {`, change `const fileResult = yield* Effect.promise(() => writeFeedbackFile({...}));` to `const fileResult = yield* writeFeedbackFile({...});`, and replace the trailing `} catch (err) { console.error(...) }` with `}).pipe(Effect.catchCause((cause) => Effect.sync(() => { console.error(`[review-status] Failed to send feedback to ${agentId}:\\n${Cause.pretty(cause)}`); })));`. Add `Cause` to the effect import at line 56. catchCause is required rather than Effect.catch because the block must also swallow the defect a rejected Effect.promise(() => deliverQueuedFeedback(...)) produces — a JS try/catch caught neither, which is why this handler was inert. Keep the msg template literal, the dynamic-import bridge, and the deliverQueuedFeedback bridge exactly as they are."
+        },
+        "items": [
+          {
+            "id": "fix-review-feedback-effect.ac1",
+            "title": "Given review status blocked or failed with reviewNotes, POST /api/workspaces/:issueId/review-status writes the review-agent feedback file via a direct `yield* writeFeedbackFile(...)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-review-feedback-effect.ac2",
+            "title": "Given writeFeedbackFile fails, the route logs '[review-status] Failed to send feedback to <agentId>' with the pretty-printed cause and still returns jsonResponse(status) — it does not return 500",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-review-feedback-effect.ac3",
+            "title": "Given a grep of lines 1500-1545 of workspaces.ts, the review-feedback block contains an Effect.catchCause handler and no bare `} catch` wrapping a `yield*`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-review-feedback-effect.ac4",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits no error at workspaces.ts lines 1513, 1521, 1523, 1526, 1528, or 1530",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-review-feedback-effect.ac5",
+            "title": "The change preserves the correct bridges: the block still contains `Effect.promise(() => deliverQueuedFeedback(` and `Effect.promise(() => import(` unmodified relative to origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-test-feedback-effect",
+        "title": "Write the test-agent feedback file and replace its dead try/catch with Effect.catchCause",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p src/dashboard/server/tsconfig.json 2>&1 | grep -E 'workspaces.ts\\((157[0-9]|158[0-9]|159[0-9])' || echo CLEAN"
+          ],
+          "expected_outputs": [
+            "the grep prints CLEAN — the TS2741 at line 1579 and the five TS18046 'fileResult is of type unknown' errors are gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-4 in .pan/drafts/PAN-3567.md. Apply the identical transformation as fix-review-feedback-effect to the `testStatus === 'failed' && testNotes` block starting at src/dashboard/server/routes/workspaces.ts line 1574: `try {` becomes `yield* Effect.gen(function* () {`, `yield* Effect.promise(() => writeFeedbackFile({...}))` becomes `yield* writeFeedbackFile({...})`, and the trailing catch becomes `}).pipe(Effect.catchCause((cause) => Effect.sync(() => { console.error(`[review-status] Failed to send test feedback to ${agentId}:\\n${Cause.pretty(cause)}`); })));`. Keep the specialist:'test-agent'/outcome:'failed' literals, the deliverQueuedFeedback('test-failed') bridge, and the dynamic-import bridge unchanged."
+        },
+        "items": [
+          {
+            "id": "fix-test-feedback-effect.ac1",
+            "title": "Given test status failed with testNotes, POST /api/workspaces/:issueId/review-status writes the test-agent feedback file via a direct `yield* writeFeedbackFile(...)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-test-feedback-effect.ac2",
+            "title": "Given writeFeedbackFile fails, the route logs '[review-status] Failed to send test feedback to <agentId>' and still returns jsonResponse(status) — it does not return 500",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-test-feedback-effect.ac3",
+            "title": "Given a grep of lines 1565-1610 of workspaces.ts, the test-feedback block contains an Effect.catchCause handler and no bare `} catch` wrapping a `yield*`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-test-feedback-effect.ac4",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits no error at workspaces.ts lines 1579, 1587, 1589, 1592, 1593, or 1595",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-container-guard",
+        "title": "Extract a fail-closed checkWorkspaceRemovalGuard helper and use it in the clean route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3567",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "test-container-guard"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/stash-clean.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx tsc --noEmit -p src/dashboard/server/tsconfig.json 2>&1 | grep 'stash-clean.ts(3' || echo CLEAN"
+          ],
+          "expected_outputs": [
+            "the grep prints CLEAN — the TS2741 at line 364 and the two TS18046 'orphanedContainers is of type unknown' errors are gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-5 in .pan/drafts/PAN-3567.md. In src/dashboard/server/routes/workspaces/stash-clean.ts, export a `WorkspaceRemovalGuard` verdict type ({ allow: true } | { allow: false; status: 409 | 500; error: string }) and an exported `checkWorkspaceRemovalGuard(workspacePath): Effect.Effect<WorkspaceRemovalGuard>` that yields getContainersReferencingWorkspacePath directly, maps a non-empty list to the existing 409 message verbatim, and uses Effect.catch on ProcessSpawnError to return { allow: false, status: 500, error: `Cannot remove workspace: failed to enumerate Docker containers referencing ${workspacePath}: ${err.message}` }. Add `import type { ProcessSpawnError } from '../../../../lib/errors.js';`. Then replace the inline guard at lines 362-372 with `const guard = yield* checkWorkspaceRemovalGuard(workspacePath); if (!guard.allow) return jsonResponse({ error: guard.error }, { status: guard.status });`. This is the seam the regression test consumes — the helper must return a verdict value, never throw or fail."
+        },
+        "items": [
+          {
+            "id": "extract-container-guard.ac1",
+            "title": "stash-clean.ts exports `checkWorkspaceRemovalGuard`, which returns an Effect whose error channel is empty, so a caller that yields it never has to discharge a failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-container-guard.ac2",
+            "title": "Given Docker enumeration fails with ProcessSpawnError, the helper returns { allow: false, status: 500 } whose error names the workspace path and the underlying message — it never returns allow: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-container-guard.ac3",
+            "title": "Given enumeration returns a non-empty container list, the helper returns status 409 with the pre-existing message text 'Cannot remove workspace: N Docker container(s) still reference compose paths in <dirname>/. Stop the containers first.' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-container-guard.ac4",
+            "title": "POST /api/workspaces/:issueId/clean calls the helper and returns jsonResponse({ error }, { status }) whenever allow is false, reaching no rm -rf, backup, or spawnPanCommand statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-container-guard.ac5",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits no error at stash-clean.ts lines 364, 366, or 369",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-rm-fallback-catch",
+        "title": "Make the root-owned rm -rf docker fallback reachable via Effect.catchCause",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/stash-clean.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'catch' src/dashboard/server/routes/workspaces/stash-clean.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the grep shows only Effect-level handlers (Effect.catch / Effect.catchCause) — no bare `} catch {` inside postWorkspaceCleanRoute"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-6 in .pan/drafts/PAN-3567.md. In src/dashboard/server/routes/workspaces/stash-clean.ts lines 375-387, the JS `try { yield* Effect.promise(() => execAsync('rm -rf ...')) } catch { <docker alpine cleanup> }` can never fire — Effect.promise turns a rejection into a defect and Effect's generator runtime does not throw into the JS catch. Replace it with `yield* Effect.promise(() => execAsync('rm -rf ...')).pipe(Effect.catchCause(() => Effect.gen(function* () { <the same console.log, docker run, and rmdir statements> })))`. catchCause rather than Effect.catch, because the failure arrives as a defect. If the docker fallback itself fails, that defect still reaches httpHandler and yields a 500, matching today's intended worst case."
+        },
+        "items": [
+          {
+            "id": "fix-rm-fallback-catch.ac1",
+            "title": "Given the plain `rm -rf` rejects on root-owned files, the route logs 'Regular rm failed, using Docker to clean up root-owned files...' and runs the alpine `docker run` cleanup followed by `rmdir`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-rm-fallback-catch.ac2",
+            "title": "Given a grep for `catch` in stash-clean.ts, postWorkspaceCleanRoute shows only Effect-level handlers and no bare `} catch` block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-rm-fallback-catch.ac3",
+            "title": "The change preserves every shell command: the docker run, rmdir, and rm -rf strings and their maxBuffer/encoding options still match origin/main character for character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-container-guard",
+        "title": "Regression test locking the fail-closed container guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "three tests pass in workspace-removal-guard.test.ts with no skips"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-7 in .pan/drafts/PAN-3567.md. Create tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts. vi.mock '../../../../../src/lib/workspace-manager.js' so getContainersReferencingWorkspacePath is a vi.fn() returning an Effect, then import checkWorkspaceRemovalGuard from the stash-clean route module and drive it with Effect.runPromise. Follow the mocking style of tests/unit/dashboard/server/routes/reset-review-route.test.ts — vi.hoisted() for handles you assert on, and vi.mock() factories for every module stash-clean.ts imports at module scope, notably '../workspaces.js' (getProjectPath, requireTrustedMutationOrigin, readJsonBody, spawnPanCommand, getWorkspaceInfoForIssue); without those the import pulls in the whole workspaces route module and fails. Three cases: empty list → allow true; two containers → allow false, status 409, message contains '2 Docker container(s)'; ProcessSpawnError → allow false, status 500, message contains the workspace path and the underlying message. No timers are involved, so no fake-timer setup is needed."
+        },
+        "items": [
+          {
+            "id": "test-container-guard.ac1",
+            "title": "Given getContainersReferencingWorkspacePath succeeds with an empty array, the test asserts checkWorkspaceRemovalGuard resolves to { allow: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-container-guard.ac2",
+            "title": "Given it succeeds with two containers, the test asserts allow is false, status is 409, and the error message contains '2 Docker container(s)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-container-guard.ac3",
+            "title": "Given it fails with ProcessSpawnError, the test asserts allow is false and status is 500 — the assertion that fails if the guard ever regresses to fail-open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-container-guard.ac4",
+            "title": "`npx vitest run tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts` exits 0 with three passing tests and no skips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lower-types-baseline",
+        "title": "Lower the dashboard-types ratchet from 47 to the post-fix count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/dashboard-types-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-dashboard-types.sh --update",
+            "bash scripts/lint-dashboard-types.sh",
+            "cat scripts/dashboard-types-baseline.txt"
+          ],
+          "expected_outputs": [
+            "the update prints '✓ dashboard-types baseline updated: 47 → 30'",
+            "the plain check exits 0",
+            "the baseline file contains 30"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-8 in .pan/drafts/PAN-3567.md. After the five site fixes are in the tree, run `bash scripts/lint-dashboard-types.sh --update` from the workspace root. Expected result is 47 → 30 (17 errors removed: 5 TS2741 plus 12 cascading TS18046). A count above 30 means one of the earlier items introduced a new type error — diagnose and fix it rather than accepting the higher number; the script refuses to raise above 47 outright. Commit the changed baseline with PAN-3567 in the message, which scripts/lint-ratchet-audit.sh requires for audited baseline changes."
+        },
+        "items": [
+          {
+            "id": "lower-types-baseline.ac1",
+            "title": "scripts/dashboard-types-baseline.txt contains 30, down from 47",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lower-types-baseline.ac2",
+            "title": "`bash scripts/lint-dashboard-types.sh` (no --update) exits 0 against the new baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lower-types-baseline.ac3",
+            "title": "`npx tsc --noEmit -p src/dashboard/server/tsconfig.json` emits zero lines matching \"TS2741: Property 'then' is missing in type 'Effect<\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lower-types-baseline.ac4",
+            "title": "The commit touching the baseline carries PAN-3567 in its message so scripts/lint-ratchet-audit.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-effect-bridging",
+        "title": "Document the Effect bridging convention in docs/EFFECT-BRIDGING.md and CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T16:45:11.955Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3567",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/EFFECT-BRIDGING.md",
+            "CLAUDE.md",
+            "docs/INDEX.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'internalCall' docs/EFFECT-BRIDGING.md",
+            "grep -c 'Effect.catchCause' docs/EFFECT-BRIDGING.md",
+            "grep -c 'EFFECT-BRIDGING' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "each grep returns a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-9 in .pan/drafts/PAN-3567.md. Create docs/EFFECT-BRIDGING.md (≤80 lines) stating: Effect.promise/Effect.tryPromise bridge Promise-returning thunks only, an Effect-returning callee is yield*ed directly; the measured fact that on effect@4.0.0-beta.73 Effect.promise(() => <Effect>) raises 'TypeError: internalCall(...).then is not a function' inside the fiber so the endpoint returns 500 rather than silently succeeding, with the reproduction snippet; the measured fact that a JS try/catch around a yield* catches neither typed failures nor defects, so Effect.catch handles typed failures and Effect.catchCause is needed when defects must also be swallowed; the legitimate bridges that must not be 'fixed' (dynamic import(), genuinely Promise-returning callees); pointers to PAN-3568 / docs/EFFECT-DIAGNOSTICS.md as the mechanical gate and scripts/lint-dashboard-types.sh as the current ratchet; and a worked-example line citing this issue (five sites, 17 baselined errors, 47 → 30). Add a short 3-5 line '## Effect bridging' section to CLAUDE.md after the existing '## Dashboard Server Architecture (Effect + Raw WebSocket)' section linking to the new doc — do not restate it, CLAUDE.md costs context in every session. Add the doc to docs/INDEX.md if that file lists docs by filename; if it has no matching list, skip it and say so in the commit message."
+        },
+        "items": [
+          {
+            "id": "document-effect-bridging.ac1",
+            "title": "docs/EFFECT-BRIDGING.md contains the rule that Effect.promise and Effect.tryPromise accept Promise-returning thunks only, and that an Effect-returning callee is yield*ed directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-effect-bridging.ac2",
+            "title": "The doc contains the string 'internalCall' and explains that the mistake produces an HTTP 500 rather than a silent no-op, with the reproduction snippet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-effect-bridging.ac3",
+            "title": "The doc contains 'Effect.catchCause' and explains that a JS try/catch around a yield* catches neither typed failures nor defects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-effect-bridging.ac4",
+            "title": "The doc contains the list of bridges an author preserves rather than 'fixes': dynamic `import()` and genuinely Promise-returning callees",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-effect-bridging.ac5",
+            "title": "CLAUDE.md contains a link to docs/EFFECT-BRIDGING.md in a section placed after 'Dashboard Server Architecture (Effect + Raw WebSocket)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-container-guard",
+        "to": "test-container-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-container-guard",
+        "to": "fix-rm-fallback-catch",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-context-digest-effect",
+        "to": "lower-types-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-refresh-token-effect",
+        "to": "lower-types-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-review-feedback-effect",
+        "to": "lower-types-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-test-feedback-effect",
+        "to": "lower-types-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-container-guard",
+        "to": "lower-types-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-container-guard",
+        "to": "document-effect-bridging",
+        "type": "informs"
+      },
+      {
+        "from": "fix-refresh-token-effect",
+        "to": "fix-review-feedback-effect",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-review-feedback-effect",
+        "to": "fix-test-feedback-effect",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-refresh-token-effect",
+        "to": "fix-test-feedback-effect",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-06-PAN-3567-six-floating-effects-effect-promise-trypromise-wrapping-effect-returning-callees-inner-effect-never-runs.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
