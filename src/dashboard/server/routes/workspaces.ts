@@ -1571,19 +1571,19 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
       if (testStatus === 'failed' && testNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures, then invoke the /rebase-and-submit skill\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite locally to verify your fixes pass\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
-        try {
+        yield* Effect.gen(function* () {
           const { writeFeedbackFile } = yield* Effect.promise(() => import(
             '../../../lib/cloister/feedback-writer.js'
           ));
           const wsInfo = getWorkspaceInfoForIssue(issueId);
-          const fileResult = yield* Effect.promise(() => writeFeedbackFile({
+          const fileResult = yield* writeFeedbackFile({
             issueId,
             workspacePath: wsInfo.localPath,
             specialist: 'test-agent',
             outcome: 'failed',
             summary: `Tests FAILED: ${(testNotes || '').slice(0, 80)}`,
             markdownBody: feedbackBody,
-          }));
+          });
           if (!fileResult.success) {
             console.error(
               `[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`
@@ -1595,9 +1595,9 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
             );
           }
-        } catch (err) {
-          console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
-        }
+        }).pipe(Effect.catchCause((cause) => Effect.sync(() => {
+          console.error(`[review-status] Failed to send test feedback to ${agentId}:\n${Cause.pretty(cause)}`);
+        })));
       }
 
       if (testStatus === 'passed') {
