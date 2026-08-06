@@ -307,6 +307,11 @@
       "timestamp": "2026-08-06T13:03:23.359Z",
       "reason": "end",
       "note": "Fixed both blocking findings from review cycle 9: (1) mergeDbOnlyReviewStatuses() could keep a closed issue's review status visible in the live snapshot after close-out deletes its DB row, since that deletion emits no read-model removal event -- fixed by pruning closed-issue review statuses on every getSnapshot() request (pruneReviewStatusesForReadSource), the same live-signal pattern pruneAgentsForReadSource already uses for agents, so a mid-session close self-heals on the next snapshot rather than only after a restart. (2) The persisted-branch fallback did a synchronous full-table scan on the request path -- replaced with an issue-scoped WHERE query through the existing agents_issue_idx index, composed into the route's existing Promise.all batch. Also resolved a verification-gate lint failure that turned out to be a machine-load phantom (dist/ ENOENT under concurrent builds) -- confirmed independently that a clean lint run passes end to end, and separately fixed a real, self-inflicted file-size allowlist gap from this cycle's own line growth. No other deviations."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T13:07:38.986Z"
     }
   ],
   "feedback": [],
@@ -375,7 +380,7 @@
     "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T13:07:38.214Z",
+  "updated": "2026-08-06T13:07:39.007Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "reviewing",
@@ -582,7 +587,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
