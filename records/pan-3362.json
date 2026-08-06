@@ -283,10 +283,10 @@
       "tests/unit/lib/uat-fixtures/seed.test.ts",
       "tests/unit/scripts/lint-state-writes.test.ts"
     ],
-    "recordedAt": "2026-08-06T10:05:44.428Z"
+    "recordedAt": "2026-08-06T10:06:09.706Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T10:06:03.374Z",
+  "updated": "2026-08-06T10:06:09.707Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "reviewing",
