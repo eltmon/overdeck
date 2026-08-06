@@ -1031,7 +1031,7 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:27:46.122Z",
+  "updated": "2026-08-06T22:27:49.815Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -1040,10 +1040,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T22:27:46.120Z",
+    "updatedAt": "2026-08-06T22:27:47.892Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues: testGateReset now evaluates the EFFECTIVE test status (input.extra.testStatus when supplied, else the row's) so a row already at 'pending' can no longer let orphan restore's forwarded historical passed/skipped land against a fresh evidence head. Added the specified regression, parameterized over passed and skipped.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
+    "reviewRequestedAt": "2026-08-06T22:27:47.418Z",
     "reviewSpawnedAt": "2026-08-06T22:24:23.481Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -1099,8 +1100,7 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-06T22:27:45.056Z"
-    },
-    "reviewRequestedAt": "2026-08-06T22:27:46.120Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -1121,9 +1121,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 9776440,
-            "output": 78146,
-            "cacheRead": 18118144,
+            "input": 10176550,
+            "output": 82261,
+            "cacheRead": 22621184,
             "cacheWrite": 0
           }
         },
@@ -1214,9 +1214,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 12510695,
-          "output": 132205,
-          "cacheRead": 28140544,
+          "input": 12910805,
+          "output": 136320,
+          "cacheRead": 32643584,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1227,8 +1227,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 91.6626237,
-        "pricingAsOf": "2026-08-06T22:26:51.249Z"
+        "usd": 93.8503917,
+        "pricingAsOf": "2026-08-06T22:27:49.169Z"
       }
     },
     "merges": [
