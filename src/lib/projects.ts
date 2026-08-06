@@ -357,8 +357,8 @@ export interface ProjectConfig {
    * rebasing onto the new main.
    */
   merge_train?: 'enabled' | 'disabled';
-  /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
-  quality_gates?: Record<string, QualityGateConfig>;
+  /** Merge checks: pre-push quality gates and main-verification fallback requirements. */
+  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[];
   /** Version-string propagation performed after a UAT batch merge. */
   version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */

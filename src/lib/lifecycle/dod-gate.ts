@@ -21,7 +21,12 @@ import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { aggregateGenerationShipStatus, loadShipRecords } from '../cloister/ship-status.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
-import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import {
+  fetchCommitCheckRuns,
+  fetchIssuePullRequest,
+  fetchRequiredStatusChecks,
+  type CommitCheckRuns,
+} from '../overdeck/pull-requests.js';
 import { listUatGenerationsSync, type UatGeneration } from '../overdeck/merge-sync.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
@@ -130,12 +135,11 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
+export const DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS = ['test', 'lint', 'build (22)', 'guard'];
+
 interface MainVerifyRowDeps {
-  readCheckRuns: (ctx: LifecycleContext, commit: string) => Promise<{
-    total: number;
-    failed: string[];
-    pending: string[];
-  }>;
+  readCheckRuns: (ctx: LifecycleContext, commit: string) => Promise<CommitCheckRuns>;
+  readRequiredChecks?: (ctx: LifecycleContext) => Promise<string[]>;
   /**
    * PAN-3202: default-branch commits that contain `mergeCommit`, newest first.
    * These are the candidate heads for the later-green-run evidence form.
@@ -143,10 +147,21 @@ interface MainVerifyRowDeps {
   readContainingDefaultBranchCommits?: (ctx: LifecycleContext, mergeCommit: string) => Promise<string[]>;
 }
 
+function configuredMainVerifyChecks(ctx: LifecycleContext): string[] {
+  const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+  return project?.main_verify_required_checks?.length
+    ? project.main_verify_required_checks
+    : DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS;
+}
+
 const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   readCheckRuns: async (ctx, commit) => {
-    if (!ctx.github) return { total: 0, failed: [], pending: [] };
+    if (!ctx.github) return { total: 0, names: [], successful: [], failed: [], pending: [] };
     return fetchCommitCheckRuns(ctx.github.owner, ctx.github.repo, commit);
+  },
+  readRequiredChecks: async ctx => {
+    if (!ctx.github) return configuredMainVerifyChecks(ctx);
+    return fetchRequiredStatusChecks(ctx.github.owner, ctx.github.repo, 'main', configuredMainVerifyChecks(ctx));
   },
   readContainingDefaultBranchCommits: async (ctx, mergeCommit) => {
     const { stdout } = await execFileAsync(
@@ -592,9 +607,25 @@ const LATER_GREEN_CANDIDATE_LIMIT = 5;
  * which is exactly what "verified on main" means. Row 7 (deploy) already reasons
  * this way through the same containment relation.
  */
+function requiredChecksOutcome(checks: CommitCheckRuns, required: string[]): {
+  missing: string[];
+  unsuccessful: string[];
+} {
+  return {
+    missing: required.filter(check => !checks.names.includes(check)),
+    unsuccessful: required.filter(check => checks.names.includes(check) && !checks.successful.includes(check)),
+  };
+}
+
+function hasRequiredChecksGreen(checks: CommitCheckRuns, required: string[]): boolean {
+  const outcome = requiredChecksOutcome(checks, required);
+  return outcome.missing.length === 0 && outcome.unsuccessful.length === 0;
+}
+
 async function findLaterGreenDefaultBranchRun(
   ctx: LifecycleContext,
   mergeCommit: string,
+  required: string[],
   deps: MainVerifyRowDeps,
 ): Promise<{ run: { sha: string; total: number } | null; note: string }> {
   const readCandidates =
@@ -611,7 +642,7 @@ async function findLaterGreenDefaultBranchRun(
   for (const sha of probed) {
     try {
       const checks = await deps.readCheckRuns(ctx, sha);
-      if (checks.total > 0 && checks.failed.length === 0 && checks.pending.length === 0) {
+      if (hasRequiredChecksGreen(checks, required)) {
         return { run: { sha, total: checks.total }, note: '' };
       }
     } catch (error) {
@@ -641,30 +672,30 @@ export async function checkMainVerifyRow(
   }
 
   try {
+    const requiredChecks = await (deps.readRequiredChecks ?? defaultMainVerifyRowDeps.readRequiredChecks!)(ctx);
     const checks = await deps.readCheckRuns(ctx, mergeCommit);
-    if (checks.total > 0 && checks.failed.length === 0 && checks.pending.length === 0) {
-      return result('main-verify', 'pass', `${checks.total} check-runs concluded successfully on ${mergeCommit}`);
+    const outcome = requiredChecksOutcome(checks, requiredChecks);
+    if (hasRequiredChecksGreen(checks, requiredChecks)) {
+      return result('main-verify', 'pass', `required checks concluded successfully on ${mergeCommit}: ${requiredChecks.join(', ')}`);
     }
 
     // The merge commit's own run stays the primary evidence, so its outcome is
     // always recorded first; the later-green-run form only appends to it.
     const parts = [
-      ...(checks.failed.length > 0 ? [`failed checks: ${checks.failed.join(', ')}`] : []),
-      ...(checks.pending.length > 0 ? [`still running: ${checks.pending.join(', ')}`] : []),
+      ...(outcome.missing.length > 0 ? [`missing required checks on ${mergeCommit}: ${outcome.missing.join(', ')}`] : []),
+      ...(outcome.unsuccessful.length > 0 ? [`required checks not successful: ${outcome.unsuccessful.join(', ')}`] : []),
     ];
-    const primary = checks.total === 0
-      ? `no CI check-runs on merge commit ${mergeCommit}`
-      : `${parts.join('; ')} on ${mergeCommit}`;
+    const primary = parts.join('; ');
 
-    const later = await findLaterGreenDefaultBranchRun(ctx, mergeCommit, deps);
+    const later = await findLaterGreenDefaultBranchRun(ctx, mergeCommit, requiredChecks, deps);
     if (later.run) {
       return result(
         'main-verify',
         'pass',
-        `${primary}; verified on main by later green CI run ${later.run.sha} containing the merge (${later.run.total} check-runs concluded successfully)`,
+        `${primary}; verified on main by later green CI run ${later.run.sha} containing the merge (required checks concluded successfully: ${requiredChecks.join(', ')})`,
       );
     }
-    return result('main-verify', checks.total === 0 ? 'skip' : 'miss', `${primary}; ${later.note}`);
+    return result('main-verify', 'miss', `${primary}; ${later.note}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return result('main-verify', 'miss', `could not read merge-commit check-runs: ${message}`);
