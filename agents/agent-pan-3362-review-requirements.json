@@ -47,6 +47,10 @@
     {
       "at": "2026-08-06T08:14:56.048Z",
       "event": "spawned"
+    },
+    {
+      "at": "2026-08-06T08:23:47.843Z",
+      "event": "stopped"
     }
   ],
   "archiveRef": null,
