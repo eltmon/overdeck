@@ -2072,30 +2072,17 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T20:49:48.752Z",
+  "updated": "2026-08-06T20:50:49.344Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T20:49:48.666Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-06T20:49:48.665Z"
-      },
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-06T20:49:48.665Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
-    "reviewedAtCommit": "bbd19558daddaf94e79a206507b204b34362136a",
-    "reviewSpawnedAt": "2026-08-03T00:29:14.386Z"
+    "updatedAt": "2026-08-06T20:50:49.320Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3514"
   },
   "closeOut": {
     "usage": {
@@ -2193,7 +2180,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.9107007,
-        "pricingAsOf": "2026-08-06T20:49:48.686Z"
+        "pricingAsOf": "2026-08-06T20:50:49.335Z"
       }
     },
     "merges": [
@@ -2202,7 +2189,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
