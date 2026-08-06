@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:13:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3418: Empty-string conversation model is stored, never backfilled, and blanks the harness+model chips (conv 1794 silently ran Opus 5)",
-    "updated": "2026-08-01T15:22:11.930Z"
+    "updated": "2026-08-06T10:40:38.127Z"
   },
   "plan": {
     "id": "pan-3418",
     "title": "Empty-string conversation model is stored, never backfilled, and blanks the harness+model chips",
-    "status": "running",
+    "status": "completed",
     "uid": "7251748d-20f9-4acd-bab9-8e6e0bba8f0a",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T15:13:37Z",
-    "updated": "2026-08-01T15:22:11.930Z",
+    "updated": "2026-08-06T10:40:38.127Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3418",
@@ -424,5 +424,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
