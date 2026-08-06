@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import type { Command } from 'commander';
 import { parseSequenceMd } from '../../lib/backlog/sequence-io.js';
 import { buildClassifyLookups } from '../../lib/backlog/lookups.js';
@@ -17,7 +16,6 @@ import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings
 import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
 import { activeOrderBookIssues } from '../../lib/cloister/flywheel.js';
 import { listSubstrateBugWeights, type WeightedSubstrateBug } from '../../lib/overdeck/substrate-bug-weights-service.js';
-import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/github-app.js';
 
 /**
  * Sandbox-safe Flywheel data surfaces. These read state DIRECTLY (sequence.md + SQLite) and
@@ -37,48 +35,34 @@ function parseGitHubRemoteUrl(remoteUrl: string): { owner: string; repo: string 
   return { owner: match[1]!, repo: match[2]! };
 }
 
-async function resolveGitHubOwnerRepo(): Promise<{ owner: string; repo: string } | null> {
-  try {
-    const { stdout } = await execAsync('git remote get-url origin', { encoding: 'utf8' });
-    return parseGitHubRemoteUrl(stdout);
-  } catch {
-    return null;
-  }
+async function resolveGitHubOwnerRepo(): Promise<{ owner: string; repo: string }> {
+  const { stdout } = await execAsync('git remote get-url origin', { encoding: 'utf8' });
+  const repo = parseGitHubRemoteUrl(stdout);
+  if (!repo) throw new Error('origin is not a GitHub repository');
+  return repo;
 }
 
-/** Labels for all open issues, keyed by bare number — fetched via REST so it works inside a
- *  sandboxed harness without burning the gh GraphQL budget. */
+/** Labels for all open issues, keyed by bare number. This must fail rather than make a
+ *  label-dependent forecast indistinguishable from an empty backlog. */
 export async function fetchOpenIssueLabels(): Promise<Map<string, string[]>> {
+  const repo = await resolveGitHubOwnerRepo();
+  const { stdout } = await execFileAsync(
+    'gh',
+    ['api', '--paginate', '--slurp', `repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=100`],
+    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+  );
+  const pages = JSON.parse(stdout || '[]') as Array<Array<{
+    number: number;
+    pull_request?: unknown;
+    labels?: Array<{ name?: string | null } | string>;
+  }>>;
   const byNumber = new Map<string, string[]>();
-  try {
-    const repo = await resolveGitHubOwnerRepo();
-    if (!repo) return byNumber;
-
-    if (isGitHubAppConfigured()) {
-      const issues = await Effect.runPromise(listOpenIssuesWithLabels(repo.owner, repo.repo));
-      for (const issue of issues) {
-        byNumber.set(String(issue.number), issue.labels);
-      }
-      return byNumber;
-    }
-
-    const { stdout } = await execFileAsync(
-      'gh',
-      ['api', '--paginate', '--slurp', `repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=100`],
-      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
-    );
-    const pages = JSON.parse(stdout || '[]') as Array<Array<{
-      number: number;
-      pull_request?: unknown;
-      labels?: Array<{ name?: string | null } | string>;
-    }>>;
-    for (const issue of pages.flat()) {
-      if (issue.pull_request) continue;
-      byNumber.set(String(issue.number), (issue.labels ?? [])
-        .map((label) => typeof label === 'string' ? label : label.name)
-        .filter((name): name is string => typeof name === 'string' && name.length > 0));
-    }
-  } catch { /* GitHub unavailable — labels stay empty (degraded, never throws) */ }
+  for (const issue of pages.flat()) {
+    if (issue.pull_request) continue;
+    byNumber.set(String(issue.number), (issue.labels ?? [])
+      .map((label) => typeof label === 'string' ? label : label.name)
+      .filter((name): name is string => typeof name === 'string' && name.length > 0));
+  }
   return byNumber;
 }
 
