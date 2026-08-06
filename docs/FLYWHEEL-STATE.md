@@ -1290,3 +1290,21 @@ work agent — it had already picked up the same work on its own.
 **Also this tick:** PAN-3589 struck (row-6 required-checks), and its evidence grew a fourth instance — PAN-3583's own close-out passed row 6 on `1 check-runs` where that run is the Mintlify deploy. PAN-3580's planning **completed**: a 47KB xBRIEF is on the state branch and it now waits on operator release, which is `auto_pickup_backlog: false` working as designed rather than a stall.
 
 **Scoreboard:** PAN-3581 and PAN-3583 landed, deployed, and closed out; PAN-3422, PAN-3477, PAN-3567, PAN-3568 closed out behind them. Six close-outs this run, zero operator overrides used.
+
+### RUN-82 tick 5 — 2026-08-06T21:20Z — third fix landed; PAN-3582's hour-long stall traced to a rebase-after-signal
+
+**PAN-3589 landed and deployed** — `d921b8cec5 fix(lifecycle): require named main CI checks (#3592)`, live as build `d921b8cec556`. Third substrate fix this run to go file → strike → land → deploy. Closed out.
+
+**Immediately instructive: the new row-6 gate could not exercise itself, because PAN-3582 is still unlanded.** PAN-3589's own close-out reported row 4 as `forge metadata unavailable: GitHub App PR lookup failed … 403` and row 6 as `no merge commit resolvable` → SKIP. The App rate-limit exhaustion prevents resolving the merge commit at all, so the hardened required-checks check degrades to a skip rather than a MISS. **PAN-3582 is the keystone: until it lands, it degrades the membership read door, DoD rows 4 and 6, and the deacon's whole patrol cadence.**
+
+**Traced PAN-3582's hour-long stall to an exact sequence, and it changes the recommended fix.** `origin/strike/pan-3582` is `86ac15064f`, sitting directly on `d20c97c49c` (PAN-3581's merge, 20:06Z). The recorded signal was `c83f7c9986`, and `git merge-base --is-ancestor c83f7c9986 origin/strike/pan-3582` says **not an ancestor** — the branch was rebased onto the newer main and force-pushed *after* readiness was signalled. `strike-ready.ts:65-70` is blameless: it fetches, refuses when local and remote heads differ, and records the remote head, so it recorded the truth at the moment it ran. The signal went stale underneath itself.
+
+Everything after that is the real defect. The landing door correctly rejected the stale signal; the recovery message went to monitor mail for a live idle agent; the agent had already reported `pan strike-ready succeeded` and believed itself done; and **`pan recover PAN-3582` respawned the session without the agent acting on the queued instruction** — pane counters frozen at `cost $3.4278`, `ctx 41%` across three ticks spanning an hour. Three independent delivery mechanisms all failed to reach an agent that was sitting right there at its prompt.
+
+**What cleared it: running `pan strike-ready PAN-3582` from the strike worktree myself**, which re-derived the head (`ready at 86ac15064f`) and reset `strikeLandingState: ready`, `strikeRecoveryCount: 0`. Posted to PAN-3593 with the recommendation that follows from it: **when a landing rejects on a stale signal, re-derive readiness from the branch rather than asking the agent to re-signal.** Every input is already on disk — branch pushed, gates passed, CI run — so routing it through an agent who has declared itself finished adds a hop that can only fail. A rebase-after-signal is also not an edge case: it is exactly what `pan sync-main` produces whenever main moves between signalling and the next patrol, and the patrol is on ~8-minute cycles because of PAN-3582 itself.
+
+**Carry this: when three delivery paths fail to move an agent, stop improving delivery.** The queued-mail fix, the recover command, and the retry ladder are all attempts to push information *into* an agent that has no reason to act on it. The state the system needed was sitting in git the whole time.
+
+**PAN-3512 is genuinely reworking** — 23m30s of work, 52.1k tokens, `+619/-30`, cost $16.02 on PR #3514. The fresh restart (enabled by PAN-3583) plus the `--host --yes` stack override (PAN-3591) put it back to productive work after three days stalled.
+
+**Push-event CI still absent** — last push run remains 14:58:51Z. Unchanged; PAN-3586 still needs its credential comparison and is stranded behind the un-redispatchable idle strike (PAN-3593 manifestation 2).
