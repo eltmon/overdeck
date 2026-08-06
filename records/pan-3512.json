@@ -949,20 +949,20 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:30:22.507Z",
+  "updated": "2026-08-06T21:45:18.838Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T21:18:35.418Z",
-    "updatedAt": "2026-08-06T21:29:53.207Z",
+    "updatedAt": "2026-08-06T21:45:18.803Z",
+    "reviewNotes": "Orphan restore can overwrite the fresh-head test-gate reset with historical passed test status",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
-    "reviewRequestedAt": "2026-08-06T21:18:35.418Z",
     "reviewSpawnedAt": "2026-08-06T21:29:42.657Z"
   },
   "closeOut": {
@@ -982,6 +982,12 @@
             "output": 99699,
             "cacheRead": 12886016,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 288986,
+            "output": 10665,
+            "cacheRead": 3810304,
+            "cacheWrite": 0
           }
         },
         "review.correctness": {
@@ -989,6 +995,12 @@
             "input": 602475,
             "output": 17078,
             "cacheRead": 2961408,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 1083366,
+            "output": 20300,
+            "cacheRead": 2649088,
             "cacheWrite": 0
           }
         },
@@ -998,6 +1010,12 @@
             "output": 3840,
             "cacheRead": 1079296,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 571407,
+            "output": 10384,
+            "cacheRead": 1874944,
+            "cacheWrite": 0
           }
         },
         "review.requirements": {
@@ -1006,6 +1024,12 @@
             "output": 24295,
             "cacheRead": 2406912,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 459729,
+            "output": 16734,
+            "cacheRead": 4156928,
+            "cacheWrite": 0
           }
         },
         "review.security": {
@@ -1013,6 +1037,12 @@
             "input": 435074,
             "output": 10778,
             "cacheRead": 1306624,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 420702,
+            "output": 5744,
+            "cacheRead": 1213440,
             "cacheWrite": 0
           }
         },
@@ -1047,9 +1077,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 199051,
-          "output": 897,
-          "cacheRead": 128000,
+          "input": 3023241,
+          "output": 64724,
+          "cacheRead": 13832704,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1060,8 +1090,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.9107007,
-        "pricingAsOf": "2026-08-06T21:29:53.307Z"
+        "usd": 63.3547997,
+        "pricingAsOf": "2026-08-06T21:45:18.819Z"
       }
     },
     "merges": [
@@ -1070,7 +1100,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
