@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:45:37.687Z",
+  "updated": "2026-08-06T08:08:19.233Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -159,5 +159,42 @@
     "docs-uat-relay.docs-uat-relay.ac1": "completed",
     "docs-uat-relay.docs-uat-relay.ac2": "completed",
     "docs-uat-relay.docs-uat-relay.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/PARKED-POPULATION.md",
+      "src/lib/__tests__/review-status-uat-failure.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/__tests__/uat-failure-feedback.test.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/uat-failure-feedback.ts",
+      "src/lib/parked/__tests__/resolver.test.ts",
+      "src/lib/parked/resolver.ts",
+      "src/lib/review-status.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/PARKED-POPULATION.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "src/lib/__tests__/review-status-uat-failure.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/uat-failure-feedback.ts",
+      "src/lib/parked/__tests__/resolver.test.ts",
+      "src/lib/parked/resolver.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+    ],
+    "recordedAt": "2026-08-06T08:08:19.232Z"
   }
 }
