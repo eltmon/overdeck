@@ -74,7 +74,7 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:54:40.984Z",
+  "updated": "2026-08-06T17:55:11.850Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -90,7 +90,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3577",
     "reviewedAtCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
     "lastVerifiedCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
-    "reviewRequestedAt": "2026-08-06T17:54:31.556Z",
+    "reviewRequestedAt": "2026-08-06T17:55:11.245Z",
     "reviewSpawnedAt": "2026-08-06T17:46:38.474Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -121,7 +121,8 @@
         "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
       ],
       "recordedAt": "2026-08-06T17:54:30.718Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-06T17:55:11.245Z"
   },
   "closeOut": {
     "usage": {
