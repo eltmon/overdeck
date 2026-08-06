@@ -291,7 +291,7 @@
     "recordedAt": "2026-08-06T10:06:09.706Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T10:11:04.148Z",
+  "updated": "2026-08-06T10:12:50.434Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
@@ -484,7 +484,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
