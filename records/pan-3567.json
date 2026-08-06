@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:52:13.008Z",
+  "updated": "2026-08-06T16:54:26.177Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fix-refresh-token-effect": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2289625,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:52:13.008Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Yielded the Effect-returning digest regeneration directly; preserved the dynamic import bridge.",
         "releasedAt": "2026-08-06T16:52:05.355Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2289625,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:52:13.008Z",
+        "itemId": "fix-refresh-token-effect",
+        "outcome": "completed",
+        "reason": "Ran the token refresh Effect directly and returned its typed failures as the route's existing failure JSON shape.",
+        "releasedAt": "2026-08-06T16:54:26.177Z"
       }
     ],
     "statusReasons": {
       "fix-context-digest-effect": {
         "reason": "Yielded the Effect-returning digest regeneration directly; preserved the dynamic import bridge.",
         "updatedAt": "2026-08-06T16:52:05.355Z"
+      },
+      "fix-refresh-token-effect": {
+        "reason": "Ran the token refresh Effect directly and returned its typed failures as the route's existing failure JSON shape.",
+        "updatedAt": "2026-08-06T16:54:26.177Z"
       }
     }
   },
@@ -89,6 +96,10 @@
     "fix-context-digest-effect.ac2": "completed",
     "fix-context-digest-effect.ac3": "completed",
     "fix-context-digest-effect.ac4": "completed",
-    "fix-refresh-token-effect": "running"
+    "fix-refresh-token-effect": "completed",
+    "fix-refresh-token-effect.ac1": "completed",
+    "fix-refresh-token-effect.ac2": "completed",
+    "fix-refresh-token-effect.ac3": "completed",
+    "fix-refresh-token-effect.ac4": "completed"
   }
 }
