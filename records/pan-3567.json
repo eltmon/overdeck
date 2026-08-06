@@ -40,7 +40,8 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt"
+      "scripts/file-size-allowlist.txt",
+      "src/lib/workspace-manager/docker.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -62,12 +63,13 @@
       "src/dashboard/server/routes/specialists/project-routes.ts",
       "src/dashboard/server/routes/workspaces.ts",
       "src/dashboard/server/routes/workspaces/stash-clean.ts",
+      "src/lib/workspace-manager/docker.ts",
       "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
     ],
-    "recordedAt": "2026-08-06T17:42:42.114Z"
+    "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:54:26.549Z",
+  "updated": "2026-08-06T17:54:30.719Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "blocked",
