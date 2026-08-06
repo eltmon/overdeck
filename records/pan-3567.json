@@ -91,10 +91,10 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T18:02:37.303Z",
+  "updated": "2026-08-06T18:05:25.505Z",
   "pipeline": {
     "issueId": "PAN-3567",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -102,13 +102,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T17:55:11.245Z",
-    "updatedAt": "2026-08-06T18:02:30.282Z",
-    "reviewNotes": "Docker enumeration failures still authorize destructive workspace removal",
+    "updatedAt": "2026-08-06T18:05:25.442Z",
+    "reviewNotes": "All convoy reviewers passed; Docker enumeration errors now fail closed",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3577",
-    "reviewedAtCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
+    "reviewedAtCommit": "539b762e1c338b9e94ec698bbfea89e781a2be46",
     "lastVerifiedCommit": "539b762e1c338b9e94ec698bbfea89e781a2be46",
-    "reviewRequestedAt": "2026-08-06T17:55:11.245Z",
     "reviewSpawnedAt": "2026-08-06T18:02:30.280Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -146,9 +146,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 221520,
-            "output": 6985,
-            "cacheRead": 2785280,
+            "input": 1548088,
+            "output": 39538,
+            "cacheRead": 17159168,
             "cacheWrite": 0
           }
         },
@@ -195,15 +195,15 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 2295775,
-          "output": 108944,
-          "cacheRead": 47285760,
+          "input": 3622343,
+          "output": 141497,
+          "cacheRead": 61659648,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.195107,
-        "pricingAsOf": "2026-08-06T18:02:32.242Z"
+        "usd": 26.593309,
+        "pricingAsOf": "2026-08-06T18:05:25.494Z"
       }
     },
     "merges": [
