@@ -33,6 +33,30 @@
     {
       "at": "2026-08-06T21:23:00.722Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-06T22:02:06.194Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": [
+        "context-pct",
+        "initial-context-pct",
+        "launcher.sh",
+        "lifecycle.log",
+        "output.log",
+        "pending.lock",
+        "pty-token",
+        "ready.json",
+        "session.id",
+        "sessions.json",
+        "state.json"
+      ]
     }
   ],
   "archiveRef": null,
