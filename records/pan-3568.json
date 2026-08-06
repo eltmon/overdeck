@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:48:43.006Z",
+  "updated": "2026-08-06T17:48:51.981Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "docs": {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3367637,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:48:51.980Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -259,6 +267,7 @@
     "reviewer-prompt": "completed",
     "reviewer-prompt.ac1": "completed",
     "reviewer-prompt.ac2": "completed",
-    "reviewer-prompt.ac3": "completed"
+    "reviewer-prompt.ac3": "completed",
+    "docs": "running"
   }
 }
