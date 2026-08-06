@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T20:56:14.443Z",
+  "updated": "2026-08-06T20:59:30.639Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,16 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "migrate-fallback": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1818751,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T20:56:14.442Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2443,6 +2435,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3512 dead)",
         "releasedAt": "2026-08-02T23:44:25.598Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1818751,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T20:56:14.442Z",
+        "itemId": "migrate-fallback",
+        "outcome": "completed",
+        "reason": "Fallback already routed through recordReviewVerdict on main (fd48e3af39); remaining gap was the unconditional killSession. Not-landed now skips feedback + kill and records the rejection reason. 3 tests in deacon-review-signals-verdict-door.test.ts.",
+        "releasedAt": "2026-08-06T20:59:30.639Z"
       }
     ],
     "statusReasons": {
@@ -2467,8 +2470,8 @@
         "updatedAt": "2026-08-02T23:34:51.343Z"
       },
       "migrate-fallback": {
-        "reason": "stale claim released (agent-pan-3512 dead)",
-        "updatedAt": "2026-08-02T23:44:25.598Z"
+        "reason": "Fallback already routed through recordReviewVerdict on main (fd48e3af39); remaining gap was the unconditional killSession. Not-landed now skips feedback + kill and records the rejection reason. 3 tests in deacon-review-signals-verdict-door.test.ts.",
+        "updatedAt": "2026-08-06T20:59:30.639Z"
       },
       "docs-write-door": {
         "reason": "stale claim released (agent-pan-3512 dead)",
@@ -2499,8 +2502,12 @@
     "retire-review-arm.retire-review-arm.ac2": "completed",
     "retire-review-arm.retire-review-arm.ac3": "completed",
     "retire-review-arm.retire-review-arm.ac4": "completed",
-    "migrate-fallback": "running",
-    "docs-write-door": "pending"
+    "migrate-fallback": "completed",
+    "docs-write-door": "pending",
+    "migrate-fallback.ac1": "completed",
+    "migrate-fallback.ac2": "completed",
+    "migrate-fallback.ac3": "completed",
+    "migrate-fallback.ac4": "completed"
   },
   "workModel": "claude-opus-5"
 }
