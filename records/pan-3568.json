@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:11:48.955Z",
+  "updated": "2026-08-06T17:15:27.256Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "patch-wiring": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 2666885,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:11:48.955Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Added isolated Effect diagnostics tsconfig variants for root, dashboard server, contracts, and effect-acp; config resolution and no-emit ACP file-set preservation verified.",
         "releasedAt": "2026-08-06T17:09:03.221Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 2666885,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:11:48.955Z",
+        "itemId": "patch-wiring",
+        "outcome": "completed",
+        "reason": "Patched TypeScript through prepare, verified idempotence, confirmed floatingEffect diagnostics appear only in the diag lane, and confirmed two builds preserve emitted content.",
+        "releasedAt": "2026-08-06T17:15:27.256Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "diag-tsconfigs": {
         "reason": "Added isolated Effect diagnostics tsconfig variants for root, dashboard server, contracts, and effect-acp; config resolution and no-emit ACP file-set preservation verified.",
         "updatedAt": "2026-08-06T17:09:03.221Z"
+      },
+      "patch-wiring": {
+        "reason": "Patched TypeScript through prepare, verified idempotence, confirmed floatingEffect diagnostics appear only in the diag lane, and confirmed two builds preserve emitted content.",
+        "updatedAt": "2026-08-06T17:15:27.256Z"
       }
     }
   },
@@ -128,6 +135,10 @@
     "diag-tsconfigs.ac3": "completed",
     "diag-tsconfigs.ac4": "completed",
     "diag-tsconfigs.ac5": "completed",
-    "patch-wiring": "running"
+    "patch-wiring": "completed",
+    "patch-wiring.ac1": "completed",
+    "patch-wiring.ac2": "completed",
+    "patch-wiring.ac3": "completed",
+    "patch-wiring.ac4": "completed"
   }
 }
