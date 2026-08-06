@@ -403,6 +403,12 @@ export async function checkVerificationRow(
     notes.length > 0 ? ` (${notes.join('; ')})` : ''
   }`;
   if (accepted) return result('verification', 'pass', observed);
+  // An out-of-band merge never enters merge-ops, so the CI-green skip cannot
+  // record its normal verification verdict. Once rows 4 and 6 prove the landed
+  // work and main CI green, that evidence satisfies row 3 without an override.
+  if (value === undefined && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
+    return result('verification', 'pass', `${observed}; verification satisfied by green main CI after landing`);
+  }
   return terminalVerdictSettlement('verification', value, observed, settlement) ??
     result('verification', 'miss', observed);
 }
