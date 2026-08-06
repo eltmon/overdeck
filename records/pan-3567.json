@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:56:07.486Z",
+  "updated": "2026-08-06T16:56:56.998Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "fix-test-feedback-effect": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2405775,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:56:07.486Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Yielded review feedback writes directly and converted Effect failures or defects into the existing non-fatal log path.",
         "releasedAt": "2026-08-06T16:55:58.003Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2405775,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:56:07.486Z",
+        "itemId": "fix-test-feedback-effect",
+        "outcome": "completed",
+        "reason": "Yielded test feedback writes directly and converted typed failures or defects into the existing non-fatal log path.",
+        "releasedAt": "2026-08-06T16:56:56.998Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "fix-review-feedback-effect": {
         "reason": "Yielded review feedback writes directly and converted Effect failures or defects into the existing non-fatal log path.",
         "updatedAt": "2026-08-06T16:55:58.003Z"
+      },
+      "fix-test-feedback-effect": {
+        "reason": "Yielded test feedback writes directly and converted typed failures or defects into the existing non-fatal log path.",
+        "updatedAt": "2026-08-06T16:56:56.998Z"
       }
     }
   },
@@ -130,6 +137,10 @@
     "fix-review-feedback-effect.ac3": "completed",
     "fix-review-feedback-effect.ac4": "completed",
     "fix-review-feedback-effect.ac5": "completed",
-    "fix-test-feedback-effect": "running"
+    "fix-test-feedback-effect": "completed",
+    "fix-test-feedback-effect.ac1": "completed",
+    "fix-test-feedback-effect.ac2": "completed",
+    "fix-test-feedback-effect.ac3": "completed",
+    "fix-test-feedback-effect.ac4": "completed"
   }
 }
