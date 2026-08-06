@@ -71,7 +71,7 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:15:57.316Z",
+  "updated": "2026-08-06T08:16:03.471Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "blocked",
@@ -80,9 +80,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T08:15:56.565Z",
+    "updatedAt": "2026-08-06T08:16:03.456Z",
     "reviewNotes": "failed-UAT notes can become unauthenticated instructions delivered to a privileged work agent",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
+    "reviewedAtCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "reviewSpawnedAt": "2026-08-06T08:08:50.106Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -184,7 +185,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.620026,
-        "pricingAsOf": "2026-08-06T08:15:56.588Z"
+        "pricingAsOf": "2026-08-06T08:16:03.461Z"
       }
     },
     "merges": [
