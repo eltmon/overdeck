@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:00:13.692Z",
+  "updated": "2026-08-06T21:00:16.794Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,16 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "docs-write-door": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1855902,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:00:07.624Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2476,6 +2468,17 @@
         "outcome": "completed",
         "reason": "Already landed on main via fd48e3af39; legacy-routes.ts:264 routes through recordReviewVerdict with landed-gated delivery. In branch via merge 27e9314aa0.",
         "releasedAt": "2026-08-06T21:00:13.692Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1855902,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:00:07.624Z",
+        "itemId": "docs-write-door",
+        "outcome": "completed",
+        "reason": "Already landed on main via fd48e3af39; docs/REVIEW-AGENT-ARCHITECTURE.md documents the write door. In branch via merge 27e9314aa0.",
+        "releasedAt": "2026-08-06T21:00:16.794Z"
       }
     ],
     "statusReasons": {
@@ -2504,8 +2507,8 @@
         "updatedAt": "2026-08-06T20:59:30.639Z"
       },
       "docs-write-door": {
-        "reason": "stale claim released (agent-pan-3512 dead)",
-        "updatedAt": "2026-08-02T23:44:25.598Z"
+        "reason": "Already landed on main via fd48e3af39; docs/REVIEW-AGENT-ARCHITECTURE.md documents the write door. In branch via merge 27e9314aa0.",
+        "updatedAt": "2026-08-06T21:00:16.794Z"
       },
       "migrate-quick-signal": {
         "reason": "Already landed on main via fd48e3af39 (PAN-3512 strike); src/cli/commands/specialists/done.ts:227 routes through recordReviewVerdict. In this branch via merge 27e9314aa0.",
@@ -2541,7 +2544,7 @@
     "retire-review-arm.retire-review-arm.ac3": "completed",
     "retire-review-arm.retire-review-arm.ac4": "completed",
     "migrate-fallback": "completed",
-    "docs-write-door": "running",
+    "docs-write-door": "completed",
     "migrate-fallback.ac1": "completed",
     "migrate-fallback.ac2": "completed",
     "migrate-fallback.ac3": "completed",
@@ -2553,7 +2556,10 @@
     "migrate-quick-signal.ac3": "completed",
     "migrate-coordinator.ac1": "completed",
     "migrate-coordinator.ac2": "completed",
-    "migrate-coordinator.ac3": "completed"
+    "migrate-coordinator.ac3": "completed",
+    "docs-write-door.ac1": "completed",
+    "docs-write-door.ac2": "completed",
+    "docs-write-door.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
