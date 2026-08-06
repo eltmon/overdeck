@@ -520,28 +520,21 @@
     "recordedAt": "2026-08-06T00:17:20.709Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T07:11:43.043Z",
+  "updated": "2026-08-06T07:12:34.314Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "pending",
     "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T07:11:40.381Z",
-    "reviewNotes": "Approved: cycle 13 changes only the focused no-loss test; all current-cycle code is clean and two repeated requirements findings remain non-promotable under convergence.",
-    "testNotes": "Automated gates on feature/pan-3423 at HEAD 4783783b1659be48921ce15c828ec4fc43c4cb36 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423), re-run fresh since HEAD advanced past the last recorded verification (5e2735f) via commit 4783783b16 'test: fix singleton health attention audit' (system-health-ui-no-loss.test.tsx, 2 insertions/4 deletions). bun install --frozen-lockfile: no changes (deps already synced). npm run typecheck PASSED (root tsc, hooks, evals, dashboard guard 47 known/0 new, frontend guard 0 known/0 new). npm run lint PASSED (exit 0) including lint:file-size, lint:circular, lint:ratchet-audit, lint:quarantine-audit, lint:source-introspection. npm run build PASSED (frontend + server bundle, dist externals guard OK). Scoped tests: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention (frontend workspace) -> 3 files / 39 tests passed (includes the singleton-audit fix from the latest commit). npx vitest run src/lib/agents/__tests__/agent-health.test.ts -> 1 file / 12 tests passed. Full frontend suite (src/dashboard/frontend, npx vitest run) -> 309 files / 3044 tests passed. Full root-level npm test equivalent (npx vitest run --no-file-parallelism from repo root) -> 1409 files / 13314 tests passed, 3 files / 50 tests skipped, 0 failures.",
+    "updatedAt": "2026-08-06T07:12:34.293Z",
     "uatNotes": "Issue is a dashboard UI redesign (SystemHealthPill popover) — UAT required per observable-dashboard-behavior trigger. Built this workspace's dashboard (npm run build) and ran dist/dashboard/server.js under Node 22 as an isolated peer on PORT=3019 with OVERDECK_DISABLE_DEACON=1 (never touched the host dashboard on :3011, per the host-process-boundary rule and PAN-2322 port-hijack guard). Drove it with an isolated Playwright MCP browser instance (no shared profile/session). Opened the System Health pill against real live host data and verified, via the accessibility tree, every FR/AC in the PRD: (1) header state badge 'warning' + relative 'Updated 15s ago' time (FR-5/popover-header-summary-chips.ac1); (2) synthesized summary line 'Action required: 1 critical issue · 4 stalled agents · 2 idle agents · memory at 50.3% · 31.1 GB spawn headroom · 2 context notes' in a bordered box (FR-8/ac2); (3) 2x2 vitals tiles (CPU/Memory/Overdeck/Swap) each with a meter bar, Swap carrying the 'historical · not live pressure' sub-label (FR-4/vitals-meter-tiles.ac1,ac3); (4) chip row replacing the old tiles — 'Admitted work agents: 2', 'Containers: 19', 'Webhook relay: Running' (FR-5/ac3); (5) Needs-attention section with grouped critical row 'agent activity stalled x4' (sub 'agent-min-941, strike-pan-3559 +2 more') and grouped warning row 'agent activity stalled x2', both with no Open/Kill controls (attention-section.ac1,ac4); (6) collapsed '2 context notes — background, not pressure signals' disclosure that expands to reveal exactly the 2 severity:info reasons ('Swap occupancy is historical context...', 'Virtual memory commitment is diagnostic...') (FR-1/attention-section.ac2); (7) on a re-poll, a singleton attention row rendered 'agent-pan-3423-test · PAN-3423' / 'no activity for 24 min.' with working 'Open PAN-3423' and 'Kill' actions — clicked Open and confirmed it navigated to ?issue=PAN-3423&tab=conversation and closed the popover (FR-6/attention-section.ac3, popover-header-summary-chips); (8) Top consumers rows with kind badges (Agent/Container/Specialist), proportional memory-share meters, and header 'No leaks' (0 leaked present) (FR-7/top-consumers-upgrade.ac1,ac2). No console errors or warnings during the session. docs/RESOURCE-GOVERNOR.md confirmed to contain the new popover section describing grouped/singleton attention rows and the context-note disclosure (docs-resource-governor.ac1). Stopped the temporary port-3019 dashboard instance after verification; host dashboard on :3011 was never started, stopped, or restarted.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "mergeNotes": "Rebase conflicts in: src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx; Work agent agent-pan-3423 could not be prepared for the rebase: Merge preparation request for agent-pan-3423 was not delivered (Not restarting agent-pan-3423 with a fresh session — resume failed (Resume continue prompt did not become a confirmed turn for agent-pan-3423); session rotation is disabled (PAN-1980). Agent left stopped; feedback queued in mail.) — it went to the mail queue, so no rebase would ever happen.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "lastVerifiedCommit": "4783783b1659be48921ce15c828ec4fc43c4cb36",
-    "reviewRequestedAt": "2026-08-06T00:17:21.838Z",
-    "reviewSpawnedAt": "2026-08-06T00:08:27.163Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/parked.ts"
@@ -716,7 +709,7 @@
       },
       "costAtCloseOut": {
         "usd": 414.6927553,
-        "pricingAsOf": "2026-08-06T07:11:43.038Z"
+        "pricingAsOf": "2026-08-06T07:12:34.308Z"
       }
     },
     "merges": [
