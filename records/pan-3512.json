@@ -1036,17 +1036,17 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:34:00.904Z",
+  "updated": "2026-08-06T22:34:01.857Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T22:33:59.847Z",
-    "reviewNotes": "All convoy reviewers passed; fresh-head re-gating now covers historical passed and skipped orphan test state",
+    "updatedAt": "2026-08-06T22:34:00.954Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: testGateReset now evaluates the EFFECTIVE test status (input.extra.testStatus when supplied, else the row's) so a row already at 'pending' can no longer let orphan restore's forwarded historical passed/skipped land against a fresh evidence head. Added the specified regression, parameterized over passed and skipped.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "bfffba962f8f58a0caf866d654fa2d4c061374e0",
     "lastVerifiedCommit": "bfffba962f8f58a0caf866d654fa2d4c061374e0",
@@ -1248,7 +1248,7 @@
       },
       "costAtCloseOut": {
         "usd": 95.3101027,
-        "pricingAsOf": "2026-08-06T22:33:59.873Z"
+        "pricingAsOf": "2026-08-06T22:34:00.987Z"
       }
     },
     "merges": [
