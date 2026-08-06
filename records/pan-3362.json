@@ -368,7 +368,7 @@
     "recordedAt": "2026-08-06T12:28:47.930Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T12:59:31.042Z",
+  "updated": "2026-08-06T12:59:58.723Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "blocked",
@@ -380,7 +380,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T12:38:19.948Z",
-    "updatedAt": "2026-08-06T12:59:29.832Z",
+    "updatedAt": "2026-08-06T12:59:58.702Z",
     "reviewNotes": "stale review-status rows survive in the dashboard read model after closed-issue cleanup",
     "testNotes": "Ran from workspace feature-pan-3362 at HEAD dbe30a3ddaa97b9a8f61b516b79df0357ab509d0 (verified pwd/branch before every command; working tree clean; merge-base with origin/main == origin/main tip 036e90b9a6, so branch is fully caught up). Gates per projects.yaml panopticon-cli.quality_gates. install: bun install --frozen-lockfile clean, no changes. typecheck: npm run typecheck clean (root tsc + hooks + evals + dashboard-types guard 47 known/0 new + frontend-types guard 0 known/0 new). frontend-typecheck: npx tsc --noEmit in src/dashboard/frontend clean. lint: npm run lint exit 0 (skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all passed; only pre-existing unrelated rolldown warnings). build: npm run build exit 0, dist-externals guard passed. server-bundle: npm run build:dashboard:server:bundle exit 0. test (changed-base gate, CHANGED_BASE=merge-base with origin/main = 036e90b9a6, root+frontend run concurrently per projects.yaml): root 760 test files passed/2 skipped (7287 tests passed/20 skipped), frontend 163 files/1906 tests passed, combined exit 0. All automated gates green.",
     "uatNotes": "Restarted this workspace's own container (overdeck-feature-pan-3362) to pick up HEAD c36f8d4693 (health confirmed buildCommit c36f8d4693...). Ran node dist/cli/index.js admin seed-uat-fixtures pan-3362 from this workspace's own freshly-built dist (not main) — seeding succeeded (5 agent rows, 4 activity entries, plan+continue written), server restarted healthy. Navigated Playwright to https://feature-pan-3362.overdeck.localhost/issues/FIX-1 and checked every element cli-command.ac2 requires:\n\nMET: (1) phase — WORK highlighted in the Plan→Work→Review→Test→Ship→Done crew spine. (2) four review-convoy rows — review.security/correctness/performance/requirements all render as separate 'Done — review complete' cards. (3) non-empty Activity feed — 4 [FIXTURE] entries render in both the Live Activity rail and the Activity tab.\n\nNOT MET: (4) branch feature/fix-1 is not rendered anywhere (browser_find for 'feature/fix-1' across the full drawer: no matches). GET /api/agents still returns every FIX-1 agent row with branch: null and git: null — same root cause as the prior UAT cycle (no persisted branch field reaching the read side). (5) No PR link renders on the issue-detail drawer — only the tracker 'Issue' link (github.com/uat-fixtures/repo/issues/1) appears; browser_find for 'pull/1' and /View PR|PR #|pull request/i found nothing, even though GET /api/review/FIX-1/status correctly returns prUrl 'https://github.com/uat-fixtures/repo/pull/1' and prNumber 1. (6) Plan tab does not show a non-zero item badge — 'Tasks' tab reads 'Tasks 0/0' and its body reads '0 open, 0 closed, No tasks yet', even though GET /api/workspaces/FIX-1/plan and GET /api/issues/FIX-1/tasks both correctly return the seeded 3-item/6-AC xBRIEF, and GET /api/workspaces/FIX-1 reports hasPlan:true, hasTasks:true, but tasksCount:0. The same drawer's Overview tab task rail correctly shows '3 open, 0 closed' with all 3 fixture tasks listed by title (screenshot: pan-3362-uat-overview-tab.png) alongside the Tasks tab's empty state (screenshot: pan-3362-uat-tasks-tab.png) on the same page load — reproducible, not a cache glitch. Note this is the same symptom as the prior UAT cycle but the earlier corrupted:true workspace-marker cause (fixed by commit fef7014816's CLAUDE.md write) is resolved; the Plan-tab badge is still 0/0 due to a separate tasksCount computation gap.\n\nPer the test-role contract: a required UAT that leaves any criterion unproven is uatStatus failed even when automated gates pass. 3 of the 6 elements cli-command.ac2 requires are unmet (branch, PR link, Plan-tab badge), so UAT fails.",
@@ -566,7 +566,7 @@
       },
       "costAtCloseOut": {
         "usd": 304.227103,
-        "pricingAsOf": "2026-08-06T12:59:31.037Z"
+        "pricingAsOf": "2026-08-06T12:59:58.714Z"
       }
     },
     "merges": [
