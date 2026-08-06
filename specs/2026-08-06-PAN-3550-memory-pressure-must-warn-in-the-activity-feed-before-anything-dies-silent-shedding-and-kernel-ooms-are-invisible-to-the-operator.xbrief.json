@@ -4,17 +4,17 @@
     "created": "2026-08-06T00:03:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3550: Memory pressure must warn in the activity feed before anything dies",
-    "updated": "2026-08-06T00:04:58.642Z"
+    "updated": "2026-08-06T00:17:22.074Z"
   },
   "plan": {
     "id": "pan-3550",
     "title": "Memory pressure must warn in the activity feed before anything dies — silent shedding and kernel OOMs are invisible to the operator",
-    "status": "proposed",
+    "status": "running",
     "uid": "35d89581-40f9-4bc4-848d-5629a718767b",
     "author": "agent:claude-opus-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-06T00:03:39Z",
-    "updated": "2026-08-06T00:04:58.642Z",
+    "updated": "2026-08-06T00:17:22.074Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3550",
@@ -589,5 +589,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
