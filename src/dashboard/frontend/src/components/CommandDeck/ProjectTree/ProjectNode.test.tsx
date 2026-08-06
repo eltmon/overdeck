@@ -25,6 +25,13 @@ vi.mock('lucide-react', () => ({
   AlertCircle: () => <svg data-testid="alertcircle-icon" />,
 }));
 
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
+}));
+
 vi.mock('./FeatureItem', () => ({
   FeatureItem: ({ feature }: { feature: ProjectFeature }) => <div data-testid={`feature-${feature.issueId}`}>{feature.issueId}</div>,
   sessionMatchesFilter: (session: SessionNodeType, filter: 'all' | 'alive' | 'failed') => {
@@ -276,7 +283,10 @@ describe('ProjectNode', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledWith('/api/projects/overdeck/rename', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
         body: JSON.stringify({ name: 'Overdeck App' }),
       });
     });
