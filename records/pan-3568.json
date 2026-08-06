@@ -12,22 +12,71 @@
       "timestamp": "2026-08-06T16:55:17.755Z",
       "reason": "start",
       "agentModel": "gpt-5.6-terra"
+    },
+    {
+      "timestamp": "2026-08-06T18:15:29.131Z",
+      "reason": "end",
+      "note": "Anomalies: the first full npm test run had four unrelated 5-second hook/test timeouts under concurrent load; each passed in isolation and the full rerun passed. The planning handoff left .overdeck/context/codebase/stack.md unstaged, so I committed its issue-relevant context correction separately. Delivered the Effect diagnostics CI ratchet, baseline audit, ACP typecheck lane, reviewer guidance, tests, and documentation."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/stack.md"
+    ],
+    "declaredScopeUntouched": [
+      "scripts/postinstall.mjs"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "bun.lock",
+      "docs/EFFECT-DIAGNOSTICS.md",
+      "package.json",
+      "packages/contracts/tsconfig.effect-diag.json",
+      "packages/effect-acp/tsconfig.effect-diag.json",
+      "roles/review-correctness.md",
+      "scripts/effect-diagnostics-baseline.txt",
+      "scripts/lint-effect-diagnostics.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "scripts/postinstall.mjs",
+      "src/dashboard/server/tsconfig.effect-diag.json",
+      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts",
+      "tsconfig.effect-diag.json"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/stack.md",
+      "CLAUDE.md",
+      "bun.lock",
+      "docs/EFFECT-DIAGNOSTICS.md",
+      "package.json",
+      "packages/contracts/tsconfig.effect-diag.json",
+      "packages/effect-acp/tsconfig.effect-diag.json",
+      "roles/review-correctness.md",
+      "scripts/effect-diagnostics-baseline.txt",
+      "scripts/lint-effect-diagnostics.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "src/dashboard/server/tsconfig.effect-diag.json",
+      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts",
+      "tsconfig.effect-diag.json"
+    ],
+    "recordedAt": "2026-08-06T18:15:17.034Z"
+  },
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:15:20.202Z",
+  "updated": "2026-08-06T18:15:29.132Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T18:15:20.199Z",
+    "updatedAt": "2026-08-06T18:15:22.784Z",
     "inspectNotes": "All 5 ACs verified: four diag tsconfigs extend their sibling ./tsconfig.json (identical blob 8e78f192e9) with includeSuggestionsInTsc=false and both ignoreEffect*InTscExitCode=true; git grep '\"plugins\"' over real tsconfigs prints nothing; acp base-vs-diag tsc --listFiles diff is empty (both exit 0); root diag lane exits 0 with no TS5058/TS5024, other three resolve cleanly. NFR-1 holds: dashboard ratchet 47 known/none new, frontend ratchet 0/none new.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3578",
     "reviewRequestedAt": "2026-08-06T18:15:20.199Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -71,35 +120,36 @@
         "tsconfig.effect-diag.json"
       ],
       "recordedAt": "2026-08-06T18:15:17.034Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3578"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 515401,
-            "output": 34211,
-            "cacheRead": 9353216,
+            "input": 876008,
+            "output": 121800,
+            "cacheRead": 47926784,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 515401,
-          "output": 34211,
-          "cacheRead": 9353216,
+          "input": 876008,
+          "output": 121800,
+          "cacheRead": 47926784,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.1399930000000005,
-        "pricingAsOf": "2026-08-06T17:11:40.111Z"
+        "usd": 15.998787,
+        "pricingAsOf": "2026-08-06T18:15:28.804Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3578"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -325,48 +375,5 @@
     "docs.ac2": "completed",
     "docs.ac3": "completed",
     "docs.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".overdeck/context/codebase/stack.md"
-    ],
-    "declaredScopeUntouched": [
-      "scripts/postinstall.mjs"
-    ],
-    "declaredScope": [
-      "CLAUDE.md",
-      "bun.lock",
-      "docs/EFFECT-DIAGNOSTICS.md",
-      "package.json",
-      "packages/contracts/tsconfig.effect-diag.json",
-      "packages/effect-acp/tsconfig.effect-diag.json",
-      "roles/review-correctness.md",
-      "scripts/effect-diagnostics-baseline.txt",
-      "scripts/lint-effect-diagnostics.sh",
-      "scripts/lint-ratchet-audit.sh",
-      "scripts/postinstall.mjs",
-      "src/dashboard/server/tsconfig.effect-diag.json",
-      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
-      "tests/unit/scripts/lint-ratchet-audit.test.ts",
-      "tsconfig.effect-diag.json"
-    ],
-    "actualChangedFiles": [
-      ".overdeck/context/codebase/stack.md",
-      "CLAUDE.md",
-      "bun.lock",
-      "docs/EFFECT-DIAGNOSTICS.md",
-      "package.json",
-      "packages/contracts/tsconfig.effect-diag.json",
-      "packages/effect-acp/tsconfig.effect-diag.json",
-      "roles/review-correctness.md",
-      "scripts/effect-diagnostics-baseline.txt",
-      "scripts/lint-effect-diagnostics.sh",
-      "scripts/lint-ratchet-audit.sh",
-      "src/dashboard/server/tsconfig.effect-diag.json",
-      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
-      "tests/unit/scripts/lint-ratchet-audit.test.ts",
-      "tsconfig.effect-diag.json"
-    ],
-    "recordedAt": "2026-08-06T18:15:17.034Z"
   }
 }
