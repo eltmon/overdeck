@@ -368,7 +368,7 @@
     "recordedAt": "2026-08-06T12:28:47.930Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T13:03:07.519Z",
+  "updated": "2026-08-06T13:03:12.525Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -379,7 +379,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-06T12:38:19.948Z",
     "updatedAt": "2026-08-06T13:03:07.497Z",
     "reviewNotes": "Review pipeline error: Command failed: git push origin feature/pan-3362\nTo https://github.com/eltmon/overdeck.git\n ! [remote rejected]       feature/pan-3362 -> feature/pan-3362 (cannot lock ref 'refs/heads/feature/pan-3362': is at e60fdfbbd61183c21a6426ea0577eab68d819d3b but expected 3bfc2e27aad34f7144bcc2353151d768fa8b0148)\nerror: failed to push some refs to 'https://github.com/eltmon/overdeck.git'\n",
     "testNotes": "Ran from workspace feature-pan-3362 at HEAD dbe30a3ddaa97b9a8f61b516b79df0357ab509d0 (verified pwd/branch before every command; working tree clean; merge-base with origin/main == origin/main tip 036e90b9a6, so branch is fully caught up). Gates per projects.yaml panopticon-cli.quality_gates. install: bun install --frozen-lockfile clean, no changes. typecheck: npm run typecheck clean (root tsc + hooks + evals + dashboard-types guard 47 known/0 new + frontend-types guard 0 known/0 new). frontend-typecheck: npx tsc --noEmit in src/dashboard/frontend clean. lint: npm run lint exit 0 (skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all passed; only pre-existing unrelated rolldown warnings). build: npm run build exit 0, dist-externals guard passed. server-bundle: npm run build:dashboard:server:bundle exit 0. test (changed-base gate, CHANGED_BASE=merge-base with origin/main = 036e90b9a6, root+frontend run concurrently per projects.yaml): root 760 test files passed/2 skipped (7287 tests passed/20 skipped), frontend 163 files/1906 tests passed, combined exit 0. All automated gates green.",
