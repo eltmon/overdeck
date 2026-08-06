@@ -583,10 +583,8 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // The row keeps the reason and subject, then exposes actions only when the
-    // grouped reason resolves to one concrete agent target.
-    expect(within(dialog).getAllByText(/activity stalled/).length).toBeGreaterThan(0);
-    expect(within(dialog).getAllByText(/agent-stalled/).length).toBeGreaterThan(0);
+    // A singleton attention item names its subject in the title and preserves
+    // the humanized inactivity duration in the row's sub-line.
     const attentionRow = within(dialog).getByText('no activity for 35 min.').closest('.text-xs')!;
     expect(within(attentionRow).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
     expect(within(attentionRow).getByRole('button', { name: 'Open PAN-1' })).toBeInTheDocument();
