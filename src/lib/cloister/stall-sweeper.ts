@@ -273,8 +273,9 @@ function reportRow(
     }
 
     case 'uat-failed': {
+      // Reaching this orbit means the relay's feedback-target resurrection ladder failed.
       const notes = typeof row.details?.uatNotes === 'string' ? row.details.uatNotes : 'UAT failed — see the UAT panel for details';
-      recommend(`re-drive ${issueId} for UAT rework via pan resume agent-${issueId.toLowerCase()} with the UAT feedback (pan start ${issueId} if the agent is stopped)`, { uatNotes: notes.slice(0, 400) });
+      recommend(`start a work agent for ${issueId} via pan start ${issueId} — the UAT-failure relay found no live target for its feedback`, { uatNotes: notes.slice(0, 400) });
       return true;
     }
 
