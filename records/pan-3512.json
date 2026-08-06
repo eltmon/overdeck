@@ -1036,18 +1036,20 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:27:54.228Z",
+  "updated": "2026-08-06T22:28:23.808Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T22:27:53.143Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: testGateReset now evaluates the EFFECTIVE test status (input.extra.testStatus when supplied, else the row's) so a row already at 'pending' can no longer let orphan restore's forwarded historical passed/skipped land against a fresh evidence head. Added the specified regression, parameterized over passed and skipped.",
+    "updatedAt": "2026-08-06T22:28:23.748Z",
+    "reviewNotes": "All convoy reviewers passed; fresh-head re-gating now covers historical passed and skipped orphan test state",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
+    "reviewedAtCommit": "bfffba962f8f58a0caf866d654fa2d4c061374e0",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
     "reviewRequestedAt": "2026-08-06T22:27:47.418Z",
     "reviewSpawnedAt": "2026-08-06T22:24:23.481Z",
@@ -1126,9 +1128,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 10178049,
-            "output": 82304,
-            "cacheRead": 23003136,
+            "input": 10184541,
+            "output": 83074,
+            "cacheRead": 24342016,
             "cacheWrite": 0
           }
         },
@@ -1219,9 +1221,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 12912304,
-          "output": 136363,
-          "cacheRead": 33025536,
+          "input": 12918796,
+          "output": 137133,
+          "cacheRead": 34364416,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -1232,8 +1234,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 93.9502727,
-        "pricingAsOf": "2026-08-06T22:27:54.223Z"
+        "usd": 94.3127747,
+        "pricingAsOf": "2026-08-06T22:28:23.790Z"
       }
     },
     "merges": [
