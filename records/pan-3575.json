@@ -58,18 +58,18 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:08:54.571Z",
+  "updated": "2026-08-06T08:15:56.614Z",
   "pipeline": {
     "issueId": "PAN-3575",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T08:08:50.107Z",
+    "updatedAt": "2026-08-06T08:15:56.565Z",
+    "reviewNotes": "failed-UAT notes can become unauthenticated instructions delivered to a privileged work agent",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
-    "reviewRequestedAt": "2026-08-06T08:08:22.729Z",
     "reviewSpawnedAt": "2026-08-06T08:08:50.106Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -112,26 +112,66 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-terra": {
+            "input": 209035,
+            "output": 8532,
+            "cacheRead": 2174464,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-terra": {
+            "input": 391010,
+            "output": 28313,
+            "cacheRead": 5089792,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-terra": {
+            "input": 319340,
+            "output": 7398,
+            "cacheRead": 1313792,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-terra": {
+            "input": 248639,
+            "output": 15228,
+            "cacheRead": 2408448,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-terra": {
+            "input": 419477,
+            "output": 20882,
+            "cacheRead": 5360128,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 659518,
-            "output": 49257,
-            "cacheRead": 26925056,
+            "input": 665400,
+            "output": 49895,
+            "cacheRead": 27789312,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 659518,
-          "output": 49257,
-          "cacheRead": 26925056,
+          "input": 2252901,
+          "output": 130248,
+          "cacheRead": 44135936,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.118941,
-        "pricingAsOf": "2026-08-06T08:08:53.561Z"
+        "usd": 18.620026,
+        "pricingAsOf": "2026-08-06T08:15:56.588Z"
       }
     },
     "merges": [
