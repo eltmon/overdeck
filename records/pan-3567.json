@@ -34,15 +34,7 @@
       "note": "Fixed the blocked review finding: Docker enumeration errors now propagate from the production promise boundary into the Effect guard, which returns a 500 refusal before workspace cleanup. The regression test exercises the real rejected docker command path."
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-06T17:50:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3567\n\n# Review Synthesis — PAN-3567 — 2026-08-06T13:50:07-04:00\n\n## Verdict: CHANGES REQUESTED — Docker enumeration failures still authorize destructive workspace removal\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/context.json\n- Branch: feature/3567\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567\n- HEAD reviewed: a02e2f515ca68ab619816e2cf9787c3a1d94a5ab\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Docker enumeration failures still authorize destructive workspace removal — `src/dashboard/server/routes/workspaces/stash-clean.ts:54`\n\n`checkWorkspaceRemovalGuard()` handles an Effect failure by refusing deletion, but its production dependency cannot surface Docker enumeration failures. `getContainersReferencingWorkspacePathPromise()` catches every `docker ps` failure and returns `[]` in `src/lib/workspace-manager/docker.ts:15-33`; its Effect wrapper consequently succeeds with that empty list in `src/lib/workspace-manager.ts:125-133`. The changed guard then returns `{ allow: true }`, so `POST /api/workspaces/:issueId/clean` can proceed to `rm -rf` while Docker is unavailable.\n\nPreserve the enumeration error through the production promise/Effect boundary so the guard's 500 refusal is reachable, and update the regression test to cover that real failure path instead of injecting an otherwise impossible failed Effect.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security: no security findings.\n- Performance: no performance findings.\n- Requirements: all traced requirements were reported complete; the blocking correctness finding shows FR-6's fail-closed behavior is not satisfied in production.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3567/.pan/review/agent-pan-3567-review-a02e2f51/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3567 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -74,23 +66,23 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:55:44.691Z",
+  "updated": "2026-08-06T18:02:30.016Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T17:55:11.245Z",
-    "updatedAt": "2026-08-06T17:55:42.982Z",
+    "updatedAt": "2026-08-06T18:02:29.324Z",
     "reviewNotes": "Docker enumeration failures still authorize destructive workspace removal",
     "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3577",
     "reviewedAtCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
-    "lastVerifiedCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
+    "lastVerifiedCommit": "539b762e1c338b9e94ec698bbfea89e781a2be46",
     "reviewRequestedAt": "2026-08-06T17:55:11.245Z",
     "reviewSpawnedAt": "2026-08-06T17:46:38.474Z",
     "scopeDrift": {
@@ -186,7 +178,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.195107,
-        "pricingAsOf": "2026-08-06T17:55:44.642Z"
+        "pricingAsOf": "2026-08-06T18:02:29.366Z"
       }
     },
     "merges": [
