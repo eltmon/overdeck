@@ -1350,3 +1350,23 @@ That moves PAN-3586 from "verification hygiene" to "the close-out gate is stoppe
 **PAN-3586 planning completed** — a 35KB xBRIEF is on the state branch alongside its draft. It now waits on operator release like PAN-3580, which is `auto_pickup_backlog=false` behaving as designed. Both planned issues in the awaiting-release queue are substrate fixes that unblock other work, which is the Planning floor doing exactly its job.
 
 **Unchanged:** push-event CI still silent since 14:58:51Z, so PAN-3582's own close-out remains blocked on DoD row 6 with `missing required checks … test, lint, build (22), guard`. Still not overriding it.
+
+### RUN-82 tick 8 — 2026-08-06T22:20Z — push CI returned, PAN-3582 closed out, PAN-3512 converging 12 → 1
+
+**Push-event CI resumed at 22:00:44Z after 7 hours dark.** All nine checks green on `cc366a3a97` (main's tip): test, lint, build (22), guard, reject-planning-paths, smoke test, trailer gate, flake lane. Main is genuinely verified again for the first time since 14:58Z.
+
+**PAN-3582 closed out clean, and the row-6 gate certified it on real evidence this time:**
+
+```
+6  main-verify  required checks concluded successfully on cc366a3a97…: test, lint, build (22), guard   PASS
+```
+
+Two ticks ago the same row read `missing required checks … test, lint, build (22), guard` and blocked. The gate said MISS while evidence was absent and PASS once it existed — which is the whole point of PAN-3589, demonstrated end to end on the same commit. Full loop closed on the keystone: filed 19:35 → struck → landed → deployed → verified by measurement → closed out.
+
+**Kept PAN-3586 open despite the symptom clearing, and the timing is why.** `cc366a3a` was pushed at **21:30:43Z** and produced no run; the run appeared on that same SHA at **22:00:44Z**, thirty minutes later. A push event does not arrive half an hour late, so something *re-triggered* it — a manual re-run, a backlog drain, a credential change — and none of that is visible from here. I have already been wrong about this issue twice (first the promote path, then a billing escalation drawn from an unfiltered sample); a third reading based on "it works now" would be the same error wearing friendlier clothes.
+
+**Carry this: "the symptom stopped" is the weakest possible evidence that a fault is fixed, and it is most tempting exactly when you are tired of the issue.** The remaining xBRIEF work stands on its own merits regardless of cause — identify the push credential, add `workflow_dispatch`, and raise a needs-you when a merge to `main` produces no CI run. That last item is what turns a 7-hour invisible outage into a 5-minute one.
+
+**PAN-3512 is converging hard: 12 blocking findings at cycle 2, 1 at cycle 4.** Latest verdict is CHANGES REQUESTED on a single correctness finding — historical test status bypasses re-gating when the current row is pending, `review-verdict-writer.ts:230`. The agent is actively reworking (cost $20.33 → $27.08, diff +658/-37 → +699/-39). The PAN-3151 convergence gate correctly leaves it alone: the series is monotonically decreasing, so this is a healthy rework loop, not a stall. Stating it the way the doctrine requires: **blocked, 1 finding, converging.**
+
+**Both planned substrate fixes remain unreleased** — PAN-3580 and PAN-3586 carry `planned` but not `released`. The awaiting-release queue is doing its job; the operator's gate is the only thing between them and work.
