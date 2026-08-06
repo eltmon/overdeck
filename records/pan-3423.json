@@ -485,18 +485,18 @@
     "recordedAt": "2026-08-06T00:17:20.709Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:17:20.710Z",
+  "updated": "2026-08-06T00:17:21.840Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T00:15:46.712Z",
+    "updatedAt": "2026-08-06T00:17:21.838Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (100506ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (13 tests | 1 failed) 302ms\n     × shows singleton identity, duration, Open, and Kill actions when critical 15ms\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 79 passed (80)\n   Start at  20:14:57\n   Duration  3.01s (transform 1.67s, setup 527ms, import 3.48s, tests 963ms, environment 872ms)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-liWJWI/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace alread\n…(416 chars elided)…\n] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SUZYu8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agen\n...(truncated)",
     "conflictsSince": {
@@ -509,7 +509,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewRequestedAt": "2026-08-06T00:14:56.918Z",
+    "reviewRequestedAt": "2026-08-06T00:17:21.838Z",
     "reviewSpawnedAt": "2026-08-06T00:08:27.163Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -538,7 +538,7 @@
         "src/lib/agents/__tests__/agent-health.test.ts",
         "src/lib/agents/health.ts"
       ],
-      "recordedAt": "2026-08-06T00:10:05.676Z"
+      "recordedAt": "2026-08-06T00:17:20.709Z"
     }
   },
   "closeOut": {
