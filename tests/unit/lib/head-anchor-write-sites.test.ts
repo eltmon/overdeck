@@ -46,7 +46,6 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/cloister/deacon-review-status.ts', 'reviewedAtCommit', "reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath)", 'Producer-fed review recovery stamp.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: status.lastVerifiedCommit', 'Diagnostic nudge payload mirrors persisted status.'),
-  allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed verification-bypass stamp.'),
   allow('src/lib/cloister/review-verdict-writer.ts', 'reviewedAtCommit', 'reviewedAtCommit: input.evidenceHead as HeadAnchor', 'Anchor-match verdict preserves the already-verified evidence anchor.'),
   allow('src/lib/cloister/review-verdict-writer.ts', 'reviewedAtCommit', 'reviewedAtCommit: input.evidenceHead as HeadAnchor', 'Verdict write door persists the producer-issued evidence anchor after freshness classification.'),
   allow('src/lib/cloister/deacon-post-review-commits.ts', 'reviewedAtCommit', 'reviewedAtCommit: verdict.currentAnchor', 'Drift evaluator advances a proven-benign anchor.'),
