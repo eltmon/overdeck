@@ -1704,7 +1704,14 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'GitHub App not configured' }, { status: 400 });
     }
 
-    yield* Effect.promise(() => refreshWorkspaceToken(workspacePath));
+    const refreshResult = yield* refreshWorkspaceToken(workspacePath).pipe(
+      Effect.as({ ok: true } as const),
+      Effect.catch((error) => Effect.succeed({ ok: false as const, error: error.message })),
+    );
+    if (!refreshResult.ok) {
+      return jsonResponse({ success: false, error: refreshResult.error }, { status: 500 });
+    }
+
     return jsonResponse({ success: true, message: `Token refreshed for ${issueId}` });
   })),
 );
