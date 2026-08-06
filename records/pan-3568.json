@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:44:40.306Z",
+  "updated": "2026-08-06T17:47:42.631Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "acp-typecheck-gate": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 3299797,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:44:40.306Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -158,6 +150,17 @@
         "outcome": "completed",
         "reason": "Audited Effect diagnostics baseline growth with issue-reference enforcement, a first-baseline bootstrap exemption, and coverage for growth, shrink, and header-only edits.",
         "releasedAt": "2026-08-06T17:44:28.920Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3299797,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:44:40.306Z",
+        "itemId": "acp-typecheck-gate",
+        "outcome": "completed",
+        "reason": "Added the Effect ACP typecheck lane to the root chain, verified it passes cleanly, and proved the root chain rejects a deliberate ACP type error.",
+        "releasedAt": "2026-08-06T17:47:42.631Z"
       }
     ],
     "statusReasons": {
@@ -188,6 +191,10 @@
       "ratchet-audit-wiring": {
         "reason": "Audited Effect diagnostics baseline growth with issue-reference enforcement, a first-baseline bootstrap exemption, and coverage for growth, shrink, and header-only edits.",
         "updatedAt": "2026-08-06T17:44:28.920Z"
+      },
+      "acp-typecheck-gate": {
+        "reason": "Added the Effect ACP typecheck lane to the root chain, verified it passes cleanly, and proved the root chain rejects a deliberate ACP type error.",
+        "updatedAt": "2026-08-06T17:47:42.631Z"
       }
     }
   },
@@ -230,6 +237,9 @@
     "ratchet-audit-wiring.ac2": "completed",
     "ratchet-audit-wiring.ac3": "completed",
     "ratchet-audit-wiring.ac4": "completed",
-    "acp-typecheck-gate": "running"
+    "acp-typecheck-gate": "completed",
+    "acp-typecheck-gate.ac1": "completed",
+    "acp-typecheck-gate.ac2": "completed",
+    "acp-typecheck-gate.ac3": "completed"
   }
 }
