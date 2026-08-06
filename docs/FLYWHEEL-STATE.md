@@ -1386,3 +1386,15 @@ The mechanism is **documented in a code comment that names the bug** — `src/li
 Two things follow. Any all-zeros classification beside a non-zero total should be unprintable — the tool must say `labels: unavailable` or exit non-zero. And I should treat the Planning floor as unverified until PAN-3595 lands, rather than assuming the queue is genuinely empty.
 
 **Unchanged:** PAN-3580 and PAN-3586 still carry `planned` without `released`. Main is green on `cc366a3a97` with all nine checks.
+
+### RUN-82 tick 10 — 2026-08-06T22:58Z — quiet tick spent on the measurement gap that hid PAN-3582
+
+Nothing landed this tick. PAN-3595's strike is at "verify and hand off" (+100/-83, cost $3.74), PAN-3512 sits in `uat/pan-flint-0806` awaiting the operator's ship, and PAN-3580 and PAN-3586 still carry `planned` without `released`. Main is green on `cc366a3a97`.
+
+**Used the quiet to close a gap this run kept paying for: the deacon patrol has no per-step timing.** Filed PAN-3596. The patrol is the system's central scheduler — liveness reconciliation, auto-resume, merge-blocker reconciliation and Docker teardown all ride inside it — and when it overruns, the only signal is one unattributed line: `patrol interval skipped — previous patrol still in flight`.
+
+That cost this run twice. **Finding PAN-3582 took source reading, not telemetry** — I read `deacon.ts` and `state-plane-patrol.ts` and counted 403s in a log; the 481-GET loop had emitted 58,708 rate-limit errors before anything surfaced it, and what finally did was an unrelated symptom (a crashing `pan review pending`). **Verifying the fix is now only half-possible**: cycle starts went from 5–8 minutes apart to 3–4 (49755 at 22:44:48 → 49758 at 22:54:48), which is real improvement and still 3–4× the 60-second design. I can state a residual exists and cannot say what it is. The candidates from the earlier audit — `reconcileFalseMerged`, `reconcileClosedPrReadyForMerge`, `reconcileTestStatusFromGreenCi`, `reconcileAndCheckIfMerged` — are all plausible, and picking between them would be guessing, which the doctrine rightly forbids as a basis for a strike.
+
+**Carry this: a scheduler whose own latency is unobservable will keep acquiring slow steps, because adding one has no visible cost until something else breaks loudly.** Every patrol-borne duty degrades in proportion to the overrun, and the dashboard shows a healthy deacon either way. The filing is deliberately observability-only — time each step, warn when one exceeds a fraction of the interval, and put the top three durations into the skip line so the message diagnoses itself. The next `reconcileProjectStatePlanes` should be found in one cycle by a log line rather than in months by a rate-limit outage.
+
+This is the same shape as PAN-3595 from last tick and PAN-3594 two ticks before: **three of the last four filings are about the system's ability to see itself**, not about behaviour. A false ERROR that drowns the log, a query that reports failure as zero, and a scheduler with no timings — none of them break anything directly, and all three actively hid real defects from me during this run.
