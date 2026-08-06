@@ -72,7 +72,7 @@
     "recordedAt": "2026-08-06T01:01:02.668Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:05:00.370Z",
+  "updated": "2026-08-06T01:05:03.666Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -81,8 +81,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T01:03:27.432Z",
+    "updatedAt": "2026-08-06T01:03:29.239Z",
     "reviewNotes": "Top-RSS attribution and the OOM canary are not connected to the running patrol",
+    "verificationNotes": "Verification FAILED at test (29299ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3550/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3550\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  20:46:03\n   Duration  742ms (transform 274ms, setup 96ms, import 446ms, tests 10ms, environment 117ms)\n\n\n--- stderr ---\n\n⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯\nError: Transform failed with 1 error:\n\n\u001b[31m[PARSE_ERROR] Error:\u001b[0m Unexpected token\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m tests/unit/lib/cloister/memory-pressure-patrol.test.ts:273:1 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m273 │\u001b[0m }\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m ┬  \n \u001b[38;5;240m    │\u001b[0m ╰── \n\u001b[38;5;246m─────╯\u001b[0m\n\n ❯ transformWithOxc node_modules/.bun/vite@8.0.12/node_modules/vite/dist/node/chunks/node.js:3340:19\n ❯ TransformPluginContext.transform node_modules/.bun/vite@8.0.12/node_modules/vite/dist/node/chunks/node.js:3408:26\n ❯ EnvironmentPluginContainer.transform node_modules/.bun/vite@8.0.12/node_modules/vite/dist/node/chunks/node.js:30193:51\n ❯ loadAndTransform node_modules/.bun/vite@8.0.12/node_modules/vite/dist/node/chunks/node.js:24511:26\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { errors: [ Error: \u001b[31m[PARSE_ERROR] Error:\u001b[0m Unexpected token\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b\n…(9890 chars elided)…\nx-server.service,task=python,pid=2230723,uid=1000\\nOut of memory: Killed process 2230723 (python) total-vm:349473036kB, anon-rss:41321032kB, file-rss:66872kB, shmem-rss:8744kB, UID:1000 pgtables:85936kB oom_score_adj:200`;\\n      const kills = parseOomKills(journal);\\n      expect(kills).toHaveLength(1);\\n      expect(kills[0].pid).toBe(2230723);\\n      expect(kills[0].comm).toBe(\\'python\\');\\n      expect(kills[0].inOverdeckTree).toBe(true);\\n      expect(kills[0].rssBytes).toBe((41321032 + 66872 + 8744) * 1024);\\n    });\\n\\n    it(\\'handles cgroup outside Overdeck tree\\', async () => {\\n      const { parseOomKills } = await import(\\'../../../../src/lib/cloister/memory-pressure-patrol.js\\');\\n      const journal = `oom-kill:constraint=CONSTRAINT_NONE,task_memcg=/user.slice/user-1000.slice/user@1000.service/app.slice/Chrome.scope,task=Chrome,pid=5956,uid=1000`;\\n      const kills = parseOomKills(journal);\\n      expect(kills[0].inOverdeckTree).toBe(false);\\n    });\\n  });\\n});\\n' }\n\n\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3574",
     "reviewedAtCommit": "4dc068000b1b1d56cd58fcc6ecb8fccbb375db77",
     "reviewRequestedAt": "2026-08-06T01:01:03.438Z",
@@ -189,7 +190,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.800944,
-        "pricingAsOf": "2026-08-06T01:04:28.961Z"
+        "pricingAsOf": "2026-08-06T01:05:02.846Z"
       }
     },
     "merges": [
@@ -198,7 +199,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3550",
