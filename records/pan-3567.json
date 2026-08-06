@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:09:53.640Z",
+  "updated": "2026-08-06T17:10:48.839Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "lower-types-baseline": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2638655,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:09:53.640Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -158,6 +150,17 @@
         "outcome": "completed",
         "reason": "Moved the root-owned cleanup fallback into Effect.catchCause so rejected rm effects reach it.",
         "releasedAt": "2026-08-06T17:09:42.824Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2638655,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:09:53.640Z",
+        "itemId": "lower-types-baseline",
+        "outcome": "completed",
+        "reason": "Lowered the dashboard type ratchet from 47 to 30 after removing all five floating Effect errors and their cascades.",
+        "releasedAt": "2026-08-06T17:10:48.839Z"
       }
     ],
     "statusReasons": {
@@ -188,6 +191,10 @@
       "fix-rm-fallback-catch": {
         "reason": "Moved the root-owned cleanup fallback into Effect.catchCause so rejected rm effects reach it.",
         "updatedAt": "2026-08-06T17:09:42.824Z"
+      },
+      "lower-types-baseline": {
+        "reason": "Lowered the dashboard type ratchet from 47 to 30 after removing all five floating Effect errors and their cascades.",
+        "updatedAt": "2026-08-06T17:10:48.839Z"
       }
     }
   },
@@ -228,6 +235,10 @@
     "fix-rm-fallback-catch.ac1": "completed",
     "fix-rm-fallback-catch.ac2": "completed",
     "fix-rm-fallback-catch.ac3": "completed",
-    "lower-types-baseline": "running"
+    "lower-types-baseline": "completed",
+    "lower-types-baseline.ac1": "completed",
+    "lower-types-baseline.ac2": "completed",
+    "lower-types-baseline.ac3": "completed",
+    "lower-types-baseline.ac4": "completed"
   }
 }
