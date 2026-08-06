@@ -962,7 +962,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:07:15.585Z",
+  "updated": "2026-08-06T22:07:24.829Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -976,7 +976,9 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
-    "reviewSpawnedAt": "2026-08-06T21:29:42.657Z"
+    "reviewSpawnedAt": "2026-08-06T21:29:42.657Z",
+    "reviewRequestedAt": "2026-08-06T22:07:24.327Z",
+    "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z"
   },
   "closeOut": {
     "usage": {
