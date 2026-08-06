@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:01:21.282Z",
+  "updated": "2026-08-06T17:09:42.824Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "fix-rm-fallback-catch": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2479127,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:01:21.282Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -147,6 +139,17 @@
         "outcome": "completed",
         "reason": "Added three isolated regression cases for empty, non-empty, and failed Docker container enumeration.",
         "releasedAt": "2026-08-06T17:01:08.914Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2479127,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:01:21.282Z",
+        "itemId": "fix-rm-fallback-catch",
+        "outcome": "completed",
+        "reason": "Moved the root-owned cleanup fallback into Effect.catchCause so rejected rm effects reach it.",
+        "releasedAt": "2026-08-06T17:09:42.824Z"
       }
     ],
     "statusReasons": {
@@ -173,6 +176,10 @@
       "test-container-guard": {
         "reason": "Added three isolated regression cases for empty, non-empty, and failed Docker container enumeration.",
         "updatedAt": "2026-08-06T17:01:08.914Z"
+      },
+      "fix-rm-fallback-catch": {
+        "reason": "Moved the root-owned cleanup fallback into Effect.catchCause so rejected rm effects reach it.",
+        "updatedAt": "2026-08-06T17:09:42.824Z"
       }
     }
   },
@@ -209,6 +216,9 @@
     "test-container-guard.ac2": "completed",
     "test-container-guard.ac3": "completed",
     "test-container-guard.ac4": "completed",
-    "fix-rm-fallback-catch": "running"
+    "fix-rm-fallback-catch": "completed",
+    "fix-rm-fallback-catch.ac1": "completed",
+    "fix-rm-fallback-catch.ac2": "completed",
+    "fix-rm-fallback-catch.ac3": "completed"
   }
 }
