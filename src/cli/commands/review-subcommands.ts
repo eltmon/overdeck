@@ -4,7 +4,7 @@ import { pendingCommand } from './pending.js';
 import { requestReviewCommand } from './request-review.js';
 import { resetReviewCommand } from './reset-review.js';
 import { resyncReviewCommand } from './resync-review.js';
-import { reviewModeCommand, reviewScopeCommand } from './review-mode.js';
+import { reviewModeCommand } from './review-mode.js';
 import { reviewRestartCommand } from './review-restart.js';
 import { reviewSpawnReviewerCommand } from './review-spawn-reviewer.js';
 
@@ -47,10 +47,6 @@ export function registerReviewCommands(program: Command): void {
     .description('Set per-issue review mode (quick, full, or none)')
     .action(reviewModeCommand);
 
-  review
-    .command('scope <id> <scope>')
-    .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
-    .action(reviewScopeCommand);
 
   review
     .command('restart <id>')

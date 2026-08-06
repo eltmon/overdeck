@@ -33,10 +33,9 @@ import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewParents } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
-import { reconcileBranchInvalidation } from './branch-invalidation.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
@@ -2665,14 +2664,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-3485: the stall sweeper — walk the parked population and execute each
-  // orbit's autonomous un-park action (resume-with-feedback, merge re-eval,
-  // UAT re-drive, zombie reap, idle nudge→stop). Operator gates are respected,
-  // never overridden — re-surfaced on a TTL instead. Emits sweep.* events.
+  // PAN-3485: the stall sweeper observes the parked population and records
+  // recommendations. It never un-parks work; operator gates remain untouched.
   try {
-    const sweepActions = await (await import('./stall-sweeper.js')).runStallSweeperPatrol();
-    actions.push(...sweepActions);
-    for (const a of sweepActions) addLog('action', a, state.patrolCycle);
+    const sweepRecommendations = await (await import('./stall-sweeper.js')).runStallSweeperPatrol();
+    actions.push(...sweepRecommendations);
+    for (const recommendation of sweepRecommendations) addLog('info', recommendation, state.patrolCycle);
   } catch (err: any) {
     console.warn(`[deacon] stall sweeper patrol failed: ${err?.message ?? err}`);
     addLog('warn', `Stall sweeper patrol failed: ${err?.message ?? err}`, state.patrolCycle);
@@ -2961,20 +2958,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
-  // Notify review synthesis when server-owned convoy reviewers crash or time out.
-  // PAN-1862 Phase A backstops: force the convoy for a parent that never signals
-  // discovery-ready, and report fork cache misses (observability only).
-  const stalledDiscoveryActions = await checkStalledReviewDiscovery();
-  actions.push(...stalledDiscoveryActions);
-  for (const a of stalledDiscoveryActions) addLog('action', a, state.patrolCycle);
-  // PAN-2584: a review PARENT past its deadline with no terminal verdict is wedged —
-  // kill it so the durable review-request intent can respawn it warm.
+  // The review-parent patrol is observability-only and checks the synthesis artifact
+  // before the runtime row, so a completed parent is never mistaken for a stalled one.
   const stalledParentActions = await checkStalledReviewParents();
   actions.push(...stalledParentActions);
   for (const a of stalledParentActions) addLog('action', a, state.patrolCycle);
-  const forkCacheActions = await checkReviewForkCacheMisses();
-  actions.push(...forkCacheActions);
-  for (const a of forkCacheActions) addLog('action', a, state.patrolCycle);
 
   const reviewerMonitorActions = await monitorReviewConvoySignals();
   actions.push(...reviewerMonitorActions);
@@ -3053,14 +3041,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const staleMergeBlockerActions = await reconcileStaleMergeBlockers();
   actions.push(...staleMergeBlockerActions);
   for (const a of staleMergeBlockerActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-3154: detect when a merge to main invalidates open branches. Watches
-  // each project's origin/main head on a cooldown; on change, probes every
-  // in-pipeline branch for newly-created conflicts and marks + notifies them
-  // via the existing conflict-gate/blocker machinery.
-  const branchInvalidationActions = await reconcileBranchInvalidation();
-  actions.push(...branchInvalidationActions);
-  for (const a of branchInvalidationActions) addLog('action', a, state.patrolCycle);
 
   // PAN-2198: re-derive readyForMerge for the no-blocker "stuck after review" strand
   // (review+test+verify passed, no blocker, but readyForMerge stuck false) so it

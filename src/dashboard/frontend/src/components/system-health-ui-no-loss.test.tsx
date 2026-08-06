@@ -419,11 +419,14 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Top consumers section with kind badges. getAllBy*: the audit asks whether
-    // these are still displayed, and several consumer rows legitimately match —
-    // getBy* would fail on the section being MORE populated, not less.
-    expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
-    expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
+    // Every consumer kind and label stays visible even when a label appears in
+    // more than one location, while the leaked-state diagnosis remains present.
+    for (const kind of ['Agent', 'Specialist', 'Container']) {
+      expect(within(dialog).getAllByText(kind).length).toBeGreaterThan(0);
+    }
+    for (const label of ['agent-pan-1', 'specialist-review-agent', 'container-1']) {
+      expect(within(dialog).getAllByText(new RegExp(label)).length).toBeGreaterThan(0);
+    }
     expect(within(dialog).getByText('LEAKED')).toBeInTheDocument();
     expect(within(dialog).getByText('⚠ 1 leaked specialist')).toBeInTheDocument();
   });
@@ -580,6 +583,10 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
+    // The row keeps the reason and subject, then exposes actions only when the
+    // grouped reason resolves to one concrete agent target.
+    expect(within(dialog).getAllByText(/activity stalled/).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText(/agent-stalled/).length).toBeGreaterThan(0);
     const attentionRow = within(dialog).getByText('no activity for 35 min.').closest('.text-xs')!;
     expect(within(attentionRow).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
     expect(within(attentionRow).getByRole('button', { name: 'Open PAN-1' })).toBeInTheDocument();

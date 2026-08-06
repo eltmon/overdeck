@@ -200,6 +200,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     ui: {
       openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
+      theme: DEFAULT_CONFIG.ui.theme,
     },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
@@ -697,6 +698,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (typeof config.ui?.open_in_editor_command === 'string') {
       const command = config.ui.open_in_editor_command.trim();
       result.ui.openInEditorCommand = command === '' ? null : command;
+    }
+
+    if (config.ui?.theme !== undefined) {
+      if (config.ui.theme !== 'ledger' && config.ui.theme !== 'broadsheet') {
+        throw new Error('config.yaml: ui.theme must be ledger or broadsheet');
+      }
+      result.ui.theme = config.ui.theme;
     }
 
     if (config.issues) {

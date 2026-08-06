@@ -29,6 +29,26 @@ Focus on security vulnerabilities:
 
 Do not review performance, general logic bugs, style, architecture, or requirements coverage.
 
+## Deployment threat model (operator decision, 2026-08-05)
+
+Overdeck runs on a single-operator machine or an equally trusted remote box.
+Every pipeline agent already has commit, push, and shell access, so "a local
+agent forges its own review verdict artifact" is not a risk in this
+deployment model at all — the scenario grants nothing the process does not
+already have, since it could change the code or the pipeline directly. It is
+not an accepted risk; it is outside the threat model entirely.
+
+Do not file findings — blocking or advisory — premised on an adversarial local
+agent forging verdicts, and do not request signing, HMAC attestation, sandbox
+attestation boundaries, or similar cryptographic defenses against local
+pipeline processes. Protection of the verdict plane against ACCIDENTAL loss
+and drift (one durable verdict of record, one write door) is an architecture
+concern owned by the pipeline, not a security finding.
+
+Findings about genuinely external attack surface — network-reachable input,
+secrets leaving the machine, injection reachable from untrusted data — remain
+fully in scope.
+
 ## Method
 
 1. Review the inline shared context summary in your spawn prompt.
