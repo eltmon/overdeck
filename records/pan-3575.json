@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:08:19.233Z",
+  "updated": "2026-08-06T08:08:43.223Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -25,7 +25,46 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T07:21:36.369Z"
+    "updatedAt": "2026-08-06T08:08:22.729Z",
+    "reviewRequestedAt": "2026-08-06T08:08:22.729Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt",
+        "scripts/source-introspection-baseline.txt",
+        "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/cloister/__tests__/uat-failure-feedback.test.ts"
+      ],
+      "declaredScope": [
+        "CLAUDE.md",
+        "docs/PARKED-POPULATION.md",
+        "src/lib/__tests__/review-status-uat-failure.test.ts",
+        "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+        "src/lib/cloister/__tests__/uat-failure-feedback.test.ts",
+        "src/lib/cloister/stall-sweeper.ts",
+        "src/lib/cloister/uat-failure-feedback.ts",
+        "src/lib/parked/__tests__/resolver.test.ts",
+        "src/lib/parked/resolver.ts",
+        "src/lib/review-status.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "docs/PARKED-POPULATION.md",
+        "scripts/file-size-allowlist.txt",
+        "scripts/source-introspection-baseline.txt",
+        "src/lib/__tests__/review-status-uat-failure.test.ts",
+        "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+        "src/lib/cloister/stall-sweeper.ts",
+        "src/lib/cloister/uat-failure-feedback.ts",
+        "src/lib/parked/__tests__/resolver.test.ts",
+        "src/lib/parked/resolver.ts",
+        "src/lib/review-status.ts",
+        "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
+      ],
+      "recordedAt": "2026-08-06T08:08:19.232Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3576"
   },
   "closeOut": {
     "usage": {
