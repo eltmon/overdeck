@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:00:10.352Z",
+  "updated": "2026-08-06T21:00:13.692Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,15 +2345,8 @@
     }
   ],
   "tasks": {
-    "sequence": 22,
+    "sequence": 23,
     "claims": {
-      "migrate-coordinator": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 1855412,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T21:00:04.408Z"
-      },
       "docs-write-door": {
         "writerId": "agent-pan-3512",
         "agentId": "agent-pan-3512",
@@ -2472,6 +2465,17 @@
         "outcome": "completed",
         "reason": "Already landed on main via fd48e3af39 (PAN-3512 strike); src/cli/commands/specialists/done.ts:227 routes through recordReviewVerdict. In this branch via merge 27e9314aa0.",
         "releasedAt": "2026-08-06T21:00:10.352Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1855412,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T21:00:04.408Z",
+        "itemId": "migrate-coordinator",
+        "outcome": "completed",
+        "reason": "Already landed on main via fd48e3af39; legacy-routes.ts:264 routes through recordReviewVerdict with landed-gated delivery. In branch via merge 27e9314aa0.",
+        "releasedAt": "2026-08-06T21:00:13.692Z"
       }
     ],
     "statusReasons": {
@@ -2506,6 +2510,10 @@
       "migrate-quick-signal": {
         "reason": "Already landed on main via fd48e3af39 (PAN-3512 strike); src/cli/commands/specialists/done.ts:227 routes through recordReviewVerdict. In this branch via merge 27e9314aa0.",
         "updatedAt": "2026-08-06T21:00:10.352Z"
+      },
+      "migrate-coordinator": {
+        "reason": "Already landed on main via fd48e3af39; legacy-routes.ts:264 routes through recordReviewVerdict with landed-gated delivery. In branch via merge 27e9314aa0.",
+        "updatedAt": "2026-08-06T21:00:13.692Z"
       }
     }
   },
@@ -2539,10 +2547,13 @@
     "migrate-fallback.ac3": "completed",
     "migrate-fallback.ac4": "completed",
     "migrate-quick-signal": "completed",
-    "migrate-coordinator": "running",
+    "migrate-coordinator": "completed",
     "migrate-quick-signal.ac1": "completed",
     "migrate-quick-signal.ac2": "completed",
-    "migrate-quick-signal.ac3": "completed"
+    "migrate-quick-signal.ac3": "completed",
+    "migrate-coordinator.ac1": "completed",
+    "migrate-coordinator.ac2": "completed",
+    "migrate-coordinator.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
