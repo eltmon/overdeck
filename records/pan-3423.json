@@ -437,6 +437,11 @@
       "timestamp": "2026-08-06T00:00:54.941Z",
       "reason": "start",
       "agentModel": "gpt-5.6-terra"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-06T00:08:27.750Z"
     }
   ],
   "feedback": [],
@@ -472,10 +477,10 @@
     "recordedAt": "2026-08-04T18:51:45.736Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:00:54.944Z",
+  "updated": "2026-08-06T00:08:27.783Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "pending",
@@ -484,7 +489,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T19:45:02.360Z",
-    "updatedAt": "2026-08-06T00:00:48.847Z",
+    "updatedAt": "2026-08-06T00:08:27.164Z",
     "conflictsSince": {
       "sha": "7260c8afde053f5c82404d673780cbaebe2cc6b6",
       "detectedAt": "2026-08-06T00:00:31.905Z",
@@ -494,7 +499,8 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3466"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
+    "reviewSpawnedAt": "2026-08-06T00:08:27.163Z"
   },
   "closeOut": {
     "usage": {
@@ -567,6 +573,12 @@
             "output": 261602,
             "cacheRead": 154996224,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 279619,
+            "output": 13266,
+            "cacheRead": 3524096,
+            "cacheWrite": 0
           }
         }
       },
@@ -594,11 +606,17 @@
           "output": 57676,
           "cacheRead": 28109119,
           "cacheWrite": 677817
+        },
+        "openai/gpt-5.6-terra": {
+          "input": 279619,
+          "output": 13266,
+          "cacheRead": 3524096,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 370.5894373,
-        "pricingAsOf": "2026-08-06T00:00:48.864Z"
+        "usd": 372.3685063,
+        "pricingAsOf": "2026-08-06T00:08:27.208Z"
       }
     },
     "merges": [
@@ -607,7 +625,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 16,
