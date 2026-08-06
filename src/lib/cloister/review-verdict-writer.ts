@@ -233,8 +233,12 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     reviewStatus: input.verdict,
     reviewNotes: input.notes,
     ...(input.evidenceHead ? { reviewedAtCommit: input.evidenceHead as HeadAnchor } : {}),
-    ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
     ...(input.extra ? { ...input.extra } : {}),
+    // The re-gate lands LAST so no caller extra can overwrite it. Orphan restore
+    // forwards the restored snapshot's historical testStatus/testNotes; letting
+    // those win would make a newer reviewed head look verified with no new test
+    // run — the "admit a verdict that should not advance" failure this door exists to prevent.
+    ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
   };
 
   setReviewStatusSync(issueId, update, status);
