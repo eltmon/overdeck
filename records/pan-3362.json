@@ -210,19 +210,19 @@
     "recordedAt": "2026-08-06T07:39:46.028Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T07:48:53.135Z",
+  "updated": "2026-08-06T07:50:30.670Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T07:44:50.638Z",
-    "updatedAt": "2026-08-06T07:48:52.998Z",
+    "updatedAt": "2026-08-06T07:50:30.642Z",
     "testNotes": "typecheck: clean (tsc --noEmit + hooks/evals/dashboard/frontend guards, 0 new errors). lint: clean (eslint + effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all passed). npm test first run: 12973 passed, 45 failed, 51 skipped (13076 total) — every failure is 'Hook timed out in 5000ms' or 'Test timed out in 5000ms' inside setupOverdeckTestDb(), none in this branch's changed files (src/lib/uat-fixtures/*, src/cli/commands/admin/seed-uat-fixtures.ts, docs). Reran all 41 distinct failed files: 37 passed clean immediately; remaining 4 reran with fileParallelism off: 2 passed, 2 still timed out; reran those final 2 alone: both passed. Host load average was 19.91/22.68/24.72 (20 concurrent Overdeck agents on this machine) during the run, matching known setupOverdeckTestDb()-under-load flakiness (PAN-3393 class) and confirmed non-reproducing in isolation. Zero real regressions found.",
     "uatNotes": "Brought up this workspace's own docker container (pan workspace rebuild pan-3362 -> overdeck-feature-pan-3362, healthy at https://api-feature-pan-3362.overdeck.localhost), per roles/test.md's host-process-boundary rule (never touch the host dashboard; use only the feature workspace's own container). Ran node dist/cli/index.js admin seed-uat-fixtures pan-3362 (this issue's own new command) — seeding succeeded (5 agent rows, 4 activity entries, plan+continue files written) and the server restarted healthy. Navigated Playwright to https://feature-pan-3362.overdeck.localhost and opened FIX-1's issue detail (cli-command.ac2). Confirmed working: [FIXTURE] issue renders, a phase/status is shown (Paused mid-work), 5 agent rows appear (1 Work + 4 Review = the review convoy), and the Activity feed is non-empty (fixture-seeded/tests-passed/review-approved/work-completed entries visible). Two required elements are NOT met: (1) Plan tab shows 'Tasks 0/0' / 'No tasks yet' / plan panel shows '✗ no spec' instead of a non-zero item badge -- root cause: GET /api/workspaces/FIX-1 returns {exists:true, corrupted:true, message:'Workspace exists but is not a valid git worktree or containerized workspace'}, so GET /api/workspaces/FIX-1/plan and GET /api/issues/FIX-1/tasks both 404 even though the fixture wrote a valid 3-item/6-AC xBRIEF to <OVERDECK_HOME>/uat-fixtures/repo/workspaces/feature-fix-1/.overdeck/spec.vbrief.json -- the seeded workspace directory is not a real git worktree, so the workspace resolver flags it corrupted and the plan is invisible through the UI's normal read path. (2) Branch 'feature/fix-1' is not rendered anywhere on the issue detail page; GET /api/agents confirms the live agent-fix-1-work row has \"git\": null. (PR data itself is correctly served -- GET /api/review/FIX-1/status returns prUrl 'https://github.com/uat-fixtures/repo/pull/1' and prNumber 1 -- but this is moot given criteria 1 and 2 already fail.) Screenshot saved at .playwright-mcp/pan-3362-fix1-issue-detail.png. Per roles/test.md: 'A UAT that cannot run or leaves any criterion unproven is uatStatus: failed even when testStatus: passed' -- two of cli-command.ac2's required observable elements are unproven/disproven, so UAT fails even though automated gates pass.",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
@@ -339,10 +339,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1438,
-            "output": 40271,
-            "cacheRead": 15140217,
-            "cacheWrite": 433927
+            "input": 1446,
+            "output": 41447,
+            "cacheRead": 15832661,
+            "cacheWrite": 437779
           }
         },
         "work": {
@@ -368,15 +368,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2532,
-          "output": 282535,
-          "cacheRead": 228253331,
-          "cacheWrite": 7122808
+          "input": 2540,
+          "output": 283711,
+          "cacheRead": 228945775,
+          "cacheWrite": 7126660
         }
       },
       "costAtCloseOut": {
-        "usd": 189.034752,
-        "pricingAsOf": "2026-08-06T07:48:53.052Z"
+        "usd": 189.194648,
+        "pricingAsOf": "2026-08-06T07:50:30.661Z"
       }
     },
     "merges": [
