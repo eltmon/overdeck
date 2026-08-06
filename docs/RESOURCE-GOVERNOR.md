@@ -69,24 +69,10 @@ autonomous admission decision in the deacon runs through the same module.
 governor mode:
 
 | Band | Mode | Meaning |
-|---
-
-## Activity-Feed Signals (PAN-3550)
-
-The memory governor's level transitions and kernel OOM kills appear in the dashboard activity feed via a dedicated 15-second deacon timer, independent of the 60-second patrol. The timer emits **transition-only** — one row per level change, never duplicates while the level persists.
-
-Four feed levels:
-- **`ok`** — MemAvailable above the watch reserve; Overdeck is admitting work normally.
-- **`watch`** — MemAvailable below the watch reserve but still admitting (band is `ok`). Warning that the soft reserve may soon be crossed.
-- **`holding`** (band `soft`) — Overdeck has stopped admitting new agents and dispatches. Work queues until memory recovers above the recovery reserve.
-- **`shedding`** (band `hard`) — MemAvailable is below the hard reserve. Overdeck admits nothing; the kernel may OOM-kill. Automatic eviction is not wired.
-
-Top RSS consumers are attributed to Overdeck tmux sessions via `getRuntimeCensus()` (the in-repo runtime census, not the machine-local `.overdeck/logs/memory-census.log`).
-
-**OOM Canary** watches the kernel journal for `oom-kill:` lines, parses the victim's pid, command, RSS, and cgroup, and emits one activity entry per kill. The cursor-file pattern ensures no duplicate reporting across patrol ticks or dashboard restarts. On permission error (user not in `adm` group), the canary disables itself gracefully and logs once, never blocking the rest of the patrol.|---|---|
+|---|---|---|
 | `ok` | `admitting` | Behavior unchanged from before PAN-2500 — count and load gates still apply. |
 | `soft` | `holding` | Stop admitting new resumes and new advancing dispatches. Nothing is killed. |
-| `hard` | `shedding` | Actively reclaim memory (see the eviction ladder below). |
+| `hard` | `shedding` | Admission is blocked. Automatic eviction is not wired; the kernel may start killing processes if memory stays exhausted. |
 
 The governor never re-admits the moment it clears SOFT. It holds until `MemAvailable` exceeds
 RECOVERY — a threshold strictly above SOFT. Without that gap, a system oscillating around SOFT would
@@ -114,6 +100,20 @@ otherwise                                                -> hold the current mod
 
 The governor's mode is module-level state, persisted across calls within the process — it is not
 recomputed from scratch each time, which is what makes the hold behavior possible.
+
+## Activity-Feed Signals (PAN-3550)
+
+The memory governor's level transitions and kernel OOM kills appear in the dashboard activity feed via a dedicated 15-second deacon timer, independent of the 60-second patrol. The timer emits **transition-only** — one row per level change, never duplicates while the level persists.
+
+Four feed levels:
+- **`ok`** — MemAvailable above the watch reserve; Overdeck is admitting work normally.
+- **`watch`** — MemAvailable below the watch reserve but still admitting (band is `ok`). Warning that the soft reserve may soon be crossed.
+- **`holding`** (band `soft`) — Overdeck has stopped admitting new agents and dispatches. Work queues until memory recovers above the recovery reserve.
+- **`shedding`** (band `hard`) — MemAvailable is below the hard reserve. Overdeck admits nothing; the kernel may OOM-kill. Automatic eviction is not wired.
+
+Top RSS consumers are attributed to Overdeck tmux sessions via `getRuntimeCensus()` (the in-repo runtime census, not the machine-local `.overdeck/logs/memory-census.log`).
+
+**OOM Canary** watches the kernel journal for `oom-kill:` lines, parses the victim's pid, command, RSS, and cgroup, and emits one activity entry per kill. The cursor-file pattern ensures no duplicate reporting across patrol ticks or dashboard restarts. On permission error (user not in `adm` group), the canary disables itself gracefully and logs once, never blocking the rest of the patrol.
 
 ### Swap runway and PSI
 
@@ -316,9 +316,10 @@ preserving only `lastYieldResumeAt` as the cooldown tracker. Every yield and res
 `Yielded agent-pan-1234 (idle 22m) to run review for PAN-5678`.
 
 This is opt-in and **disabled by default** — an unset install keeps the static defer-until-attrition
-behavior at every dispatch site (see the config table below). It complements, and does not replace,
-the eviction ladder: `shed()` still owns docker-stack reclaim under HARD memory pressure; preemption
-only pauses idle work agents at slot granularity for throughput.
+behavior at every dispatch site (see the config table below). Preemption pauses idle work agents at
+slot granularity for throughput; it is the only automatic reclaim path that runs. `shed()` remains in
+the module but is wired to no caller (PAN-3550) — nothing evicts docker stacks or pauses agents under
+HARD pressure on its own.
 
 Recovery reconcilers do not bypass the governor. `decideAutonomousRedrive()`
 first applies the unified resume policy and then reads the cached memory verdict;
