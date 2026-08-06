@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   backlogCandidates,
   computeBookProgress,
+  firstReadyBookInQueue,
   membership,
   ensureOrderIssueStore,
   orderIssueStoreStatus,
@@ -121,6 +122,31 @@ describe('orders resolver', () => {
     const progress = computeBookProgress(value, lookup(true));
     expect(progress.drained).toBe(true);
     expect(progress.landed).toBe(1);
+  });
+
+  it('returns the first ready book in index.json queue order, skipping non-ready statuses', () => {
+    const root = fixtureRoot();
+    writeBooks(root, [
+      book('2026-07-17-draft', 'draft', ['PAN-1']),
+      book('2026-07-17-running', 'running', ['PAN-2']),
+      book('2026-07-17-first-ready', 'ready', ['PAN-3']),
+      book('2026-07-17-second-ready', 'ready', ['PAN-4']),
+      book('2026-07-17-complete', 'complete', ['PAN-5']),
+    ]);
+
+    expect(firstReadyBookInQueue(root)?.id).toBe('2026-07-17-first-ready');
+  });
+
+  it('returns null when the queue is empty or no book is ready', () => {
+    const emptyRoot = fixtureRoot();
+    expect(firstReadyBookInQueue(emptyRoot)).toBeNull();
+
+    const noReadyRoot = fixtureRoot();
+    writeBooks(noReadyRoot, [
+      book('2026-07-17-draft-only', 'draft', ['PAN-1']),
+      book('2026-07-17-running-only', 'running', ['PAN-2']),
+    ]);
+    expect(firstReadyBookInQueue(noReadyRoot)).toBeNull();
   });
 
   describe('ensureOrderIssueStore', () => {

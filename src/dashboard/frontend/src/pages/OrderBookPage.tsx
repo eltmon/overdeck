@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Loader2 } from 'lucide-react';
 
 import { AddIssuesRail } from '../components/orders/AddIssuesRail';
@@ -7,17 +8,29 @@ import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
 import { LaneEditor } from '../components/orders/LaneEditor';
 import { LifecycleStrip } from '../components/orders/LifecycleStrip';
 import { ProgressPanel } from '../components/orders/ProgressPanel';
+import { withProject } from '../components/orders/projectScope';
 import { RunSettingsPanel } from '../components/orders/RunSettingsPanel';
 import { ValidationPanel } from '../components/orders/ValidationPanel';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface OrdersPayload {
   books: OrderBookView[];
+  project?: string;
+}
+
+interface RegisteredProject {
+  key: string;
+  name: string;
+  path: string;
 }
 
 async function readError(response: Response): Promise<string> {
   const payload = await response.json().catch(() => null) as { error?: unknown } | null;
   return typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status})`;
+}
+
+function projectFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get('project');
 }
 
 export function OrderBookPage() {
@@ -29,15 +42,38 @@ export function OrderBookPage() {
   const [view, setView] = useState<'setup' | 'progress'>('setup');
   const [starting, setStarting] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  // projectKey is the explicit scope — a deep link or a picker choice — and is
+  // the only thing threaded onto fetches. serverProject is what an unscoped read
+  // resolved from the server's own cwd, so the picker can show it without
+  // pinning the URL (decision D1: absent ?project= stays back-compatible).
+  const [projectKey, setProjectKey] = useState<string | null>(projectFromUrl);
+  const [serverProject, setServerProject] = useState<string | null>(null);
+
+  const { data: registeredProjects = [] } = useQuery<RegisteredProject[]>({
+    queryKey: ['registered-projects'],
+    queryFn: async () => {
+      const response = await fetch('/api/registered-projects');
+      if (!response.ok) throw new Error('Failed to fetch registered projects');
+      return response.json() as Promise<RegisteredProject[]>;
+    },
+    staleTime: 60_000,
+  });
+
+  // Bumped on every loadBooks call so a response from a superseded project
+  // switch can recognize it arrived late and skip applying its stale books.
+  const loadGeneration = useRef(0);
 
   const loadBooks = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/orders');
+      const response = await fetch(withProject('/api/orders', projectKey));
       if (!response.ok) throw new Error(await readError(response));
       const payload = await response.json() as OrdersPayload;
+      if (loadGeneration.current !== generation) return;
       setBooks(payload.books);
+      if (payload.project) setServerProject(payload.project);
       setSelectedId((current) => {
         if (current && payload.books.some((book) => book.id === current)) return current;
         return payload.books.find((book) => book.status === 'running')?.id
@@ -46,11 +82,33 @@ export function OrderBookPage() {
           ?? null;
       });
     } catch (cause) {
+      if (loadGeneration.current !== generation) return;
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if (loadGeneration.current === generation) setLoading(false);
     }
+  }, [projectKey]);
+
+  const selectProject = useCallback((key: string) => {
+    setProjectKey(key);
+    setSelectedId(null);
+    // Clear immediately so the previous project's books never render under
+    // the newly-selected scope while the new fetch is in flight.
+    setBooks([]);
+    setPreview(null);
+    setActionMessage(null);
+    const params = new URLSearchParams(window.location.search);
+    params.set('project', key);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
   }, []);
+
+  const shownProject = projectKey ?? serverProject;
+  const pickerOptions = useMemo(() => {
+    const keys = registeredProjects.map((project) => project.key);
+    // A project resolved from the envelope or a deep link stays selectable even
+    // when the registry response has not landed yet.
+    return shownProject && !keys.includes(shownProject) ? [shownProject, ...keys] : keys;
+  }, [registeredProjects, shownProject]);
 
   useEffect(() => {
     void loadBooks();
@@ -68,7 +126,7 @@ export function OrderBookPage() {
   useEffect(() => {
     if (!selectedId) return;
     let current = true;
-    void fetch(`/api/orders/${encodeURIComponent(selectedId)}`)
+    void fetch(withProject(`/api/orders/${encodeURIComponent(selectedId)}`, projectKey))
       .then(async (response) => {
         if (!response.ok) throw new Error(await readError(response));
         return response.json() as Promise<OrderBookView>;
@@ -76,10 +134,10 @@ export function OrderBookPage() {
       .then((book) => { if (current) updateBook(book); })
       .catch((cause) => { if (current) setActionMessage(cause instanceof Error ? cause.message : String(cause)); });
     return () => { current = false; };
-  }, [selectedId, updateBook]);
+  }, [selectedId, updateBook, projectKey]);
 
   const createBook = async (name: string) => {
-    const response = await fetch('/api/orders', {
+    const response = await fetch(withProject('/api/orders', projectKey), {
       method: 'POST',
       credentials: 'include',
       headers: await dashboardMutationJsonHeaders(),
@@ -93,7 +151,7 @@ export function OrderBookPage() {
 
   const patchBook = async (patch: Record<string, unknown>) => {
     if (!selected) return;
-    const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}`, {
+    const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}`, projectKey), {
       method: 'PATCH', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
       body: JSON.stringify(patch),
     });
@@ -122,7 +180,7 @@ export function OrderBookPage() {
   const previewBrief = async () => {
     if (!selected) return;
     setActionMessage(null);
-    const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}/preview-brief`);
+    const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}/preview-brief`, projectKey));
     if (!response.ok) {
       setActionMessage(await readError(response));
       return;
@@ -144,7 +202,7 @@ export function OrderBookPage() {
     setStarting(true);
     setActionMessage(null);
     try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}/start`, {
+      const response = await fetch(withProject(`/api/orders/${encodeURIComponent(selected.id)}/start`, projectKey), {
         method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
       });
       if (!response.ok) throw new Error(await readError(response));
@@ -166,6 +224,18 @@ export function OrderBookPage() {
           <h1 className="text-sm font-medium text-foreground">Order Book</h1>
           <p className="text-[11px] text-muted-foreground">Operator special orders executed with lane semantics</p>
         </div>
+        <label className="ml-2 flex items-center gap-1.5 border-l border-border pl-3 text-[11px] text-muted-foreground">
+          Project
+          <select
+            aria-label="Order book project"
+            value={shownProject ?? ''}
+            onChange={(event) => selectProject(event.target.value)}
+            className="rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+          >
+            {!shownProject && <option value="">Loading…</option>}
+            {pickerOptions.map((key) => <option key={key} value={key}>{key}</option>)}
+          </select>
+        </label>
         {selected && (
           <>
             <span className="ml-2 border-l border-border pl-3 font-mono text-[11px] text-muted-foreground">{selected.id}</span>
@@ -230,11 +300,11 @@ export function OrderBookPage() {
               </p>
             </section>
 
-            <LaneEditor book={selected} onBookChange={updateBook} />
+            <LaneEditor book={selected} onBookChange={updateBook} project={projectKey} />
 
             <section className="grid gap-3 lg:grid-cols-2" aria-label="Add issues to order book">
-              <AddIssuesRail book={selected} books={books} onBookChange={updateBook} />
-              <BacklogCandidatesRail book={selected} onBookChange={updateBook} />
+              <AddIssuesRail book={selected} books={books} onBookChange={updateBook} project={projectKey} />
+              <BacklogCandidatesRail book={selected} onBookChange={updateBook} project={projectKey} />
             </section>
 
             <section className="grid gap-3 lg:grid-cols-2">

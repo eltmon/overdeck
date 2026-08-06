@@ -57,6 +57,14 @@ describe('OrderBookModule', () => {
     expect(screen.queryByText(/release|add issue|remove/i)).not.toBeInTheDocument();
   });
 
+  it('points the edit link at the book own project when the projection names one', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ...book, project: 'mind-your-now' })));
+    renderWithQuery(<OrderBookModule status={status} />);
+
+    await waitFor(() => expect(screen.getByRole('link', { name: /Active campaign/ }))
+      .toHaveAttribute('href', '/orders?project=mind-your-now'));
+  });
+
   it('renders the issue position and book name only for active-book members', async () => {
     const fetchMock = vi.fn(async () => Response.json({ books: [book, { ...book, id: 'done-book', status: 'complete', items: [{ ...book.items[0], issue: 'PAN-9' }] }] }));
     vi.stubGlobal('fetch', fetchMock);

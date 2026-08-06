@@ -7,7 +7,47 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../../lib/orders/types.js';
+import type { ProjectConfig } from '../../../../lib/projects.js';
 import { makeOrdersRouteLayer } from '../orders.js';
+
+const {
+  mockGetProjectSync,
+  mockFindProjectByPathSync,
+  mockListProjectsSync,
+  mockResolveStateReadHomeSync,
+  mockResolveStateReadHomeAsync,
+  mockStartFlywheelRun,
+} = vi.hoisted(() => ({
+  mockGetProjectSync: vi.fn(),
+  mockFindProjectByPathSync: vi.fn(),
+  mockListProjectsSync: vi.fn(),
+  mockResolveStateReadHomeSync: vi.fn(),
+  mockResolveStateReadHomeAsync: vi.fn(),
+  mockStartFlywheelRun: vi.fn(),
+}));
+
+vi.mock('../../../../lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/projects.js')>();
+  return {
+    ...actual,
+    getProjectSync: mockGetProjectSync,
+    findProjectByPathSync: mockFindProjectByPathSync,
+    listProjectsSync: mockListProjectsSync,
+  };
+});
+
+vi.mock('../../../../cli/commands/flywheel.js', () => ({
+  startFlywheelRun: mockStartFlywheelRun,
+}));
+
+vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/state-read-home.js')>();
+  return {
+    ...actual,
+    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
+    resolveStateReadHomeAsync: mockResolveStateReadHomeAsync,
+  };
+});
 
 interface RouteResult {
   status: number;
@@ -110,6 +150,16 @@ function writeSequence(root: string): void {
 beforeEach(() => {
   process.env['OVERDECK_INTERNAL_TOKEN'] = 'orders-route-test-token';
   _resetInternalTokenCacheForTests();
+  mockGetProjectSync.mockReset().mockReturnValue(null);
+  mockFindProjectByPathSync.mockReset().mockReturnValue(null);
+  mockListProjectsSync.mockReset().mockReturnValue([]);
+  mockResolveStateReadHomeSync.mockReset();
+  // Delegates to whatever the sync mock is configured to return, so tests only
+  // need to configure one mock regardless of which resolution path they exercise.
+  mockResolveStateReadHomeAsync.mockReset().mockImplementation(
+    async (project: ProjectConfig, key?: string) => mockResolveStateReadHomeSync(project, key),
+  );
+  mockStartFlywheelRun.mockReset();
 });
 
 afterEach(() => {
@@ -309,5 +359,166 @@ describe('/api/orders routes', () => {
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-88', warnings: [] } });
     expect(startOrderBook).toHaveBeenCalledOnce();
     expect(startOrderBook).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-07-18-clean' }));
+  });
+
+  it('resolves ?project=<key> through the projects registry and stamps the envelope', async () => {
+    const rootA = gitFixture();
+    const rootB = gitFixture();
+    const projectA = { path: '/fake/project-a' } as ProjectConfig;
+    const projectB = { path: '/fake/project-b' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => {
+      if (key === 'project-a') return projectA;
+      if (key === 'project-b') return projectB;
+      return null;
+    });
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === projectA ? rootA : rootB,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-a', mutation('POST', {
+      id: '2026-07-18-book-a',
+      name: 'Book A',
+    }))).resolves.toMatchObject({ status: 200, body: { id: '2026-07-18-book-a' } });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-b', mutation('POST', {
+      id: '2026-07-18-book-b',
+      name: 'Book B',
+    }))).resolves.toMatchObject({ status: 200, body: { id: '2026-07-18-book-b' } });
+
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-a')).resolves.toMatchObject({
+      status: 200,
+      body: { project: 'project-a', books: [{ id: '2026-07-18-book-a' }] },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-b')).resolves.toMatchObject({
+      status: 200,
+      body: { project: 'project-b', books: [{ id: '2026-07-18-book-b' }] },
+    });
+  });
+
+  it('rejects an unknown ?project= key with 400 across GET and mutation routes', async () => {
+    mockGetProjectSync.mockReturnValue(null);
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+
+    await expect(requestOrdersRoute(layer, '/api/orders?project=ghost-project')).resolves.toMatchObject({
+      status: 400,
+      body: { error: expect.stringContaining('Unknown project: ghost-project') },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=ghost-project', mutation('POST', {
+      name: 'Should not be created',
+    }))).resolves.toMatchObject({
+      status: 400,
+      body: { error: expect.stringContaining('Unknown project: ghost-project') },
+    });
+  });
+
+  it('scans other registered projects when the book is missing from the default state root', async () => {
+    const defaultRoot = gitFixture();
+    const otherRoot = gitFixture();
+    const defaultProject = { path: '/fake/default-project' } as ProjectConfig;
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockListProjectsSync.mockReturnValue([
+      { key: 'default-project', config: defaultProject },
+      { key: 'other-project', config: otherProject },
+    ]);
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === defaultProject ? defaultRoot : otherRoot,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
+      id: '2026-07-18-scanned',
+      name: 'Scanned book',
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-scanned')).resolves.toMatchObject({
+      status: 200,
+      body: { id: '2026-07-18-scanned', project: 'other-project' },
+    });
+  });
+
+  it('returns the same 404 when the book exists in no registered project', async () => {
+    const defaultRoot = gitFixture();
+    const otherRoot = gitFixture();
+    const defaultProject = { path: '/fake/default-project' } as ProjectConfig;
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockListProjectsSync.mockReturnValue([
+      { key: 'default-project', config: defaultProject },
+      { key: 'other-project', config: otherProject },
+    ]);
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === defaultProject ? defaultRoot : otherRoot,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere')).resolves.toMatchObject({
+      status: 404,
+      body: { error: 'Order book not found: 2026-07-18-nowhere' },
+    });
+  });
+
+  it('does not scan when ?project= is explicit — a missing book in that project 404s', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockListProjectsSync.mockReturnValue([{ key: 'other-project', config: otherProject }]);
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere?project=other-project'))
+      .resolves.toMatchObject({ status: 404, body: { error: 'Order book not found: 2026-07-18-nowhere' } });
+    expect(mockListProjectsSync).not.toHaveBeenCalled();
+  });
+
+  it('starts the Flywheel with cwd set to the non-default project\'s resolved path', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-OTHER' });
+
+    const states = new Map<string, OrderIssueState>([['PAN-20', { issue: 'PAN-20', open: true, parked: false }]]);
+    const layer = makeOrdersRouteLayer({ issueLookup: issueLookup(states) });
+    await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
+      id: '2026-07-18-cross-start',
+      name: 'Cross start',
+    }));
+    await requestOrdersRoute(layer, '/api/orders/2026-07-18-cross-start/items?project=other-project', mutation('POST', {
+      items: [{ issue: 'PAN-20', lane: 'A' }],
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-cross-start/start?project=other-project', mutation('POST')))
+      .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-OTHER', warnings: [] } });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start' });
+  });
+
+  it('keeps starting from the server cwd when the book is in the default project', async () => {
+    const defaultRoot = gitFixture();
+    const defaultProject = { path: process.cwd() } as ProjectConfig;
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockListProjectsSync.mockReturnValue([{ key: 'default-project', config: defaultProject }]);
+    mockResolveStateReadHomeSync.mockReturnValue({ root: defaultRoot, migrated: true });
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-DEFAULT' });
+
+    const states = new Map<string, OrderIssueState>([['PAN-21', { issue: 'PAN-21', open: true, parked: false }]]);
+    const layer = makeOrdersRouteLayer({ issueLookup: issueLookup(states) });
+    await requestOrdersRoute(layer, '/api/orders', mutation('POST', {
+      id: '2026-07-18-default-start',
+      name: 'Default start',
+    }));
+    await requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/items', mutation('POST', {
+      items: [{ issue: 'PAN-21', lane: 'A' }],
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/start', mutation('POST')))
+      .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-DEFAULT', warnings: [] } });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: process.cwd(), orders: '2026-07-18-default-start' });
   });
 });

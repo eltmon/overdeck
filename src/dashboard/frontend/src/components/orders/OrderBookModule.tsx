@@ -9,6 +9,8 @@ interface OrderBookProgressItem {
 }
 
 interface OrderBookProjection extends OrderBook {
+  /** Project key whose state root the book was read from (PAN-3427). */
+  project?: string;
   progress?: {
     total: number;
     landed: number;
@@ -67,7 +69,7 @@ export function OrderBookModule({ status }: { status: FlywheelStatus }) {
       <div className="flex items-center gap-2">
         <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
         <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Order book</h2>
-        <a href="/orders" className="truncate text-xs text-foreground hover:text-primary hover:underline">{orders.bookName} <ArrowRight className="inline h-3 w-3" /></a>
+        <a href={book?.project ? `/orders?project=${encodeURIComponent(book.project)}` : '/orders'} className="truncate text-xs text-foreground hover:text-primary hover:underline">{orders.bookName} <ArrowRight className="inline h-3 w-3" /></a>
         {book && (
           <span className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[10px] font-medium ${book.settings.posture === 'drain' ? 'border-warning/30 bg-warning/[0.08] text-warning-foreground' : 'border-border bg-muted/40 text-muted-foreground'}`}>
             {book.settings.posture.toUpperCase()}
