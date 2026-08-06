@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:40:37.810Z",
+  "updated": "2026-08-06T00:40:42.246Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -20,7 +20,42 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T00:17:15.326Z"
+    "updatedAt": "2026-08-06T00:40:42.244Z",
+    "reviewRequestedAt": "2026-08-06T00:40:42.244Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt"
+      ],
+      "declaredScopeUntouched": [
+        "CLAUDE.md",
+        "tests/unit/lib/cloister/memory-governor.test.ts"
+      ],
+      "declaredScope": [
+        "CLAUDE.md",
+        "docs/RESOURCE-GOVERNOR.md",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/memory-governor.ts",
+        "src/lib/cloister/memory-pressure-patrol.ts",
+        "src/lib/config-yaml/defaults.ts",
+        "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/schema.ts",
+        "tests/unit/lib/cloister/memory-governor.test.ts",
+        "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/RESOURCE-GOVERNOR.md",
+        "scripts/file-size-allowlist.txt",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/memory-governor.ts",
+        "src/lib/cloister/memory-pressure-patrol.ts",
+        "src/lib/config-yaml/defaults.ts",
+        "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/schema.ts",
+        "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+      ],
+      "recordedAt": "2026-08-06T00:40:37.808Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3574"
   },
   "closeOut": {
     "usage": {
