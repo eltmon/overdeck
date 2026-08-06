@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:15:04.101Z",
+  "updated": "2026-08-06T18:15:17.035Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -280,5 +280,48 @@
     "docs.ac2": "completed",
     "docs.ac3": "completed",
     "docs.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/stack.md"
+    ],
+    "declaredScopeUntouched": [
+      "scripts/postinstall.mjs"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "bun.lock",
+      "docs/EFFECT-DIAGNOSTICS.md",
+      "package.json",
+      "packages/contracts/tsconfig.effect-diag.json",
+      "packages/effect-acp/tsconfig.effect-diag.json",
+      "roles/review-correctness.md",
+      "scripts/effect-diagnostics-baseline.txt",
+      "scripts/lint-effect-diagnostics.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "scripts/postinstall.mjs",
+      "src/dashboard/server/tsconfig.effect-diag.json",
+      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts",
+      "tsconfig.effect-diag.json"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/stack.md",
+      "CLAUDE.md",
+      "bun.lock",
+      "docs/EFFECT-DIAGNOSTICS.md",
+      "package.json",
+      "packages/contracts/tsconfig.effect-diag.json",
+      "packages/effect-acp/tsconfig.effect-diag.json",
+      "roles/review-correctness.md",
+      "scripts/effect-diagnostics-baseline.txt",
+      "scripts/lint-effect-diagnostics.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "src/dashboard/server/tsconfig.effect-diag.json",
+      "tests/unit/scripts/lint-effect-diagnostics.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts",
+      "tsconfig.effect-diag.json"
+    ],
+    "recordedAt": "2026-08-06T18:15:17.034Z"
   }
 }
