@@ -278,20 +278,21 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T07:49:38.840Z",
+  "updated": "2026-08-06T07:53:40.796Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T07:47:59.690Z",
+    "updatedAt": "2026-08-06T07:53:40.719Z",
     "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
+    "testNotes": "Reconciled from green GitHub Actions CI on d8b4dbb6: lint (https://github.com/eltmon/overdeck/actions/runs/30733578185/job/91458036596)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
@@ -360,9 +361,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 208216,
-            "output": 7083,
-            "cacheRead": 3551232,
+            "input": 209664,
+            "output": 7183,
+            "cacheRead": 3787776,
             "cacheWrite": 0
           }
         },
@@ -445,15 +446,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 1846711,
-          "output": 81439,
-          "cacheRead": 15123968,
+          "input": 1848159,
+          "output": 81539,
+          "cacheRead": 15360512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 237.3718768,
-        "pricingAsOf": "2026-08-06T07:47:59.771Z"
+        "usd": 237.4361328,
+        "pricingAsOf": "2026-08-06T07:53:40.785Z"
       }
     },
     "merges": [
@@ -462,7 +463,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
