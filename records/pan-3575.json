@@ -71,7 +71,7 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:52:22.265Z",
+  "updated": "2026-08-06T08:52:28.304Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -80,10 +80,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T08:51:31.940Z",
+    "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z",
+    "updatedAt": "2026-08-06T08:52:22.259Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "reviewedAtCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
+    "reviewRequestedAt": "2026-08-06T08:52:21.853Z",
     "reviewSpawnedAt": "2026-08-06T08:08:50.106Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -121,9 +123,7 @@
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "recordedAt": "2026-08-06T08:08:19.232Z"
-    },
-    "reviewRequestedAt": "2026-08-06T08:52:21.853Z",
-    "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -170,24 +170,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 2676076,
-            "output": 183564,
-            "cacheRead": 55136768,
+            "input": 2730500,
+            "output": 187312,
+            "cacheRead": 57150976,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 4265789,
-          "output": 264005,
-          "cacheRead": 71585280,
+          "input": 4320213,
+          "output": 267753,
+          "cacheRead": 73599488,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.520975,
-        "pricingAsOf": "2026-08-06T08:51:31.971Z"
+        "usd": 33.216811,
+        "pricingAsOf": "2026-08-06T08:52:28.299Z"
       }
     },
     "merges": [
