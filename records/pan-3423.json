@@ -550,20 +550,20 @@
     "recordedAt": "2026-08-06T07:15:41.214Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T07:17:45.948Z",
+  "updated": "2026-08-06T07:22:37.514Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T07:16:00.191Z",
-    "updatedAt": "2026-08-06T07:17:45.874Z",
+    "updatedAt": "2026-08-06T07:22:37.471Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3423-review",
     "uatNotes": "Issue is a dashboard UI redesign (SystemHealthPill popover) — UAT required per observable-dashboard-behavior trigger. Built this workspace's dashboard (npm run build) and ran dist/dashboard/server.js under Node 22 as an isolated peer on PORT=3019 with OVERDECK_DISABLE_DEACON=1 (never touched the host dashboard on :3011, per the host-process-boundary rule and PAN-2322 port-hijack guard). Drove it with an isolated Playwright MCP browser instance (no shared profile/session). Opened the System Health pill against real live host data and verified, via the accessibility tree, every FR/AC in the PRD: (1) header state badge 'warning' + relative 'Updated 15s ago' time (FR-5/popover-header-summary-chips.ac1); (2) synthesized summary line 'Action required: 1 critical issue · 4 stalled agents · 2 idle agents · memory at 50.3% · 31.1 GB spawn headroom · 2 context notes' in a bordered box (FR-8/ac2); (3) 2x2 vitals tiles (CPU/Memory/Overdeck/Swap) each with a meter bar, Swap carrying the 'historical · not live pressure' sub-label (FR-4/vitals-meter-tiles.ac1,ac3); (4) chip row replacing the old tiles — 'Admitted work agents: 2', 'Containers: 19', 'Webhook relay: Running' (FR-5/ac3); (5) Needs-attention section with grouped critical row 'agent activity stalled x4' (sub 'agent-min-941, strike-pan-3559 +2 more') and grouped warning row 'agent activity stalled x2', both with no Open/Kill controls (attention-section.ac1,ac4); (6) collapsed '2 context notes — background, not pressure signals' disclosure that expands to reveal exactly the 2 severity:info reasons ('Swap occupancy is historical context...', 'Virtual memory commitment is diagnostic...') (FR-1/attention-section.ac2); (7) on a re-poll, a singleton attention row rendered 'agent-pan-3423-test · PAN-3423' / 'no activity for 24 min.' with working 'Open PAN-3423' and 'Kill' actions — clicked Open and confirmed it navigated to ?issue=PAN-3423&tab=conversation and closed the popover (FR-6/attention-section.ac3, popover-header-summary-chips); (8) Top consumers rows with kind badges (Agent/Container/Specialist), proportional memory-share meters, and header 'No leaks' (0 leaked present) (FR-7/top-consumers-upgrade.ac1,ac2). No console errors or warnings during the session. docs/RESOURCE-GOVERNOR.md confirmed to contain the new popover section describing grouped/singleton attention rows and the context-note disclosure (docs-resource-governor.ac1). Stopped the temporary port-3019 dashboard instance after verification; host dashboard on :3011 was never started, stopped, or restarted.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
@@ -633,9 +633,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 648593,
-            "output": 19370,
-            "cacheRead": 4827136,
+            "input": 760721,
+            "output": 26229,
+            "cacheRead": 7283200,
             "cacheWrite": 0
           }
         },
@@ -724,9 +724,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 5093744,
-          "output": 143575,
-          "cacheRead": 36133888,
+          "input": 5205872,
+          "output": 150434,
+          "cacheRead": 38589952,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -743,8 +743,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 419.9057773,
-        "pricingAsOf": "2026-08-06T07:17:45.938Z"
+        "usd": 420.9030003,
+        "pricingAsOf": "2026-08-06T07:22:37.501Z"
       }
     },
     "merges": [
