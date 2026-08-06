@@ -38,6 +38,7 @@ import {
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
+import { listOverdeckAgentStatesSync } from '../../../../lib/overdeck/agent-state-sync.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
 import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
@@ -123,10 +124,34 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
     const branchName = `feature/${issueLower}`;
     const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], { cwd: workspacePath, encoding: 'utf-8' });
     const url = stdout.trim();
-    return url || null;
+    if (url) return url;
   } catch {
-    return null;
+    // fall through to the DB fallback below
   }
+  // `gh pr view` needs a real GitHub-backed remote and workspace checkout —
+  // neither exists for the obviously-fake FIX-1 UAT fixture (PAN-3362), whose
+  // review_status row carries a real prUrl written directly through the
+  // canonical write door. Fall back to it whenever the shell lookup finds
+  // nothing, rather than reporting no PR when a persisted one exists.
+  return getReviewStatusSync(issueId)?.prUrl ?? null;
+}
+
+/**
+ * Fallback branch info for a workspace with no real `.git` checkout —
+ * `getGitStatusAsync()` shells real git and returns null there. The
+ * obviously-fake FIX-1 UAT fixture (PAN-3362) has a persisted work-agent
+ * `branch` (written through the canonical agent-state write door) but no
+ * on-disk checkout to shell against, so report that instead of nothing.
+ */
+export function getPersistedBranchFallback(issueId: string): {
+  branch: string;
+  uncommittedFiles: number;
+  latestCommit: string;
+} | null {
+  const workAgent = listOverdeckAgentStatesSync().find(
+    (a) => a.issueId.toUpperCase() === issueId.toUpperCase() && a.role === 'work' && a.branch,
+  );
+  return workAgent?.branch ? { branch: workAgent.branch, uncommittedFiles: 0, latestCommit: '' } : null;
 }
 async function getIndexStats(workspacePath: string): Promise<{
   fileCount?: number;
@@ -597,13 +622,14 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
+        const [shellGit, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
         ]));
+        const git = shellGit ?? getPersistedBranchFallback(issueId);
         const sessionNames = yield* listSessionNames();
         const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 

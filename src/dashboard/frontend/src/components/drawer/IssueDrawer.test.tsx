@@ -52,7 +52,7 @@ function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function mockFetch() {
+function mockFetch(workspaceOverride?: Record<string, unknown>) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     const currentIssue = useDashboardStore.getState().issuesRaw.find((candidate) => candidate.identifier === 'PAN-1');
@@ -85,7 +85,13 @@ function mockFetch() {
       const rs = useDashboardStore.getState().reviewStatusByIssueId['PAN-1'];
       return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
     }
-    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', hasDocker: true, path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/api/workspaces/')) return Response.json({
+      exists: true,
+      issueId: 'PAN-1',
+      hasDocker: true,
+      path: currentIssue?.workspacePath ?? '/tmp/pan-1',
+      ...workspaceOverride,
+    });
     if (url.includes('/api/issues/') && url.endsWith('/tasks')) {
       return Response.json({ issueId: 'PAN-1', workspacePath: '/tmp/pan-1', tasks: [] });
     }
@@ -414,6 +420,32 @@ describe('IssueDrawer', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1'));
     expect(screen.queryByTestId('drawer-workspace-section')).toBeNull();
     expect(wsTransportMock.getAvailableEditors).not.toHaveBeenCalled();
+  });
+
+  it('renders the workspace branch when the workspace route reports one (PAN-3362)', async () => {
+    // The route falls back to a persisted agent branch when there's no real
+    // .git checkout to shell against (e.g. the FIX-1 UAT fixture) — this
+    // asserts the drawer actually surfaces whatever branch it reports.
+    vi.stubGlobal('fetch', mockFetch({
+      path: '/tmp/pan-workspace',
+      git: { branch: 'feature/pan-1', uncommittedFiles: 0, latestCommit: '' },
+    }));
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+
+    renderDrawer();
+
+    const branch = await screen.findByTestId('drawer-workspace-branch');
+    expect(branch).toHaveTextContent('feature/pan-1');
+  });
+
+  it('omits the workspace branch line when the workspace route reports none', async () => {
+    vi.stubGlobal('fetch', mockFetch({ path: '/tmp/pan-workspace' }));
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+
+    renderDrawer();
+
+    await screen.findByTestId('drawer-workspace-section');
+    expect(screen.queryByTestId('drawer-workspace-branch')).toBeNull();
   });
 
   it('tears down the drawer issue subscription on close and reuses quick same-issue reopens', async () => {

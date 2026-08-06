@@ -271,7 +271,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-type ReviewStatusSnapshotInput = ReviewStatus & {
+export type ReviewStatusSnapshotInput = ReviewStatus & {
   reviewCoordinatorSessionName?: string;
   reviewSessionNames?: string[];
   reviewSubStatuses?: Record<string, 'running' | 'done'>;
@@ -323,6 +323,33 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     blockerReasons: status.blockerReasons && status.blockerReasons.length > 0 ? status.blockerReasons : undefined,
     autoRequeueCount: typeof status.autoRequeueCount === 'number' ? status.autoRequeueCount : undefined,
   };
+}
+
+/**
+ * Layers DB-only review_status rows into a boot snapshot for issues
+ * reconstructCacheAuto() didn't already cover (PAN-3362).
+ *
+ * reconstructCacheAuto() deliberately enumerates only tracker-backed
+ * in-flight issues (it reads NO SQLite cache tables — sources of truth
+ * only), so an issue with a review_status row but no real per-issue record
+ * (e.g. the obviously-fake FIX-1 UAT fixture) is never included in
+ * `trackerDerived`. This is a supplementary, additive source — a DB-only
+ * row NEVER overrides a tracker-derived entry for the same issueId, the
+ * same posture agentsById already takes by layering AgentsResolver's
+ * DB-backed list alongside reconstructCacheAuto's result rather than
+ * folding it in.
+ */
+export function mergeDbOnlyReviewStatuses(
+  trackerDerived: Record<string, ReviewStatusSnapshot>,
+  dbReviewStatuses: Record<string, ReviewStatusSnapshotInput>,
+): Record<string, ReviewStatusSnapshot> {
+  const dbOnly: Record<string, ReviewStatusSnapshot> = {};
+  for (const [issueId, dbStatus] of Object.entries(dbReviewStatuses)) {
+    if (!(issueId in trackerDerived)) {
+      dbOnly[issueId] = toReviewStatusSnapshot(dbStatus);
+    }
+  }
+  return dbOnly;
 }
 
 // ─── ReadModelService ────────────────────────────────────────────────────────
@@ -515,6 +542,19 @@ export const ReadModelServiceLive = Layer.effect(
       const result = yield* Effect.promise(() => reconstructCacheAuto());
       const overdeckAgents = yield* agentsResolver.list({});
 
+      // See mergeDbOnlyReviewStatuses() doc comment — reconstructCacheAuto()
+      // only enumerates tracker-backed issues, so DB-only review_status rows
+      // (e.g. the FIX-1 UAT fixture, PAN-3362) need a supplementary source.
+      let dbOnlyReviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
+      try {
+        const { getAllReviewStatusesFromDb } = yield* Effect.promise(
+          () => import('../../lib/overdeck/review-status-sync.js'),
+        );
+        dbOnlyReviewStatusByIssueId = mergeDbOnlyReviewStatuses(result.reviewStatusByIssueId, getAllReviewStatusesFromDb());
+      } catch (err) {
+        console.error('[ReadModel] Failed to layer in DB-only review statuses:', err);
+      }
+
       const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
         overdeckAgents.map((a) => [a.id, agentSnapshotFromOverdeck(a)]),
       );
@@ -540,7 +580,7 @@ export const ReadModelServiceLive = Layer.effect(
         ...INITIAL_READ_MODEL_STATE,
         sequence,
         agentsById,
-        reviewStatusByIssueId: result.reviewStatusByIssueId,
+        reviewStatusByIssueId: { ...dbOnlyReviewStatusByIssueId, ...result.reviewStatusByIssueId },
         issuesRaw: [],
         recentActivity,
       };
