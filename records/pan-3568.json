@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:28:19.286Z",
+  "updated": "2026-08-06T17:39:42.084Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "lint-chain-wiring": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 3004562,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:28:19.286Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Added five hermetic fake-npx tests covering marker filtering, plain TypeScript errors, lower-only updates, and crashed lane handling.",
         "releasedAt": "2026-08-06T17:28:09.261Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 3004562,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:28:19.286Z",
+        "itemId": "lint-chain-wiring",
+        "outcome": "completed",
+        "reason": "Seeded the 308-finding Effect diagnostics baseline, wired it into npm run lint, and verified lint plus existing typecheck ratchets remain green.",
+        "releasedAt": "2026-08-06T17:39:42.084Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "ratchet-tests": {
         "reason": "Added five hermetic fake-npx tests covering marker filtering, plain TypeScript errors, lower-only updates, and crashed lane handling.",
         "updatedAt": "2026-08-06T17:28:09.261Z"
+      },
+      "lint-chain-wiring": {
+        "reason": "Seeded the 308-finding Effect diagnostics baseline, wired it into npm run lint, and verified lint plus existing typecheck ratchets remain green.",
+        "updatedAt": "2026-08-06T17:39:42.084Z"
       }
     }
   },
@@ -190,6 +197,10 @@
     "ratchet-tests.ac3": "completed",
     "ratchet-tests.ac4": "completed",
     "ratchet-tests.ac5": "completed",
-    "lint-chain-wiring": "running"
+    "lint-chain-wiring": "completed",
+    "lint-chain-wiring.ac1": "completed",
+    "lint-chain-wiring.ac2": "completed",
+    "lint-chain-wiring.ac3": "completed",
+    "lint-chain-wiring.ac4": "completed"
   }
 }
