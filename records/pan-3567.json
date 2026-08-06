@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T19:24:08.857Z",
+  "updated": "2026-08-06T19:24:12.601Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "passed",
@@ -103,7 +103,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T17:55:11.245Z",
-    "updatedAt": "2026-08-06T19:24:08.459Z",
+    "updatedAt": "2026-08-06T19:24:09.064Z",
     "reviewNotes": "Docker enumeration failures still authorize destructive workspace removal",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -206,7 +206,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.741047000000002,
-        "pricingAsOf": "2026-08-06T19:24:08.478Z"
+        "pricingAsOf": "2026-08-06T19:24:10.782Z"
       }
     },
     "merges": [
