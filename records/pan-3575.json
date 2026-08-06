@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:34:04.706Z",
+  "updated": "2026-08-06T07:34:23.641Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "wire-review-status-uat": {
+        "writerId": "agent-pan-3575",
+        "agentId": "agent-pan-3575",
+        "pid": 298673,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T07:34:23.641Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3575",
@@ -81,6 +89,7 @@
     "uat-relay-module.uat-relay-module.ac2": "completed",
     "uat-relay-module.uat-relay-module.ac3": "completed",
     "uat-relay-module.uat-relay-module.ac4": "completed",
-    "uat-relay-module.uat-relay-module.ac5": "completed"
+    "uat-relay-module.uat-relay-module.ac5": "completed",
+    "wire-review-status-uat": "running"
   }
 }
