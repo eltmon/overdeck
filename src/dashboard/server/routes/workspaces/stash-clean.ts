@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import type { ProcessSpawnError } from '../../../../lib/errors.js';
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
 import {
   listStashes,
@@ -41,6 +42,32 @@ import {
 } from '../workspaces.js';
 
 const execAsync = promisify(exec);
+
+export type WorkspaceRemovalGuard =
+  | { allow: true }
+  | { allow: false; status: 409 | 500; error: string };
+
+/** Refuse workspace removal when Docker state cannot be safely verified. */
+export const checkWorkspaceRemovalGuard = (
+  workspacePath: string,
+): Effect.Effect<WorkspaceRemovalGuard> =>
+  getContainersReferencingWorkspacePath(workspacePath).pipe(
+    Effect.map((orphanedContainers) => {
+      if (orphanedContainers.length > 0) {
+        return {
+          allow: false as const,
+          status: 409 as const,
+          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. Stop the containers first.`,
+        };
+      }
+      return { allow: true as const };
+    }),
+    Effect.catch((error: ProcessSpawnError) => Effect.succeed({
+      allow: false as const,
+      status: 500 as const,
+      error: `Cannot remove workspace: failed to enumerate Docker containers referencing ${workspacePath}: ${error.message}`,
+    })),
+  );
 
 function resolveWorkspacePath(issueId: string): string | null {
   const info = getWorkspaceInfoForIssue(issueId);
@@ -342,6 +369,11 @@ const postWorkspaceCleanRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 404 });
     }
 
+    const guard = yield* checkWorkspaceRemovalGuard(workspacePath);
+    if (!guard.allow) {
+      return jsonResponse({ error: guard.error }, { status: guard.status });
+    }
+
     let backupPath: string | null = null;
 
     if (createBackup) {
@@ -358,19 +390,6 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     }
 
     console.log(`Removing corrupted workspace: ${workspacePath}`);
-
-    // Guard: never delete workspace while containers still reference its compose path
-    const orphanedContainers = yield* Effect.promise(() =>
-      getContainersReferencingWorkspacePath(workspacePath)
-    );
-    if (orphanedContainers.length > 0) {
-      return jsonResponse(
-        {
-          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. Stop the containers first.`,
-        },
-        { status: 409 },
-      );
-    }
 
     try {
       yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
