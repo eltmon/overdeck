@@ -33,12 +33,17 @@ LANES=(
   "effect-acp:packages/effect-acp/tsconfig.effect-diag.json"
 )
 
+initializing=false
 if [[ ! -f "$BASELINE_FILE" ]]; then
-  echo "✖ missing $BASELINE_FILE" >&2
-  exit 1
+  if [[ "$MODE" != "update" ]]; then
+    echo "✖ missing $BASELINE_FILE" >&2
+    exit 1
+  fi
+  initializing=true
+  baseline_count=0
+else
+  baseline_count=$(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE_FILE" || true)
 fi
-
-baseline_count=$(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE_FILE" || true)
 
 npx effect-language-service patch
 
@@ -70,7 +75,7 @@ count=$(printf '%s\n' "$current" | grep -cE "$MARKER_REGEX" || true)
 norm() { grep -E "$MARKER_REGEX" | sed -E 's/^([^(:]+)\([0-9]+,[0-9]+\)/\1/' | sort -u; }
 
 if [[ "$MODE" == "update" ]]; then
-  if (( count > baseline_count )); then
+  if [[ "$initializing" != true ]] && (( count > baseline_count )); then
     echo "✖ refusing to raise the baseline: $count findings vs baseline $baseline_count." >&2
     echo "  Fix the new findings — the ratchet only lowers." >&2
     exit 1
