@@ -82,19 +82,19 @@
     "recordedAt": "2026-08-06T18:15:17.034Z"
   },
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:26:07.972Z",
+  "updated": "2026-08-06T18:28:13.286Z",
   "pipeline": {
     "issueId": "PAN-3568",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T18:16:15.623Z",
-    "updatedAt": "2026-08-06T18:26:07.962Z",
-    "reviewNotes": "Stack context falsely says the root Effect ACP typecheck gate does not exist",
+    "updatedAt": "2026-08-06T18:28:13.254Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issue: corrected the codebase stack context to identify the root typecheck:acp lane.",
     "inspectNotes": "All 5 ACs verified: four diag tsconfigs extend their sibling ./tsconfig.json (identical blob 8e78f192e9) with includeSuggestionsInTsc=false and both ignoreEffect*InTscExitCode=true; git grep '\"plugins\"' over real tsconfigs prints nothing; acp base-vs-diag tsc --listFiles diff is empty (both exit 0); root diag lane exits 0 with no TS5058/TS5024, other three resolve cleanly. NFR-1 holds: dashboard ratchet 47 known/none new, frontend ratchet 0/none new.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3578",
     "reviewedAtCommit": "933b165219643018d3401e4ecf0299dd597e2aff",
@@ -149,9 +149,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 228977,
-            "output": 6365,
-            "cacheRead": 2003968,
+            "input": 232717,
+            "output": 6549,
+            "cacheRead": 2201600,
             "cacheWrite": 0
           }
         },
@@ -189,24 +189,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 880667,
-            "output": 122660,
-            "cacheRead": 48589824,
+            "input": 1125769,
+            "output": 124850,
+            "cacheRead": 52220928,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 3034455,
-          "output": 211277,
-          "cacheRead": 58942976,
+          "input": 3283297,
+          "output": 213651,
+          "cacheRead": 62771712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.491118,
-        "pricingAsOf": "2026-08-06T18:26:07.967Z"
+        "usd": 27.106021,
+        "pricingAsOf": "2026-08-06T18:28:13.280Z"
       }
     },
     "merges": [
