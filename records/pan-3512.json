@@ -932,6 +932,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T22:10:31.046Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T22:12:46.515Z"
     }
   ],
   "feedback": [],
@@ -991,18 +996,18 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:12:44.884Z",
+  "updated": "2026-08-06T22:12:46.531Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:12:43.404Z",
-    "reviewNotes": "Agent re-review request (1/25): Addressed feedback: the test-gate re-gate now lands after caller extras in the verdict write door, so an orphan restore's historical passed test result can no longer overwrite the fresh-head reset; added the regression the reviewer asked for. Also completed the remaining verdict-door migrations (fallback kill-conditional, orphan-restore, unsignaled auto-completes, infra-bypass).",
+    "updatedAt": "2026-08-06T22:12:44.183Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3512-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "a63150255d34ef88c774450cb0703e2d84a27b6e",
@@ -1190,7 +1195,7 @@
       },
       "costAtCloseOut": {
         "usd": 76.4042297,
-        "pricingAsOf": "2026-08-06T22:12:43.443Z"
+        "pricingAsOf": "2026-08-06T22:12:44.248Z"
       }
     },
     "merges": [
@@ -1199,7 +1204,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
