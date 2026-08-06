@@ -1333,3 +1333,20 @@ That moves PAN-3586 from "verification hygiene" to "the close-out gate is stoppe
 **PAN-3512 is genuinely productive** — committed `82a90d8518`, pushed to `feature/pan-3512`, all xBRIEF items complete, now fixing a stale manifest entry in `head-anchor-write-sites.test.ts` surfaced by the full suite. The long "Roosting" turn was a full test run, not a stall — worth checking before calling a quiet agent stuck.
 
 **Also noted, not yet acted on:** local `main` is ahead 5 / behind 4 of origin. The 5 are my own FLYWHEEL-STATE commits, which the agent main-push guard correctly refuses to let me push (only `conv-` identities are exempt). They are committed and safe, just local.
+
+### RUN-82 tick 7 — 2026-08-06T22:00Z — PAN-3582 verified live, and it revealed that two "blind spots" were never blind spots
+
+**Verified the keystone fix by measurement, not by assumption.** Build `cc366a3a97fa` deployed at 21:37Z; measured 20 minutes later:
+
+- **Rate-limit exhaustion is over.** The last `API rate limit exceeded for installation ID 144090266` in the deacon log is **21:22:06Z — before the deploy**, nothing since. `pan review pending --ready`, which had been crashing with `Pipeline membership lens gather failed for all projects`, now runs clean.
+- **Patrol cadence roughly doubled**: `reconcileAgentLiveness` passes at 21:43:49 → 21:47:09 → 21:50:26 → 21:53:06 → 21:56:32, ~3.3 minutes apart against 7–8 before. Still short of the 60-second design and `patrol interval skipped` still fires, so a secondary term remains — the GitHub-heavy `reconcileFalseMerged` and `reconcileClosedPrReadyForMerge` reconcilers are the obvious next candidates. The dominant term is gone.
+
+**The real payoff was an error I had been repeating for six ticks.** With the budget restored, lexerra and krux stopped returning 403 and started returning the truth: `404 Not Found — GitHub App not configured for this repository or repository inaccessible`. The App is simply **not installed on `eltmon/lexerra` or `eltmon/krux`**. Their membership has been unavailable for a configuration reason the whole time, and the rate-limit 403 was masking it. I reported both as rate-limit casualties in every status snapshot from tick 1 onward.
+
+**Carry this: a loud failure upstream can impersonate every failure downstream.** Once the App was exhausted, *every* GitHub read returned 403, so every project looked like the same problem. The rule is that a blanket failure mode should lower confidence in any per-target diagnosis made while it is active — I should have marked those two "unknown behind the rate limit" rather than "rate-limit blind spot". Fixing the loud thing is also the cheapest way to find out what it was hiding.
+
+**PAN-3512 reached review.** It handed off and `agent-pan-3512-review` spawned at 21:30Z — an issue that was dead for three days is now in the review convoy, having gone through PAN-3583's `--fresh` fix and PAN-3591's `--host --yes` stack override to get there. Final work state: `+658/-37`, cost $20.33.
+
+**PAN-3586 planning completed** — a 35KB xBRIEF is on the state branch alongside its draft. It now waits on operator release like PAN-3580, which is `auto_pickup_backlog=false` behaving as designed. Both planned issues in the awaiting-release queue are substrate fixes that unblock other work, which is the Planning floor doing exactly its job.
+
+**Unchanged:** push-event CI still silent since 14:58:51Z, so PAN-3582's own close-out remains blocked on DoD row 6 with `missing required checks … test, lint, build (22), guard`. Still not overriding it.
