@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-3567",
   "schemaVersion": 2,
-  "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T16:50:27.989Z",
-  "pipeline": {
-    "issueId": "PAN-3567",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-06T16:36:46.959Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,8 +9,33 @@
       "timestamp": "2026-08-06T16:36:46.959Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-08-06T16:36:46.959Z",
+  "updated": "2026-08-06T16:50:31.353Z",
+  "pipeline": {
+    "issueId": "PAN-3567",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-06T16:50:31.340Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-08-06T16:50:31.348Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3567",
