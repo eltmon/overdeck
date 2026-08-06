@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T17:25:27.324Z",
+  "updated": "2026-08-06T17:28:09.261Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "ratchet-tests": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 2908147,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:25:27.324Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Added the four-lane Effect diagnostics ratchet with marker-only finding classification, a parseable-diagnostic crash guard, and lower-only baseline updates.",
         "releasedAt": "2026-08-06T17:25:18.055Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 2908147,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:25:27.324Z",
+        "itemId": "ratchet-tests",
+        "outcome": "completed",
+        "reason": "Added five hermetic fake-npx tests covering marker filtering, plain TypeScript errors, lower-only updates, and crashed lane handling.",
+        "releasedAt": "2026-08-06T17:28:09.261Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +146,10 @@
       "ratchet-script": {
         "reason": "Added the four-lane Effect diagnostics ratchet with marker-only finding classification, a parseable-diagnostic crash guard, and lower-only baseline updates.",
         "updatedAt": "2026-08-06T17:25:18.055Z"
+      },
+      "ratchet-tests": {
+        "reason": "Added five hermetic fake-npx tests covering marker filtering, plain TypeScript errors, lower-only updates, and crashed lane handling.",
+        "updatedAt": "2026-08-06T17:28:09.261Z"
       }
     }
   },
@@ -169,6 +176,11 @@
     "ratchet-script.ac3": "completed",
     "ratchet-script.ac4": "completed",
     "ratchet-script.ac5": "completed",
-    "ratchet-tests": "running"
+    "ratchet-tests": "completed",
+    "ratchet-tests.ac1": "completed",
+    "ratchet-tests.ac2": "completed",
+    "ratchet-tests.ac3": "completed",
+    "ratchet-tests.ac4": "completed",
+    "ratchet-tests.ac5": "completed"
   }
 }
