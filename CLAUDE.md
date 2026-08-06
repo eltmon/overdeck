@@ -399,6 +399,14 @@ before advancing to the review role. If typecheck/lint/test fail, feedback is se
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
+## Verdict feedback routing
+
+Review `blocked`/`failed`, test `failed`, and UAT `failed` verdicts all return work to
+the work agent through the same feedback doors: `writeFeedbackFile()` persists the
+feedback, `resolveIssueFeedbackTarget()` finds or resurrects the work target, and
+`surfaceIssueFeedbackNeedsYou()` creates a durable escalation when no target resolves.
+The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`.
+
 ## Review Convergence Gate (PAN-3151)
 
 When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. Distinguish from the prompt-level convergence gate (`roles/review.md:62`), which governs single-reviewer filtering within one cycle.

@@ -309,13 +309,14 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     }
   }
 
-  // 5. uat-failed — passed review+test but UAT failed and the merge never advanced
-  if (!closed && r?.uatStatus === 'failed' && r.mergeStatus !== 'merged' && !r.readyForMerge) {
+  // 5. uat-failed — the feedback relay already owns rework while work is live.
+  const hasLiveWorkAgent = s.liveAgents.some((agent) => agent.role === 'work');
+  if (!closed && r?.uatStatus === 'failed' && r.mergeStatus !== 'merged' && !r.readyForMerge && !hasLiveWorkAgent) {
     push(
       'uat-failed',
       isoOr(r.updatedAt, s.now),
-      'UAT failed after review and test passed — the merge gate will not take it and nothing routed the failure back to work',
-      'route the UAT failure notes to the work agent as a rework kickoff through the existing work-resume door',
+      'UAT failed and no work agent is live to rework it — the merge gate will not take the issue and the UAT-failure relay found no delivery target',
+      'pan start <id> to put a work agent on the UAT feedback; the relay redelivers on the next failed verdict',
       { uatNotes: r.uatNotes ?? null },
     );
   }

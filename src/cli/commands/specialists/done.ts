@@ -23,6 +23,7 @@ import {
 import type { HeadAnchor } from '../../../lib/git-utils.js';
 import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
 import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -83,9 +84,13 @@ export async function doneCommand(
     }
 
     const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+    const internalToken = getInternalTokenSync();
     const response = await fetch(`${baseUrl}/api/specialists/done`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
+      },
       body: JSON.stringify({
         specialist,
         issueId: normalizedIssueId,

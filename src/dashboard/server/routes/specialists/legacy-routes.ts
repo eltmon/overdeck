@@ -117,6 +117,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   'POST',
   '/api/specialists/done',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const { specialist, issueId, status, notes, itemId, runId } = body as {

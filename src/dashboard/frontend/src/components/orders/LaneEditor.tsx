@@ -6,12 +6,14 @@ import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { Issue } from '../../types';
 import type { OrderBookView } from './BookStrip';
 import { LaneItem, type LaneItemState } from './LaneItem';
+import { withProject } from './projectScope';
 
 interface LaneEditorProps {
   book: OrderBookView;
   inFlightIssues?: ReadonlySet<string>;
   issues?: Issue[];
   onBookChange: (book: OrderBookView) => void;
+  project?: string | null;
 }
 
 async function responseBook(response: Response): Promise<OrderBookView> {
@@ -27,7 +29,7 @@ function itemState(book: OrderBookView, issueId: string, inFlight: ReadonlySet<s
   return book.settings.posture === 'drain' ? 'held' : 'released';
 }
 
-export function LaneEditor({ book, inFlightIssues = new Set(), issues, onBookChange }: LaneEditorProps) {
+export function LaneEditor({ book, inFlightIssues = new Set(), issues, onBookChange, project }: LaneEditorProps) {
   const storeIssues = useDashboardStore(selectIssues) as Issue[];
   const availableIssues = issues ?? storeIssues;
   const titles = useMemo(
@@ -39,7 +41,7 @@ export function LaneEditor({ book, inFlightIssues = new Set(), issues, onBookCha
 
   const patchItem = async (issueId: string, patch: Record<string, unknown>) => {
     setError(null);
-    const response = await fetch(`/api/orders/${encodeURIComponent(book.id)}/items/${encodeURIComponent(issueId)}`, {
+    const response = await fetch(withProject(`/api/orders/${encodeURIComponent(book.id)}/items/${encodeURIComponent(issueId)}`, project), {
       method: 'PATCH',
       credentials: 'include',
       headers: await dashboardMutationJsonHeaders(),
@@ -77,7 +79,7 @@ export function LaneEditor({ book, inFlightIssues = new Set(), issues, onBookCha
   const remove = async (issueId: string) => {
     setError(null);
     try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(book.id)}/items/${encodeURIComponent(issueId)}`, {
+      const response = await fetch(withProject(`/api/orders/${encodeURIComponent(book.id)}/items/${encodeURIComponent(issueId)}`, project), {
         method: 'DELETE',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),

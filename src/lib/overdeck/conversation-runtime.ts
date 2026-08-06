@@ -903,8 +903,8 @@ export async function handleConversationCreate(
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-    const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
-    const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
+    const model = typeof body['model'] === 'string' ? body['model'].trim() || undefined : undefined;
+    const effort = typeof body['effort'] === 'string' ? body['effort'].trim() || undefined : undefined;
     const harness = await resolveAllowedHarness(body['harness'], model);
     const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
