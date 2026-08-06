@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:40:33.950Z",
+  "updated": "2026-08-06T00:40:37.810Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -180,5 +180,38 @@
     "oom-canary.oom-canary.ac4": "completed",
     "oom-canary.oom-canary.ac5": "completed",
     "oom-canary.oom-canary.ac6": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScopeUntouched": [
+      "CLAUDE.md",
+      "tests/unit/lib/cloister/memory-governor.test.ts"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/memory-governor.ts",
+      "src/lib/cloister/memory-pressure-patrol.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/schema.ts",
+      "tests/unit/lib/cloister/memory-governor.test.ts",
+      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/memory-governor.ts",
+      "src/lib/cloister/memory-pressure-patrol.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/schema.ts",
+      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+    ],
+    "recordedAt": "2026-08-06T00:40:37.808Z"
   }
 }
