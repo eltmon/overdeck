@@ -242,6 +242,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T11:54:26.951Z"
+    },
+    {
+      "timestamp": "2026-08-06T12:28:54.196Z",
+      "reason": "end",
+      "note": "Fixed the two remaining UAT-blocking gaps from the cycle-2 re-run: branch (drawer now falls back to the persisted work-agent branch when GET /api/workspaces/:issueId has no real .git checkout to shell against) and PR link (the review-status boot snapshot now layers in DB-only review_status rows reconstructCacheAuto's tracker-driven enumeration misses, so reviewStatusByIssueId -- and the prUrl the View PR action reads -- is populated for issues with no per-issue record). No deviations."
     }
   ],
   "feedback": [],
@@ -308,7 +313,7 @@
     "recordedAt": "2026-08-06T12:28:47.930Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T12:28:53.667Z",
+  "updated": "2026-08-06T12:28:54.197Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
