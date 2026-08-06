@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -175,26 +175,20 @@ describe('getActiveSessionModel', () => {
     });
     writeFileSync(oldSessionFile, oldContent + '\n');
 
-    // Wait a bit to ensure different mtime
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const newSessionFile = join(claudeProjectDir, 'new-session.jsonl');
+    const newContent = JSON.stringify({
+      sessionId: 'new-session',
+      model: 'claude-sonnet-4-5-20250929'
+    });
+    writeFileSync(newSessionFile, newContent + '\n');
 
-    // Create newer session file
-    setTimeout(() => {
-      const newSessionFile = join(claudeProjectDir, 'new-session.jsonl');
-      const newContent = JSON.stringify({
-        sessionId: 'new-session',
-        model: 'claude-sonnet-4-5-20250929'
-      });
-      writeFileSync(newSessionFile, newContent + '\n');
+    const oldTime = new Date('2025-01-01T00:00:00Z');
+    const newTime = new Date('2025-01-01T00:00:01Z');
+    utimesSync(oldSessionFile, oldTime, oldTime);
+    utimesSync(newSessionFile, newTime, newTime);
 
-      try {
-        const result = getActiveSessionModelSync(testWorkspacePath);
-        // Should return model from newer file
-        expect(result).toBe('claude-sonnet-4-5-20250929');
-      } finally {
-        rmSync(claudeProjectDir, { recursive: true, force: true });
-      }
-    }, 100);
+    const result = getActiveSessionModelSync(testWorkspacePath);
+    expect(result).toBe('claude-sonnet-4-5-20250929');
   });
 
   it('should search first 10 lines for model field', () => {
