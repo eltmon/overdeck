@@ -445,7 +445,7 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-06T00:16:08.874Z",
+  "updated": "2026-08-06T00:16:12.069Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "passed",
@@ -456,7 +456,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T23:51:33.187Z",
-    "updatedAt": "2026-08-05T23:59:31.888Z",
+    "updatedAt": "2026-08-06T00:16:12.038Z",
     "reviewNotes": "Review passed applied by deacon sweep from on-disk synthesis.md",
     "testNotes": "npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 47 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED exit 0 (all sub-lints green incl. state-writes/state-paths/pipeline-membership/workspace-doors/park-exits/circular 56 baselined-0 new/ratchet-audit/quarantine-audit). Root npm test PASSED: 1409 test files / 13314 tests passed, 3 files / 50 tests skipped, 0 failed (head-anchor-write-sites.test.ts inventory mismatch from an earlier review cycle is resolved on this HEAD, re-ran standalone 2/2 passed). Full frontend suite (npm --prefix src/dashboard/frontend run test, no filter) PASSED: 309 test files / 3032 tests, 0 failed, incl. RolesPanel.test.tsx and IssuePolicyStrip.test.tsx covering the removed reReviewScope control. UAT not required: pure backend pipeline internals plus one UI control removal fully covered by component tests; no acceptance criteria or issue/PR notes call for browser verification.",
     "verificationNotes": "Merge already landed; verify-on-main owns post-merge validation.",
@@ -703,7 +703,9 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T23:47:10.054Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-06T00:16:12.038Z"
   },
   "closeOut": {
     "usage": {
@@ -787,7 +789,86 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3573"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-06T00:16:12.066Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: skipped at 35d77802397e641c38d13f152dcfa2db4c32d125 (skipped per issue policy)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; forge metadata unavailable: GitHub App PR lookup failed: GitHub API GET /repos/eltmon/overdeck/pulls?head=eltmon%3Afeature%2Fpan-3552&state=all failed: 403 {\n\t\"message\": \"API rate limit exceeded for installation ID 144090266. If you reach out to GitHub Support for help, please include the request ID 9A52:2A2029:95B06E:1F1D814:6A73D233 and timestamp 2026-08-06 00:15:47 UTC. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https:\\/\\/docs.github.com\\/en\\/site-policy\\/github-terms\\/github-terms-of-service)\",\n\t\"documentation_url\": \"https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api#rate-limiting\",\n\t\"status\": \"403\"\n}\n",
+          "status": "pass"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
+          "status": "skip"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)",
+          "status": "skip"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (8 transcript files preserved); No strike branch strike/pan-3552 found; Pruned 705 checkpoint ref(s) for agent-pan-3552, planning-pan-3552, strike-pan-3552; No specialist registry entries for PAN-3552"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
