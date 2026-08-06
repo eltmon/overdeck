@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-06T19:31:50.463Z",
-  "updated": "2026-08-06T21:19:04.528Z",
+  "updated": "2026-08-06T21:23:46.417Z",
   "pipeline": {
     "issueId": "PAN-3582",
     "reviewStatus": "pending",
@@ -13,12 +13,14 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T21:18:58.622Z",
+    "updatedAt": "2026-08-06T21:23:46.399Z",
     "lastVerifiedCommit": "86ac15064f3c17731c79380ef64babccec8dc7a0",
     "strikeReadyHead": "86ac15064f3c17731c79380ef64babccec8dc7a0",
     "strikeReadyAt": "2026-08-06T21:15:03.932Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-06T21:24:46.392Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-06T20:14:15.241Z",
@@ -26,6 +28,13 @@
         "mainHead": "d20c97c49c97e805fd231cb4f9a90e47b124fd16",
         "outcome": "failed",
         "detail": "Stale strike signal: recorded HEAD c83f7c99860b66c0ffb610f944138660564b7b5f differs from origin/strike/pan-3582 at 86ac15064f3c17731c79380ef64babccec8dc7a0"
+      },
+      {
+        "timestamp": "2026-08-06T21:23:46.392Z",
+        "strikeHead": "86ac15064f3c17731c79380ef64babccec8dc7a0",
+        "mainHead": "d921b8cec556c0644e4f866ef22f144ef7dc1c41",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -51,7 +60,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.201086,
-        "pricingAsOf": "2026-08-06T21:19:04.470Z"
+        "pricingAsOf": "2026-08-06T21:23:46.405Z"
       }
     },
     "merges": [],
