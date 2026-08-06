@@ -278,19 +278,19 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-06T08:08:59.736Z",
+  "updated": "2026-08-06T08:27:15.899Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "mergeStep": "verifying",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-06T08:08:49.395Z",
+    "updatedAt": "2026-08-06T08:27:15.784Z",
     "reviewNotes": "All four reviewers clear; two non-blocking sync-prune advisories recorded.",
     "testNotes": "Reconciled from green GitHub Actions CI on d8b4dbb6: lint (https://github.com/eltmon/overdeck/actions/runs/30733578185/job/91458036596)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -361,9 +361,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 522231,
-            "output": 23923,
-            "cacheRead": 7987200,
+            "input": 701369,
+            "output": 29724,
+            "cacheRead": 10189824,
             "cacheWrite": 0
           }
         },
@@ -454,9 +454,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 2160726,
-          "output": 98279,
-          "cacheRead": 19559936,
+          "input": 2339864,
+          "output": 104080,
+          "cacheRead": 21762560,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -467,8 +467,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 241.0502368,
-        "pricingAsOf": "2026-08-06T08:08:49.408Z"
+        "usd": 242.1357618,
+        "pricingAsOf": "2026-08-06T08:27:15.840Z"
       }
     },
     "merges": [
