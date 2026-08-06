@@ -17,9 +17,27 @@
       "timestamp": "2026-08-06T18:15:29.131Z",
       "reason": "end",
       "note": "Anomalies: the first full npm test run had four unrelated 5-second hook/test timeouts under concurrent load; each passed in isolation and the full rerun passed. The planning handoff left .overdeck/context/codebase/stack.md unstaged, so I committed its issue-relevant context correction separately. Delivered the Effect diagnostics CI ratchet, baseline audit, ACP typecheck lane, reviewer guidance, tests, and documentation."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T18:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T18:26:04.902Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T18:26:04.986Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T18:26:04Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3568\n\n# Review Synthesis — PAN-3568 — 2026-08-06T18:25:00Z\n\n## Verdict: CHANGES REQUESTED — the changed stack reference says the new root Effect ACP typecheck gate does not exist\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/context.json`\n- Branch: `feature/pan-3568`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568`\n- HEAD reviewed: `933b165219643018d3401e4ecf0299dd597e2aff`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR merge base: `e18aa3f16aa9d98d174490a54ffc92a4af94328c`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] The changed stack reference contradicts the new root ACP typecheck gate — `.overdeck/context/codebase/stack.md:27`\n\nFR-5 requires the root `npm run typecheck` chain to typecheck `packages/effect-acp`. The PR adds `npm run typecheck:acp` to that root chain in `package.json`, but the changed stack reference says that `packages/effect-acp` and `packages/contracts` are typechecked by no root gate. This leaves future agents with documentation that contradicts the feature's actual topology, so update the reference to identify `packages/effect-acp` as covered by the root typecheck command while preserving the accurate statement for `packages/contracts` if it remains uncovered.\n\nThe finding is in PR scope: `.overdeck/context/codebase/stack.md` is in the PR diff, and this is the first review cycle.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security: no blockers or advisories; fixed, quoted repository-controlled shell inputs do not evaluate diagnostic output as code.\n- Correctness: no blockers or advisories; the diagnostic lanes, baseline comparison, failure handling, and ratchet-audit integration passed the reviewer’s focused validation.\n- Performance: no blockers or advisories; the four bounded diagnostic lanes run only in the developer/CI lint path and add no production hot-path work.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3568/.pan/review/agent-pan-3568-review-933b1652/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3568 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/stack.md"
@@ -64,7 +82,7 @@
     "recordedAt": "2026-08-06T18:15:17.034Z"
   },
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T18:26:04.122Z",
+  "updated": "2026-08-06T18:26:04.987Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "blocked",
