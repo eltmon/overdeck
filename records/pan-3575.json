@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:39:24.819Z",
+  "updated": "2026-08-06T07:39:33.793Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "parked-orbit-owner": {
+        "writerId": "agent-pan-3575",
+        "agentId": "agent-pan-3575",
+        "pid": 581542,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T07:39:33.793Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3575",
@@ -102,6 +110,7 @@
     "wire-review-status-uat.wire-review-status-uat.ac2": "completed",
     "wire-review-status-uat.wire-review-status-uat.ac3": "completed",
     "wire-review-status-uat.wire-review-status-uat.ac4": "completed",
-    "wire-review-status-uat.wire-review-status-uat.ac5": "completed"
+    "wire-review-status-uat.wire-review-status-uat.ac5": "completed",
+    "parked-orbit-owner": "running"
   }
 }
