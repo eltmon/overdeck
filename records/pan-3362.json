@@ -208,27 +208,21 @@
     "recordedAt": "2026-08-01T13:59:42.560Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T07:26:58.143Z",
+  "updated": "2026-08-06T07:27:33.035Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T14:53:43.234Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
-    "testNotes": "typecheck: clean (tsc --noEmit + hooks/evals/dashboard/frontend guards, 0 new errors). lint: clean (eslint + effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all passed). npm test first run: 12973 passed, 45 failed, 51 skipped (13076 total) — every failure is 'Hook timed out in 5000ms' or 'Test timed out in 5000ms' inside setupOverdeckTestDb(), none in this branch's changed files (src/lib/uat-fixtures/*, src/cli/commands/admin/seed-uat-fixtures.ts, docs). Reran all 41 distinct failed files: 37 passed clean immediately; remaining 4 reran with fileParallelism off: 2 passed, 2 still timed out; reran those final 2 alone: both passed. Host load average was 19.91/22.68/24.72 (20 concurrent Overdeck agents on this machine) during the run, matching known setupOverdeckTestDb()-under-load flakiness (PAN-3393 class) and confirmed non-reproducing in isolation. Zero real regressions found.",
+    "updatedAt": "2026-08-06T07:27:32.994Z",
     "uatNotes": "Brought up this workspace's own docker container (pan workspace rebuild pan-3362 -> overdeck-feature-pan-3362, healthy at https://api-feature-pan-3362.overdeck.localhost), per roles/test.md's host-process-boundary rule (never touch the host dashboard; use only the feature workspace's own container). Ran node dist/cli/index.js admin seed-uat-fixtures pan-3362 (this issue's own new command) — seeding succeeded (5 agent rows, 4 activity entries, plan+continue files written) and the server restarted healthy. Navigated Playwright to https://feature-pan-3362.overdeck.localhost and opened FIX-1's issue detail (cli-command.ac2). Confirmed working: [FIXTURE] issue renders, a phase/status is shown (Paused mid-work), 5 agent rows appear (1 Work + 4 Review = the review convoy), and the Activity feed is non-empty (fixture-seeded/tests-passed/review-approved/work-completed entries visible). Two required elements are NOT met: (1) Plan tab shows 'Tasks 0/0' / 'No tasks yet' / plan panel shows '✗ no spec' instead of a non-zero item badge -- root cause: GET /api/workspaces/FIX-1 returns {exists:true, corrupted:true, message:'Workspace exists but is not a valid git worktree or containerized workspace'}, so GET /api/workspaces/FIX-1/plan and GET /api/issues/FIX-1/tasks both 404 even though the fixture wrote a valid 3-item/6-AC xBRIEF to <OVERDECK_HOME>/uat-fixtures/repo/workspaces/feature-fix-1/.overdeck/spec.vbrief.json -- the seeded workspace directory is not a real git worktree, so the workspace resolver flags it corrupted and the plan is invisible through the UI's normal read path. (2) Branch 'feature/fix-1' is not rendered anywhere on the issue detail page; GET /api/agents confirms the live agent-fix-1-work row has \"git\": null. (PR data itself is correctly served -- GET /api/review/FIX-1/status returns prUrl 'https://github.com/uat-fixtures/repo/pull/1' and prNumber 1 -- but this is moot given criteria 1 and 2 already fail.) Screenshot saved at .playwright-mcp/pan-3362-fix1-issue-detail.png. Per roles/test.md: 'A UAT that cannot run or leaves any criterion unproven is uatStatus: failed even when testStatus: passed' -- two of cli-command.ac2's required observable elements are unproven/disproven, so UAT fails even though automated gates pass.",
-    "verificationNotes": "Verification FAILED at test (1303939ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/src/dashboard/frontend\n\n ❯ |root| tests/lib/memory/e2e.test.ts (1 test | 1 failed) 5357ms\n     × persists six turns, rolls up once, searches, resets, excludes subagents, records cost, and dedupes concurrent claims 5356ms (retry x1)\n ❯ |root| src/lib/memory/__tests__/backfill.test.ts (4 tests | 1 failed) 5825ms\n     × a fixture session whose cwd matches a workspace produces a written observation 5344ms (retry x1)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 6926ms\n     × searches observations with issue, tag, workspace, and sibling filters 5310ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-osrqjP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspa\n…(1104 chars elided)…\nre-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-W1x91w/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n\n...(truncated)",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
-    "lastVerifiedCommit": "da81f1421484b3a4aa69ae900795e3b93d02e4f5",
-    "reviewRequestedAt": "2026-08-01T13:59:43.571Z",
-    "reviewSpawnedAt": "2026-08-01T14:32:17.620Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -340,7 +334,7 @@
       },
       "costAtCloseOut": {
         "usd": 173.103665,
-        "pricingAsOf": "2026-08-01T15:21:57.273Z"
+        "pricingAsOf": "2026-08-06T07:27:33.019Z"
       }
     },
     "merges": [
