@@ -124,17 +124,17 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:53:47.703Z",
+  "updated": "2026-08-06T08:54:05.008Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:52:21.853Z",
-    "updatedAt": "2026-08-06T08:53:47.681Z",
+    "updatedAt": "2026-08-06T08:54:04.987Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
@@ -242,7 +242,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.093311,
-        "pricingAsOf": "2026-08-06T08:53:47.697Z"
+        "pricingAsOf": "2026-08-06T08:54:04.998Z"
       }
     },
     "merges": [
