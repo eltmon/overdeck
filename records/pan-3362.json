@@ -245,11 +245,11 @@
     "recordedAt": "2026-08-06T07:39:46.028Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T08:21:21.358Z",
+  "updated": "2026-08-06T08:21:29.885Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -257,7 +257,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T07:44:50.638Z",
-    "updatedAt": "2026-08-06T08:21:19.030Z",
+    "updatedAt": "2026-08-06T08:21:29.874Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: assertContainerEnv now requires real container-runtime evidence (/.dockerenv or /run/.containerenv), not just the caller-controlled OVERDECK_DISABLE_DEACON/CONTAINER_MODE env flags, closing the NonGoal-4 host-write path the requirements reviewer identified.",
     "testNotes": "Ran from workspace feature-pan-3362 (verified pwd/branch before every command). Gates match projects.yaml panopticon-cli.quality_gates. install: bun install --frozen-lockfile clean, no changes. typecheck: npm run typecheck clean (root tsc + hooks + evals + dashboard-types guard 47 known/0 new + frontend-types guard 0 known/0 new); frontend-typecheck: npx tsc --noEmit in src/dashboard/frontend clean. lint: npm run lint exit 0, all sub-checks (skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit) passed, only pre-existing unrelated rolldown warnings (acp session-runtime.d.ts, ineffective-dynamic-import). build: npm run build exit 0, dist-externals guard passed. server-bundle: npm run build:dashboard:server:bundle exit 0. test (configured changed-base gate, CHANGED_BASE=origin/main merge-base 29343dc8ec, root+frontend run concurrently per projects.yaml): root 5858 passed/20 skipped (589 files), frontend 3032 passed (309 files), combined exit 0. Also ran tests/unit/lib/uat-fixtures/ directly: 10/10 passed (includes the new seed.test.ts AC-5 case). All automated gates green — testStatus passed.\n\nIMPORTANT PROCESS FLAG (not a code defect, but affects what 'the reviewed branch' means): the workspace has 3 UNCOMMITTED files on top of committed HEAD 48144d072a (which review/inspect passed): src/lib/uat-fixtures/fixture-data.ts, src/lib/uat-fixtures/seed.ts, tests/unit/lib/uat-fixtures/seed.test.ts. This diff adds fixtureWorkspacePath() + a seeded CLAUDE.md marker file, fixing the 'workspace corrupted' finding from UAT cycle 1 (GET /api/workspaces/FIX-1 no longer reports corrupted:true). All gates above were run against the actual working tree (uncommitted diff included, since tsc/eslint/vitest read the filesystem regardless of git status) and reflect that state. But this fix is NOT part of the committed/reviewed HEAD — someone must commit it (and re-review if required) before it is part of what actually merges. Root cause not further investigated per test-role scope; flagging for the work/review roles.",
     "uatNotes": "Brought up this workspace's own container (overdeck-feature-pan-3362, already running; restarted the server service to pick up the freshly-built dist so the uncommitted fixture-data.ts/seed.ts fix would be in effect, confirmed healthy at https://api-feature-pan-3362.overdeck.localhost/api/health). Ran node dist/cli/index.js admin seed-uat-fixtures pan-3362 (this issue's own new command, from this workspace's own dist, not main) — seeding succeeded (5 agent rows, 4 activity entries, plan+continue files written) and the server restarted healthy. Navigated Playwright to https://feature-pan-3362.overdeck.localhost/issues/FIX-1 and opened FIX-1's issue detail drawer, checking every element cli-command.ac2 requires:\n\nMET: (1) a phase — WORK is shown highlighted/active in the Plan→Work→Review→Test→Ship→Done crew spine, status 'In Progress'. (2) four review-convoy rows — review.security / review.correctness / review.performance / review.requirements all render as separate cards, each 'Done — review complete'. (3) non-empty Activity feed — 4 [FIXTURE] entries ('Fixture seeded for UAT verification', 'Tests passed', 'Review convoy approved', 'Work agent completed implementation') render in both the Live Activity rail and the dedicated Activity tab. Screenshot: .playwright-mcp/pan-3362-fix1-activity-tab.png.\n\nNOT MET: (4) branch feature/fix-1 is not rendered anywhere on the page (browser_find for 'feature/fix-1' across the full drawer: no matches). Root cause: GET /api/agents shows every FIX-1 agent row with \"branch\": null and \"git\": null; the raw agents SQLite table has no `branch` column at all (PRAGMA table_info(agents) confirmed), so AgentState.branch as set by fixtureAgentStates() is silently dropped by the write door — branch display appears to be sourced from a live git inspection of the agent's workspace directory, which the seeded fixture path is not (no .git). (5) A PR link is not rendered on the issue-detail drawer — only the tracker 'Issue' link (https://github.com/uat-fixtures/repo/issues/1) appears; browser_find for 'pull/1'/'PR #'/'View PR' found nothing. GET /api/review/FIX-1/status correctly returns prUrl 'https://github.com/uat-fixtures/repo/pull/1' and prNumber 1, but grep of the frontend confirms prUrl is only ever rendered by AwaitingMergePage/Pipeline/SimpleIssuePage components, never by IssueDetail/IssueDrawer. (6) Plan tab does not show a non-zero item badge — the 'Tasks' tab reads 'Tasks 0/0' and its panel body reads '0 open, 0 closed, No tasks yet' on a clean reload, even though GET /api/workspaces/FIX-1/plan and GET /api/issues/FIX-1/tasks both correctly return the seeded 3-item/6-AC xBRIEF (confirmed via curl), and even though the SAME drawer's Overview tab task rail correctly shows '3 open, 0 closed' with all 3 fixture tasks listed by title. This proves the Plan/Tasks tab badge and TasksPanel body read a different, unpopulated data source (issue.tasks on the websocket-pushed Issue snapshot via useDrawerData's issueTasks()) than the Overview rail (which hits the REST endpoint directly) — a genuine, reproducible inconsistency, not a one-off cache glitch (verified across a full page reload). Screenshot: .playwright-mcp/pan-3362-fix1-tasks-tab-badge-mismatch.png.\n\nPer the test-role contract: a required UAT that leaves any criterion unproven is uatStatus failed even when automated gates pass. 3 of the 6 elements cli-command.ac2 requires are unmet (branch, PR link, Plan-tab badge), so UAT fails.",
@@ -312,9 +312,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 1766130,
-            "output": 34285,
-            "cacheRead": 15248384,
+            "input": 1769075,
+            "output": 34483,
+            "cacheRead": 15581696,
             "cacheWrite": 0
           }
         },
@@ -399,9 +399,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 5615062,
-          "output": 168656,
-          "cacheRead": 47516160,
+          "input": 5618007,
+          "output": 168854,
+          "cacheRead": 47849472,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -412,8 +412,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 211.564933,
-        "pricingAsOf": "2026-08-06T08:21:21.348Z"
+        "usd": 211.658595,
+        "pricingAsOf": "2026-08-06T08:21:29.879Z"
       }
     },
     "merges": [
