@@ -20,7 +20,7 @@ const TEXTAREA_STYLE: React.CSSProperties = {
   outline: 'none',
   resize: 'none',
   padding: 16,
-  fontFamily: "'SF Mono', monospace",
+  fontFamily: "var(--font-mono), 'SF Mono', monospace",
   fontSize: 13,
   lineHeight: 1.55,
   background: 'transparent',

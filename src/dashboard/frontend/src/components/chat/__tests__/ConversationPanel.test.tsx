@@ -319,6 +319,8 @@ describe('ConversationPanel rename flow', () => {
   it('passes conversation context usage to the composer footer', () => {
     renderPanel({
       ...mockConversation,
+      sessionAlive: true,
+      status: 'active',
       contextUsage: {
         activeBytes: 6_000,
         estimatedTokens: 1_500,
@@ -336,6 +338,8 @@ describe('ConversationPanel rename flow', () => {
     renderPanel(
       {
         ...mockConversation,
+        sessionAlive: true,
+        status: 'active',
         contextUsage: {
           activeBytes: 6_000,
           estimatedTokens: 1_500,
@@ -604,3 +608,49 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
     expect(screen.getByText('How can I help you?')).toBeInTheDocument();
   });
 });
+
+describe('ConversationPanel spawn-placeholder window (post-reboot interrupted rows)', () => {
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  // 2026-08-05 post-reboot: a dead tmux session + no endedAt rendered
+  // "Starting…" for 5+ minutes over a day-old conversation whose transcript
+  // was on disk. Interrupted rows must render their content, not the spawn
+  // placeholder.
+  it('does not show Starting… for an old interrupted conversation with transcript content', () => {
+    renderPanel(
+      { ...mockConversation, sessionAlive: false, status: 'active', endedAt: null, createdAt: '2026-08-04T13:48:50.505Z' },
+      {},
+      {
+        messages: [{ id: 'u1', role: 'user', text: 'older conversation content', createdAt: '2026-08-04T14:00:00Z' }],
+        workLog: [],
+        streaming: false,
+      },
+    );
+    expect(screen.queryByText('Starting…')).toBeNull();
+    expect(screen.queryByText('Waiting for the session to start.')).toBeNull();
+  });
+
+  it('still shows Starting… for a genuinely fresh spawn', () => {
+    renderPanel(
+      { ...mockConversation, sessionAlive: false, status: 'active', endedAt: null, createdAt: new Date().toISOString() },
+      {},
+      { messages: [], workLog: [], streaming: false },
+    );
+    expect(screen.getByText('Starting…')).toBeInTheDocument();
+  });
+});
+

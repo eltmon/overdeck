@@ -10,7 +10,7 @@ import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
@@ -478,26 +478,24 @@ export function CommandDeck({
     const excludeSet = new Set<number>();
     if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
-    const pathToKeys = new Map<string, string[]>();
+    const keyToKeys = new Map<string, string[]>();
     for (const rp of registeredProjects) {
-      if (!rp.path) continue;
       const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
-      pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
+      keyToKeys.set(rp.key, keys);
     }
 
+    // One resolver decides "which project" for every conversation (PAN-1577):
+    // explicit projectKey override first, cwd→project-path inference otherwise.
     for (const conv of conversations) {
-      if (!conv.cwd) continue;
-      const cwd = conv.cwd.replace(/\/+$/, '');
-      for (const [projectPath, projectKeys] of pathToKeys) {
-        if (cwd === projectPath || cwd.startsWith(projectPath + '/')) {
-          for (const projectKey of projectKeys) {
-            if (!map[projectKey]) map[projectKey] = [];
-            map[projectKey].push(conv);
-          }
-          excludeSet.add(conv.id);
-          break;
-        }
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) continue;
+      const projectKeys = keyToKeys.get(effectiveKey);
+      if (!projectKeys) continue;
+      for (const projectKey of projectKeys) {
+        if (!map[projectKey]) map[projectKey] = [];
+        map[projectKey].push(conv);
       }
+      excludeSet.add(conv.id);
     }
 
     return { projectConversations: map, excludeConvIds: excludeSet };
@@ -509,16 +507,17 @@ export function CommandDeck({
   // PAN-2005: same idea for the issue cockpit deep-link (/command-deck/<proj>/<issue>).
   const appliedCockpit = useRef<string | null>(null);
 
-  // Resolve the registered project (by name) that owns a conversation's cwd,
-  // or null when the conversation is unscoped — cwd not under any registered
-  // project (e.g. created without a projectKey, so cwd defaults to ~/Projects).
+  // Resolve the registered project (by name) that owns a conversation, or null
+  // when the conversation is unscoped. Prefers the explicit `projectKey`
+  // override (PAN-1577) when set; falls back to cwd→project-path inference
+  // only when it's null (e.g. created without a projectKey, so cwd defaults to
+  // ~/Projects).
   const resolveConversationProjectName = useCallback(
     (conv: Conversation | null | undefined): string | null => {
-      if (!conv?.cwd) return null;
-      const cwd = conv.cwd;
-      const matched = registeredProjects.find(
-        (rp) => !!rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')),
-      );
+      if (!conv) return null;
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) return null;
+      const matched = registeredProjects.find((rp) => rp.key === effectiveKey);
       return matched ? (matched.name ?? matched.key) : null;
     },
     [registeredProjects],
@@ -1481,8 +1480,8 @@ export function CommandDeck({
               initialFocus={projectConvMutations.forkTargetFocus}
               isPending={projectConvMutations.isForkPending}
               onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
+              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey);
               }}
             />
           )}

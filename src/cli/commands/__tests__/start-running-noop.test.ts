@@ -306,6 +306,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-X', {
         allowPausedForce: false,
         allowLiveSessionReplacement: true,
+        explicitFresh: true,
       });
     });
 

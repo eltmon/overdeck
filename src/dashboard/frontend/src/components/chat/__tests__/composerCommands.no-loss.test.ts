@@ -15,8 +15,7 @@ interface LegacyCommand {
 type MappingRow =
   | { legacy: string; kind: 'overdeck'; target: string }
   | { legacy: string; kind: 'native'; target: string }
-  | { legacy: string; kind: 'alias'; target: string }
-  | { legacy: string; kind: 'excluded'; reason: string };
+  | { legacy: string; kind: 'alias'; target: string };
 
 const PRE_ADAPTER_COMMANDS = preAdapterCommands as LegacyCommand[];
 const HANDOFF_ALIASES = ['/handoff', '/pan-handoff', '/pan handoff'] as const;
@@ -57,8 +56,7 @@ function invalidMappings(rows: readonly MappingRow[]): MappingRow[] {
   return rows.filter(row => {
     if (row.kind === 'overdeck') return !PORTABLE_OVERDECK_LABELS.has(row.target);
     if (row.kind === 'native') return !CLAUDE_NATIVE_LABELS.has(row.target);
-    if (row.kind === 'alias') return !isComposerCommandMessage(row.target);
-    return row.reason.trim().length === 0;
+    return !isComposerCommandMessage(row.target);
   });
 }
 
@@ -69,7 +67,7 @@ describe('composer command no-loss audit', () => {
   ];
 
   it('accounts for every frozen legacy entry and handoff alias exactly once', () => {
-    expect(PRE_ADAPTER_COMMANDS).toHaveLength(262);
+    expect(PRE_ADAPTER_COMMANDS).toHaveLength(260);
     expect(new Set(MAPPING_ROWS.map(row => row.legacy)).size).toBe(MAPPING_ROWS.length);
     expect(unaccountedEntries(completeInventory, MAPPING_ROWS)).toEqual([]);
     expect(invalidMappings(MAPPING_ROWS)).toEqual([]);
@@ -79,16 +77,6 @@ describe('composer command no-loss audit', () => {
     const missingStart = MAPPING_ROWS.filter(row => row.legacy !== 'pan start');
 
     expect(unaccountedEntries(completeInventory, missingStart)).toContain('pan start');
-  });
-
-  it('requires every exclusion row to carry an explicit reason', () => {
-    const invalidExclusion: MappingRow = {
-      legacy: 'removed command',
-      kind: 'excluded',
-      reason: '',
-    };
-
-    expect(invalidMappings([...MAPPING_ROWS, invalidExclusion])).toContain(invalidExclusion);
   });
 
   it('keeps all three handoff aliases intercepted by the dashboard', () => {

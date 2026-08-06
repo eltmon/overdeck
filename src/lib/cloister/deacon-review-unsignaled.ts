@@ -11,6 +11,7 @@ import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialis
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy-liveness.js';
+import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
 
@@ -211,7 +212,7 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'pending' || !status.reviewSpawnedAt) continue;
+      if ((status.reviewStatus !== 'pending' && status.reviewStatus !== 'reviewing') || !status.reviewSpawnedAt) continue;
 
       try {
         const resolved = resolveProjectFromIssueSync(issueId);
@@ -313,13 +314,13 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
         const reviewNotes = parsed.topBlocker
           ? `${parsed.topBlocker} — ${attribution}`
           : `Review ${parsed.verdict} ${attribution}`;
-        setReviewStatusSync(issueId, {
-          reviewStatus: parsed.verdict,
-          reviewNotes,
-          ...((parsed.verdict === 'passed' || parsed.verdict === 'blocked') && currentHead
-            ? { reviewedAtCommit: currentHead }
-            : {}),
+        const convergence = await convergeRowFromVerdictOfRecord(issueId, {
+          runId: basename(latestDir),
+          workspacePath: wsPath,
+          writer: 'unsignaled-recovery',
+          notes: reviewNotes,
         });
+        if (!convergence.converged) continue;
 
         if (parsed.verdict === 'blocked') {
           try {

@@ -30,8 +30,6 @@ interface DoneOptions {
   item?: string;
   /** Review cycle identity used to deduplicate blocked feedback delivery. */
   runId?: string;
-  /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
-  reviewers?: string;
   notes?: string;
   uatStatus?: 'passed' | 'failed';
   uatNotes?: string;
@@ -113,36 +111,15 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
-      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
-      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
-      // Anchored to the workspace HEAD recorded below; malformed entries are
-      // dropped with a warning rather than failing the verdict write.
-      if (options.reviewers) {
-        const verdicts: NonNullable<ReviewStatus['reviewerVerdicts']> = {};
-        for (const pair of options.reviewers.split(',')) {
-          const [subRole, verdict] = pair.split('=').map(t => t.trim().toLowerCase());
-          if (subRole && (verdict === 'passed' || verdict === 'blocked')) {
-            verdicts[subRole] = { status: verdict };
-          } else if (pair.trim()) {
-            console.warn(chalk.yellow(`  ⚠ Ignoring malformed --reviewers entry: "${pair.trim()}" (want subRole=passed|blocked)`));
-          }
-        }
-        if (Object.keys(verdicts).length > 0) update.reviewerVerdicts = verdicts;
-      }
       // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
       // route does. The synthesis agent signals via this CLI path, so without this
       // the snapshot never happens: canSkipTests can't fire and the deacon's
       // post-review-commit drift detection goes blind, jamming the issue at
-      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts
-      // (reviewedAtCommit) AND for any verdict carrying --reviewers: per-reviewer
-      // verdicts need their atCommit anchor on a BLOCKED aggregate too — that is
-      // exactly the cycle whose clean reviewers selective re-review wants to skip
-      // next time (PAN-1862 FR-6/NFR-1). A bare blocked verdict skips this probe so
-      // the durable verdict write stays synchronous ahead of feedback delivery;
-      // its reviewedAtCommit anchor is recorded by a second best-effort write after
+      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts;
+      // a blocked verdict stays synchronous ahead of feedback delivery, and its
+      // reviewedAtCommit anchor is recorded by a second best-effort write after
       // feedback delivery below (PAN-2524, PAN-3148).
-      if (options.status === 'passed' || update.reviewerVerdicts) {
+      if (options.status === 'passed') {
         let workspaceHead: HeadAnchor | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
@@ -165,9 +142,6 @@ export async function doneCommand(
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
-        }
-        if (workspaceHead && update.reviewerVerdicts) {
-          for (const v of Object.values(update.reviewerVerdicts)) if (v) v.atCommit = workspaceHead;
         }
         if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
       }
@@ -239,23 +213,15 @@ export async function doneCommand(
 
   let status = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
 
-  // For review verdicts, route through the verdict write door (PAN-3512)
-  // when there's an evidence head (passed verdict with reviewers, or any blocked/failed verdict).
+  // Route every terminal review verdict through the verdict write door (PAN-3512).
   if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
-    let evidenceHead: HeadAnchor | undefined;
-    if (update.reviewedAtCommit) {
-      evidenceHead = update.reviewedAtCommit;
-    } else if (update.reviewerVerdicts) {
-      const firstVerdict = Object.values(update.reviewerVerdicts)[0];
-      if (firstVerdict?.atCommit) {
-        evidenceHead = rehydrateHeadAnchor(firstVerdict.atCommit);
-      }
-    }
+    const evidenceHead = update.reviewedAtCommit
+      ? rehydrateHeadAnchor(update.reviewedAtCommit)
+      : undefined;
 
     const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
       verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
       notes: options.notes,
-      reviewerVerdicts: update.reviewerVerdicts,
       evidenceHead,
       extra: {
         ...(update.verificationStatus !== undefined

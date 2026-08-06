@@ -4,6 +4,7 @@ import { Data, Effect } from 'effect';
 import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
+import { getReviewStatusSync } from './review-status.js';
 import { sessionExistsSync, sessionExists } from './tmux.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
@@ -11,6 +12,29 @@ export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_cont
 
 function sessionResetRequiredReason(agentId: string, agentOrIssueId: string): string {
   return `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or run 'pan reset-session ${agentOrIssueId}' before starting a new session.`;
+}
+
+/**
+ * PAN-3555: a completion marker stops meaning "nothing to resume" the moment the
+ * pipeline owes the agent rework — a failed verification, a blocked/failed review,
+ * or a failed test after the handoff makes the warm session the rework target
+ * (the same condition PAN-2668 uses to clear stoppedByUser for feedback delivery).
+ * Without this, the handed-off branch routed `pan start` to a silent fresh session
+ * whenever the feedback loop's direct resumeAgent() path failed, abandoning the
+ * resumable transcript with no refusal and no logged reason.
+ */
+export function issueOwesReworkSync(issueId: string | undefined): boolean {
+  if (!issueId) return false;
+  try {
+    const row = getReviewStatusSync(issueId);
+    if (!row) return false;
+    return row.verificationStatus === 'failed'
+      || row.reviewStatus === 'blocked'
+      || row.reviewStatus === 'failed'
+      || row.testStatus === 'failed';
+  } catch {
+    return false;
+  }
 }
 
 export interface WorkAgentLifecycleState {
@@ -38,6 +62,11 @@ export interface WorkAgentLifecycleState {
    * feedback loop is unaffected — it resurrects through `resumeAgent()`
    * directly, not through this read door. */
   handedOff: boolean;
+  /** PAN-3555: true when the agent handed off but the canonical review row shows the
+   * pipeline owes it rework (failed verification, blocked/failed review, or failed
+   * test). An owed-rework handoff is resumable again — `handedOff` alone no longer
+   * closes the resume doors. */
+  owesRework: boolean;
   runtimeState: string;
   agentStatus: string;
   canStartFresh: boolean;
@@ -86,6 +115,8 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
+  const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
+  const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -107,6 +138,9 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   } else if (hasLiveTmuxSession && agentStatus === 'running') {
     recommendedAction = 'none';
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
+  } else if (canWarmResumeAfterHandoff) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
     // only relaunches a finished transcript (which the harness then compacts)
@@ -152,6 +186,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     isCompleted,
     isCrashed,
     handedOff,
+    owesRework,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
@@ -159,7 +194,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     // session — no resume needed. Stuck agents (isRunning=true, isRunningButStuck=true) must
     // use the dedicated isRunningButStuck flag at call sites; canResumeSession stays false for
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
-    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && (!handedOff || owesRework),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
@@ -191,6 +226,8 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
+  const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
+  const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -212,6 +249,9 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   } else if (hasLiveTmuxSession && agentStatus === 'running') {
     recommendedAction = 'none';
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
+  } else if (canWarmResumeAfterHandoff) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
     // only relaunches a finished transcript (which the harness then compacts)
@@ -257,6 +297,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     isCompleted,
     isCrashed,
     handedOff,
+    owesRework,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
@@ -266,7 +307,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
     // PAN-2908: the async snapshot used to omit hasSavedSession here — every stopped agent with
     // a workspace looked resumable, so the CTA offered Resume with nothing to resume (PAN-806).
-    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && (!handedOff || owesRework),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
@@ -278,6 +319,12 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
 interface StartFreshOptions {
   allowPausedForce?: boolean;
   allowLiveSessionReplacement?: boolean;
+  /** True only when the caller carries an explicit operator `--fresh` intent.
+   * PAN-3555: without it, a handed-off agent that owes rework and has a
+   * resumable warm session must be refused a fresh start — plain `pan start`
+   * silently abandoning the warm transcript is exactly the bug. Explicit
+   * `--fresh` keeps working (the PAN-3543 escape from the reset deadlock). */
+  explicitFresh?: boolean;
 }
 
 export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
@@ -288,6 +335,12 @@ export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFr
   const liveSessionReplacement = options.allowLiveSessionReplacement === true && lifecycle.isRunning;
   if (liveSessionReplacement && lifecycle.canResetSession) {
     throw new Error(sessionResetRequiredReason(lifecycle.agentId, agentOrIssueId));
+  }
+  if (options.explicitFresh !== true && lifecycle.owesRework && lifecycle.canResumeSession) {
+    throw new Error(
+      `Agent ${lifecycle.agentId} handed off its work but the pipeline owes it rework, and its warm session is resumable. `
+      + `Use 'pan resume ${agentOrIssueId}' to continue that session with the pending feedback, or pass --fresh to deliberately start a new one (PAN-3555).`,
+    );
   }
   if (!lifecycle.canStartFresh && !pausedForceOverride && !liveSessionReplacement) {
     throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);

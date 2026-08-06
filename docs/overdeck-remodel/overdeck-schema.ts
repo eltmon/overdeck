@@ -99,6 +99,7 @@ export const conversations = sqliteTable("conversations", {
   name: text("name").notNull().unique(),                         // operator/favorite key
   cwd: text("cwd").notNull(),                                    // pointer input (encodes the claude path)
   issueId: text("issue_id"),                                     // soft pointer — no FK; nullable. Conversations of closed/deleted/ad-hoc issues outlive the issue row.
+  projectKey: text("project_key"),                               // explicit registered-project association; cwd remains independent
   harness: text("harness"),                                      // resolver discriminator
   model: text("model"),
   effort: text("effort"),

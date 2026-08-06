@@ -61,6 +61,7 @@ const conversationsTable = sqliteTable('conversations', {
   forkFallbackReason:  text('fork_fallback_reason'),
   deliveryMethod:      text('delivery_method'),
   spawnError:          text('spawn_error'),
+  projectKey:          text('project_key'),
 });
 
 const conversationFilesTable = sqliteTable('conversation_files', {
@@ -133,6 +134,8 @@ export const Conversation = Schema.Struct({
   handoffDocPath:      Schema.NullOr(Schema.String),
   handoffTargetConvId: Schema.NullOr(ConversationId),
   clearedToConvId:     Schema.NullOr(ConversationId),
+  /** Explicit project assignment override (PAN-1577). Null = fall back to deriving the project from cwd. */
+  projectKey:          Schema.NullOr(Schema.String),
   files:               Schema.Array(BackingFile),
 });
 export type Conversation = typeof Conversation.Type;
@@ -219,6 +222,7 @@ function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
     handoffDocPath:      row.handoffDocPath ?? null,
     handoffTargetConvId: row.handoffTargetConvId ?? null,
     clearedToConvId:     row.clearedToConvId ?? null,
+    projectKey:          row.projectKey ?? null,
     files:               files.map(rowToBackingFile),
   });
 }
@@ -388,7 +392,7 @@ export const TranscriptsWriterLive = Layer.succeed(
 export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly create: (opts: {
     name: ConversationName; cwd: string; model?: string; effort?: string;
-    harness?: Harness; issueId?: string; title?: string;
+    harness?: Harness; issueId?: string; projectKey?: string; title?: string;
   }) => Effect.Effect<Conversation>;
   readonly archive:       (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | AlreadyArchived>;
   readonly unarchive:     (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | NotArchived>;
@@ -398,6 +402,8 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
     Effect.Effect<Conversation, ConversationNotFound>;
   readonly setModel:   (name: ConversationName, model: string)    => Effect.Effect<Conversation, ConversationNotFound>;
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>;
+  /** Explicit project assignment override (PAN-1577); pass null to clear it back to cwd-derived grouping. */
+  readonly setProjectKey: (name: ConversationName, projectKey: string | null) => Effect.Effect<Conversation, ConversationNotFound>;
   readonly handoff:     (source: ConversationName, target: ConversationName, docPath: string) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
   readonly clear:       (source: ConversationName) =>
@@ -418,7 +424,7 @@ export const ConversationWriterLive = Layer.effect(
 
     const create = (opts: {
       name: ConversationName; cwd: string; model?: string; effort?: string;
-      harness?: Harness; issueId?: string; title?: string;
+      harness?: Harness; issueId?: string; projectKey?: string; title?: string;
     }): Effect.Effect<Conversation> =>
       Effect.gen(function* () {
         const id = randomUUID() as unknown as ConversationId;
@@ -429,6 +435,7 @@ export const ConversationWriterLive = Layer.effect(
             name:        opts.name,
             cwd:         opts.cwd,
             issueId:     opts.issueId ?? null,
+            projectKey:  opts.projectKey ?? null,
             harness:     opts.harness ?? null,
             model:       opts.model ?? null,
             effort:      opts.effort ?? null,
@@ -440,7 +447,8 @@ export const ConversationWriterLive = Layer.effect(
         yield* bus.emit({ type: 'conversation.created', payload: { name: opts.name } });
         return decodeConversation({
           id, name: opts.name, cwd: opts.cwd,
-          issueId: opts.issueId ?? null, harness: opts.harness ?? null,
+          issueId: opts.issueId ?? null, projectKey: opts.projectKey ?? null,
+          harness: opts.harness ?? null,
           model: opts.model ?? null, effort: opts.effort ?? null,
           title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
           createdAt: ts, archivedAt: null,
@@ -527,6 +535,17 @@ export const ConversationWriterLive = Layer.effect(
         return yield* resolver.get(name);
       });
 
+    const setProjectKey = (name: ConversationName, projectKey: string | null):
+      Effect.Effect<Conversation, ConversationNotFound> =>
+      Effect.gen(function* () {
+        yield* resolver.get(name);
+        yield* Effect.promise(() =>
+          db.q.update(conversationsTable).set({ projectKey }).where(eq(conversationsTable.name, name)),
+        );
+        yield* bus.emit({ type: 'conversation.projectKeyChanged', payload: { name, projectKey } });
+        return yield* resolver.get(name);
+      });
+
     // The fork primitive — the ONLY mechanism that creates a new backing file.
     // Creates a fresh UUID locator, registers a conversation_files pointer, records lineage.
     // NEVER opens an existing file for write.
@@ -578,7 +597,7 @@ export const ConversationWriterLive = Layer.effect(
 
     return ConversationWriter.of({
       create, archive, unarchive, setFavorite, unsetFavorite,
-      retitle, setModel, setHarness,
+      retitle, setModel, setHarness, setProjectKey,
       handoff, clear, summaryFork, compact,
     });
   }),
@@ -670,6 +689,8 @@ export interface LegacyConversation {
   forkRequest: string | null;
   forkRetryCount: number;
   workspaceId: string | null;
+  /** Explicit project assignment override. Null = fall back to deriving the project from cwd. */
+  projectKey: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -758,6 +779,7 @@ interface LegacyConversationRow {
   delivery_method: string | null;
   spawn_error: string | null;
   workspace_id: string | null;
+  project_key: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -792,6 +814,7 @@ const LEGACY_CONVERSATION_SELECT = `
     c.delivery_method,
     c.spawn_error,
     c.workspace_id,
+    c.project_key,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -917,6 +940,7 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     forkRequest: row.fork_request ?? null,
     forkRetryCount: row.fork_retry_count ?? 0,
     workspaceId: row.workspace_id ?? null,
+    projectKey: row.project_key ?? null,
   };
 }
 
@@ -1208,6 +1232,8 @@ export function createConversation(opts: {
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
   /** PAN-1990: explicit workspace id. Falls back to resolveWorkspaceForCwd(cwd) when omitted. */
   workspaceId?: string | null;
+  /** Explicit registered-project association; never inferred from cwd at write time. */
+  projectKey?: string | null;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -1222,8 +1248,8 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -1240,6 +1266,7 @@ export function createConversation(opts: {
       opts.deliveryMethod ?? null,
       null,  // spawn_error starts null
       workspaceId,
+      opts.projectKey ?? null,
     );
     if (opts.claudeSessionId) {
       db.prepare(`
@@ -1353,6 +1380,11 @@ export function setConversationEffort(name: string, effort: string | null): void
 
 export function setConversationHarness(name: string, harness: RuntimeName): void {
   overdeckDb().prepare(`UPDATE conversations SET harness = ? WHERE name = ?`).run(harness, name);
+}
+
+/** Set (or clear, with null) the project assignment override for a conversation. */
+export function setConversationProjectKey(name: string, projectKey: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET project_key = ? WHERE name = ?`).run(projectKey, name);
 }
 
 export function setConversationClaudeSessionId(name: string, claudeSessionId: string): void {

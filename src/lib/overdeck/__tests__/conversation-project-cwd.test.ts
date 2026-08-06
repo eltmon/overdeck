@@ -44,19 +44,19 @@ afterAll(() => {
 
 describe('resolveProjectCwd', () => {
   it('resolves a project by its yaml key', async () => {
-    expect(resolveProjectCwd('myapp')).toEqual({ cwd: MYAPP_PATH });
+    await expect(resolveProjectCwd('myapp')).resolves.toEqual({ key: 'myapp', cwd: MYAPP_PATH });
   });
 
   it('resolves a project by its display name (PAN-2590)', async () => {
-    expect(resolveProjectCwd('MyApp')).toEqual({ cwd: MYAPP_PATH });
+    await expect(resolveProjectCwd('MyApp')).resolves.toEqual({ key: 'myapp', cwd: MYAPP_PATH });
   });
 
   it('reports an unregistered project as unknown', async () => {
-    expect(resolveProjectCwd('Nope')).toEqual({ error: 'Unknown project: Nope' });
+    await expect(resolveProjectCwd('Nope')).resolves.toEqual({ error: 'Unknown project: Nope' });
   });
 
   it('reports a registered project whose path is missing on disk', async () => {
-    const result = resolveProjectCwd('Ghost');
+    const result = await resolveProjectCwd('Ghost');
     expect('error' in result && result.error).toMatch(/^Project path does not exist: /);
     expect('error' in result && result.error).toContain('(project: Ghost)');
   });

@@ -1383,6 +1383,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
     }
 
+    case 'conversation.moved': {
+      return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
+    }
+
     case 'conversation.title_changed': {
       return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
     }

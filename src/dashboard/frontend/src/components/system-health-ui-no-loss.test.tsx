@@ -290,11 +290,14 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Top consumers section with kind badges. getAllBy*: the audit asks whether
-    // these are still displayed, and several consumer rows legitimately match —
-    // getBy* would fail on the section being MORE populated, not less.
-    expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
-    expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
+    // Top consumers section with every kind badge and consumer label. getAllBy*
+    // tolerates repeated labels while preserving the no-loss check for each row.
+    for (const kind of ['agent', 'specialist', 'container']) {
+      expect(within(dialog).getAllByText(kind).length).toBeGreaterThan(0);
+    }
+    for (const label of ['agent-pan-1', 'specialist-review-agent', 'container-1']) {
+      expect(within(dialog).getAllByText(new RegExp(label)).length).toBeGreaterThan(0);
+    }
   });
 
   it('displays attention section with severity dots and grouped agent rows when critical', () => {
@@ -320,10 +323,10 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Attention section should exist with agent activity issue. Both the agent
-    // id and the reason message render it, so match on presence rather than
-    // uniqueness — the audited property is that the row is visible at all.
-    expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
+    // Attention section should retain both the grouped reason and the affected
+    // agent. Both values may occur more than once, so assert presence separately.
+    expect(within(dialog).getAllByText(/activity stalled/).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText(/agent-stalled/).length).toBeGreaterThan(0);
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {
