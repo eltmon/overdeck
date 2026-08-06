@@ -17,9 +17,22 @@
       "timestamp": "2026-08-06T08:08:46.787Z",
       "reason": "end",
       "note": "Anomaly: full npm test ran 1,415 files and timed out in 27 unrelated SQLite setup hooks; the failing files pass in an isolated 3-file run. No deviations. Added the UAT feedback relay, canonical review-status wiring, parked-orbit ownership, sweeper copy, tests, and documentation."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T08:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T08:15:57.316Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T08:15:57Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3575\n\n# Review Synthesis — PAN-3575 — 2026-08-06T08:13:00Z\n\n## Verdict: CHANGES REQUESTED — failed-UAT notes can become unauthenticated instructions delivered to a privileged work agent\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3575/.pan/review/agent-pan-3575-review-1bfc84db/context.json`\n- Branch: `feature/pan-3575`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3575`\n- HEAD reviewed: `1bfc84db91ac6390a5f623a339eb1ea3565c9d71`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 1 |\n| correctness | ready | `correctness.md` | 1 |\n| performance | ready | `performance.md` | 1 |\n| requirements | ready | `requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Failed-UAT notes reach a privileged agent through an unauthenticated status ingress — `src/lib/cloister/uat-failure-feedback.ts:43`\n\nThe new relay persists `uatNotes` verbatim and tells the target work agent to read and act on the generated feedback file. The existing network-reachable `POST /api/review/:issueId/status` endpoint accepts arbitrary failed-UAT notes without dashboard-mutation authorization or CSRF protection, so a reachable client can supply instructions that the new relay forwards into a privileged agent session. The feedback interpolation and delivery sink are introduced by this PR, so this finding is in PR scope. Protect the status ingress and every other machine-facing UAT verdict ingress before the notes can reach `setReviewStatusSync()`, and add a route-level regression test that unauthenticated or CSRF-less failed-UAT requests cannot invoke the relay.\n\n### [correctness] Non-throwing agent-delivery failures are recorded as successful delivery — `src/lib/cloister/uat-failure-feedback.ts:108`\n\n`messageAgent()` can resolve with `delivered: false`, but the relay sets `agentMessageSent = true` for every resolved outcome and skips `surfaceIssueFeedbackNeedsYou()`. Since the anchor is recorded before delivery, later identical status posts deduplicate instead of re-routing the feedback, leaving a failed UAT merge-blocked without agent feedback or a durable escalation. Inspect the returned `MessageDeliveryOutcome`, mark delivery successful only when `delivered` is true, and surface needs-you with its reason otherwise; cover that resolved-failure outcome in the relay tests.\n\n### [performance] The module-global verdict-anchor map grows with historical failed issues — `src/lib/cloister/uat-failure-feedback.ts:31`\n\n`lastNotifiedAnchor` stores an entry after each successful feedback write and is cleared only when a later non-failed UAT update arrives. Issues that remain failed until terminal lifecycle completion retain their keys for the lifetime of the dashboard process, so a long-running host grows the map with every historical UAT failure. Bound the state through terminal-lifecycle cleanup and eviction, or move this deduplication state into lifecycle-owned durable status.\n\n## Non-blocking Findings\n\n### [correctness] Resolver exceptions after feedback persistence — `src/lib/cloister/uat-failure-feedback.ts:126`\n\n`resolveIssueFeedbackTarget()` failures are logged after the verdict anchor is stored, without a needs-you escalation. This is advisory in the source report, but the routing-error path should surface the established escalation so persisted feedback does not become undiscoverable.\n\n## Clean Sub-roles\n\n- Requirements: all 13 in-PR-scope requirements were implemented, with no missing or partial acceptance criteria reported.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3575/.pan/review/agent-pan-3575-review-1bfc84db/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3575 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -58,7 +71,7 @@
     "recordedAt": "2026-08-06T08:08:19.232Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:15:56.614Z",
+  "updated": "2026-08-06T08:15:57.316Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "blocked",
