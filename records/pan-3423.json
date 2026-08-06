@@ -442,6 +442,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-06T00:08:27.750Z"
+    },
+    {
+      "timestamp": "2026-08-06T00:10:11.258Z",
+      "reason": "end",
+      "note": "No deviations. Synced origin/main commit 7260c8afde, resolved all three conflicts while preserving System Health attention actions, context-note fallback, and the current head-anchor inventory; full npm test and focused conflict tests passed; feature branch is pushed."
     }
   ],
   "feedback": [],
@@ -475,18 +480,18 @@
     "recordedAt": "2026-08-06T00:10:05.676Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-06T00:10:06.583Z",
+  "updated": "2026-08-06T00:10:11.259Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T00:10:06.582Z",
+    "updatedAt": "2026-08-06T00:10:11.193Z",
     "conflictsSince": {
       "sha": "7260c8afde053f5c82404d673780cbaebe2cc6b6",
       "detectedAt": "2026-08-06T00:00:31.905Z",
@@ -497,8 +502,8 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewSpawnedAt": "2026-08-06T00:08:27.163Z",
     "reviewRequestedAt": "2026-08-06T00:10:06.582Z",
+    "reviewSpawnedAt": "2026-08-06T00:08:27.163Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/parked.ts"
@@ -542,9 +547,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26359188,
-            "output": 363218,
-            "cacheRead": 104443392,
+            "input": 27128562,
+            "output": 365124,
+            "cacheRead": 106124800,
             "cacheWrite": 0
           }
         },
@@ -554,6 +559,12 @@
             "output": 53094,
             "cacheRead": 12468736,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 295762,
+            "output": 5774,
+            "cacheRead": 815104,
+            "cacheWrite": 0
           }
         },
         "review.performance": {
@@ -561,6 +572,12 @@
             "input": 1469167,
             "output": 27128,
             "cacheRead": 5790208,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 533539,
+            "output": 8488,
+            "cacheRead": 1823232,
             "cacheWrite": 0
           }
         },
@@ -570,6 +587,12 @@
             "output": 143875,
             "cacheRead": 10240512,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 320849,
+            "output": 6088,
+            "cacheRead": 1047040,
+            "cacheWrite": 0
           }
         },
         "review.security": {
@@ -577,6 +600,12 @@
             "input": 1233220,
             "output": 21622,
             "cacheRead": 3718144,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 337937,
+            "output": 11068,
+            "cacheRead": 2930176,
             "cacheWrite": 0
           }
         },
@@ -602,9 +631,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 279619,
-            "output": 13266,
-            "cacheRead": 3524096,
+            "input": 322639,
+            "output": 17185,
+            "cacheRead": 5964288,
             "cacheWrite": 0
           }
         }
@@ -617,9 +646,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 37171800,
-          "output": 870539,
-          "cacheRead": 291657216,
+          "input": 37941174,
+          "output": 872445,
+          "cacheRead": 293338624,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-terra": {
+          "input": 1810726,
+          "output": 48603,
+          "cacheRead": 12579840,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -633,17 +668,11 @@
           "output": 57676,
           "cacheRead": 28109119,
           "cacheWrite": 677817
-        },
-        "openai/gpt-5.6-terra": {
-          "input": 279619,
-          "output": 13266,
-          "cacheRead": 3524096,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 372.3685063,
-        "pricingAsOf": "2026-08-06T00:08:27.208Z"
+        "usd": 383.7350393,
+        "pricingAsOf": "2026-08-06T00:10:11.209Z"
       }
     },
     "merges": [
@@ -652,7 +681,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 16,
