@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:37:13.219Z",
-  "updated": "2026-08-06T16:59:36.481Z",
+  "updated": "2026-08-06T17:09:03.221Z",
   "pipeline": {
     "issueId": "PAN-3568",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "diag-tsconfigs": {
-        "writerId": "agent-pan-3568",
-        "agentId": "agent-pan-3568",
-        "pid": 2456115,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T16:59:36.481Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3568",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Hoisted @effect/language-service to root devDependencies, refreshed bun.lock, and verified root binary resolution.",
         "releasedAt": "2026-08-06T16:59:26.584Z"
+      },
+      {
+        "writerId": "agent-pan-3568",
+        "agentId": "agent-pan-3568",
+        "pid": 2456115,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T16:59:36.481Z",
+        "itemId": "diag-tsconfigs",
+        "outcome": "completed",
+        "reason": "Added isolated Effect diagnostics tsconfig variants for root, dashboard server, contracts, and effect-acp; config resolution and no-emit ACP file-set preservation verified.",
+        "releasedAt": "2026-08-06T17:09:03.221Z"
       }
     ],
     "statusReasons": {
       "root-devdep": {
         "reason": "Hoisted @effect/language-service to root devDependencies, refreshed bun.lock, and verified root binary resolution.",
         "updatedAt": "2026-08-06T16:59:26.584Z"
+      },
+      "diag-tsconfigs": {
+        "reason": "Added isolated Effect diagnostics tsconfig variants for root, dashboard server, contracts, and effect-acp; config resolution and no-emit ACP file-set preservation verified.",
+        "updatedAt": "2026-08-06T17:09:03.221Z"
       }
     }
   },
@@ -89,6 +96,11 @@
     "root-devdep.ac2": "completed",
     "root-devdep.ac3": "completed",
     "root-devdep.ac4": "completed",
-    "diag-tsconfigs": "running"
+    "diag-tsconfigs": "completed",
+    "diag-tsconfigs.ac1": "completed",
+    "diag-tsconfigs.ac2": "completed",
+    "diag-tsconfigs.ac3": "completed",
+    "diag-tsconfigs.ac4": "completed",
+    "diag-tsconfigs.ac5": "completed"
   }
 }
