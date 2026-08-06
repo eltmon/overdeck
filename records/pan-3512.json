@@ -972,6 +972,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T22:24:29.010Z"
+    },
+    {
+      "timestamp": "2026-08-06T22:27:50.975Z",
+      "reason": "end",
+      "note": "Cycle-4 review finding fixed and resubmitted. Anomaly first: this is the second fix to the same failure class -- my cycle-3 fix reordered the spread so caller extra could not overwrite the test-gate re-gate, but testGateReset still keyed off status.testStatus alone, so a row already at 'pending' made the reset false and orphan restore's forwarded historical passed/skipped landed unopposed against a fresh evidence head. testGateReset now evaluates the EFFECTIVE test status (input.extra.testStatus when supplied, else the row's), so a terminal test result cannot survive an evidence-head change from either source. Verified there is no sibling hole: reviewGatesPassedSync ANDs on testStatus passed/skipped, so forcing pending blocks readyForMerge regardless of verificationStatus or any other extra field. Known boundary, unchanged from main and called out in the commit body: the no-evidence path cannot compare heads, so a history-snapshot restore with no evidenceHead still lands its historical test status -- that is what the path is for and predates this issue. Added the regression the reviewer specified, parameterized over passed and skipped. Broader context from earlier in this session: the core deliverable had ALREADY landed on main via strike commit fd48e3af39; my branch was a stale non-compiling duplicate 196 commits behind, reconciled by merging origin/main and taking main's side on all 3 conflicts, which dissolved the 8 blocking findings from the earlier cycle. Four plan items are closed citing main rather than new code. Delta I implemented: fallback convoy-parent kill conditional on the verdict landing, both orphan-restore writes, both unsignaled-recovery auto-completes, the infra-bypass (site drifted :1557 -> :1560), a stale head-anchor manifest entry removed, plus the two test-gate fixes. Outstanding by nature: AC #5 (production proof on PAN-1577's next live verdict) is a post-merge observation this branch cannot satisfy. All 12 items terminal; typecheck, lint, and full suite green (exit 0, 13471 passed, 0 failed); all file-size ceilings held with no allowlist change. Re-review was already requested via pan review request before this signal."
     }
   ],
   "feedback": [],
@@ -1031,7 +1036,7 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:27:49.815Z",
+  "updated": "2026-08-06T22:27:50.975Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
