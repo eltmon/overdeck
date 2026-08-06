@@ -27,6 +27,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T17:50:31.623Z"
+    },
+    {
+      "timestamp": "2026-08-06T17:54:38.858Z",
+      "reason": "end",
+      "note": "Fixed the blocked review finding: Docker enumeration errors now propagate from the production promise boundary into the Effect guard, which returns a 500 refusal before workspace cleanup. The regression test exercises the real rejected docker command path."
     }
   ],
   "feedback": [
@@ -69,22 +74,23 @@
     "recordedAt": "2026-08-06T17:54:30.718Z"
   },
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:54:31.562Z",
+  "updated": "2026-08-06T17:54:38.859Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T17:54:31.556Z",
+    "updatedAt": "2026-08-06T17:54:32.660Z",
     "reviewNotes": "Docker enumeration failures still authorize destructive workspace removal",
     "inspectNotes": "All 5 ACs verified: checkWorkspaceRemovalGuard (stash-clean.ts:51) is typed Effect.Effect<WorkspaceRemovalGuard> with empty error channel and Effect.catch discharges the only failure (ProcessSpawnError from workspace-manager.ts:126-132); enumeration failure returns {allow:false,status:500} naming workspacePath and error.message; non-empty list keeps the 409 text byte-identical to the removed block; the guard now runs at line 372, before backup/rsync, rm -rf, and spawnPanCommand; tsc -p src/dashboard/server/tsconfig.json reports zero errors in stash-clean.ts (remaining project errors are pre-existing and in other files).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3577",
     "reviewedAtCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
     "lastVerifiedCommit": "a02e2f515ca68ab619816e2cf9787c3a1d94a5ab",
+    "reviewRequestedAt": "2026-08-06T17:54:31.556Z",
     "reviewSpawnedAt": "2026-08-06T17:46:38.474Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -115,17 +121,16 @@
         "tests/unit/dashboard/server/routes/workspace-removal-guard.test.ts"
       ],
       "recordedAt": "2026-08-06T17:54:30.718Z"
-    },
-    "reviewRequestedAt": "2026-08-06T17:54:31.556Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 218928,
-            "output": 6811,
-            "cacheRead": 2589696,
+            "input": 221520,
+            "output": 6985,
+            "cacheRead": 2785280,
             "cacheWrite": 0
           }
         },
@@ -163,24 +168,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 527433,
-            "output": 43313,
-            "cacheRead": 26421760,
+            "input": 964126,
+            "output": 58872,
+            "cacheRead": 33616384,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 1848464,
-          "output": 92425,
-          "cacheRead": 38567424,
+          "input": 2287749,
+          "output": 108158,
+          "cacheRead": 45957632,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.649453,
-        "pricingAsOf": "2026-08-06T17:50:34.675Z"
+        "usd": 18.831219,
+        "pricingAsOf": "2026-08-06T17:54:38.684Z"
       }
     },
     "merges": [
