@@ -10,7 +10,7 @@
   },
   "launch": {
     "harness": "claude-code",
-    "model": "claude-haiku-4-5",
+    "model": "claude-opus-5",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3512",
     "branch": null
   },
@@ -19,11 +19,20 @@
       "id": "aa1d4c1a-66ff-408a-945d-7bebeb9e9a5f",
       "startedAt": "2026-08-02T23:03:08.879Z",
       "reason": "spawn"
+    },
+    {
+      "id": "58dcbdf5-915e-4531-9c73-2b973022128a",
+      "startedAt": "2026-08-06T20:50:49.269Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
     {
       "at": "2026-08-02T23:03:08.879Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-06T20:50:49.269Z",
       "event": "spawned"
     }
   ],
