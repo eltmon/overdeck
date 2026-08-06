@@ -1,0 +1,549 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-06T21:50:46Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3586: Pushes to main from the merge/promote doors trigger no workflow run — 5 commits on main have zero CI, while pull_request runs work fine",
+    "updated": "2026-08-06T21:58:27.275Z"
+  },
+  "plan": {
+    "id": "pan-3586",
+    "title": "Pushes to main from the merge/promote doors trigger no workflow run — 5 commits on main have zero CI, while pull_request runs work fine",
+    "status": "proposed",
+    "uid": "65c714a8-9919-4cf5-95e1-e6aa3ecd53c3",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-06T21:50:46Z",
+    "updated": "2026-08-06T21:58:27.275Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3586",
+        "label": "PAN-3586",
+        "type": "issue"
+      },
+      {
+        "uri": "https://stspg.io/rcz3fcm83sff",
+        "label": "GitHub incident qcvjkzcs7j74 — Actions webhook triggers throttled",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "ci",
+      "github-actions",
+      "lifecycle",
+      "uat-promote",
+      "merge",
+      "resilience"
+    ],
+    "metadata": {
+      "sizeJustification": "12 files, and the 7 counted subsystems are a measurement artifact rather than real breadth: the metric keys on the first two path segments, so docs/DEFINITION-OF-DONE.md and docs/UAT-BATCH-TRAINS.md count as two subsystems, and scripts/file-size-allowlist.txt counts as a third — none of which is a code surface. The real surfaces are four: .github/workflows, src/lib (github-app + cloister), src/dashboard (the merge route), and tests/unit. The work is also genuinely inseparable as shipped value. The recovery door (items 1-2) and the landing verification (items 3-5) are the two halves of one defect: shipping detection without a recovery door tells the operator main is unverified and leaves no way to verify it, and shipping the recovery door without detection leaves the next occurrence to be discovered hours later by a blocked close-out — which is exactly what happened on 2026-08-06. The operator routed this as a single issue through the normal pipeline in the issue's strike self-abort comment, and the issue body sequences the same three fixes as one unit ('Item 3 is the one that unblocks today; 1 and 2 stop it recurring'). Splitting into siblings would delay the close-out unblock without reducing the diff.",
+      "canonicalFilename": "2026-08-06-PAN-3586-pushes-to-main-from-the-merge-promote-doors-trigger-no-workflow-run-5-commits-on-main-have-zero-ci-while-pull-request-runs-work-fine.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Between 2026-08-06T14:58:51Z and now, GitHub created zero push-event workflow runs for eltmon/overdeck across all three push-triggered workflows, while pull_request runs were created intermittently. Six commits landed on main with no CI evidence; the tip carries only 'Mintlify Deployment'. DoD row 6 (main-verify) correctly reports 'missing required checks: test, lint, build (22), guard', so every close-out is blocked. The issue body blamed the UAT promote path's push credential; that is disproven — the repo events feed shows actor=overdeck-agent[bot] on both the last push that DID create runs (e18aa3f16a) and the ones that did not (d921b8cec5, cc366a3a97), the workflow files are byte-identical, the repo is public so minutes are free, and run volume is 84/day. The actual cause is GitHub incident qcvjkzcs7j74 (Critical, opened 15:22:49Z): 'webhook triggers throttled to 15% processing'. No repo-side code change can make GitHub create runs. What survives the incident is that there is no way to verify an un-CI'd main tip (push is the only non-PR trigger, so no run exists to re-run), and that both landing doors report clean success without ever asking whether GitHub did anything with the event — a failure mode that is cause-agnostic and will recur.",
+      "Proposal": "Three changes. (1) A recovery door: add workflow_dispatch to ci.yml and to state-plane-branches.yml — the two workflows that own row 6's four required checks — so an unverified main tip can be verified on demand with `gh workflow run`. state-plane-branches.yml additionally needs a dispatch-safe commit range, because github.event.before is absent under dispatch and the naive addition makes its guard inspect zero files and report green. (2) Landing verification at both doors: a shared bounded poller asks GET /repos/{owner}/{repo}/actions/runs?head_sha=<full sha> (verified live: total_count=3 for a triggering commit, 0 for the unverified tip) for 6 attempts at 20s intervals, and on no run records a durable 'main-ci-run-missing' needs-you trip through recordDeadEndNeedsYou — the existing record write door, so no new store. Verification never changes the outcome of an operation that already landed. (3) A runbook in docs/DEFINITION-OF-DONE.md and docs/UAT-BATCH-TRAINS.md so the next occurrence is recognized in minutes rather than misattributed to a credential bug.",
+      "NonGoals": "- Do NOT attempt to fix GitHub's incident; nothing in this repository can make GitHub create runs for dropped webhook events.\n- Do NOT add a standing githubstatus.com poller or an incident-aware pipeline mode; the escalation message points at the status page and that is the whole detection surface.\n- Do NOT change src/lib/lifecycle/dod-gate.ts or checkMainVerifyRow; PAN-3589 landed that hardening as d921b8cec5 and row 6 is behaving correctly.\n- Do NOT roll back, rewind, or re-push a landed promotion or merge; main is never rewound, and 'fail loudly' means a durable trip plus an operator signal.\n- Do NOT add workflow_dispatch to .github/workflows/no-planning-on-main.yml; its reject-planning-paths check is not in row 6's required set and does not gate close-out.\n- Do NOT auto-dispatch the recovery run from code; self-dispatch during a degraded-Actions window queues runs that cannot execute and hides the operator signal.\n- Do NOT change the promote path's credential, askpass, or push mechanism; the credential was proven identical across working and non-working pushes.\n- Do NOT use --accept-main-verify to unblock close-outs; the gate is correct and the evidence genuinely does not exist.\n- Do NOT add, renumber, or remove rows in the docs/DEFINITION-OF-DONE.md numbered table; dod-doc-drift.test.ts asserts it matches DOD_ROWS exactly."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treated the issue body's 'determine why the push raised no workflow event' as answered by investigation rather than as a code work item.",
+        "rationale": "Planning gathered positive evidence that the pusher identity, workflow files, repo visibility, Actions permissions, and run volume are all unchanged or benign, and that GitHub incident qcvjkzcs7j74 reports webhook triggers throttled to 15%. A plan item reading 'investigate and decide' would hand the work agent an unanswerable question; the finding is recorded in the PRD, continue.json, and here instead."
+      },
+      {
+        "summary": "Put workflow_dispatch on both ci.yml and state-plane-branches.yml rather than ci.yml alone.",
+        "rationale": "DoD row 6 requires test, lint, build (22) and guard. The first three are ci.yml jobs but guard is state-plane-branches.yml:13, so dispatching CI alone would leave row 6 permanently MISS on guard and the recovery door would not actually unblock close-out."
+      },
+      {
+        "summary": "Chose a needs-you trip (recordDeadEndNeedsYou with recoveryPath 'main-ci-run-missing') as the durable unverified-main marker, instead of a new column, table, or state file.",
+        "rationale": "The single-source-of-truth tenet forbids a parallel store. recordDeadEndNeedsYou already writes through updateIssueRecordForWorkspace into the per-issue permanent record and emits the operator signal on the first trip, so the durable marker and the loud failure are the same artifact with no schema change."
+      },
+      {
+        "summary": "Detect run creation via actions/runs?head_sha rather than via commit check-runs.",
+        "rationale": "Run creation is precisely what failed. Check-runs do not appear until jobs start, so they cannot distinguish 'GitHub never created a run' from 'jobs are still queued' — exactly the ambiguity that cost hours of misattribution today. The head_sha filter was verified live during planning."
+      },
+      {
+        "summary": "Fixed the poll window at 6 attempts x 20s = 120s rather than making it configurable.",
+        "rationale": "No configurability was requested and GitHub normally creates runs within seconds. Two minutes avoids false alarms while keeping the promote flow responsive, and six requests per landing is negligible against the 5000/hr installation budget."
+      },
+      {
+        "summary": "Made merge-door verification non-blocking (fire-and-forget) while promote-door verification is awaited inline.",
+        "rationale": "The merge door serves an operator HTTP request that must not wait out a 120s poll, whereas the promote door is a background batch flow whose caller already tolerates minutes of git work. Both record the same trip; only the scheduling differs."
+      },
+      {
+        "summary": "Excluded no-planning-on-main.yml from the recovery door.",
+        "rationale": "Its reject-planning-paths check is not among row 6's required checks, so adding a trigger there would not affect close-out and would widen the change without benefit."
+      }
+    ],
+    "items": [
+      {
+        "id": "ci-workflow-dispatch",
+        "title": "Add workflow_dispatch to ci.yml so main's CI checks can be produced on demand",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'workflow_dispatch' .github/workflows/ci.yml",
+            "python3 -c \"import yaml,sys; d=yaml.safe_load(open('.github/workflows/ci.yml')); print(sorted(d[True].keys()) if True in d else sorted(d['on'].keys()))\""
+          ],
+          "expected_outputs": [
+            "grep prints a workflow_dispatch line under the on: block",
+            "the parsed trigger key list contains push, pull_request and workflow_dispatch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a bare `workflow_dispatch:` entry to the `on:` block of .github/workflows/ci.yml (currently lines 3-7, push+pull_request only), with a comment explaining that it is the recovery door for a main tip that received no push-event run. No job or step changes are needed: the workflow's only event-context read is `sha=\"${{ github.event.pull_request.head.sha || github.sha }}\"` at :147, which already falls back to github.sha when pull_request context is absent. This produces the test, lint and build (22) check-runs that DoD row 6 requires."
+        },
+        "items": [
+          {
+            "id": "ci-workflow-dispatch.ac1",
+            "title": "Given .github/workflows/ci.yml, when its on: block is parsed as YAML, then it contains workflow_dispatch alongside the existing push and pull_request triggers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-dispatch.ac2",
+            "title": "Given the change is on main, when `gh workflow run ci.yml --ref main` is run, then it exits 0 and `gh api \"repos/eltmon/overdeck/actions/runs?event=workflow_dispatch&per_page=1\" --jq .total_count` returns a count greater than zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-dispatch.ac3",
+            "title": "Given the diff for this item, when .github/workflows/ci.yml is inspected below the on: block, then the build, lint, test, prompt-gate, flake-lane and clean-install job definitions are byte-identical to their pre-change form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-plane-workflow-dispatch",
+        "title": "Add workflow_dispatch to state-plane-branches.yml with a dispatch-safe commit range",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/state-plane-branches.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'workflow_dispatch\\|inputs.since\\|github.event.before' .github/workflows/state-plane-branches.yml",
+            "bash -n <(sed -n '/run: |/,$p' .github/workflows/state-plane-branches.yml | tail -n +2 | sed 's/^          //')"
+          ],
+          "expected_outputs": [
+            "grep shows workflow_dispatch with a since input, an inputs.since reference, and exactly one remaining github.event.before reference in the push branch",
+            "the extracted guard shell body parses without a syntax error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `workflow_dispatch:` with an optional `since` input (description: base SHA to diff from, default empty) to the on: block of .github/workflows/state-plane-branches.yml, AND change the guard step's range computation in the same commit. The current else branch at :24-31 reads `before=\"${{ github.event.before }}\"`, which is absent under workflow_dispatch, producing range \"..$GITHUB_SHA\"; git resolves that as HEAD..$GITHUB_SHA, and because the checkout IS $GITHUB_SHA, `git diff --name-only \"$range\"` (scripts/guard-state-plane-branches.sh:31) inspects zero files and the guard reports green having verified nothing. Insert an `elif [[ \"${{ github.event_name }}\" == workflow_dispatch ]]` branch that sets before to `${{ inputs.since }}` when non-empty and `${{ github.sha }}~1` otherwise, leaving the existing push branch untouched. This produces the guard check-run that DoD row 6 requires and that ci.yml cannot supply."
+        },
+        "items": [
+          {
+            "id": "state-plane-workflow-dispatch.ac1",
+            "title": "Given .github/workflows/state-plane-branches.yml, when its on: block is parsed, then it contains workflow_dispatch with a since input that defaults to an empty string, alongside the unchanged push and pull_request triggers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-workflow-dispatch.ac2",
+            "title": "Given the guard step's shell body, when the event name is workflow_dispatch and no since input is supplied, then the computed range is `${{ github.sha }}~1..${{ github.sha }}` and never a value whose left side is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-workflow-dispatch.ac3",
+            "title": "Given the guard step's shell body, when the event name is workflow_dispatch and a since SHA is supplied, then the computed range uses that SHA as its left side",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-workflow-dispatch.ac4",
+            "title": "Given the diff for this item, when github.event.before references are counted in the file, then exactly one remains and it sits in the push branch, preserving the existing zero-SHA empty-tree fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-workflow-dispatch.ac5",
+            "title": "Given the change is on main, when `gh workflow run state-plane-branches.yml --ref main` is run, then it exits 0 and a guard check-run appears on main's tip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "landing-verification-helper",
+        "title": "Add a bounded poller that reports whether GitHub created a workflow run for a landed SHA",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3586",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "promote-door-landing-check",
+            "merge-door-landing-check"
+          ],
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "src/lib/cloister/main-landing-verification.ts",
+            "tests/unit/lib/cloister/main-landing-verification.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/main-landing-verification.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the main-landing-verification suite passes with every poll-timing case driven by fake timers",
+            "typecheck completes without errors",
+            "the file-size guard passes with an audited allowlist row for src/lib/github-app.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Export `countWorkflowRunsForShaPromise(owner, repo, sha)` from src/lib/github-app.ts next to getCiCheckRunsStatePromise (:481), implemented with the module-private githubApi helper (:358) so it inherits the installation token, reading GET /repos/{owner}/{repo}/actions/runs?head_sha=<sha>&per_page=1 and returning total_count. It must take the full 40-character SHA — an abbreviated one silently returns zero. Then create src/lib/cloister/main-landing-verification.ts exporting LANDING_VERIFY_ATTEMPTS=6, LANDING_VERIFY_INTERVAL_MS=20000, `verifyMainLanding(owner, repo, sha, deps)` returning { runCreated, attempts, sha }, and `buildUnverifiedMainMessage(sha, attempts)`. Dependencies (countRuns, sleep, log) are injected so both call sites test without network or wall-clock. The poller returns on the first non-zero count; a rejected countRuns is caught per attempt, logged, and treated as not-yet-seen so a transient API error never masquerades as a missing run. The message must name the condition in plain sentences, the landed SHA, https://www.githubstatus.com, and both `gh workflow run ci.yml --ref main` and `gh workflow run state-plane-branches.yml --ref main`. src/lib/github-app.ts is 1000 lines on origin/main, so this item adds its own scripts/file-size-allowlist.txt row shaped `<lines> src/lib/github-app.ts # PAN-3586` in the same commit."
+        },
+        "items": [
+          {
+            "id": "landing-verification-helper.ac1",
+            "title": "Given a countRuns stub that returns 3 on its first call, when verifyMainLanding runs, then it returns { runCreated: true, attempts: 1 } and calls countRuns exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-verification-helper.ac2",
+            "title": "Given a countRuns stub that returns 0 twice then 1, when verifyMainLanding runs under vi.useFakeTimers with vi.advanceTimersByTimeAsync driving the interval, then it returns { runCreated: true, attempts: 3 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-verification-helper.ac3",
+            "title": "Given a countRuns stub that always returns 0, when verifyMainLanding runs, then it returns { runCreated: false, attempts: 6 } and calls countRuns exactly 6 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-verification-helper.ac4",
+            "title": "Given a countRuns stub that rejects on every attempt, when verifyMainLanding runs, then it resolves to { runCreated: false } rather than rejecting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-verification-helper.ac5",
+            "title": "Given buildUnverifiedMainMessage(sha, attempts), when its output is inspected, then it contains the sha, the substring 'gh workflow run ci.yml', the substring 'gh workflow run state-plane-branches.yml', and 'githubstatus.com'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-door-landing-check",
+        "title": "Make the UAT promote door verify its own landing and escalate an unverified main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote.ts",
+            "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote-verification.test.ts tests/unit/lib/cloister/uat-promote.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the uat-promote suites pass, including a new case asserting success:true plus one trip per member when no run is created",
+            "typecheck completes without errors",
+            "the file-size guard passes with an audited allowlist row for src/lib/cloister/uat-promote.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/uat-promote.ts, add optional `verifyLanding` and `recordUnverifiedMain` members to the injectable deps interface alongside markRepoPromoted (:105). After the successful merge log at :242 and before the finishPromote call at :246, await verifyLanding(mergeSha); when it reports runCreated:false, build the message with buildUnverifiedMainMessage, log it, and call recordUnverifiedMain once per batch member — gen.members elements are objects carrying issueId (see :157 and :715), so pass member.issueId, not the object. Wrap the whole block in try/catch that logs and swallows: a promotion already live on main must never be turned into a failure by its own observation step, and main is never rewound. Bind recordUnverifiedMain in production wiring to recordDeadEndNeedsYou(issueId, 'main-ci-run-missing', mergeSha, message) so the trip is keyed to the landed SHA and repeat runs for the same commit de-duplicate. src/lib/cloister/uat-promote.ts is 894 lines on origin/main, so add its scripts/file-size-allowlist.txt row in the same commit."
+        },
+        "items": [
+          {
+            "id": "promote-door-landing-check.ac1",
+            "title": "Given a promotion whose injected verifyLanding reports runCreated:false, when promoteGeneration completes, then it still returns success:true and the batch is finalized exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-door-landing-check.ac2",
+            "title": "Given a promotion of a batch with two members whose verifyLanding reports runCreated:false, when promoteGeneration completes, then recordUnverifiedMain is called twice, once per member issueId, each with the landed merge SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-door-landing-check.ac3",
+            "title": "Given a promotion whose verifyLanding reports runCreated:true, when promoteGeneration completes, then recordUnverifiedMain is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-door-landing-check.ac4",
+            "title": "Given a promotion whose injected verifyLanding rejects, when promoteGeneration completes, then it returns success:true and the rejection does not propagate out of promoteGeneration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-door-landing-check",
+        "title": "Make the PR merge door verify its own landing and escalate an unverified main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "tests/unit/dashboard/server/routes/workspaces/merge-ops-landing.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/workspaces/merge-ops-landing.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the merge-ops landing suite passes with fake-timer-driven poll cases",
+            "typecheck completes without errors",
+            "the file-size guard passes with an audited allowlist row for src/dashboard/server/routes/workspaces/merge-ops.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/merge-ops.ts, after the single-repo merge succeeds and review status is set to merged (:453-460), schedule a small exported helper `verifyLandedMergeAndEscalate(issueId, forge, prNumber)` with `void ...catch(...)` so the operator's MERGE response is not held for the 120s poll window. The helper resolves the merge commit SHA from the merged PR state (check the field exposed by getPullRequestState in src/lib/github-app.ts:899 first; if no merge commit SHA is exposed, fall back to fetching and reading `git rev-parse origin/main` in the project path, which is the merge at that moment — do not invent a new API call), calls verifyMainLanding, and on runCreated:false calls recordDeadEndNeedsYou(issueId, 'main-ci-run-missing', sha, buildUnverifiedMainMessage(...)). Every failure path logs and swallows. Cover the polyrepo merge path at :737 the same way. src/dashboard/server/routes/workspaces/merge-ops.ts is 1912 lines on origin/main, so add its scripts/file-size-allowlist.txt row in the same commit."
+        },
+        "items": [
+          {
+            "id": "merge-door-landing-check.ac1",
+            "title": "Given verifyLandedMergeAndEscalate with an injected verifier reporting runCreated:false, when it runs, then it calls the trip recorder exactly once with recoveryPath 'main-ci-run-missing' and the landed SHA as the obligation generation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-door-landing-check.ac2",
+            "title": "Given verifyLandedMergeAndEscalate with an injected verifier reporting runCreated:true, when it runs, then it never calls the trip recorder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-door-landing-check.ac3",
+            "title": "Given verifyLandedMergeAndEscalate whose SHA resolution or verifier rejects, when it runs, then it resolves without rejecting and records no trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-door-landing-check.ac4",
+            "title": "Given the merge route diff, when the successful-merge path is read, then the verification call is scheduled without await so the HTTP response is returned before the poll window elapses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unverified-main-runbook",
+        "title": "Document the unverified-main condition and its workflow_dispatch recovery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T21:50:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3586",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/UAT-BATCH-TRAINS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+            "grep -c 'gh workflow run ci.yml --ref main' docs/DEFINITION-OF-DONE.md docs/UAT-BATCH-TRAINS.md"
+          ],
+          "expected_outputs": [
+            "the dod-doc-drift suite still passes, proving the numbered row table is unchanged",
+            "both docs return a non-zero match count for the recovery command"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a prose recovery section to docs/DEFINITION-OF-DONE.md under row 6 stating that a row-6 MISS naming absent required checks can mean GitHub created no workflow run at all (not that CI failed), that the required set is test, lint, build (22) and guard, that guard comes from state-plane-branches.yml while the other three come from ci.yml, and that recovery is to check https://www.githubstatus.com and then run `gh workflow run ci.yml --ref main` and `gh workflow run state-plane-branches.yml --ref main`. Add a section to docs/UAT-BATCH-TRAINS.md stating that promotion now polls for a workflow run on the landed SHA, records a main-ci-run-missing needs-you trip per member when none appears, and never rolls back a landed promotion. Add prose only: tests/unit/lib/lifecycle/dod-doc-drift.test.ts parses the numbered row table in DEFINITION-OF-DONE.md and asserts it matches DOD_ROWS exactly, so no table row may be added, renumbered, or removed."
+        },
+        "items": [
+          {
+            "id": "unverified-main-runbook.ac1",
+            "title": "Given docs/DEFINITION-OF-DONE.md after the change, when its row-6 recovery section is read, then it states that absent required checks can mean no workflow run was created and names both gh workflow run commands plus githubstatus.com",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unverified-main-runbook.ac2",
+            "title": "Given docs/UAT-BATCH-TRAINS.md after the change, when its promotion section is read, then it states that promotion polls for a workflow run on the landed SHA, records a main-ci-run-missing needs-you trip per member when none appears, and never rolls back a landed promotion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unverified-main-runbook.ac3",
+            "title": "Given the change, when tests/unit/lib/lifecycle/dod-doc-drift.test.ts runs, then it passes, proving the numbered DoD row table was not added to, renumbered, or reduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "landing-verification-helper",
+        "to": "promote-door-landing-check",
+        "type": "blocks"
+      },
+      {
+        "from": "landing-verification-helper",
+        "to": "merge-door-landing-check",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-door-landing-check",
+        "to": "merge-door-landing-check",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-workflow-dispatch",
+        "to": "unverified-main-runbook",
+        "type": "informs"
+      },
+      {
+        "from": "state-plane-workflow-dispatch",
+        "to": "unverified-main-runbook",
+        "type": "informs"
+      },
+      {
+        "from": "promote-door-landing-check",
+        "to": "unverified-main-runbook",
+        "type": "informs"
+      },
+      {
+        "from": "merge-door-landing-check",
+        "to": "unverified-main-runbook",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
