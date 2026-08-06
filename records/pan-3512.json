@@ -969,23 +969,78 @@
     "recordedAt": "2026-08-06T22:07:28.509Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:07:28.510Z",
+  "updated": "2026-08-06T22:07:29.661Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T22:07:24.327Z",
-    "updatedAt": "2026-08-06T22:07:24.818Z",
+    "updatedAt": "2026-08-06T22:07:29.659Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: the test-gate re-gate now lands after caller extras in the verdict write door, so an orphan restore's historical passed test result can no longer overwrite the fresh-head reset; added the regression the reviewer asked for. Also completed the remaining verdict-door migrations (fallback kill-conditional, orphan-restore, unsignaled auto-completes, infra-bypass).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
-    "reviewRequestedAt": "2026-08-06T22:07:24.327Z",
-    "reviewSpawnedAt": "2026-08-06T21:29:42.657Z"
+    "reviewRequestedAt": "2026-08-06T22:07:29.659Z",
+    "reviewSpawnedAt": "2026-08-06T21:29:42.657Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
+        "src/lib/cloister/orphan-restore-verdict.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "packages/contracts/src/events.ts",
+        "scripts/file-size-allowlist.txt",
+        "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/lib/review-verdict-guards.ts"
+      ],
+      "declaredScope": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "packages/contracts/src/events.ts",
+        "scripts/file-size-allowlist.txt",
+        "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/lib/__tests__/review-verdict-guards.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-status.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/review-verdict-writer.ts",
+        "src/lib/review-verdict-guards.ts"
+      ],
+      "actualChangedFiles": [
+        "src/lib/__tests__/review-verdict-guards.test.ts",
+        "src/lib/cloister/__tests__/deacon-infra-bypass-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-status.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/orphan-restore-verdict.ts",
+        "src/lib/cloister/review-verdict-writer.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ],
+      "recordedAt": "2026-08-06T22:07:28.509Z"
+    }
   },
   "closeOut": {
     "usage": {
