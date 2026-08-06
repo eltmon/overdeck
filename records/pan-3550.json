@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:17:15.346Z",
+  "updated": "2026-08-06T00:17:48.039Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -45,5 +45,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-08-06T00:05:03.990Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "watch-reserve-config": {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1199624,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:17:48.039Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "watch-reserve-config": "running"
+  }
 }
