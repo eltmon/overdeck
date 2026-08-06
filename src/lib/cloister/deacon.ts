@@ -307,7 +307,12 @@ const DEACON_LOG_FILE = join(OVERDECK_HOME, 'logs', 'deacon.log');
 
 let deaconInterval: NodeJS.Timeout | null = null;
 const deaconPatrolGuard = createInFlightGuard();
+let memoryPatrolInterval: NodeJS.Timeout | null = null;
 let config: DeaconConfig = { ...DEFAULT_CONFIG };
+
+/** PAN-3550: the memory watch samples far more often than the 60s patrol so rising
+ *  pressure reaches the activity feed before the kernel acts. */
+export const MEMORY_PATROL_INTERVAL_MS = 15_000;
 
 /**
  * Load deacon configuration
@@ -3465,6 +3470,19 @@ export function startDeacon(): void {
     runScheduledPatrol('interval');
   }, config.patrolIntervalMs);
 
+  // PAN-3550: memory pressure patrol on dedicated 15s timer
+  memoryPatrolInterval = setInterval(() => {
+    void (async () => {
+      const { patrolMemoryPressure } = await import('./memory-pressure-patrol.js');
+      for (const action of await patrolMemoryPressure()) {
+        logDeaconEventSync(`memory-pressure-patrol: ${action}`);
+      }
+    })().catch((err) => {
+      logDeaconEventSync(`memory-pressure-patrol: error: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }, MEMORY_PATROL_INTERVAL_MS);
+  memoryPatrolInterval.unref?.();
+
   logDeaconEventSync('startDeacon: health monitor started');
 }
 
@@ -3476,6 +3494,10 @@ export function stopDeacon(): void {
     clearInterval(deaconInterval);
     deaconInterval = null;
     console.log('[deacon] Stopped health monitor');
+  }
+  if (memoryPatrolInterval) {
+    clearInterval(memoryPatrolInterval);
+    memoryPatrolInterval = null;
   }
 }
 
