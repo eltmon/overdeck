@@ -2072,7 +2072,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T20:50:49.344Z",
+  "updated": "2026-08-06T20:56:14.443Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -2345,8 +2345,16 @@
     }
   ],
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "migrate-fallback": {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 1818751,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T20:56:14.442Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -2491,7 +2499,7 @@
     "retire-review-arm.retire-review-arm.ac2": "completed",
     "retire-review-arm.retire-review-arm.ac3": "completed",
     "retire-review-arm.retire-review-arm.ac4": "completed",
-    "migrate-fallback": "pending",
+    "migrate-fallback": "running",
     "docs-write-door": "pending"
   },
   "workModel": "claude-opus-5"
