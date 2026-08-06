@@ -60,6 +60,28 @@ describe('Claude session reconstruction fallback', () => {
     expect(asyncSessionId).toBe(syncSessionId);
   });
 
+  it('does not reconstruct a reset session from the durable agents plane', () => {
+    const result = resolveLatestSessionIdSync(agentState.id, deps({
+      isSessionReset: () => true,
+      readAgentPlaneRecord: () => ({
+        version: 1,
+        agentId: agentState.id,
+        issueId: agentState.issueId,
+        projectKey: 'myn',
+        role: 'work',
+        origin: { machineId: 'origin', overdeckHome: '/home/origin/.overdeck' },
+        launch: { harness: 'claude-code', model: 'claude-opus-5', workspace: agentState.workspace, branch: 'feature/min-839' },
+        sessions: [{ id: 'reset-session', startedAt: '2026-08-01T11:00:00.000Z', reason: 'spawn' }],
+        lifecycle: [],
+        archiveRef: null,
+        recovered: false,
+      }),
+      transcriptExists: () => true,
+    }));
+
+    expect(result).toEqual({ sessionId: null, checked: ['session reset marker'] });
+  });
+
   it('uses the freshest agents-plane session that has a local transcript', () => {
     const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
       readAgentPlaneRecord: () => ({
