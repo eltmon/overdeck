@@ -401,6 +401,8 @@ export interface ResourcesConfig {
   governor_hard_reserve_gb?: number;
   /** PAN-2500: deacon memory governor — re-admit only past this reserve; must exceed governor_soft_reserve_gb */
   governor_recovery_reserve_gb?: number;
+  /** PAN-3550: deacon memory governor — warn in the activity feed at this reserve; must exceed governor_soft_reserve_gb */
+  governor_watch_reserve_gb?: number;
   /** PAN-2500: cold-start footprint estimate (GiB) for a work agent with no live per-project docker-stack data yet */
   governor_footprint_default_work_gb?: number;
   /** PAN-2500: cold-start footprint estimate (GiB) for a review agent */
@@ -915,6 +917,8 @@ export interface NormalizedConfig {
     governorSoftReserveGb: number;
     governorHardReserveGb: number;
     governorRecoveryReserveGb: number;
+    /** PAN-3550: activity-feed warn reserve, GiB. Always normalized above governorSoftReserveGb. */
+    governorWatchReserveGb: number;
     /** PAN-2500: cold-start per-role footprint defaults, GiB (used when no live per-project stack data exists). */
     governorFootprintDefaultWorkGb: number;
     governorFootprintDefaultReviewGb: number;
