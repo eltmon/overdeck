@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T16:36:46.959Z",
-  "updated": "2026-08-06T17:10:56.490Z",
+  "updated": "2026-08-06T17:12:02.875Z",
   "pipeline": {
     "issueId": "PAN-3567",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "document-effect-bridging": {
-        "writerId": "agent-pan-3567",
-        "agentId": "agent-pan-3567",
-        "pid": 2655855,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T17:10:56.490Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3567",
@@ -169,6 +161,17 @@
         "outcome": "completed",
         "reason": "Lowered the dashboard type ratchet from 47 to 30 after removing all five floating Effect errors and their cascades.",
         "releasedAt": "2026-08-06T17:10:48.839Z"
+      },
+      {
+        "writerId": "agent-pan-3567",
+        "agentId": "agent-pan-3567",
+        "pid": 2655855,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T17:10:56.490Z",
+        "itemId": "document-effect-bridging",
+        "outcome": "completed",
+        "reason": "Documented direct Effect yielding, valid Promise bridges, failure handling, diagnostics follow-up, and the dashboard type ratchet.",
+        "releasedAt": "2026-08-06T17:12:02.875Z"
       }
     ],
     "statusReasons": {
@@ -203,6 +206,10 @@
       "lower-types-baseline": {
         "reason": "Lowered the dashboard type ratchet from 47 to 30 after removing all five floating Effect errors and their cascades.",
         "updatedAt": "2026-08-06T17:10:48.839Z"
+      },
+      "document-effect-bridging": {
+        "reason": "Documented direct Effect yielding, valid Promise bridges, failure handling, diagnostics follow-up, and the dashboard type ratchet.",
+        "updatedAt": "2026-08-06T17:12:02.875Z"
       }
     }
   },
@@ -248,6 +255,11 @@
     "lower-types-baseline.ac2": "completed",
     "lower-types-baseline.ac3": "completed",
     "lower-types-baseline.ac4": "completed",
-    "document-effect-bridging": "running"
+    "document-effect-bridging": "completed",
+    "document-effect-bridging.ac1": "completed",
+    "document-effect-bridging.ac2": "completed",
+    "document-effect-bridging.ac3": "completed",
+    "document-effect-bridging.ac4": "completed",
+    "document-effect-bridging.ac5": "completed"
   }
 }
