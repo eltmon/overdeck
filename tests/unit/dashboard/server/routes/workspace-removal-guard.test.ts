@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
-const { getContainersReferencingWorkspacePathMock } = vi.hoisted(() => ({
-  getContainersReferencingWorkspacePathMock: vi.fn(),
-}));
+const { dockerExecMock } = vi.hoisted(() => {
+  const dockerExecMock = vi.fn();
+  Object.assign(dockerExecMock, {
+    [Symbol.for('nodejs.util.promisify.custom')]: dockerExecMock,
+  });
+  return { dockerExecMock };
+});
 
-vi.mock('../../../../../src/lib/workspace-manager.js', () => ({
-  getContainersReferencingWorkspacePath: getContainersReferencingWorkspacePathMock,
+vi.mock('child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('child_process')>(),
+  exec: dockerExecMock,
 }));
 vi.mock('../../../../../src/lib/stashes.js', () => ({
   listStashes: vi.fn(),
@@ -31,19 +36,20 @@ vi.mock('../../../../../src/dashboard/server/routes/workspaces.js', () => ({
   getWorkspaceInfoForIssue: vi.fn(),
 }));
 
-import { ProcessSpawnError } from '../../../../../src/lib/errors.js';
 import { checkWorkspaceRemovalGuard } from '../../../../../src/dashboard/server/routes/workspaces/stash-clean.js';
 
 describe('checkWorkspaceRemovalGuard', () => {
   it('allows removal when no container references the workspace', async () => {
-    getContainersReferencingWorkspacePathMock.mockReturnValue(Effect.succeed([]));
+    dockerExecMock.mockResolvedValue({ stdout: '' });
 
     await expect(Effect.runPromise(checkWorkspaceRemovalGuard('/workspaces/feature-pan-3567')))
       .resolves.toEqual({ allow: true });
   });
 
   it('refuses removal when containers reference the workspace', async () => {
-    getContainersReferencingWorkspacePathMock.mockReturnValue(Effect.succeed([{}, {}]));
+    dockerExecMock.mockResolvedValue({
+      stdout: 'container-1|/workspaces/feature-pan-3567/.devcontainer/docker-compose.yml\ncontainer-2|/workspaces/feature-pan-3567/.devcontainer/docker-compose.yml',
+    });
 
     const result = await Effect.runPromise(checkWorkspaceRemovalGuard('/workspaces/feature-pan-3567'));
 
@@ -53,11 +59,7 @@ describe('checkWorkspaceRemovalGuard', () => {
 
   it('fails closed when Docker enumeration fails', async () => {
     const workspacePath = '/workspaces/feature-pan-3567';
-    getContainersReferencingWorkspacePathMock.mockReturnValue(Effect.fail(new ProcessSpawnError({
-      command: 'docker',
-      args: ['ps'],
-      message: 'Docker daemon unavailable',
-    })));
+    dockerExecMock.mockRejectedValue(new Error('Docker daemon unavailable'));
 
     const result = await Effect.runPromise(checkWorkspaceRemovalGuard(workspacePath));
 
