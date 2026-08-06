@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:38:11.166Z",
+  "updated": "2026-08-06T00:38:14.104Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "oom-canary": {
-        "writerId": "agent-pan-3550",
-        "agentId": "agent-pan-3550",
-        "pid": 1522854,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T00:38:11.166Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3550",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "topMemoryConsumers() implemented with upward parent-chain walk for session attribution. All ACs met.",
         "releasedAt": "2026-08-06T00:37:59.168Z"
+      },
+      {
+        "writerId": "agent-pan-3550",
+        "agentId": "agent-pan-3550",
+        "pid": 1522854,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T00:38:11.166Z",
+        "itemId": "oom-canary",
+        "outcome": "completed",
+        "reason": "parseOomKills() implemented with journal line parsing and pid-based join. Detects Overdeck tree kills via cgroup regex.",
+        "releasedAt": "2026-08-06T00:38:14.104Z"
       }
     ],
     "statusReasons": {
@@ -134,6 +137,10 @@
       "top-consumer-attribution": {
         "reason": "topMemoryConsumers() implemented with upward parent-chain walk for session attribution. All ACs met.",
         "updatedAt": "2026-08-06T00:37:59.168Z"
+      },
+      "oom-canary": {
+        "reason": "parseOomKills() implemented with journal line parsing and pid-based join. Detects Overdeck tree kills via cgroup regex.",
+        "updatedAt": "2026-08-06T00:38:14.104Z"
       }
     }
   },
@@ -166,6 +173,12 @@
     "top-consumer-attribution.top-consumer-attribution.ac3": "completed",
     "top-consumer-attribution.top-consumer-attribution.ac4": "completed",
     "top-consumer-attribution.top-consumer-attribution.ac5": "completed",
-    "oom-canary": "running"
+    "oom-canary": "completed",
+    "oom-canary.oom-canary.ac1": "completed",
+    "oom-canary.oom-canary.ac2": "completed",
+    "oom-canary.oom-canary.ac3": "completed",
+    "oom-canary.oom-canary.ac4": "completed",
+    "oom-canary.oom-canary.ac5": "completed",
+    "oom-canary.oom-canary.ac6": "completed"
   }
 }
