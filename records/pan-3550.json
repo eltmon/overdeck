@@ -49,7 +49,7 @@
     "recordedAt": "2026-08-06T00:40:37.808Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T00:42:20.907Z",
+  "updated": "2026-08-06T00:42:22.991Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "reviewing",
@@ -127,7 +127,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3550",
