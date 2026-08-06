@@ -312,6 +312,11 @@
       "timestamp": "2026-08-06T09:11:17.285Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T09:21:28.397Z"
     }
   ],
   "feedback": [],
@@ -360,10 +365,10 @@
     "recordedAt": "2026-08-06T09:11:11.873Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-06T09:21:27.615Z",
+  "updated": "2026-08-06T09:21:29.006Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -371,12 +376,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T09:13:38.076Z",
-    "updatedAt": "2026-08-06T09:21:26.955Z",
+    "updatedAt": "2026-08-06T09:21:27.654Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewedAtCommit": "e00985f0004f6f0d2e6f4151594d1f2c6ff5c0fb",
     "lastVerifiedCommit": "61ae98a5366c21a91507f7b73ad5ef6553270ec5",
     "reviewRequestedAt": "2026-08-06T09:13:38.076Z",
-    "reviewSpawnedAt": "2026-08-06T07:33:40.508Z",
+    "reviewSpawnedAt": "2026-08-06T09:21:27.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
@@ -554,7 +559,7 @@
       },
       "costAtCloseOut": {
         "usd": 280.5247651,
-        "pricingAsOf": "2026-08-06T09:21:26.990Z"
+        "pricingAsOf": "2026-08-06T09:21:29.002Z"
       }
     },
     "merges": [
