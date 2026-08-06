@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T07:42:01.422Z",
+  "updated": "2026-08-06T07:44:14.586Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "sweeper-uat-recommendation": {
-        "writerId": "agent-pan-3575",
-        "agentId": "agent-pan-3575",
-        "pid": 627722,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-06T07:42:01.421Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3575",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Suppressed the UAT-failed parked orbit while a live work agent owns rework, with coverage for both ownership states.",
         "releasedAt": "2026-08-06T07:41:52.267Z"
+      },
+      {
+        "writerId": "agent-pan-3575",
+        "agentId": "agent-pan-3575",
+        "pid": 627722,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-06T07:42:01.421Z",
+        "itemId": "sweeper-uat-recommendation",
+        "outcome": "completed",
+        "reason": "Updated the UAT-failed sweeper recommendation to direct work-agent start after feedback delivery cannot find a target.",
+        "releasedAt": "2026-08-06T07:44:14.586Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "parked-orbit-owner": {
         "reason": "Suppressed the UAT-failed parked orbit while a live work agent owns rework, with coverage for both ownership states.",
         "updatedAt": "2026-08-06T07:41:52.267Z"
+      },
+      "sweeper-uat-recommendation": {
+        "reason": "Updated the UAT-failed sweeper recommendation to direct work-agent start after feedback delivery cannot find a target.",
+        "updatedAt": "2026-08-06T07:44:14.586Z"
       }
     }
   },
@@ -130,6 +137,8 @@
     "parked-orbit-owner.parked-orbit-owner.ac1": "completed",
     "parked-orbit-owner.parked-orbit-owner.ac2": "completed",
     "parked-orbit-owner.parked-orbit-owner.ac3": "completed",
-    "sweeper-uat-recommendation": "running"
+    "sweeper-uat-recommendation": "completed",
+    "sweeper-uat-recommendation.sweeper-uat-recommendation.ac1": "completed",
+    "sweeper-uat-recommendation.sweeper-uat-recommendation.ac2": "completed"
   }
 }
