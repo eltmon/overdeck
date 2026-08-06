@@ -894,6 +894,9 @@ export function fixStuckCommentedReviews(): void {
 }
 
 export function clearReviewStatus(issueId: string): void {
+  // Terminal lifecycle owns removal of the UAT feedback dedup entry. The relay
+  // stays dynamically imported to preserve the Node ESM boot graph.
+  void clearUatFailureAnchorHostSide(issueId);
   try {
     dbDelete(issueId);
   } catch (err) {

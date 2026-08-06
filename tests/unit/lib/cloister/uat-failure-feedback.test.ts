@@ -28,6 +28,7 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
 
 import {
   clearUatFailureFeedbackAnchor,
+  MAX_UAT_FAILURE_FEEDBACK_ANCHORS,
   relayUatFailureFeedback,
   resetUatFailureFeedbackStateForTests,
 } from '../../../../src/lib/cloister/uat-failure-feedback.js';
@@ -121,6 +122,49 @@ describe('relayUatFailureFeedback', () => {
     );
   });
 
+  it('surfaces needs-you when delivery resolves without delivering the feedback', async () => {
+    mocks.messageAgent.mockResolvedValue({
+      delivered: false,
+      queuedToMail: false,
+      reason: 'target session is unavailable',
+    });
+
+    const result = await Effect.runPromise(relayUatFailureFeedback({
+      issueId: 'PAN-3575',
+      anchor: 'head-one',
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      agentMessageSent: false,
+      needsYouSurfaced: true,
+    }));
+    expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-3575',
+      'Feedback delivery to agent-pan-3575 failed: target session is unavailable',
+      { specialist: 'uat-agent', feedbackPath },
+    );
+  });
+
+  it('surfaces needs-you when feedback target resolution fails after persistence', async () => {
+    mocks.resolveIssueFeedbackTarget.mockRejectedValue(new Error('agent registry unavailable'));
+
+    const result = await Effect.runPromise(relayUatFailureFeedback({
+      issueId: 'PAN-3575',
+      anchor: 'head-one',
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      feedbackPath,
+      agentMessageSent: false,
+      needsYouSurfaced: true,
+    }));
+    expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-3575',
+      'Could not resolve UAT feedback target: agent registry unavailable',
+      { specialist: 'uat-agent', feedbackPath },
+    );
+  });
+
   it('deduplicates repeated verdict anchors and accepts a later anchor', async () => {
     const first = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
     const duplicate = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
@@ -134,6 +178,23 @@ describe('relayUatFailureFeedback', () => {
     });
     expect(later.deduplicated).toBe(false);
     expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds dedup state so terminal-cleanup delays cannot retain historical failures indefinitely', async () => {
+    for (let index = 0; index <= MAX_UAT_FAILURE_FEEDBACK_ANCHORS; index++) {
+      await Effect.runPromise(relayUatFailureFeedback({
+        issueId: `PAN-${index}`,
+        anchor: `head-${index}`,
+      }));
+    }
+
+    const replayed = await Effect.runPromise(relayUatFailureFeedback({
+      issueId: 'PAN-0',
+      anchor: 'head-0',
+    }));
+
+    expect(replayed.deduplicated).toBe(false);
+    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(MAX_UAT_FAILURE_FEEDBACK_ANCHORS + 2);
   });
 
   it('clears an anchor for a new UAT cycle and retries a failed feedback write', async () => {

@@ -41,7 +41,7 @@ vi.mock('../overdeck/review-status-record-sync.js', () => ({
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { setReviewStatusSync } from '../review-status.js';
+import { clearReviewStatus, setReviewStatusSync } from '../review-status.js';
 
 const existingStatus = (overrides: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-3575',
@@ -90,6 +90,13 @@ describe('setReviewStatusSync UAT failure feedback (PAN-3575)', () => {
 
     expect(uatFeedback.clearAnchor).toHaveBeenCalledWith('PAN-3575');
     expect(uatFeedback.relay).not.toHaveBeenCalled();
+  });
+
+  it('clears the UAT feedback anchor when terminal lifecycle clears review status', async () => {
+    clearReviewStatus('PAN-3575');
+    await flushUatRelay();
+
+    expect(uatFeedback.clearAnchor).toHaveBeenCalledWith('PAN-3575');
   });
 
   it('preserves the UAT failure status when the relay rejects', async () => {

@@ -28,9 +28,22 @@ export interface UatFailureFeedbackResult {
   deduplicated: boolean;
 }
 
+/** Bound process-local dedup state even if terminal cleanup is delayed. */
+export const MAX_UAT_FAILURE_FEEDBACK_ANCHORS = 256;
 const lastNotifiedAnchor = new Map<string, string | undefined>();
 
-/** Clear one UAT verdict anchor when a new UAT cycle begins. */
+function rememberUatFailureFeedbackAnchor(issueId: string, anchor: string | undefined): void {
+  // Refresh matching entries so actively failing issues are retained under LRU eviction.
+  lastNotifiedAnchor.delete(issueId);
+  lastNotifiedAnchor.set(issueId, anchor);
+  while (lastNotifiedAnchor.size > MAX_UAT_FAILURE_FEEDBACK_ANCHORS) {
+    const oldestIssueId = lastNotifiedAnchor.keys().next().value;
+    if (oldestIssueId === undefined) return;
+    lastNotifiedAnchor.delete(oldestIssueId);
+  }
+}
+
+/** Clear one UAT verdict anchor when a new UAT cycle or terminal lifecycle begins. */
 export function clearUatFailureFeedbackAnchor(issueId: string): void {
   lastNotifiedAnchor.delete(issueId.toUpperCase());
 }
@@ -92,7 +105,7 @@ export async function relayUatFailureFeedbackPromise(
     return result;
   }
 
-  lastNotifiedAnchor.set(issueId, opts.anchor);
+  rememberUatFailureFeedbackAnchor(issueId, opts.anchor);
   result.feedbackPath = fileResult.filePath;
 
   const message = `SPECIALIST FEEDBACK: uat-agent reported UAT FAILED for ${issueId}.
@@ -101,30 +114,51 @@ MUST READ: ${fileResult.filePath}
 
 Use your Read tool to open this file, read every line, then fix every failed UAT acceptance criterion. Do NOT stop at the prompt.`;
 
+  let target: Awaited<ReturnType<typeof resolveIssueFeedbackTarget>>;
   try {
-    const target = await resolveIssueFeedbackTarget(issueId);
-    if ('agentId' in target) {
-      try {
-        await messageAgent(target.agentId, message, 'internal', { owesRework: true });
-        result.agentMessageSent = true;
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        console.warn(`[uat-failure-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
-        await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
-          specialist: 'uat-agent',
-          feedbackPath: fileResult.filePath,
-        });
-        result.needsYouSurfaced = true;
-      }
-    } else {
-      await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-        specialist: 'uat-agent',
-        feedbackPath: fileResult.filePath,
-      });
-      result.needsYouSurfaced = true;
-    }
+    target = await resolveIssueFeedbackTarget(issueId);
   } catch (err) {
-    console.warn(`[uat-failure-feedback] Could not route feedback for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`[uat-failure-feedback] Could not resolve a feedback target for ${issueId}: ${reason}`);
+    await surfaceIssueFeedbackNeedsYou(issueId, `Could not resolve UAT feedback target: ${reason}`, {
+      specialist: 'uat-agent',
+      feedbackPath: fileResult.filePath,
+    });
+    result.needsYouSurfaced = true;
+    return result;
+  }
+
+  if (!('agentId' in target)) {
+    await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+      specialist: 'uat-agent',
+      feedbackPath: fileResult.filePath,
+    });
+    result.needsYouSurfaced = true;
+    return result;
+  }
+
+  try {
+    const outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+    if (outcome.delivered) {
+      result.agentMessageSent = true;
+      return result;
+    }
+
+    const reason = outcome.reason ?? 'delivery was not accepted';
+    console.warn(`[uat-failure-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+    await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+      specialist: 'uat-agent',
+      feedbackPath: fileResult.filePath,
+    });
+    result.needsYouSurfaced = true;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`[uat-failure-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+    await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+      specialist: 'uat-agent',
+      feedbackPath: fileResult.filePath,
+    });
+    result.needsYouSurfaced = true;
   }
 
   return result;
