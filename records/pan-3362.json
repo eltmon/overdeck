@@ -387,9 +387,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T14:19:58.250Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T14:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T14:24:19.238Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T14:24:19Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3362\n\n# Review Synthesis — PAN-3362 — 2026-08-06T14:27:00Z\n\n## Verdict: CHANGES REQUESTED — the revised no-Git branch fallback still synchronously queries SQLite on the dashboard request path\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/context.json\n- Branch: feature/pan-3362\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362\n- HEAD reviewed: b67696c821244da4d9e6f12efb2e4c1a25363356\n- Cycle number: 11\n- Prior cycle SHA: e60fdfbbd61183c21a6426ea0577eab68d819d3b\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] The persisted-branch fallback still blocks its workspace request on synchronous SQLite — `src/dashboard/server/routes/workspaces/workspace-data.ts:654`\n\nThe new conditional invocation correctly avoids the lookup when shell Git succeeds, but the changed fallback path still calls `getPersistedBranchFallbackAsync()`, whose body immediately executes synchronous `listOverdeckAgentStatesByIssueSync()`. A fixture, deleted worktree, or inaccessible checkout therefore blocks the dashboard event loop on SQLite for its workspace-detail request. The invocation at line 654 is in the cycle-11 diff, so this remains a promotable blocker. Use an actually asynchronous read-door/resolver operation or a request-local in-memory projection for the fallback.\n\n## Non-blocking Findings\n\n### [performance] [demoted: previously reviewed] Snapshot construction synchronously scans every agent row — `src/dashboard/server/read-model.ts:170`\n\nThe snapshot-time full-agent scan remains a performance concern, but the cited code is unchanged since the prior review head (`e60fdfbbd61183c21a6426ea0577eab68d819d3b`). The cycle-11 convergence gate prevents promoting it again.\n\n### [correctness] Direct `--local` seeding does not state the required peer-dashboard restart — `src/cli/commands/admin/seed-uat-fixtures.ts:134`\n\nA manually invoked local seed writes durable fixture data while a running peer dashboard keeps its existing in-memory state. The documented host mode restarts and health-checks the server, so this remains an operational advisory.\n\n## Clean Sub-roles\n- security\n- correctness\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-b67696c8/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3362 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -455,7 +468,7 @@
     "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T14:24:18.412Z",
+  "updated": "2026-08-06T14:24:19.238Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "blocked",
