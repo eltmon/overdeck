@@ -38,11 +38,17 @@ recommended release without acting on it.
 | 2 | `needs-you` | open recovery trip in the per-issue permanent record | operator answers; sweeper re-surfaces on TTL |
 | 3 | `deacon-ignored` | `review_status.deaconIgnored` | operator clears the flag; sweeper re-surfaces on TTL |
 | 4 | `operator-gate` | agent `paused` (not yield) / `troubled` / `stoppedByUser` | `pan unpause` / `pan untroubled` / `pan start` — operator-only; re-surfaced on TTL |
-| 5 | `uat-failed` | `uatStatus=failed` with merge pending | recommendation: `pan resume <agent>` with the UAT feedback (`pan start` if stopped) |
+| 5 | `uat-failed` | `uatStatus=failed`, merge pending, and no live work agent | recommendation: `pan start <id>` |
 | 6 | `merge-failed` | `mergeStatus=failed`, no retry in flight | recommendation: `pan review resync` for merge re-evaluation |
 | 7 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
 | 8 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
 | 9 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+
+A failed UAT verdict reaches the work agent through the `setReviewStatus()`
+write door and `src/lib/cloister/uat-failure-feedback.ts`. The relay writes the
+feedback file with `writeFeedbackFile()` and resolves delivery with
+`resolveIssueFeedbackTarget()`, so a `uat-failed` row means the relay found no
+delivery target after its resurrection attempt.
 
 The `stuck-flag` orbit consults the **verdict of record** from the
 host-recorded active review run before making a recommendation. The sweeper is
