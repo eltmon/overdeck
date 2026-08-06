@@ -109,7 +109,7 @@
     "recordedAt": "2026-08-06T01:01:02.668Z"
   },
   "created": "2026-08-05T16:12:07.837Z",
-  "updated": "2026-08-06T01:09:47.642Z",
+  "updated": "2026-08-06T01:09:49.614Z",
   "pipeline": {
     "issueId": "PAN-3550",
     "reviewStatus": "blocked",
@@ -118,8 +118,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-06T01:09:47.603Z",
-    "reviewNotes": "Activity details expose host command-line arguments that can contain credentials",
+    "updatedAt": "2026-08-06T01:09:48.175Z",
+    "reviewNotes": "activity details persist host command-line arguments that can contain credentials",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3574",
     "reviewedAtCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
     "lastVerifiedCommit": "4ed5c557f7891ffe518c98aa2f9682cfee3762c1",
@@ -226,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.516684,
-        "pricingAsOf": "2026-08-06T01:09:47.630Z"
+        "pricingAsOf": "2026-08-06T01:09:49.610Z"
       }
     },
     "merges": [
