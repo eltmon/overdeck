@@ -962,7 +962,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:45:19.483Z",
+  "updated": "2026-08-06T21:45:25.560Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -972,9 +972,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T21:18:35.418Z",
-    "updatedAt": "2026-08-06T21:45:18.803Z",
+    "updatedAt": "2026-08-06T21:45:25.551Z",
     "reviewNotes": "Orphan restore can overwrite the fresh-head test-gate reset with historical passed test status",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
+    "reviewedAtCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "lastVerifiedCommit": "8eed74d4c4eb476878f487d1e945085543845cac",
     "reviewSpawnedAt": "2026-08-06T21:29:42.657Z"
   },
@@ -1104,7 +1105,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.3547997,
-        "pricingAsOf": "2026-08-06T21:45:18.819Z"
+        "pricingAsOf": "2026-08-06T21:45:25.554Z"
       }
     },
     "merges": [
