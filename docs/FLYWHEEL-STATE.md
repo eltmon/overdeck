@@ -1720,3 +1720,23 @@ PAN-3596 still stranded. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-
 Also worth noting: I would not have known the merge carried that file without the tick-28 check. A red main that fixes itself while a strike is mid-flight is precisely the situation where two agents produce colliding fixes for the same file.
 
 PAN-3596 still stranded with no work and no dispatch door. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 30 — 2026-08-07T05:20Z — third strike found dead with finished work; salvaged the same way
+
+**PAN-3607's strike is inert too.** Cost frozen at $2.6903 across ~20 minutes, and its workspace transcript was last written at 00:41 — hours before the strike was even spawned at ~04:20, so the current session has produced no transcript at all. Two signals disagreeing is itself the tick-24 lesson in miniature: I trusted neither and went to the artifact instead.
+
+**The artifact was there.** Clean tree, one commit ahead of main, never pushed:
+
+```
+a9e64dd517 test(infra): cover local tsc type-ratchet resolution
+```
+
+Salvaged it exactly as PAN-3594 at tick 25 — pushed `strike/pan-3607`, then `pan strike-ready PAN-3607` → `ready at a9e64dd517cf6439e9f69b2835035efdffd4e66c`.
+
+**Three strikes dead this run, all three with committed work, two of the three finished and recoverable.** PAN-3594 and PAN-3607 both died in the gap between `git commit` and `git push`; PAN-3596 died with nothing. That is a strikingly consistent failure point, and worth flagging as a pattern rather than three incidents: agents are reaching a complete, tested commit and then dying at the push. Whatever kills them is doing so at a specific stage, not randomly.
+
+**Deliberately did not rebase before pushing.** Its commit predates `c93b2f33b3`, which touched the same test file, so a conflict is plausible. Rebasing here would be me doing the agent's work and rewriting a commit I did not author; pushing as-is lets the landing door rebase, and if it conflicts that surfaces as a visible landing failure rather than as silent damage. PAN-3594 took exactly that path two ticks ago and landed.
+
+**Carry this: when two health signals disagree, stop reading signals and go look for the output.** The pane said one thing, the transcript another, and the branch settled it in a single command. A committed diff is ground truth in a way that no liveness proxy is — it either exists or it does not.
+
+Main green at `c93b2f33b3`. PAN-3596 remains the one genuine loss: dead with zero commits and no dispatch door.
