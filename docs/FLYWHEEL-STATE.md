@@ -1464,3 +1464,13 @@ Nothing landed. PAN-3593 reached `strike_landing_state: ready` (+50/-11) and awa
 That puts three strikes in flight (3593, 3594, 3596) against a `minAgents` target of 2 — all three drawn from findings this run produced, none needing an operator decision to start.
 
 **Carry this: the right response to "I cannot tell which of four candidates is responsible" is to build the measurement, not to pick one.** The temptation at tick 10 was to strike `reconcileFalseMerged` — it was the most plausible of the four and the audit had already described its missing cache. A strike aimed at a guessed cause wastes a revolution and, worse, produces a plausible-looking fix that may leave the real term untouched while appearing to resolve the issue. Filing the instrumentation instead costs one extra cycle and makes the next answer certain.
+
+### RUN-82 tick 15 — 2026-08-07T00:35Z — PAN-3593 landed; deploy correctly deferred; struck PAN-3584
+
+**PAN-3593 landed** — `f23563f3ad fix(strike): recover idle terminal sessions (#3598)`. The idle-at-prompt agent problem is fixed on `main`.
+
+**The deploy gate deferred me again, and again I did not force it.** `pan reload` returned *"Deployment deferred because the post-merge lifecycle is pending"* for PAN-3593, with the same explicit instruction not to retry or `--force`. Two conditions have to clear: the post-merge lifecycle, and CI green on the exact `origin/main` tip — which, per tick 12's measurement, is roughly 25 minutes out for `f23563f3ad`. The deploy patrol fires on its own once both settle. This is the second time this run the gate has held me and the second time waiting was correct; the standing deployer authority is about *who* deploys, not about overriding a gate mid-operation.
+
+**Struck PAN-3584** — the Flywheel doctrine drift. It is the last of my findings that costs real time rather than only clarity: its strike-ownership contradiction is what stranded PAN-3559 and PAN-3562 in `post_merge_limbo` for 34 hours, and its dead `assemble-uat` endpoint wastes a call every tick an orchestrator follows the brief literally. Four strikes now in flight (3584, 3594, 3596, and 3593 finishing post-merge).
+
+**Carry this: a doctrine bug is a substrate bug.** I nearly left PAN-3584 as documentation housekeeping behind the "real" code fixes for six ticks. But the pipeline executes its prompts as literally as it executes its code — two agents told opposite things about who lands a strike produced exactly the same class of stranded state a null pointer would, and cost more hours than any single code defect this run. The instruction set deserves the same file:line rigour and the same strike priority as the source.
