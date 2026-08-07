@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-06T23:57:02.394Z",
-  "updated": "2026-08-07T04:22:09.825Z",
+  "updated": "2026-08-07T04:25:02.761Z",
   "pipeline": {
     "issueId": "PAN-3594",
     "reviewStatus": "pending",
@@ -13,12 +13,12 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T04:22:09.806Z",
+    "updatedAt": "2026-08-07T04:25:02.751Z",
     "mergeNotes": "GitHub PR #3606 has failing required checks on HEAD c94b3d67. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3606 for details.",
     "lastVerifiedCommit": "c94b3d6746a93b0be48173382ced24be643db293",
     "strikeReadyHead": "bdb3fd30f4a915aa991a85d5358f72835c806413",
     "strikeReadyAt": "2026-08-07T04:22:09.805Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -49,24 +49,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-terra": {
-            "input": 1242041,
-            "output": 70909,
-            "cacheRead": 21741568,
+            "input": 1243415,
+            "output": 71093,
+            "cacheRead": 22476800,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 1242041,
-          "output": 70909,
-          "cacheRead": 21741568,
+          "input": 1243415,
+          "output": 71093,
+          "cacheRead": 22476800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.60415,
-        "pricingAsOf": "2026-08-07T04:22:09.817Z"
+        "usd": 9.794154,
+        "pricingAsOf": "2026-08-07T04:25:02.755Z"
       }
     },
     "merges": [],
