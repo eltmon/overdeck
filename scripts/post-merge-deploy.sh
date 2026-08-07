@@ -48,6 +48,12 @@ if [[ "${OVERDECK_POST_MERGE_DEPLOY_SUPERVISED:-}" != "1" ]]; then
     "$0" "$@"
 fi
 
+# The systemd user unit does not inherit the interactive shell's nvm PATH, so
+# `npm run build` would resolve the system Node (v18) and rolldown crashes on
+# the missing node:util styleText export. Pin Node 22 for every child below.
+NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
+export PATH="$(dirname "$NODE"):$PATH"
+
 # --- Lock: only one deploy runs at a time ---
 exec 9>"$LOCK_FILE"
 if ! flock -x -n 9; then
@@ -160,7 +166,6 @@ rm -rf "$REPO_ROOT/dist.old.$$" >> "$LOG_FILE" 2>&1 || true
 # The outer systemd unit retries this entire script on failure, so a post-kill
 # failure cannot abandon the machine with no successor.
 log "Restarting dashboard through pan restart..."
-NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
 GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
 PRIMARY_REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
 log "Restart command cwd: $PRIMARY_REPO_ROOT"
