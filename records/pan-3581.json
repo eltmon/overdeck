@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-06T19:31:59.858Z",
-  "updated": "2026-08-07T20:00:37.552Z",
+  "updated": "2026-08-07T20:03:33.592Z",
   "pipeline": {
     "issueId": "PAN-3581",
     "reviewStatus": "pending",
@@ -12,10 +12,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-06T20:27:23.812Z",
-    "updatedAt": "2026-08-07T20:00:32.635Z",
+    "updatedAt": "2026-08-07T20:03:29.191Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3581 after its harness exited before push.",
     "strikeReadyHead": "f02d992f1de9d2dee31a78c73b8b15518e269e80",
-    "strikeReadyAt": "2026-08-07T20:00:32.635Z",
+    "strikeReadyAt": "2026-08-07T20:03:29.191Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -42,7 +42,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.023415,
-        "pricingAsOf": "2026-08-07T20:00:32.644Z"
+        "pricingAsOf": "2026-08-07T20:03:29.201Z"
       }
     },
     "merges": [],
