@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { patrolStrikeLandings, StrikeLandingSupervisor, type StrikeLandingDeps } from '../../../src/lib/cloister/deacon-strike-landing.js';
+import { patrolStrikeLandings, salvageStrandedStrikeBranches, StrikeLandingSupervisor, type StrikeLandingDeps } from '../../../src/lib/cloister/deacon-strike-landing.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 const head = 'a'.repeat(40);
@@ -28,11 +28,65 @@ function deps(result: { success: boolean; mergeStatus?: string; error?: string; 
     schedule: (key, work) => { scheduledKeys.add(key); scheduled.push(work().finally(() => scheduledKeys.delete(key))); },
     isScheduled: key => scheduledKeys.has(key),
     isPersistentlyOwned: vi.fn().mockReturnValue(false),
+    listProjects: vi.fn().mockResolvedValue([]),
+    git: vi.fn(),
+    isStrikeAgentAlive: vi.fn().mockResolvedValue(false),
     flush: () => Promise.all(scheduled).then(() => undefined),
   };
 }
 
 describe('patrolStrikeLandings', () => {
+  it('pushes a clean dead strike and persists the ready marker before landing', async () => {
+    const d = deps({ success: true, mergeStatus: 'queued' });
+    d.setState(ready({ strikeReadyHead: undefined, strikeLandingState: undefined }));
+    vi.mocked(d.listProjects).mockResolvedValue([{ key: 'overdeck', config: { path: '/repo' } }] as never);
+    vi.mocked(d.git).mockImplementation(async (args) => {
+      const command = args.join(' ');
+      if (command === 'worktree list --porcelain') {
+        return `worktree /repo/workspaces/feature-pan-2702-strike\nHEAD ${head}\nbranch refs/heads/strike/pan-2702\n`;
+      }
+      if (command === 'status --porcelain') return '';
+      if (command === 'rev-list --count origin/main..HEAD') return '1';
+      if (command === 'rev-parse HEAD') return head;
+      if (command === 'push origin strike/pan-2702') return '';
+      throw new Error(`Unexpected git invocation: ${command}`);
+    });
+
+    await expect(salvageStrandedStrikeBranches(d)).resolves.toEqual([
+      `[strike-salvage] pushed PAN-2702 at ${head}`,
+    ]);
+
+    expect(d.git).toHaveBeenCalledWith(['push', 'origin', 'strike/pan-2702'], '/repo/workspaces/feature-pan-2702-strike');
+    expect(d.state).toMatchObject({
+      strikeReadyHead: head,
+      strikeLandingState: 'ready',
+      mergeNotes: 'Automatically salvaged completed strike branch strike/pan-2702 after its harness exited before push.',
+    });
+  });
+
+  it.each([
+    ['a live harness', true, ''],
+    ['a dirty worktree', false, ' M src/file.ts'],
+  ])('does not salvage %s', async (_label, alive, dirty) => {
+    const d = deps();
+    d.setState(ready({ strikeReadyHead: undefined, strikeLandingState: undefined }));
+    vi.mocked(d.listProjects).mockResolvedValue([{ key: 'overdeck', config: { path: '/repo' } }] as never);
+    vi.mocked(d.isStrikeAgentAlive).mockResolvedValue(alive);
+    vi.mocked(d.git).mockImplementation(async (args) => {
+      const command = args.join(' ');
+      if (command === 'worktree list --porcelain') {
+        return `worktree /repo/workspaces/feature-pan-2702-strike\nHEAD ${head}\nbranch refs/heads/strike/pan-2702\n`;
+      }
+      if (command === 'status --porcelain') return dirty;
+      if (command === 'rev-list --count origin/main..HEAD') return '1';
+      if (command === 'rev-parse HEAD') return head;
+      throw new Error(`Unexpected git invocation: ${command}`);
+    });
+
+    await expect(salvageStrandedStrikeBranches(d)).resolves.toEqual([]);
+    expect(d.git).not.toHaveBeenCalledWith(['push', 'origin', 'strike/pan-2702'], expect.any(String));
+  });
+
   it('claims a ready marker and invokes the strike merge door', async () => {
     const d = deps({ success: true, mergeStatus: 'queued' });
     const actions = await patrolStrikeLandings(d);

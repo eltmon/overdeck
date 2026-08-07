@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { supervisorProcessAliveSync } from '../supervisor-liveness.js';
+import { supervisorProcessAlive, supervisorProcessAliveSync } from '../supervisor-liveness.js';
 
 describe('supervisorProcessAliveSync', () => {
   it('returns true when pgrep finds a supervisor for the agent', () => {
@@ -29,5 +29,14 @@ describe('supervisorProcessAliveSync', () => {
     let called = false;
     expect(supervisorProcessAliveSync('', () => { called = true; return true; })).toBe(false);
     expect(called).toBe(false);
+  });
+
+  it('supports the same boundary-anchored probe without blocking the server', async () => {
+    let pattern = '';
+    await expect(supervisorProcessAlive('strike-pan-2702', async (value) => {
+      pattern = value;
+      return true;
+    })).resolves.toBe(true);
+    expect(pattern).toContain('--name strike-pan-2702(\\s|$)');
   });
 });
