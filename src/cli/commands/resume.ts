@@ -64,7 +64,7 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
       console.log(chalk.dim(`If the saved metadata is stale, run 'pan review reset --session ${id}' first.`));
     }
     if ((result.error || '').includes('stack')) {
-      console.log(chalk.dim(`Or retry with --host to bypass the docker stack-health gate.`));
+      console.log(chalk.dim(`Or retry with --host --yes to bypass the docker stack-health gate.`));
     }
     return exitCli(1);
   }

@@ -44,6 +44,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
+    vi.doUnmock('../review-status.js');
     vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -418,7 +419,7 @@ describe('AgentState role persistence', () => {
       workspace,
       role: 'work',
       model: 'claude-sonnet-4-6',
-    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host --yes to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
     // PAN-1618: an auto-rebuild is attempted first; when it fails the gate
@@ -467,7 +468,7 @@ describe('AgentState role persistence', () => {
       workspace,
       role: 'work',
       model: 'claude-sonnet-4-6',
-    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host --yes to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
     // PAN-1618: failed auto-rebuild → blocked with the failed-rebuild marker.
@@ -545,7 +546,7 @@ describe('AgentState role persistence', () => {
     expect(createSessionAsync).toHaveBeenCalled();
     // PAN-1556: host-override is logged via console.warn, not the activity feed
     // (it was per-spawn feed spam). The spawn proceeding + the warn is the contract.
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host to override'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host --yes to override'));
     warnSpy.mockRestore();
     rmSync(workspace, { recursive: true, force: true });
   });
@@ -707,6 +708,37 @@ describe('AgentState role persistence', () => {
     await expect(assertWorkspaceStackHealthyForSpawn('PAN-1579', 'work')).resolves.toBeUndefined();
     expect(rebuildWorkspaceStack).toHaveBeenCalledWith('PAN-1579', expect.any(Object));
     expect(emitActivityEntry).not.toHaveBeenCalled();
+  });
+
+  it.each(['blocked', 'failed'] as const)('PAN-3591: starts rework for a review-%s branch on the host without rebuilding its broken stack', async (reviewStatus) => {
+    const emitActivityEntry = vi.fn();
+    const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: false, error: 'branch does not compile' }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['overdeck-feature-pan-3591-init-1 init exited non-zero (1)'],
+        lastObserved: '2026-08-06T20:50:00.000Z',
+      })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
+    vi.doMock('../review-status.js', () => ({
+      getReviewStatusSync: vi.fn(() => ({ reviewStatus })),
+    }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+    }));
+
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-3591', 'work')).resolves.toBeUndefined();
+    expect(rebuildWorkspaceStack).not.toHaveBeenCalled();
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'warn',
+      message: 'agent-spawn-host-fallback: PAN-3591',
+      details: expect.stringContaining(`review is ${reviewStatus}`),
+    }));
   });
 
   it('PAN-1645: review/test/ship auto-fall-back to host (no throw) when the stack stays unhealthy; work still blocks', async () => {

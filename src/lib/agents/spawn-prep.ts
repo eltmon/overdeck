@@ -11,6 +11,7 @@ import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId, ComplexityLevel } from '../settings.js';
@@ -742,7 +743,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   }
 
   const details = health.reasons.join('; ');
-  const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
+  const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host --yes to override.`;
 
   if (allowHost) {
     // PAN-1556: host-override is a per-spawn detail, not user-facing activity —
@@ -788,10 +789,20 @@ export async function assertWorkspaceStackHealthyForSpawn(
         level: 'warn',
         issueId: normalizedIssue,
         message: `agent-spawn-host-fallback: ${normalizedIssue}`,
-        details: `Workspace docker stack unhealthy (${details}); ${role} runs on the host (rebase/verify use host .git + host gates), so proceeding without containers. ${reason}`,
+        details: `Workspace docker stack unhealthy (${details}); ${role} spawn proceeds on the host without containers. ${reason}`,
       });
     }
   };
+
+  // A blocked or failed review means the work agent is explicitly being
+  // restarted to repair known-broken code. Rebuilding its container stack would
+  // compile the same broken branch and can only delay that repair, so work from
+  // the host instead.
+  const reviewStatus = role === 'work' ? getReviewStatusSync(normalizedIssue)?.reviewStatus : undefined;
+  if (reviewStatus === 'blocked' || reviewStatus === 'failed') {
+    fallbackToHost(`review is ${reviewStatus}; rework must repair the branch before its stack can build`);
+    return;
+  }
 
   const blockWork = (markerMessage: string, errDetails: string): never => {
     if (!record.escalated) {
@@ -815,7 +826,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     }
     blockWork(
       `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
-      `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+      `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host --yes needed.`,
     );
   }
 
