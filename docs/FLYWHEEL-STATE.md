@@ -1706,3 +1706,17 @@ That file is **not** in PAN-3594's original commit, whose diff covers `doctor-st
 **Carry this: "the branch does not touch that file" is a claim about the branch as I last read it, not about what will be merged.** A rebase, a merge, or a squash can all change the answer between the moment I check and the moment the pipeline acts.
 
 PAN-3596 still stranded. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 29 — 2026-08-07T05:00Z — main green; the second red main was cleared by an unrelated merge, not by its own strike
+
+**Main is green.** `test=success, build (22)=success, lint=success, guard=success` on `c93b2f33b3`. Second red main of the night cleared — **but not by PAN-3607's strike.** It cleared because PAN-3594's squash merge carried the `lint-frontend-types.test.ts` change described at tick 28, a file absent from PAN-3594's own commit.
+
+**PAN-3594 deployed and closed out** — rows 6 and 8 both PASS on real evidence. Tenth substrate fix landed, deployed and closed out this run, and the only one salvaged from a dead agent's unpushed commit.
+
+**Re-scoped PAN-3607 rather than closing it.** Its strike has committed `a9e64dd517 test(infra): cover local tsc type-ratchet resolution` — which is recommendation #3 from the issue body: coverage for the dimension `b2f2417401` actually introduced, a run with no local `tsc`. The incidental fix reconciled the two broken assertions; it did not add the missing one. So the strike's work is additive, not redundant, and the honest disposition is "the emergency is over, the coverage gap is not". Flagged on the issue that `blocks-main` no longer describes reality and that the strike's commit predates the incidental fix, so the two touch the same file and may conflict on rebase. Did not intervene — the agent is alive and will sync and signal itself.
+
+**Carry this: when an emergency resolves by an unexpected path, re-derive what is left rather than closing on the headline.** The reflex when `test=success` appears is to close the red-main issue and move on. Two of the three recommendations in it had genuinely been satisfied — by accident, through a merge that had nothing to do with the issue — and the third had not. Closing would have discarded a nearly-finished strike doing exactly the work that remained. The question that matters after any surprise fix is not "is the symptom gone" but "which of the things I asked for actually happened".
+
+Also worth noting: I would not have known the merge carried that file without the tick-28 check. A red main that fixes itself while a strike is mid-flight is precisely the situation where two agents produce colliding fixes for the same file.
+
+PAN-3596 still stranded with no work and no dispatch door. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
