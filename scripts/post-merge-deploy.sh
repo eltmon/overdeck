@@ -20,7 +20,78 @@ LOCK_FILE="/tmp/overdeck-deploy.lock"
 RESTART_MARKER="$HOME/.overdeck/dashboard-restarting.json"
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
+  # Under systemd supervision the unit's StandardOutput already appends to
+  # LOG_FILE, so tee-ing the file too would land every line twice.
+  if [[ "${OVERDECK_POST_MERGE_DEPLOY_SUPERVISED:-}" == "1" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*"
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
+  fi
+}
+
+# --- Repeated-failure escalation (PAN-3601) ---
+# The outer systemd unit retries this script forever by design (PAN-3386): the
+# machine must never be left without a dashboard successor. The operator still
+# has to hear about a deploy that cannot succeed, so once the unit accumulates
+# ESCALATION_THRESHOLD consecutive failed runs, surface a durable activity
+# entry (with desktop notification) plus a TTS announcement through the
+# dashboard's internal events door. Best-effort: escalation never fails the
+# deploy, and the skip-marker is written only after the server confirms the
+# append — so a POST that fails (e.g. dashboard down mid-restart) is retried
+# on the next unit restart.
+ESCALATION_THRESHOLD=5
+maybe_escalate_repeated_failures() {
+  local unit="${OVERDECK_DEPLOY_UNIT:-}"
+  [[ -z "$unit" ]] && return 0
+  local restarts
+  restarts="$(systemctl --user show "$unit" --property=NRestarts --value 2>/dev/null || true)"
+  [[ "$restarts" =~ ^[0-9]+$ ]] || return 0
+  (( restarts < ESCALATION_THRESHOLD )) && return 0
+  local marker="/tmp/overdeck-deploy-escalated-${unit}"
+  [[ -e "$marker" ]] && return 0
+  local token_file="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
+  if [[ ! -r "$token_file" ]]; then
+    log "WARN: $restarts consecutive deploy failures, but no internal token at $token_file to escalate with."
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    log "WARN: $restarts consecutive deploy failures, but jq is unavailable to build the escalation payload."
+    return 0
+  fi
+  local dash_url="${OVERDECK_INTERNAL_DASHBOARD_URL:-http://127.0.0.1:${API_PORT:-${PORT:-3011}}}"
+  local ts log_tail entry tts response
+  ts="$(date -u '+%Y-%m-%dT%H:%M:%S.%3NZ')"
+  log_tail="$(tail -n 40 "$LOG_FILE" 2>/dev/null || true)"
+  entry="$(jq -n \
+    --arg ts "$ts" --arg issue "$ISSUE_ID" --arg unit "$unit" \
+    --arg n "$restarts" --arg tail "$log_tail" \
+    '{event: {type: "activity.entry", timestamp: $ts, payload: {
+        id: ("post-merge-deploy-needs-you-" + $unit),
+        source: "deploy-script", level: "error", status: "failed",
+        message: ("Post-merge deploy for " + $issue + " has failed " + $n + " consecutive times and will keep retrying every 10 seconds until it succeeds. The dashboard keeps serving the previous build until a deploy completes. The failing step is in /tmp/overdeck-deploy.log (systemd unit " + $unit + ")."),
+        details: $tail, issueId: $issue, desktop: true}},
+      idempotencyKey: ("post-merge-deploy-needs-you-" + $unit)}')"
+  response="$(curl -sS -m 10 -X POST "$dash_url/api/internal/events/append-once" \
+    -H 'content-type: application/json' \
+    -H "x-overdeck-internal-token: $(cat "$token_file")" \
+    --data-binary "$entry" 2>>"$LOG_FILE" || true)"
+  if [[ "$response" == *'"outcome"'* ]]; then
+    tts="$(jq -n \
+      --arg ts "$ts" --arg issue "$ISSUE_ID" --arg unit "$unit" \
+      '{event: {type: "activity.tts", timestamp: $ts, payload: {
+          id: ("post-merge-deploy-needs-you-tts-" + $unit),
+          utterance: ("Post-merge deploy for " + $issue + " is failing repeatedly and needs attention."),
+          priority: 0, issueId: $issue, source: "deploy-script"}},
+        idempotencyKey: ("post-merge-deploy-needs-you-tts-" + $unit)}')"
+    curl -sS -m 10 -X POST "$dash_url/api/internal/events/append-once" \
+      -H 'content-type: application/json' \
+      -H "x-overdeck-internal-token: $(cat "$token_file")" \
+      --data-binary "$tts" >/dev/null 2>>"$LOG_FILE" || true
+    touch "$marker"
+    log "Escalated $restarts consecutive deploy failures to the operator (unit $unit)."
+  else
+    log "WARN: escalation POST did not confirm (response: ${response:-none}); will retry on the next run."
+  fi
 }
 
 # A detached child still belongs to the dashboard's systemd cgroup. The old
@@ -43,6 +114,7 @@ if [[ "${OVERDECK_POST_MERGE_DEPLOY_SUPERVISED:-}" != "1" ]]; then
     "--property=StandardError=append:$LOG_FILE" \
     "--property=WorkingDirectory=$REPO_ROOT" \
     --setenv OVERDECK_POST_MERGE_DEPLOY_SUPERVISED=1 \
+    --setenv "OVERDECK_DEPLOY_UNIT=$UNIT" \
     --setenv OVERDECK_RESTART_INITIATOR=merge-step0 \
     --setenv "OVERDECK_ISSUE_ID=$ISSUE_ID" \
     "$0" "$@"
@@ -62,6 +134,7 @@ if ! flock -x -n 9; then
 fi
 
 log "Starting post-merge deploy for issue=$ISSUE_ID branch=$SOURCE_BRANCH reason=$REASON"
+maybe_escalate_repeated_failures
 log "Repo root (raw): $REPO_ROOT"
 
 # If REPO_ROOT points inside a workspace, resolve to the main repo.
@@ -94,6 +167,7 @@ cleanup_build_wt() {
     rm -rf "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
   fi
   rm -rf "$REPO_ROOT/dist.incoming" >> "$LOG_FILE" 2>&1 || true
+  rm -rf "$REPO_ROOT/scripts.incoming" >> "$LOG_FILE" 2>&1 || true
 }
 trap cleanup_build_wt EXIT
 
@@ -125,6 +199,8 @@ fi
 # swap before restart is a near-atomic directory rename.
 rm -rf "$REPO_ROOT/dist.incoming"
 cp -a "$BUILD_WT/dist" "$REPO_ROOT/dist.incoming"
+rm -rf "$REPO_ROOT/scripts.incoming"
+cp -a "$BUILD_WT/scripts" "$REPO_ROOT/scripts.incoming"
 
 # Worktree no longer needed once dist is staged — remove it now.
 git -C "$REPO_ROOT" worktree remove --force "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
@@ -159,6 +235,21 @@ rm -rf "$REPO_ROOT/dist.old.$$"
 mv "$REPO_ROOT/dist" "$REPO_ROOT/dist.old.$$" 2>/dev/null || true
 mv "$REPO_ROOT/dist.incoming" "$REPO_ROOT/dist"
 rm -rf "$REPO_ROOT/dist.old.$$" >> "$LOG_FILE" 2>&1 || true
+
+# PAN-3601: a deployed generation keeps its scripts/ forever unless a deploy
+# refreshes it — a broken deploy script could never heal itself through the
+# very pipeline it implements. Swap scripts/ alongside dist/ so the generation
+# always carries the scripts matching its built sha. Safe while this very
+# script runs: bash keeps reading the old (now unlinked) inode. Never do this
+# to a primary git checkout — it would clobber working-tree edits under
+# scripts/ — so gate on the deployments path.
+if [[ "$REPO_ROOT" == *"/.overdeck/deployments/"* ]]; then
+  log "Refreshing deployment scripts/ from built sha..."
+  rm -rf "$REPO_ROOT/scripts.old.$$"
+  mv "$REPO_ROOT/scripts" "$REPO_ROOT/scripts.old.$$" 2>/dev/null || true
+  mv "$REPO_ROOT/scripts.incoming" "$REPO_ROOT/scripts"
+  rm -rf "$REPO_ROOT/scripts.old.$$" >> "$LOG_FILE" 2>&1 || true
+fi
 
 # --- Step 5: Restart through the shared lifecycle door ---
 # pan restart owns the restart lock, writes the initiator + stopping phase before
