@@ -1519,3 +1519,23 @@ Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the shi
 **Carry this: PAN-3589 taught the gate to distinguish absent from passing, and it still collapses running into not-passing.** Three states, three messages — absent, running, failed — where only the third should read as an emergency. I filed it as a refinement on PAN-3589 rather than a new issue, since it is the same conflation family seen from the other side. Worth noticing that a fix which correctly split one ambiguity left a neighbouring one intact; "did this change resolve the *class* or just the instance?" is the question I did not ask when PAN-3589 landed.
 
 PAN-3594 and PAN-3596 still working. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 19 — 2026-08-07T01:52Z — RED MAIN found and struck; the "wait for CI" block turned out to be a real failure
+
+**Main is red.** `test` fails on `main`:
+
+```
+FAIL  tests/unit/scripts/pre-push-hook.test.ts > .husky/pre-push >
+      runs the main-push guard when HEAD is pushed to refs/heads/main
+FAIL  tests/unit/scripts/pre-push-hook.test.ts > .husky/pre-push >
+      audits feature branch ratchets from origin/main merge-base, not the remote feature sha
+Test Files  1 failed | 1412 passed | 4 skipped (1417)
+```
+
+Filed PAN-3602 with `blocks-main` and struck it immediately — red main is Mission #1.
+
+**Cause is not mine.** `ec3c5911cf fix(infra): scope pre-push guards to pushes targeting the overdeck repo` — an operator-side commit I did not dispatch — changed which pushes the guard runs for, and both failing cases are precisely that behaviour's assertions. `011980b9a06e` (my doctrine change, `roles/flywheel.md` only) is simply the first commit whose CI completed after `ec3c5911cf` landed. **Established this before filing rather than blaming the branch whose close-out surfaced it** — the same discipline RUN-79 had to learn twice, and the reason I checked `guard`, `lint` and `build` were all green on the same commit: one failing file is a targeted breakage, not a collapse.
+
+**The tick-18 wording complaint turned out to be half wrong, and that is worth recording.** Last tick I read `required checks not successful: test, lint`, found both `in_progress`, and reported that the gate conflates running with failed. It does — but *this* time the same message was hiding a genuine failure that simply had not finished reporting yet. The refinement I asked for on PAN-3589 is still right, and my confident dismissal of the alarm was luck rather than judgment: **I checked the state at the moment the message appeared and concluded the message was wrong, when the correct reading was "not yet known".** Twice now this run I have treated an in-flight or unavailable answer as a settled one; the earlier case was the backlog forecast reporting zeros.
+
+Four strikes now in flight — PAN-3602 (red main), PAN-3594, PAN-3596 — with PAN-3584 landed and awaiting a close-out that cannot pass until main is green again. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
