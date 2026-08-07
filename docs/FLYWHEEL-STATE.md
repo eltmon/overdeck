@@ -1799,3 +1799,20 @@ Chose these over PAN-3587, PAN-3591 and PAN-3609 deliberately. All five are real
 **One honest caveat on doing this at all:** PAN-3609's working hypothesis is that the pre-push hook is what kills strike agents. If that holds, striking two more agents is likely to produce two more stranded commits. I went ahead because the salvage path is now well-rehearsed — check the branch, push, record readiness — and a stranded commit is a recoverable outcome rather than a lost one. Worth stating so the next tick reads a stall as expected rather than surprising.
 
 Remaining filed and unstruck: PAN-3587 (dead-in-tmux liveness), PAN-3591 (stack gate deadlock), PAN-3609 (commit-to-push deaths). PAN-3596 remains the one genuine loss of the run. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 35 — 2026-08-07T06:55Z — predicted the third commit-to-push stall, and got a counter-example that sharpens the hypothesis
+
+**Both new strikes produced work; one completed the sequence and one stalled exactly where I said it would.**
+
+- **PAN-3599** ran the full course: `e331ef8e33 fix(strike): replace stalled live sessions`, pushed and signalled, `strikeLandingState: ready`.
+- **PAN-3604** hit the stall: `19bd449b79 fix(dashboard): report skipped recovery` committed, tree clean, branch never pushed. Salvaged the rehearsed way — push, then `pan strike-ready PAN-3604` → `ready at 19bd449b79…`.
+
+**Tally for the night: five strikes, three dead in the commit-to-push gap** (PAN-3594, PAN-3607, PAN-3604), one dead with nothing (PAN-3596), one clean run (PAN-3599).
+
+**The counter-example is the most useful thing here.** PAN-3599 pushed successfully, so the push path is not universally fatal — whatever kills the others is conditional. And PAN-3599 and PAN-3604 were spawned within seconds of each other, same model, same harness, so environment and timing are largely controlled between a survivor and a casualty. That turns a vague "the pre-push hook might be involved" into a differential question: what differs between those two runs? Posted to PAN-3609 with the suggestion to diff what each branch touched and whether the type-ratchet portion of `.husky/pre-push` behaves differently by file set.
+
+**Carry this: a prediction that half-fails is more informative than one that fully succeeds.** At tick 34 I recorded, before spawning, that if PAN-3609's hypothesis held both agents would likely strand. One did. Had both stranded I would have felt confirmed and learned nothing new; the split immediately bounded the hypothesis — the mechanism is real but conditional — and handed me a controlled pair to compare. Writing the prediction down beforehand is what made the partial outcome legible instead of just being two more incidents.
+
+Also worth noting the phenomenon is now **reproducible on demand**, which should make it cheap to instrument: spawn a strike, watch the hook execute, see whether the process survives it.
+
+PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
