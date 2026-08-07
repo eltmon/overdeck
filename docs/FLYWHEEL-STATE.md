@@ -1613,3 +1613,26 @@ At tick 17 I recorded "both genuinely progressing on the metric that matters —
 **`pan recover` revived both**, and is now 3-for-3 on inert strikes this run (PAN-3582 earlier, these two now), while `pan strike` remains 0-for-1 (still refuses PAN-3586 with "already running"). Posted both specimens to PAN-3599 with the observation that they **broaden it**: neither agent had recorded a self-abort, so the condition is not "a completion marker exists and is ignored" — an agent can simply stop producing output, and every liveness check the system owns answers "the process exists".
 
 **Carry this: the detection gap matters more than the recovery verb.** I found these by hand-comparing a cost figure across three ticks. The system already tracks per-agent spend and context; a check for "no cost movement in N minutes while the session is alive and no decision is pending" would have caught both in minutes instead of 100. Same class as PAN-3596 — the data exists, nothing watches it. That is now the fourth finding this run about the system's inability to see itself, and the second where I was the monitoring.
+
+### RUN-82 tick 24 — 2026-08-07T03:25Z — CORRECTION: `pan recover` revived nothing. It is 0-for-3 with three success messages.
+
+**Last tick I wrote that `pan recover` revived both frozen strikes and was "3-for-3 this run". That is wrong.** Thirty minutes after the recover, both cost figures are byte-identical to their pre-recover values ($5.3708, $1.4700), and the authoritative signal is worse:
+
+```
+pan-3594 newest transcript: 2026-08-06 22:57:05
+pan-3596 newest transcript: 2026-08-06 23:15:28   (now 03:24Z)
+```
+
+**4.5 and 4 hours of zero harness activity, spanning a `pan recover` that printed `✔ Recovered` for both.** The same held for `strike-pan-3582` at tick 4: recover reported success, the agent stayed frozen at $3.4278, and what actually unstuck it was running `pan strike-ready` by hand. Filed as PAN-3604.
+
+**This also revises tick 23's timeline.** I concluded the strikes froze around tick 17 (01:10Z) because that is when the cost stopped moving. The transcripts say they died at ~23:00Z — over two hours earlier. **The pane was already showing stale text when I read it at tick 17 and called it progress.** So the tick-17 error was not "two points look like a slope"; it was reading a rendered surface that had stopped updating and treating it as live telemetry.
+
+**Carry this — it is the same mistake three times, at three levels of the stack, and I keep re-learning it in a new costume:**
+
+- tick 16: a green DoD gate means *delivered*, not *repaired* (PAN-3593's fix did nothing).
+- tick 21: a local test run means nothing unless the worktree contains the fix.
+- tick 24: a `✔ Recovered` message means *the command ran*, not *the agent resumed*.
+
+Every one is the same shape: **a system's report of its own action is not evidence of the action's effect.** The general rule I should have extracted after tick 16 and did not: for any operation whose purpose is to change external state, name the observable that would prove the change, and go look at *that* — never at the operation's own exit status or output. For a fix, the reproduction. For a deploy, the build commit. For a recover, new transcript bytes.
+
+**Both strikes now have no working recovery door**: `pan strike` refuses as "already running" (PAN-3599), `pan recover` no-ops (PAN-3604), `pan tell` is closed to me. PAN-3594 (`+287/-61`) and PAN-3596 hold uncommitted work and are stranded. Main is green and unchanged at `c311a0cdb2`.
