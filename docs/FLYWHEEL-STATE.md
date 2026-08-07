@@ -1495,3 +1495,11 @@ $ pan strike PAN-3586
 That principle generalises past this issue. Six of the seven fixes closed out this run were verified by observing the original symptom afterwards — the rate-limit errors ceasing, `parked` going 0 → 8, row 6 flipping MISS to PASS, PAN-3512 restarting under `--fresh`. PAN-3593 is the one where I nearly skipped that step because the close-out looked so clean, and it is the one that was wrong.
 
 **Four strikes still in flight** (PAN-3584, PAN-3594, PAN-3596) with PAN-3593 now terminal. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 17 — 2026-08-07T01:10Z — quiet; three strikes progressing, nothing to act on
+
+PAN-3584 is actively landing (`strikeLandingState: landing`, `mergeStep: verifying`). PAN-3594 and PAN-3596 are both still working and both genuinely progressing on the metric that matters — spend moving while the pane sits at a prompt (3594 $3.88 → $5.37 with its diff steady at +287/-61, i.e. running gates rather than editing; 3596 at $1.47 from a standing start). Main unchanged at `f23563f3ad`, green, deployed.
+
+Nothing landed and nothing needed intervention, which is the correct outcome for a tick where three strikes are mid-flight and every remaining item is behind an operator gate. Resisted the pull to manufacture activity: with PAN-3584/3594/3596 in flight the fleet is at target, and dispatching a fourth strike from the thinner end of the findings list (PAN-3587, PAN-3591) would add contention for no velocity — those two are real but neither blocks anything today, and PAN-3591's instance was already worked around by `--host --yes`.
+
+Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
