@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-07T08:23:54.099Z",
+  "updated": "2026-08-07T08:23:59.344Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
@@ -27,7 +27,7 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:23:20.022Z",
+    "updatedAt": "2026-08-07T08:23:56.393Z",
     "mergeNotes": "GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))",
     "strikeReadyHead": "6a82f1aba4e196d5083e909998c8eb126c5b5e6d",
     "strikeReadyAt": "2026-08-07T08:17:05.555Z",
@@ -65,7 +65,7 @@
       },
       "costAtCloseOut": {
         "usd": 70.793972,
-        "pricingAsOf": "2026-08-07T08:23:54.093Z"
+        "pricingAsOf": "2026-08-07T08:23:56.436Z"
       }
     },
     "merges": [],
