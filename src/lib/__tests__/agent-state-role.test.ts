@@ -44,7 +44,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
-    vi.doUnmock('../review-status.js');
+    vi.doUnmock('../cloister/review-status-source.js');
     vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -721,8 +721,8 @@ describe('AgentState role persistence', () => {
       })),
     }));
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
-    vi.doMock('../review-status.js', () => ({
-      getReviewStatusSync: vi.fn(() => ({ reviewStatus })),
+    vi.doMock('../cloister/review-status-source.js', () => ({
+      resolveCanonicalReviewStatus: vi.fn(() => ({ available: true, status: { reviewStatus } })),
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),

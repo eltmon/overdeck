@@ -11,7 +11,7 @@ import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId, ComplexityLevel } from '../settings.js';
@@ -798,7 +798,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   // restarted to repair known-broken code. Rebuilding its container stack would
   // compile the same broken branch and can only delay that repair, so work from
   // the host instead.
-  const reviewStatus = role === 'work' ? getReviewStatusSync(normalizedIssue)?.reviewStatus : undefined;
+  const reviewStatus = role === 'work' ? resolveCanonicalReviewStatus(normalizedIssue).status?.reviewStatus : undefined;
   if (reviewStatus === 'blocked' || reviewStatus === 'failed') {
     fallbackToHost(`review is ${reviewStatus}; rework must repair the branch before its stack can build`);
     return;
