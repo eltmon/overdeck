@@ -1884,3 +1884,15 @@ Two strikes still working (PAN-3587, PAN-3609) plus the newly-dispatched PAN-358
 **Carry this: when a fix lands for one member of a defect family, re-test the others rather than assuming the family is closed.** After PAN-3599 landed and I verified it against the refusal case, the natural inference is that idle-agent recovery is now sound. It is not — the stale-signal path is untouched and fired again within the hour, against the very issue meant to reduce this class of loss. Verification proves what it tested and nothing adjacent.
 
 PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
+
+### RUN-82 tick 40 — 2026-08-07T08:25Z — the salvage mitigation is live; fifteen fixes landed and closed out
+
+**PAN-3609 landed, deployed and closed out** — `3ecd3b8da8 fix(strike): salvage completed dead branches (#3613)`, row 6 green on real CI. **Fifteen substrate fixes landed, deployed and closed out this run.**
+
+That one closes a loop this run opened three times over. Tonight I hand-salvaged PAN-3594, PAN-3607 and PAN-3604 — each time discovering a dead agent's finished commit sitting unpushed, each time running the same two commands. The procedure is now code. The next stranded strike should be a non-event rather than something an orchestrator has to notice.
+
+**PAN-3586's strike has no commit after ~35 minutes** (workspace still at an old main tip). Recording its cost at **$0.9704** so the next tick has a second sample to compare — one observation cannot distinguish "working on a hard investigation" from "died at 08:00", and that distinction is exactly what I got wrong at tick 17 by reading a single rising figure as progress. Its scope is genuinely investigative (why push-event CI is delayed and which commits get superseded), so a long quiet stretch is plausible here in a way it was not for the mechanical fixes.
+
+**Carry this: a mitigation that removes the need to notice beats a monitor that tells you to look.** The obvious response to three stranded strikes was better detection — an inertness alarm, a flatline check on agent spend. Those are worth having, and PAN-3596 filed the general case. But the salvage mitigation is strictly better for this particular failure, because it makes the human step unnecessary rather than better-prompted. Detection scales with attention; automation does not need any.
+
+PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
