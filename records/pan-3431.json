@@ -35,25 +35,23 @@
     }
   ],
   "created": "2026-08-01T16:59:47.309Z",
-  "updated": "2026-08-03T05:41:40.033Z",
+  "updated": "2026-08-07T08:16:56.633Z",
   "pipeline": {
     "issueId": "PAN-3431",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "reopenedAt": "2026-08-03T03:09:32.944Z",
-    "updatedAt": "2026-08-03T05:41:40.000Z",
-    "testNotes": "Skipped: issue is already merged",
-    "lastVerifiedCommit": "909bfc8c6ab76751f1740d8f8f669ac38133c768",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [],
     "closedOut": true,
-    "closedOutAt": "2026-08-03T05:41:40.000Z"
+    "closedOutAt": "2026-08-03T05:41:40.000Z",
+    "reopenedAt": "2026-08-03T03:09:32.944Z",
+    "updatedAt": "2026-08-07T08:16:55.063Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3431 after its harness exited before push.",
+    "strikeReadyHead": "909bfc8c6ab76751f1740d8f8f669ac38133c768",
+    "strikeReadyAt": "2026-08-07T08:16:55.063Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -77,90 +75,11 @@
       },
       "costAtCloseOut": {
         "usd": 136.537863,
-        "pricingAsOf": "2026-08-03T04:19:06.882Z"
+        "pricingAsOf": "2026-08-07T08:16:55.071Z"
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-03T05:41:40.033Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at 909bfc8c6ab76751f1740d8f8f669ac38133c768",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; forge metadata unavailable: GitHub App PR lookup failed: GitHub API GET /repos/eltmon/overdeck/pulls?head=eltmon%3Afeature%2Fpan-3431&state=all failed: 403 {\n\t\"message\": \"API rate limit exceeded for installation ID 144090266. If you reach out to GitHub Support for help, please include the request ID 9DEE:1B7F58:239F1B:7C2B9E:6A702A02 and timestamp 2026-08-03 05:41:23 UTC. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https:\\/\\/docs.github.com\\/en\\/site-policy\\/github-terms\\/github-terms-of-service)\",\n\t\"documentation_url\": \"https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api#rate-limiting\",\n\t\"status\": \"403\"\n}\n",
-          "status": "pass"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
-          "status": "skip"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)",
-          "status": "skip"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3431 not merged to main; Cleaned 7 agent state directories (1 transcript files preserved); Preserved local branch strike/pan-3431 — not merged to main; Preserved remote branch strike/pan-3431 — not merged to main; Pruned 223 checkpoint ref(s) for agent-pan-3431, planning-pan-3431, strike-pan-3431; No specialist registry entries for PAN-3431"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
