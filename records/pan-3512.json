@@ -1036,16 +1036,17 @@
     "recordedAt": "2026-08-06T22:27:45.056Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T22:42:38.217Z",
+  "updated": "2026-08-07T10:03:23.160Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-06T22:42:38.188Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-07T10:03:20.512Z",
     "reviewNotes": "All convoy reviewers passed; fresh-head re-gating now covers historical passed and skipped orphan test state",
     "testNotes": "npm run typecheck: exit 0. npm run lint: exit 0 (all guards clean, no new findings). npm test: exit 0, 1431 files/13471 tests passed (3 files/50 tests pre-existing skips), frontend 4 files/63 tests passed. No frontend/dashboard files in the actual diff (deacon.ts, deacon-review-signals.ts, deacon-review-status.ts, deacon-review-unsignaled.ts, review-verdict-writer.ts, orphan-restore-verdict.ts, done.ts, legacy-routes.ts, review-verdict-guards.ts + tests) and no acceptance criteria reference browser/dashboard/UI, so UAT was determined not required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
@@ -1200,10 +1201,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 46,
-            "output": 5970,
-            "cacheRead": 2901108,
-            "cacheWrite": 144330
+            "input": 48,
+            "output": 6919,
+            "cacheRead": 3045438,
+            "cacheWrite": 148117
           }
         },
         "work": {
@@ -1235,10 +1236,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 46,
-          "output": 5970,
-          "cacheRead": 2901108,
-          "cacheWrite": 144330
+          "input": 48,
+          "output": 6919,
+          "cacheRead": 3045438,
+          "cacheWrite": 148117
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 2156,
@@ -1248,8 +1249,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 95.4143747,
-        "pricingAsOf": "2026-08-06T22:42:38.202Z"
+        "usd": 95.4622027,
+        "pricingAsOf": "2026-08-07T10:03:20.543Z"
       }
     },
     "merges": [
