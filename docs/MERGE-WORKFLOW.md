@@ -254,3 +254,74 @@ contributor can read in one diagram.
   — `postMergeLifecycle()` and merge-button handler
 - [`src/lib/stashes.ts`](../src/lib/stashes.ts) — canonical
   `salvageable:` stash builder and parser
+
+## Post-merge lifecycle idempotency (moved from CLAUDE.md 2026-08-07)
+
+The post-merge lifecycle must run **at most once per merge**. ("postMergeLifecycle" survives
+only as a legacy label — `src/core/state-mapping.ts` — the merge agent owns the behavior.)
+If it can re-trigger itself, you get an infinite loop — that once burned 24,626 tracker API
+calls (PAN-328). The original loop was:
+specialists/done → onMergeComplete → post-merge lifecycle → (re-trigger) → specialists/done.
+
+This protection is now **structural, not advisory** — you don't have to remember
+a rule:
+
+- The concurrency guard is `createInFlightGuard()` in
+  `src/lib/cloister/in-flight-guard.ts`, used by `firePostMergeLifecycle` in
+  `src/dashboard/server/routes/specialists/shared.ts` (re-exported from
+  `specialists.ts`). A second *concurrent* call for the same issue is a no-op.
+- It is locked by `tests/unit/lib/cloister/in-flight-guard.test.ts`. **Weaken or
+  delete the guard and that suite goes red** — that is the real protection.
+- The lifecycle also checks `mergeStatus` / `_completedPostMerge`
+  (defense-in-depth).
+
+So the rule is just: if you touch the merge-completion path, keep that test
+green. A red guard test means you've reopened the loop. Adding new work to the
+post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
+idempotent and the test stays green.
+
+A merge to `main` can make another open branch stale. When the merge-train flag
+(`flywheel.merge_train_enabled`, default off) is ON, `runMergeTrainReconcile()` runs
+inside the post-merge guard and rebases/re-verifies ready siblings (PAN-1691); with the
+flag off, nothing acts on stale siblings automatically — reconcile an affected workspace
+explicitly with `pan sync-main <id>` before it proceeds through review or merge.
+
+
+## Post-merge verify handoff and Docker cleanup (moved from CLAUDE.md 2026-08-07)
+
+The merge agent's post-merge handoff (`src/lib/cloister/merge-agent.ts`; the old
+`postMergeLifecycle()` function no longer exists) is non-destructive. After
+merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
+pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and removes
+the workspace Docker containers and `overdeck-feature-<issue>_devnet` network.
+
+Docker cleanup still happens at merge time because orphaned networks from merged
+workspaces accumulate and eventually block new workspace creation with "all predefined
+address pools have been fully subnetted". Docker's default pool only supports ~31 bridge
+networks. NEVER remove this cleanup step.
+
+The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
+Close Out stops and removes the workspace Docker stack (including the
+`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
+reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
+and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
+worker with retry backoff. Tracker-backed devnet closure checks run in batches of four. The worker revalidates canonical merged status before each
+attempt, while a fresh merge-agent enqueue may use its just-verified merge for the first
+retry if status persistence lags. Durable `mergeStep: post-merge-cleanup` marks an incomplete
+handoff. Startup atomically claims the pending file and runs it in a supervised background
+promise, so dashboard boot continues while the claim remains owned. Failure moves the claim to
+a discoverable queued generation unless canonical status positively owns the retry; a newer
+pending generation is never overwritten or discarded. Startup and patrol reclaim queued files
+and claims whose owner PID is dead. Issue IDs are validated at the route and lock boundaries,
+and the resolved lock path must remain inside the lifecycle lock directory. Completion records
+`mergeStep: merged`. Patrol reconciliation prunes Docker retries that are
+no longer eligible. The worker removes Compose
+volumes, project-owned containers, and the leaked devnet while preserving workspace files,
+branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
+chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
+
+The destructive/non-reversible completion steps are owned by close-out, not merge:
+`pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
+optionally tears down the workspace or deletes feature branches according to `close_out`
+config, closes the tracker issue, and clears review status.
+
