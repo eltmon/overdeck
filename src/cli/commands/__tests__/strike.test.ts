@@ -159,6 +159,28 @@ describe('strikeCommand', () => {
   // `active` as its last recorded activity. Refusing on that state alone left
   // the strike namespace with no recovery door for the flywheel, which cannot
   // run `pan kill`.
+  it('replaces a terminally resolved strike even when its harness is still alive', async () => {
+    const fakePlan = {
+      issueId: 'PAN-3586',
+      workspace: '/tmp/feature-pan-3586-strike',
+      branch: 'strike/pan-3586',
+      sessionName: 'strike-pan-3586',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'active',
+      resolution: 'abandoned',
+      lastActivity: '2026-08-06T20:00:59.000Z',
+    }));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(tmuxMocks.isHarnessProcessAlive).not.toHaveBeenCalled();
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-3586');
+  });
+
   it('replaces a completed strike session whose recorded state is stale but whose harness is gone', async () => {
     const fakePlan = {
       issueId: 'PAN-3150',

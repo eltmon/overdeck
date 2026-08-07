@@ -172,11 +172,12 @@ function buildStrikePrompt(plan: StrikePlan): string {
  * closed the loop for the flywheel, which is forbidden `pan kill`: the only verb
  * addressing a `strike-<id>` session was the one that would not reuse it.
  *
- * The harness process tree is the honest liveness oracle (`isHarnessProcessAlive`
- * walks the pane tree rather than trusting recorded state), so a session with no
- * harness under it is replaceable no matter what the runtime state claims.
- * Cycling a session is not the one-way door `pan kill` is treated as: the strike
- * worktree, branch, and commits all survive.
+ * The harness process tree is the liveness oracle (`isHarnessProcessAlive`
+ * walks the pane tree rather than trusting recorded state), but a terminal
+ * resolution is stronger evidence that the current strike has finished. A
+ * session with no harness under it is replaceable no matter what runtime state
+ * claims. Cycling a session is not the one-way door `pan kill` is treated as:
+ * the strike worktree, branch, and commits all survive.
  */
 async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
   const hasExistingSession = await Effect.runPromise(sessionExists(plan.sessionName));
@@ -184,7 +185,12 @@ async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
 
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
   const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
-  if (runtimeState && !replaceableStates.has(runtimeState.state)) {
+  const terminalResolutions = new Set(['done', 'completed', 'abandoned']);
+  if (
+    runtimeState
+    && !replaceableStates.has(runtimeState.state)
+    && !terminalResolutions.has(runtimeState.resolution ?? '')
+  ) {
     // The recorded state says busy — only a live harness process may veto reuse.
     if (await isHarnessProcessAlive(plan.sessionName)) {
       throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
