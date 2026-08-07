@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-06T20:28:09.375Z",
-  "updated": "2026-08-06T21:17:34.543Z",
+  "updated": "2026-08-07T08:17:27.419Z",
   "pipeline": {
     "issueId": "PAN-3589",
     "reviewStatus": "pending",
@@ -19,9 +19,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-06T21:14:14.224Z",
-    "updatedAt": "2026-08-06T21:17:14.041Z",
+    "updatedAt": "2026-08-07T08:17:11.193Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3589 after its harness exited before push.",
     "strikeReadyHead": "01e40976fb539485d7baa284d47e3e3a9c08c140",
-    "strikeReadyAt": "2026-08-06T21:17:14.040Z",
+    "strikeReadyAt": "2026-08-07T08:17:11.192Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -31,24 +32,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-terra": {
-            "input": 943094,
-            "output": 37692,
-            "cacheRead": 15175168,
+            "input": 947324,
+            "output": 38678,
+            "cacheRead": 15771136,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 943094,
-          "output": 37692,
-          "cacheRead": 15175168,
+          "input": 947324,
+          "output": 38678,
+          "cacheRead": 15771136,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.716937,
-        "pricingAsOf": "2026-08-06T21:17:14.053Z"
+        "usd": 6.891295,
+        "pricingAsOf": "2026-08-07T08:17:11.199Z"
       }
     },
     "merges": [],
