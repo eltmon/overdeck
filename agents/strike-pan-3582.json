@@ -45,6 +45,22 @@
         "pending.lock",
         "state.json"
       ]
+    },
+    {
+      "at": "2026-08-07T04:29:16.264Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": [
+        "lifecycle.log",
+        "pending.lock",
+        "state.json"
+      ]
     }
   ],
   "archiveRef": null,
