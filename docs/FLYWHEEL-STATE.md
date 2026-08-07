@@ -1849,3 +1849,24 @@ Four strikes now in flight (3587, 3609) plus two landing (3599, 3604). PAN-3596 
 **Carry this: the verify-what-you-ran-against precondition applies to the tool, not just the code under test.** At tick 21 the stale thing was my worktree; here it would have been the CLI binary itself. Both are the same question — *is the artifact I am exercising the one that contains the fix?* — and the answer is not always about the repository. Test after the deploy, not after the merge.
 
 **Two more strikes running** (PAN-3587, PAN-3609), neither yet at a landing state. **Thirteen substrate fixes have now landed this run**, eleven of them closed out.
+
+### RUN-82 tick 38 — 2026-08-07T07:50Z — PAN-3599 verified by the exact command that failed all night; both fixes closed out
+
+**The deploy patrol fired on its own** (build `0e2dcb8038ff` = main), as it has every time it deferred me. Third deferral, third self-resolution.
+
+**Then the verification that mattered.** `pan strike PAN-3586` — the command that refused with `Agent strike-pan-3586 already running` on every attempt since tick 24 — now succeeds:
+
+```
+Session:    strike-pan-3586
+Branch:     strike/pan-3586
+```
+
+That is PAN-3599's fix confirmed against the precise failing case, on a deployed build, with the refusal reproduced beforehand across four separate ticks. It also unblocks PAN-3586 itself, which had been forced through planning at tick 6 solely because its stalled strike could not be replaced.
+
+**Both closed out on real evidence** — `required checks concluded successfully` on `679d1b4212` and `0e2dcb8038`. **Thirteen substrate fixes landed, deployed and closed out this run.**
+
+**Carry this: the full verification chain finally ran clean, and it took every lesson of the night to do it.** Wait for the deploy rather than testing the merge (tick 37, learned at tick 21). Test the exact command that failed rather than trusting the close-out gate (tick 16). Know that the refusal was real because it had been reproduced repeatedly, not assumed. Each of those was learned the hard way earlier — a fix that did nothing while all eight DoD rows passed, a local test run against a stale worktree, a `✔ Recovered` that recovered nothing. Applied together they turn "the pipeline says it landed" into "I watched the thing that was broken stop being broken."
+
+The cheap summary: **a fix is verified when the original failure has been made to disappear on the artifact you actually ship.** Everything else is inference.
+
+Two strikes still working (PAN-3587, PAN-3609) plus the newly-dispatched PAN-3586. PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
