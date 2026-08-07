@@ -18,16 +18,16 @@
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-07T08:18:28.412Z",
+  "updated": "2026-08-07T08:20:59.925Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
-    "mergeStep": "preparing-work-agent",
+    "mergeStatus": "queued",
+    "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:17:23.785Z",
+    "updatedAt": "2026-08-07T08:20:29.112Z",
     "mergeNotes": "Rebase conflicts in: src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts, tests/unit/lib/head-anchor-write-sites.test.ts; Work agent strike-pan-3519 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation)); run pan unpause before merging",
     "strikeReadyHead": "6a82f1aba4e196d5083e909998c8eb126c5b5e6d",
     "strikeReadyAt": "2026-08-07T08:17:05.555Z",
@@ -57,7 +57,7 @@
       },
       "costAtCloseOut": {
         "usd": 70.793972,
-        "pricingAsOf": "2026-08-07T08:18:07.683Z"
+        "pricingAsOf": "2026-08-07T08:20:29.128Z"
       }
     },
     "merges": [],
