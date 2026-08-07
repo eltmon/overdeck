@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T14:17:57.384Z",
-  "updated": "2026-08-07T08:21:07.237Z",
+  "updated": "2026-08-07T08:21:11.986Z",
   "pipeline": {
     "issueId": "PAN-2925",
     "reviewStatus": "pending",
@@ -12,13 +12,21 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:20:30.547Z",
-    "mergeNotes": "PR #2926 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.",
+    "updatedAt": "2026-08-07T08:20:30.560Z",
+    "mergeNotes": "PR #2926 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator",
     "strikeReadyHead": "f8cba59f8412633493a8dc969cf8e9ee08cc0637",
     "strikeReadyAt": "2026-08-07T08:16:46.647Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-07T08:20:30.559Z",
+        "strikeHead": "f8cba59f8412633493a8dc969cf8e9ee08cc0637",
+        "mainHead": "3ecd3b8da87061ce1800d1998f31eca7869a9bbe",
+        "outcome": "failed",
+        "detail": "PR #2926 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -42,7 +50,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.123052,
-        "pricingAsOf": "2026-08-07T08:21:05.004Z"
+        "pricingAsOf": "2026-08-07T08:21:09.794Z"
       }
     },
     "merges": [],
