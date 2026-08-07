@@ -17,7 +17,7 @@ type GuardResult = { ok: boolean; output: string };
 function makeTempGuard(baselineFindings: string[]): string {
   const root = mkdtempSync(join(tmpdir(), 'lint-effect-diagnostics-'));
   mkdirSync(join(root, 'scripts'), { recursive: true });
-  mkdirSync(join(root, 'bin'), { recursive: true });
+  mkdirSync(join(root, 'node_modules', '.bin'), { recursive: true });
 
   writeFileSync(
     join(root, 'scripts', 'lint-effect-diagnostics.sh'),
@@ -29,8 +29,13 @@ function makeTempGuard(baselineFindings: string[]): string {
     `${[...BASELINE_HEADER, ...baselineFindings.sort()].join('\n')}\n`,
   );
   writeFileSync(
-    join(root, 'bin', 'npx'),
-    '#!/usr/bin/env bash\nif [[ "$1" == "effect-language-service" && "$2" == "patch" ]]; then exit 0; fi\ncat "$FAKE_TSC_OUTPUT"\nexit "${FAKE_TSC_EXIT:-0}"\n',
+    join(root, 'node_modules', '.bin', 'effect-language-service'),
+    '#!/usr/bin/env bash\nexit 0\n',
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(root, 'node_modules', '.bin', 'tsc'),
+    '#!/usr/bin/env bash\ncat "$FAKE_TSC_OUTPUT"\nexit "${FAKE_TSC_EXIT:-0}"\n',
     { mode: 0o755 },
   );
   writeFileSync(join(root, 'tsc-output.txt'), '');
@@ -49,7 +54,6 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
       encoding: 'utf-8',
       env: {
         ...process.env,
-        PATH: `${join(root, 'bin')}:${process.env.PATH ?? ''}`,
         FAKE_TSC_OUTPUT: join(root, 'tsc-output.txt'),
         FAKE_TSC_EXIT: String(tscExit),
       },
