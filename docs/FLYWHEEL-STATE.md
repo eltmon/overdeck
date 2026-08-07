@@ -1740,3 +1740,19 @@ Salvaged it exactly as PAN-3594 at tick 25 — pushed `strike/pan-3607`, then `p
 **Carry this: when two health signals disagree, stop reading signals and go look for the output.** The pane said one thing, the transcript another, and the branch settled it in a single command. A committed diff is ground truth in a way that no liveness proxy is — it either exists or it does not.
 
 Main green at `c93b2f33b3`. PAN-3596 remains the one genuine loss: dead with zero commits and no dispatch door.
+
+### RUN-82 tick 31 — 2026-08-07T05:30Z — filed the commit-to-push death pattern as PAN-3609
+
+**PAN-3607 is landing** (`mergeStatus: merging`, `mergeStep: rebasing`, recovery count 0) — no intervention needed. Main unchanged and green at `c93b2f33b3`.
+
+**Filed PAN-3609** for the pattern I have been observing incident by incident and had not yet named: three strikes died this run, all three having already committed, and **two of the three died in the gap between `git commit` and `git push`**. Both left clean trees, exactly one commit ahead of `origin/main`, no conflict, no failing gate, no pending decision. The commit succeeded; the push never happened.
+
+The argument for treating it as a cause rather than coincidence: a random death distributes across a run lasting tens of minutes — reading, editing, gating, committing, pushing, signalling. The commit-to-push gap is a few seconds of that. Hitting it twice out of three is unlikely enough to investigate.
+
+**The lead I flagged is uncomfortable and worth stating plainly:** `git push` on this repo runs `.husky/pre-push`, which invokes `guard-agent-main-push.sh` and the type-ratchet audit. During this same window, `ec3c5911cf` changed pre-push guard scoping and `b2f2417401` changed the ratchet scripts that audit calls — **both landing with stale tests, both reddening main** (PAN-3602, PAN-3607). Two changes to the pre-push path and two agents dying at the push in one night is a coincidence I am not willing to assume.
+
+**Carry this: file the pattern, not the third instance.** I handled PAN-3594's stranding at tick 25 and PAN-3607's at tick 30 as individual salvages and moved on both times, because each had an obvious local remedy. The salvages were right, but two ticks of "recover and continue" is exactly how a recurring defect stays unfiled — the remedy is satisfying enough that the pattern never gets written down. The trigger I should watch for is *doing the same manual recovery twice*, which is a stronger signal than any single incident's severity.
+
+Also noted in the filing: nothing surfaced any of the three deaths, and a dead strike whose branch is ahead of `origin/main` with a clean tree is mechanically indistinguishable from one that pushed and signalled — so the reaper or landing door could push and record readiness itself instead of depending on an orchestrator noticing.
+
+PAN-3596 remains the one genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
