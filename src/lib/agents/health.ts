@@ -7,7 +7,7 @@ import type {
 
 const STARTUP_GRACE_MS = 5 * 60 * 1000;
 const ACTIVITY_WARNING_MS = 15 * 60 * 1000;
-const ACTIVITY_STALLED_MS = 30 * 60 * 1000;
+export const ACTIVITY_STALLED_MS = 30 * 60 * 1000;
 
 export interface PersistedAgentHealthState {
   id?: string;

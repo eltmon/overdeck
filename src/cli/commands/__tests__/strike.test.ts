@@ -147,7 +147,7 @@ describe('strikeCommand', () => {
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
       state: 'active',
-      lastActivity: '2026-06-24T00:00:00.000Z',
+      lastActivity: new Date().toISOString(),
     }));
 
     await expect(__testInternals.clearIdlePriorStrike(fakePlan)).rejects.toThrow(/already running/);
@@ -181,7 +181,29 @@ describe('strikeCommand', () => {
     expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-3586');
   });
 
-  it('replaces a completed strike session whose recorded state is stale but whose harness is gone', async () => {
+  it('replaces a stale working strike even when its harness is still alive', async () => {
+    const fakePlan = {
+      issueId: 'PAN-3586',
+      workspace: '/tmp/feature-pan-3586-strike',
+      branch: 'strike/pan-3586',
+      sessionName: 'strike-pan-3586',
+      projectRoot: '/tmp/project',
+    };
+    const lastActivity = Date.parse('2026-08-06T20:00:25.583Z');
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'active',
+      lastActivity: new Date(lastActivity).toISOString(),
+    }));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan, lastActivity + (30 * 60 * 1000))).resolves.toBe(true);
+
+    expect(tmuxMocks.isHarnessProcessAlive).not.toHaveBeenCalled();
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-3586');
+  });
+
+  it('replaces a completed strike session whose recorded state is fresh but whose harness is gone', async () => {
     const fakePlan = {
       issueId: 'PAN-3150',
       workspace: '/tmp/feature-pan-3150-strike',
@@ -192,7 +214,7 @@ describe('strikeCommand', () => {
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
       state: 'active',
-      lastActivity: '2026-07-26T18:47:19.000Z',
+      lastActivity: new Date().toISOString(),
     }));
     tmuxMocks.isHarnessProcessAlive.mockResolvedValue(false);
     agentMocks.stopAgent.mockReturnValue(Effect.void);

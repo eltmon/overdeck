@@ -10,6 +10,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 
 import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
+import { ACTIVITY_STALLED_MS } from '../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
@@ -174,24 +175,29 @@ function buildStrikePrompt(plan: StrikePlan): string {
  *
  * The harness process tree is the liveness oracle (`isHarnessProcessAlive`
  * walks the pane tree rather than trusting recorded state), but a terminal
- * resolution is stronger evidence that the current strike has finished. A
- * session with no harness under it is replaceable no matter what runtime state
- * claims. Cycling a session is not the one-way door `pan kill` is treated as:
- * the strike worktree, branch, and commits all survive.
+ * resolution is stronger evidence that the current strike has finished. Runtime
+ * resolution is best-effort, though: an agent that self-aborts at its prompt can
+ * leave a stale `working` snapshot when no terminal hook fires. That snapshot is
+ * stalled after the shared agent-health threshold, so it must not hold the strike
+ * slot forever. Cycling a session is not the one-way door `pan kill` is treated
+ * as: the strike worktree, branch, and commits all survive.
  */
-async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
+async function clearIdlePriorStrike(plan: StrikePlan, now = Date.now()): Promise<boolean> {
   const hasExistingSession = await Effect.runPromise(sessionExists(plan.sessionName));
   if (!hasExistingSession) return false;
 
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
   const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
   const terminalResolutions = new Set(['done', 'completed', 'abandoned']);
+  const lastActivity = Date.parse(runtimeState?.lastActivity ?? '');
+  const isStalled = Number.isFinite(lastActivity) && now - lastActivity >= ACTIVITY_STALLED_MS;
   if (
     runtimeState
     && !replaceableStates.has(runtimeState.state)
     && !terminalResolutions.has(runtimeState.resolution ?? '')
+    && !isStalled
   ) {
-    // The recorded state says busy — only a live harness process may veto reuse.
+    // A fresh busy runtime state still needs a live harness process to veto reuse.
     if (await isHarnessProcessAlive(plan.sessionName)) {
       throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
     }
