@@ -182,7 +182,7 @@ export function isDeploymentGenerationRoot(dir: string): boolean {
  * imported module in the repo, so the edge would put a cycle in every bundle.
  * Only the `repoRoot` field is read here, and both readers agree on it.
  */
-function activeDeploymentRepoRoot(): string | null {
+export function activeDeploymentRepoRoot(): string | null {
   try {
     const marker = join(getOverdeckHome(), 'active-dashboard-bundle.json');
     const parsed: unknown = JSON.parse(readFileSync(marker, 'utf8'));

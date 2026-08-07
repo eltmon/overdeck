@@ -144,7 +144,13 @@ async function postSpeakPayload(
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    return response.ok ? 'spoken' : 'daemon-unavailable';
+    if (response.ok) return 'spoken';
+    // A rejected payload (e.g. 400 invalid_embedding for a stale clone voice)
+    // is not the same failure as an unreachable daemon; without this line the
+    // real reason never surfaces anywhere.
+    const body = await response.text().catch(() => '');
+    console.warn(`[tts-speak] daemon rejected speak: HTTP ${response.status} ${body.slice(0, 200)}`);
+    return 'daemon-unavailable';
   } catch {
     return 'daemon-unavailable';
   } finally {
