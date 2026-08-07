@@ -1756,3 +1756,17 @@ The argument for treating it as a cause rather than coincidence: a random death 
 Also noted in the filing: nothing surfaced any of the three deaths, and a dead strike whose branch is ahead of `origin/main` with a clean tree is mechanically indistinguishable from one that pushed and signalled — so the reaper or landing door could push and record readiness itself instead of depending on an orchestrator noticing.
 
 PAN-3596 remains the one genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 32 — 2026-08-07T05:55Z — the predicted conflict arrived, and there is no actor available to resolve it
+
+**PAN-3607's landing hit the conflict I predicted at tick 30.** PR #3608 is `CONFLICTING with main`: its commit `a9e64dd517` edits `tests/unit/scripts/lint-frontend-types.test.ts`, and `c93b2f33b3` changed that same file in the interim. The first attempt before it was another `transport-failed: fetch failed`.
+
+**The prediction being right is the good news; the disposition is the bad news.** At tick 30 I chose to push without rebasing precisely so a conflict would surface as a visible landing failure rather than as silent damage from me resolving it on the agent's behalf. That worked exactly as intended. What I did not think through is that **surfacing it produces a condition nobody can act on**: the agent is dead, `pan strike PAN-3607` refuses as "already running" (PAN-3599), `pan recover` no-ops (PAN-3604), `pan tell` is closed to me, and resolving the conflict by hand means editing files, which the role forbids. A finished, valuable fix now sits on a conflicted PR with no available actor.
+
+Letting the ladder escalate to `needs_you` rather than reaching outside my rails. That is the honest end state — but it is worth being clear that "surface it" was only half a plan, and the half I skipped was checking whether anything downstream could receive what I surfaced.
+
+**Carry this: before choosing to surface rather than resolve, name who will act on the surfaced thing.** The reasoning at tick 30 — let the door rebase, let a conflict be visible — was sound about *mechanism* and silent about *actor*. Surfacing is only a strategy when a recipient exists; otherwise it is deferral with extra steps.
+
+**Two more points added to PAN-3599 from this:** a `CONFLICTING` outcome is not retryable and should escalate immediately instead of burning the ladder, joining `transport-failed` as a second outcome class that spends a recovery attempt it cannot benefit from. And the re-dispatch refusal is backwards in exactly the case that matters — a live working agent is when you do *not* want a re-strike; a dead agent holding a conflicted branch is when you do.
+
+Main green at `c93b2f33b3`. PAN-3596 still stranded. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
