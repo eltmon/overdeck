@@ -3,32 +3,22 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-07T01:50:22.813Z",
-  "updated": "2026-08-07T02:46:52.268Z",
+  "updated": "2026-08-07T08:17:39.331Z",
   "pipeline": {
     "issueId": "PAN-3602",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T02:46:52.249Z",
-    "testNotes": "Skipped: issue is already merged",
-    "lastVerifiedCommit": "46bac202c92b984befd0f135b805714a819bc546",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [
-      {
-        "timestamp": "2026-08-07T02:07:49.246Z",
-        "strikeHead": "46bac202c92b984befd0f135b805714a819bc546",
-        "mainHead": "dba64a8aa76782d5fb6badbb334589c107cbed0c",
-        "outcome": "transport-failed",
-        "detail": "Strike merge request failed: fetch failed"
-      }
-    ],
     "closedOut": true,
-    "closedOutAt": "2026-08-07T02:46:52.249Z"
+    "closedOutAt": "2026-08-07T02:46:52.249Z",
+    "updatedAt": "2026-08-07T08:17:15.039Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3602 after its harness exited before push.",
+    "strikeReadyHead": "46bac202c92b984befd0f135b805714a819bc546",
+    "strikeReadyAt": "2026-08-07T08:17:15.038Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -52,92 +42,11 @@
       },
       "costAtCloseOut": {
         "usd": 1.781207,
-        "pricingAsOf": "2026-08-07T02:16:38.736Z"
+        "pricingAsOf": "2026-08-07T08:17:15.044Z"
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-07T02:46:52.268Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at 46bac202c92b984befd0f135b805714a819bc546",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3603 MERGED at 2026-08-07T02:15:57Z",
-          "status": "pass",
-          "mergedAt": "2026-08-07T02:15:57Z",
-          "mergeCommit": "c311a0cdb2518f1f7e21b1a6bbdf84bc9eb19064"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "required checks concluded successfully on c311a0cdb2518f1f7e21b1a6bbdf84bc9eb19064: test, lint, build (22), guard",
-          "status": "pass"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit c311a0cd contains merge c311a0cd",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3602 not merged to main; Cleaned 7 agent state directories (1 transcript files preserved); Preserved local branch strike/pan-3602 — not merged to main; Preserved remote branch strike/pan-3602 — not merged to main; Pruned 14 checkpoint ref(s) for agent-pan-3602, planning-pan-3602, strike-pan-3602; No specialist registry entries for PAN-3602"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra"
