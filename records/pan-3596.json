@@ -2,7 +2,7 @@
   "issueId": "PAN-3596",
   "schemaVersion": 2,
   "created": "2026-08-07T00:15:26.147Z",
-  "updated": "2026-08-07T00:15:26.147Z",
+  "updated": "2026-08-07T14:00:54.368Z",
   "pipeline": {
     "issueId": "PAN-3596",
     "reviewStatus": "pending",
@@ -19,5 +19,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra"
+  "model": "gpt-5.6-terra",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-07T14:00:54.368Z"
+    }
+  ]
 }
