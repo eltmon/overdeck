@@ -1,26 +1,18 @@
 {
   "issueId": "PAN-2925",
   "schemaVersion": 2,
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-07T08:20:30Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-2925 needs operator attention after 1 cycle(s).\n1. strike f8cba59f8412633493a8dc969cf8e9ee08cc0637; main 3ecd3b8da87061ce1800d1998f31eca7869a9bbe; failed: PR #2926 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-19T14:17:57.384Z",
-  "updated": "2026-08-07T08:20:30.579Z",
+  "updated": "2026-08-07T08:21:02.194Z",
   "pipeline": {
     "issueId": "PAN-2925",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
+    "mergeStatus": "merging",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:17:26.552Z",
+    "updatedAt": "2026-08-07T08:20:29.101Z",
     "mergeNotes": "PR #2926 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.",
     "strikeReadyHead": "f8cba59f8412633493a8dc969cf8e9ee08cc0637",
     "strikeReadyAt": "2026-08-07T08:16:46.647Z",
@@ -50,19 +42,12 @@
       },
       "costAtCloseOut": {
         "usd": 8.123052,
-        "pricingAsOf": "2026-08-07T08:18:09.709Z"
+        "pricingAsOf": "2026-08-07T08:20:29.124Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-07T08:20Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-07T08:20:30.579Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
