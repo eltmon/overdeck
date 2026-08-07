@@ -1832,3 +1832,20 @@ Specified guard rails so the automation cannot do harm: require a clean tree (a 
 **Carry this: when the root cause is expensive and the recovery is cheap and mechanical, automate the recovery first.** It is not a workaround if the manual steps are already the sanctioned repair and the preconditions are decidable — it is moving a known-correct procedure from a human's memory into code, which is where it belongs. The root cause stays open; it just stops charging rent.
 
 Four strikes now in flight (3587, 3609) plus two landing (3599, 3604). PAN-3596 remains the run's only genuine loss.
+
+### RUN-82 tick 37 — 2026-08-07T07:35Z — both recovery-path fixes landed; deploy deferred, and I held off testing because of it
+
+**PAN-3599 and PAN-3604 both landed:**
+
+```
+0e2dcb8038 fix(strike): replace stalled live sessions (#3611)   ← PAN-3599
+679d1b4212 PAN-3604 (#3610)                                     ← PAN-3604
+```
+
+**The deploy gate deferred me again** — post-merge lifecycle pending for PAN-3599, with the usual do-not-retry-or-force instruction. Third deferral this run; the patrol has honoured its promise both previous times, so waiting is the whole action.
+
+**Held off verifying PAN-3599's fix, deliberately.** The obvious next move is to run `pan strike PAN-3586` — the command that has been refusing all night — and see whether it now succeeds. That is exactly the reproduction check tick 16 established. But the `pan` CLI runs from the deployment generation directory, so until the reload completes it would execute the **old** code, and a refusal would prove nothing about the fix. That is the tick-21 stale-worktree lesson arriving one step earlier: last time I ran the test first and caught the problem afterward; this time the precondition check came before the test.
+
+**Carry this: the verify-what-you-ran-against precondition applies to the tool, not just the code under test.** At tick 21 the stale thing was my worktree; here it would have been the CLI binary itself. Both are the same question — *is the artifact I am exercising the one that contains the fix?* — and the answer is not always about the repository. Test after the deploy, not after the merge.
+
+**Two more strikes running** (PAN-3587, PAN-3609), neither yet at a landing state. **Thirteen substrate fixes have now landed this run**, eleven of them closed out.
