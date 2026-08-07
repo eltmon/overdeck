@@ -18,6 +18,7 @@ function makeTempGuard(baselineErrors: string[]): string {
   const root = mkdtempSync(join(tmpdir(), 'lint-frontend-types-'));
   mkdirSync(join(root, 'scripts'), { recursive: true });
   mkdirSync(join(root, 'bin'), { recursive: true });
+  mkdirSync(join(root, 'node_modules', '.bin'), { recursive: true });
 
   writeFileSync(
     join(root, 'scripts', 'lint-frontend-types.sh'),
@@ -29,8 +30,13 @@ function makeTempGuard(baselineErrors: string[]): string {
     `${[...BASELINE_HEADER, ...baselineErrors.sort()].join('\n')}\n`,
   );
   writeFileSync(
-    join(root, 'bin', 'npx'),
+    join(root, 'node_modules', '.bin', 'tsc'),
     '#!/usr/bin/env bash\ncat "$FAKE_TSC_OUTPUT"\nexit "${FAKE_TSC_EXIT:-0}"\n',
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(root, 'bin', 'npx'),
+    '#!/usr/bin/env bash\nprintf "npx fallback invoked\\n" >&2\nexit 99\n',
     { mode: 0o755 },
   );
   writeFileSync(join(root, 'tsc-output.txt'), 'tsc diagnostic noise\n');
@@ -135,6 +141,17 @@ describe('lint-frontend-types.sh', () => {
     expect(result.ok).toBe(false);
     expect(result.output).toContain('typecheck command failed (exit 137) without TypeScript diagnostics');
     expect(result.output).toContain('simulated compiler crash');
+  });
+
+  it('fails when the local compiler is missing without falling back to npx', () => {
+    const root = makeTempGuard([]);
+    unlinkSync(join(root, 'node_modules', '.bin', 'tsc'));
+
+    const result = runGuard(root);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("missing node_modules/.bin/tsc — run 'bun install' first");
+    expect(result.output).not.toContain('npx fallback invoked');
   });
 
   it('does not relabel a line-shifted known error as new', () => {
