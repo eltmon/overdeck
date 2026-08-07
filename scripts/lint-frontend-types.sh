@@ -41,7 +41,15 @@ baseline_count=$(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE_FILE" || true)
 # tsc exits non-zero when it reports type errors, but launcher failures and
 # crashes can also exit non-zero without completing the typecheck. Preserve the
 # status so only parseable TypeScript diagnostics enter the ratchet path.
-if output=$(npx tsc --noEmit -p "$TSCONFIG" 2>&1); then
+# Local-install-only: `npx tsc` falls back to the npm registry's unscoped
+# `tsc` package when node_modules is stale (PAN-3605).
+TSC_BIN="node_modules/.bin/tsc"
+if [[ ! -x "$TSC_BIN" ]]; then
+  echo "✖ missing $TSC_BIN — run 'bun install' first (never falling back to the npm registry)." >&2
+  exit 1
+fi
+
+if output=$("$TSC_BIN" --noEmit -p "$TSCONFIG" 2>&1); then
   tsc_status=0
 else
   tsc_status=$?
@@ -52,7 +60,7 @@ count=$(printf '%s\n' "$current" | grep -cE 'error TS' || true)
 if (( tsc_status != 0 && count == 0 )); then
   echo "✖ dashboard frontend typecheck command failed (exit $tsc_status) without TypeScript diagnostics." >&2
   printf '%s\n' "$output" >&2
-  echo "  Reproduce: npx tsc --noEmit -p $TSCONFIG" >&2
+  echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $TSCONFIG" >&2
   exit 1
 fi
 
@@ -83,7 +91,7 @@ if (( count > baseline_count )); then
   comm -12 <(printf '%s\n' "$current" | norm) <(grep -E 'error TS' "$BASELINE_FILE" | norm || true) | sed 's/^/  known: /' >&2
   echo "  Note: an edit that rewords a pre-existing error can relabel it as NEW;" >&2
   echo "  the count delta ($((count - baseline_count))) bounds how many are truly new." >&2
-  echo "  Reproduce: npx tsc --noEmit -p $TSCONFIG" >&2
+  echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $TSCONFIG" >&2
   exit 1
 fi
 

@@ -38,8 +38,16 @@ fi
 
 baseline=$(tr -d '[:space:]' < "$BASELINE_FILE")
 
+# Local-install-only: `npx tsc` falls back to the npm registry's unscoped
+# `tsc` package when node_modules is stale (PAN-3605).
+TSC_BIN="node_modules/.bin/tsc"
+if [[ ! -x "$TSC_BIN" ]]; then
+  echo "✖ missing $TSC_BIN — run 'bun install' first (never falling back to the npm registry)." >&2
+  exit 1
+fi
+
 # tsc exits non-zero when it reports errors; count them rather than trust status.
-output=$(npx tsc --noEmit -p "$TSCONFIG" 2>&1 || true)
+output=$("$TSC_BIN" --noEmit -p "$TSCONFIG" 2>&1 || true)
 count=$(printf '%s\n' "$output" | grep -cE 'error TS' || true)
 
 if [[ "$MODE" == "update" ]]; then
@@ -57,7 +65,7 @@ if (( count > baseline )); then
   echo "✖ dashboard server typecheck regressed: $count errors (baseline $baseline)." >&2
   echo "  New type errors in src/dashboard/server. Offending lines:" >&2
   printf '%s\n' "$output" | grep -E 'error TS' | head -20 >&2
-  echo "  Reproduce: npx tsc --noEmit -p $TSCONFIG" >&2
+  echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $TSCONFIG" >&2
   exit 1
 fi
 
