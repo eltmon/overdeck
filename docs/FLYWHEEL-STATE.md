@@ -1596,3 +1596,20 @@ Its own merge commit never got a green run — it landed during the red window �
 **Nine substrate fixes now landed, deployed and closed out this run**: PAN-3581, PAN-3583, PAN-3589, PAN-3582, PAN-3595, PAN-3593, PAN-3584, PAN-3602, plus PAN-3512 carried from dead-for-three-days to merge-ready.
 
 PAN-3594 and PAN-3596 still working. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 23 — 2026-08-07T02:55Z — caught both remaining strikes frozen; recovered them; the detection gap is the real finding
+
+**PAN-3594 and PAN-3596 were both inert, and I had called one of them "progressing" at tick 17.** Their pane counters are byte-identical across three ticks spanning ~100 minutes:
+
+```
+strike-pan-3594   ctx 51%   cost $5.3708   +287/-61     (tick 17 → tick 23, unchanged)
+strike-pan-3596   ctx 41%   cost $1.4700                (tick 17 → tick 23, unchanged)
+```
+
+At tick 17 I recorded "both genuinely progressing on the metric that matters — spend moving while the pane sits at a prompt", comparing 3594's $3.88 → $5.37 against the previous tick. That reading was correct *then* and I never re-checked it against a third sample. **A rising number between two observations tells you the agent was alive at some point between them, not that it is alive now.** Two points establish a slope; three establish whether it continued. RUN-79 learned exactly this about a memory sawtooth and wrote down "the sampling window must exceed the phenomenon's period" — I applied it to CI timing at tick 12 and not to agent liveness at tick 17.
+
+`pan answer` reports no pending choice menu for either, so the inert-but-alive gate does not apply — these are stopped, not parked-on-operator.
+
+**`pan recover` revived both**, and is now 3-for-3 on inert strikes this run (PAN-3582 earlier, these two now), while `pan strike` remains 0-for-1 (still refuses PAN-3586 with "already running"). Posted both specimens to PAN-3599 with the observation that they **broaden it**: neither agent had recorded a self-abort, so the condition is not "a completion marker exists and is ignored" — an agent can simply stop producing output, and every liveness check the system owns answers "the process exists".
+
+**Carry this: the detection gap matters more than the recovery verb.** I found these by hand-comparing a cost figure across three ticks. The system already tracks per-agent spend and context; a check for "no cost movement in N minutes while the session is alive and no decision is pending" would have caught both in minutes instead of 100. Same class as PAN-3596 — the data exists, nothing watches it. That is now the fourth finding this run about the system's inability to see itself, and the second where I was the monitoring.
