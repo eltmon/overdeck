@@ -3,16 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-07T04:22:31.422Z",
-  "updated": "2026-08-07T05:20:21.606Z",
+  "updated": "2026-08-07T05:20:23.578Z",
   "pipeline": {
     "issueId": "PAN-3607",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "mergeStatus": "merging",
-    "mergeStep": "rebasing",
+    "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T05:20:21.243Z",
+    "updatedAt": "2026-08-07T05:20:22.141Z",
+    "mergeNotes": "Preparing work agent strike-pan-3607 to rebase strike/pan-3607…",
     "strikeReadyHead": "a9e64dd517cf6439e9f69b2835035efdffd4e66c",
     "strikeReadyAt": "2026-08-07T05:19:50.101Z",
     "strikeLandingState": "landing",
@@ -41,7 +42,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.510468,
-        "pricingAsOf": "2026-08-07T05:20:21.277Z"
+        "pricingAsOf": "2026-08-07T05:20:23.574Z"
       }
     },
     "merges": [],
