@@ -45,13 +45,27 @@ else
   baseline_count=$(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE_FILE" || true)
 fi
 
-npx effect-language-service patch
+# Resolve tools from the local install ONLY. `npx <name>` falls back to the
+# npm registry when the local bin is missing, and the unscoped
+# `effect-language-service` name there is claimed by a third-party squatter
+# (PAN-3605): a stale node_modules turned this line into downloading and
+# executing unreviewed code. Fail loudly instead.
+ELS_BIN="node_modules/.bin/effect-language-service"
+TSC_BIN="node_modules/.bin/tsc"
+for tool in "$ELS_BIN" "$TSC_BIN"; do
+  if [[ ! -x "$tool" ]]; then
+    echo "✖ missing $tool — run 'bun install' first (never falling back to the npm registry)." >&2
+    exit 1
+  fi
+done
+
+"$ELS_BIN" patch
 
 all_output=""
 for lane in "${LANES[@]}"; do
   label=${lane%%:*}
   tsconfig=${lane#*:}
-  if output=$(npx tsc --noEmit -p "$tsconfig" 2>&1); then
+  if output=$("$TSC_BIN" --noEmit -p "$tsconfig" 2>&1); then
     tsc_status=0
   else
     tsc_status=$?
@@ -60,7 +74,7 @@ for lane in "${LANES[@]}"; do
   if (( tsc_status != 0 )) && ! grep -Eq "$TYPE_DIAGNOSTIC_REGEX" <<< "$output"; then
     echo "✖ Effect diagnostics lane '$label' failed (exit $tsc_status) without TypeScript diagnostics." >&2
     printf '%s\n' "$output" >&2
-    echo "  Reproduce: npx tsc --noEmit -p $tsconfig" >&2
+    echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $tsconfig" >&2
     exit 1
   fi
 
@@ -97,7 +111,7 @@ if (( count > baseline_count )); then
   comm -12 <(printf '%s\n' "$current" | norm) <(grep -E "$MARKER_REGEX" "$BASELINE_FILE" | norm || true) | sed 's/^/  known: /' >&2
   echo "  Note: rewording a pre-existing finding can relabel it as NEW;" >&2
   echo "  the count delta ($((count - baseline_count))) bounds how many are truly new." >&2
-  echo "  Reproduce each lane with: npx tsc --noEmit -p <tsconfig.effect-diag.json>" >&2
+  echo "  Reproduce each lane with: node_modules/.bin/tsc --noEmit -p <tsconfig.effect-diag.json>" >&2
   exit 1
 fi
 
