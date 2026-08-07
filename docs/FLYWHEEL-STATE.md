@@ -1896,3 +1896,17 @@ That one closes a loop this run opened three times over. Tonight I hand-salvaged
 **Carry this: a mitigation that removes the need to notice beats a monitor that tells you to look.** The obvious response to three stranded strikes was better detection — an inertness alarm, a flatline check on agent spend. Those are worth having, and PAN-3596 filed the general case. But the salvage mitigation is strictly better for this particular failure, because it makes the human step unnecessary rather than better-prompted. Detection scales with attention; automation does not need any.
 
 PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
+
+### RUN-82 tick 41 — 2026-08-07T08:50Z — the two-sample rule worked, and PAN-3599's fix paid for itself immediately
+
+**PAN-3586's strike is dead, established properly this time.** Cost frozen at `$0.9704` across ~22 minutes against the sample I deliberately recorded last tick, with no commit and the workspace still at an old main tip. Two readings, one conclusion — rather than the single-observation guess that misled me at tick 17.
+
+This is the discipline from tick 23 applied *before* the mistake instead of after it: at tick 40 I could not tell a hard investigation from a death, said so, and took a baseline. That baseline made this tick's call trivial and certain. Cheap insurance, and the only reason the answer took seconds.
+
+**Nothing to salvage — it died before committing**, so PAN-3609's new automation correctly does not apply (it requires commits ahead of `origin/main`). Second time tonight a strike has produced nothing at all, after PAN-3596.
+
+**But PAN-3599's fix paid for itself on the spot.** `pan strike PAN-3586` replaced the stalled session and spawned cleanly. Four hours ago that same command refused, forcing this issue through planning at tick 6 and leaving it stranded through tick 32. The fix landed 40 minutes ago and has already turned a dead end into a routine re-dispatch — the second time today it has done so on this exact issue.
+
+**Carry this: take the baseline when you notice you cannot decide, not when you need the answer.** The instinct at tick 40 was to defer the question entirely — no commit yet, probably still working, check later. Recording one number instead cost nothing and converted a future guess into a measurement. The general form: **when you catch yourself about to say "I can't tell yet", capture whatever would make it tellable next time.**
+
+Fifteen substrate fixes landed, deployed and closed out this run. PAN-3596 remains the only genuine loss; PAN-3586 is now re-dispatched rather than lost.
