@@ -3,14 +3,20 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T14:17:57.384Z",
-  "updated": "2026-08-04T13:06:40.608Z",
+  "updated": "2026-08-07T08:16:46.660Z",
   "pipeline": {
     "issueId": "PAN-2925",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T14:17:57.384Z"
+    "updatedAt": "2026-08-07T08:16:46.648Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-2925 after its harness exited before push.",
+    "strikeReadyHead": "f8cba59f8412633493a8dc969cf8e9ee08cc0637",
+    "strikeReadyAt": "2026-08-07T08:16:46.647Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -34,7 +40,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.123052,
-        "pricingAsOf": "2026-08-04T13:06:40.602Z"
+        "pricingAsOf": "2026-08-07T08:16:46.655Z"
       }
     },
     "merges": [],
