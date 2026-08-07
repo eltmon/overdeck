@@ -119,14 +119,20 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
       return;
     }
 
-    const state = await recoverAgent(agentId, { modelOverride: options.model });
+    const recovery = await recoverAgent(agentId, { modelOverride: options.model });
 
-    if (!state) {
-      spinner.fail(`Agent not found: ${agentId}`);
+    if (!recovery) {
+      spinner.fail(`Agent not found or cannot be recovered: ${agentId}`);
       return exitCli(1);
     }
 
-    spinner.succeed(`Recovered: ${agentId}`);
+    if (recovery.action === 'already-running') {
+      spinner.fail(`No recovery performed: ${agentId} already has a live harness runtime`);
+      return exitCli(1);
+    }
+
+    const state = recovery.state;
+    spinner.succeed(`Respawned: ${agentId}`);
     console.log('');
     console.log(chalk.bold('Agent Details:'));
     console.log(`  Issue:     ${chalk.cyan(state.issueId)}`);
