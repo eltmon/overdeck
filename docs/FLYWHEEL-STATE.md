@@ -1675,3 +1675,15 @@ Cleared it as before — `pan strike-ready PAN-3594` → `ready at c94b3d6746…
 **Carry this: when a system rejects its own output, look for a value read before the write that produced it.** The staleness check is correct in principle — it exists to catch an agent pushing after signalling. It simply compares against a snapshot taken before an action the door itself performs, and nothing in the code knows those two are the same branch moving. The general smell is a validator whose reference value predates a mutation on the same path.
 
 Main is green and has moved to `b2f2417401` (operator-side, PAN-3605). PAN-3596 still stranded with no work and no dispatch door.
+
+### RUN-82 tick 27 — 2026-08-07T04:20Z — RED MAIN again, same shape as the first; PAN-3594's PR failure was inherited collateral
+
+**Main is red for the second time tonight.** `test=failure, lint=success` on `b2f2417401 fix(infra): local-install-only tsc in the type ratchet scripts (PAN-3605)`. Failing cases are in `tests/unit/scripts/lint-frontend-types.test.ts` — assertions about the very script PAN-3605 changed. Filed PAN-3607 with `blocks-main` and struck it.
+
+**Identical shape to PAN-3602 six ticks ago:** an infra-script change landing with stale tests. `ec3c5911cf` moved the pre-push guard's scoping and left two assertions behind; `b2f2417401` moved the ratchet script's `tsc` resolution and left two assertions behind. Two in one night, both operator-side, both reddening `main`. I noted on the issue that a pre-merge check failing when `scripts/*.sh` changes without its `tests/unit/scripts/*.test.ts` counterpart would have caught both — that is the class fix rather than a third individual reconciliation.
+
+**How it surfaced, and the discipline that mattered.** Not a monitor. PAN-3594's landing attempt failed with `GitHub PR #3606 has failing required checks on HEAD c94b3d67`. The obvious reading is that my salvaged commit is bad. But the failing file is `lint-frontend-types.test.ts`, and PAN-3594's diff covers `state-recreation-patrol.ts`, `state-home.ts`, `deacon.ts` and `doctor-state-worktree.ts` — no overlap at all. Checking the base before blaming the branch showed the base was red. **Third time this run that rule has changed the answer**, and the first time it saved me from re-driving work that was never broken.
+
+**Also worth recording: the salvage was vindicated by the failure, not undermined by it.** At tick 25 I argued that pushing a dead agent's finished commit was safe because "if the work is wrong it fails at CI, not on main". The PR did fail — and the failure correctly turned out to be about `main`, not the commit. The gate did its job in exactly the way the argument predicted; the only cost was one landing attempt.
+
+PAN-3594 stays queued behind red main, its readiness recorded at `c94b3d6746`. PAN-3596 still stranded with no work and no dispatch door. PAN-3512 still awaiting the operator's UAT ship; PAN-3580 and PAN-3586 still awaiting release.
