@@ -1953,3 +1953,17 @@ That is worth admitting plainly: **I ran the Observe step properly on tick 1 and
 **Not overriding it.** I cannot distinguish "a stale failed verdict that was never cleared before the merge" from "verification genuinely failed and it merged anyway" without investigating a three-week-old branch, and those two have opposite dispositions. `--accept-verification` would paper over the second case, and a failed verdict is evidence of a problem rather than absence of evidence — which is exactly the distinction PAN-3589 spent this run teaching row 6. Surfacing it for the operator instead.
 
 Fifteen substrate fixes landed, deployed and closed out this run. PAN-3512 still awaits the UAT ship; PAN-3580 still awaits release.
+
+### RUN-82 tick 45–46 — 2026-08-07T10:06Z — post-promote Observe→Act loop for uat/pan-cedar-0807
+
+**Operator promoted `uat/pan-cedar-0807` to main at `8a52c0c43f`, carrying PAN-3512.** Ran a fresh read-door sweep across **all twelve registered projects** rather than reusing the pre-promote ready set.
+
+**Result: there is no UAT batch to re-assemble.** After excluding the merged PAN-3512, nothing in any project is review+test passed with `readyForMerge` set, and `GET /api/flywheel/uat-candidate` returns `null`. That is a genuinely empty ready set, not a stale one — worth stating explicitly, because "assemble a clean batch" and "there is nothing to assemble" look the same from the outside and only the sweep distinguishes them.
+
+**Four typed blind spots, reported as such and never reconstructed from tracker, agent, tmux or workspace state:** lexerra and krux return `forge_unavailable` (the GitHub App is not installed on those repos — an operator config fix, established at tick 7), papers-please and puzzdom return `tracker_unconfigured`.
+
+**PAN-3512's close-out blocks on rows 5, 6 and 8** — post-merge lifecycle pending, CI not yet run on the promote commit, deploy gate deferred with its usual do-not-force instruction. All three are *not yet* rather than *failed*, so no override is warranted; it should close cleanly once CI concludes and the deploy patrol fires.
+
+**Separately, the earlier part of this tick found real stranded work.** Triaging the five long-standing `planned_backlog` rows I had been reporting as "parked" without ever inspecting them showed four with no remote branch at all — and **PAN-3411 with two pushed commits and no PR**, a real feature (`New Workspace as a full-page creation experience`) labelled `in-progress`. It was paused with reason `yield: making room for review of MIN-874` — a **scheduler yield that never self-cleared**, despite yields being documented as self-clearing via `autoResumeStoppedWorkAgents`. Unpaused it; the resume failed on PTY delivery and `pan start` then hit the resumable-session gate, so `--fresh` (PAN-3583's fix, live since tick 38) spawned it cleanly with 13 checklist items.
+
+**Carry this: "parked" in my own status snapshot was a label I applied, not a fact I checked.** I carried those five rows for forty-four ticks as parked backlog. One command showed four were empty and one held real unlanded work behind a stale gate. A status field I wrote myself is not evidence — it is a memo I keep re-reading.
