@@ -6,11 +6,6 @@
       "reason": "feedback",
       "note": "[2026-08-03T04:53Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-03T04:53:23.055Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-07T08:23Z] merge-agent → NEEDS-YOU — seq 2",
-      "timestamp": "2026-08-07T08:23:20.034Z"
     }
   ],
   "feedback": [
@@ -20,26 +15,19 @@
       "outcome": "failed",
       "timestamp": "2026-08-03T04:53:23Z",
       "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3519` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3519`."
-    },
-    {
-      "seq": 2,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-07T08:23:20Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3519 needs operator attention after 1 cycle(s).\n1. strike 6a82f1aba4e196d5083e909998c8eb126c5b5e6d; main 3ecd3b8da87061ce1800d1998f31eca7869a9bbe; failed: GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))"
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-07T08:23:20.034Z",
+  "updated": "2026-08-07T08:23:49.388Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
+    "mergeStatus": "merging",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:20:32.586Z",
+    "updatedAt": "2026-08-07T08:23:17.650Z",
     "mergeNotes": "GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.",
     "blockerReasons": [
       {
@@ -76,7 +64,7 @@
       },
       "costAtCloseOut": {
         "usd": 70.793972,
-        "pricingAsOf": "2026-08-07T08:21:07.258Z"
+        "pricingAsOf": "2026-08-07T08:23:17.663Z"
       }
     },
     "merges": [],
