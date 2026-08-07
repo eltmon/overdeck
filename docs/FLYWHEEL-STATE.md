@@ -1503,3 +1503,19 @@ PAN-3584 is actively landing (`strikeLandingState: landing`, `mergeStep: verifyi
 Nothing landed and nothing needed intervention, which is the correct outcome for a tick where three strikes are mid-flight and every remaining item is behind an operator gate. Resisted the pull to manufacture activity: with PAN-3584/3594/3596 in flight the fleet is at target, and dispatching a fourth strike from the thinner end of the findings list (PAN-3587, PAN-3591) would add contention for no velocity — those two are real but neither blocks anything today, and PAN-3591's instance was already worked around by `--host --yes`.
 
 Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 18 — 2026-08-07T01:30Z — PAN-3584 landed and verified by reproduction; row 6 conflates "running" with "failed"
+
+**PAN-3584 landed** — `011980b9a0 fix(flywheel): align strike and UAT doctrine (#3600)` — deployed as build `011980b9a06e`.
+
+**Verified by reproduction rather than by the close-out gate**, applying tick 16's lesson immediately:
+
+- `assemble-uat` in `roles/flywheel.md`: **0 occurrences** (the dead endpoint is gone)
+- `merge-train/assemble`: **1 occurrence** (the real route is named)
+- strike ownership now reads *"Deacon lands a ready `strike/<id>` through its server merge door… never merge the branch locally, push it to `origin/main`, or run `pan done <id> --strike`"* — which matches the strike agent's own prompt verbatim. The contradiction that stranded PAN-3559 and PAN-3562 for 34 hours is genuinely resolved, not merely reported as delivered.
+
+**Close-out is blocked, and the message nearly sent me chasing a red main.** Row 6 read `required checks not successful: test, lint`. I went straight to the CI API expecting failures and found `lint=in_progress, test=in_progress` — everything else green. The block is correct (evidence genuinely absent), the wording is not: **"not successful" reads as "failed"**, and with push CI landing ~25 minutes after a merge, this greets nearly every prompt close-out attempt.
+
+**Carry this: PAN-3589 taught the gate to distinguish absent from passing, and it still collapses running into not-passing.** Three states, three messages — absent, running, failed — where only the third should read as an emergency. I filed it as a refinement on PAN-3589 rather than a new issue, since it is the same conflation family seen from the other side. Worth noticing that a fix which correctly split one ambiguity left a neighbouring one intact; "did this change resolve the *class* or just the instance?" is the question I did not ask when PAN-3589 landed.
+
+PAN-3594 and PAN-3596 still working. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
