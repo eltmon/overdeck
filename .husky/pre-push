@@ -7,6 +7,18 @@
 
 set -e
 
+# Every guard below audits the overdeck repository's own branches. Pushes to
+# a foreign repository — e.g. scripts/mirror-okf-skill.sh pushing the subtree
+# split to eltmon/okf — carry a tree that is not overdeck, so the ratchet /
+# state-plane / file-size checks would misfire on files that legitimately
+# don't exist there (2026-08-06: mirror push failed on the file-size
+# allowlist). $2 is the remote URL when known; skip everything when the
+# destination isn't this repo.
+case "${2:-}" in
+  *overdeck*) ;;  # eltmon/overdeck by URL or local worktree path — audit
+  *) exit 0 ;;    # foreign repo (okf mirror, etc.) — nothing here applies
+esac
+
 # The overdeck-state worktree shares this repo's core.hooksPath, but the
 # orphan state branch carries none of the guard scripts — running them there
 # dies with 127 and blocks the state write door's pushes (PAN-2677). Skip the
