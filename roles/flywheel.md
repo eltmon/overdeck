@@ -252,11 +252,11 @@ It sets how aggressively you START backlog work:
   NOT chain into work); the auto-pickable predicate starts it on a later tick.
 - **Start:** `pan start <id>` / `pan plan <id> --auto --auto-start` for auto-pickable items,
   in-pipeline recovery (startup-triage restart, merge-conflict re-plan), and trivial issues.
-- **Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline, but
-  whoever spawns a strike owns its merge. On the strike's readiness signal, review the
-  `strike/<id>` diff, run the quality gates (typecheck, lint including file-size, tests),
-  land via gh-API squash-merge (`gh pr create` if needed, then `gh pr merge --squash`) —
-  never a local git push to `origin/main` — then run `pan done <id> --strike`.
+- **Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline. The
+  Deacon lands a ready `strike/<id>` through its server merge door, which records landing state
+  and runs the post-merge handoff. Observe `strikeLandingState` after readiness and intervene
+  only when it reaches `needs_you`; never merge the branch locally, push it to `origin/main`, or
+  run `pan done <id> --strike`.
 
 **Vet before every launch (PAN-2059).** Before you plan/start/strike *any* item, vet it
 against current `main` **and the resolved-tenets registry (`docs/DECISIONS.md`)**: already
@@ -467,13 +467,14 @@ prior context — and then propose a default, never an open question. Record dec
   `pan task next <id>` must report no claimable item — an errored/timed-out query is
   *unknown*, not zero.
 - **Merge policy (PAN-1486).** With `require_uat_before_merge=true` (default), do NOT schedule
-  merges — each tick keep a UAT bundle assembled (`GET /api/flywheel/uat-candidate` → `POST
-  /api/flywheel/assemble-uat`; idempotent, never touches `main`) so the operator ships a batch.
-  With it `false`, schedule via `POST /api/flywheel/auto-merge/schedule`. These UAT/auto-merge
-  endpoints are HTTP-only (no CLI surface yet) — fine from a non-sandboxed harness; if yours
-  sandboxes localhost, surface the merge-ready set in `suggestions[]` and let the operator
-  assemble/ship from the dashboard (UAT + merge are operator-gated regardless). Operator-named
-  merges use `gh pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
+  merges. The merge train assembles UAT generations autonomously; observe them through `GET
+  /api/merge-train/generations` and report the ready set so the operator ships a batch. `POST
+  /api/merge-train/assemble` is the manual reconciliation route, not a per-tick action. With it
+  `false`, schedule via `POST /api/flywheel/auto-merge/schedule`. These UAT/auto-merge endpoints
+  are HTTP-only (no CLI surface yet) — fine from a non-sandboxed harness; if yours sandboxes
+  localhost, surface the merge-ready set in `suggestions[]` and let the operator assemble/ship
+  from the dashboard (UAT + merge are operator-gated regardless). Operator-named merges use `gh
+  pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
   provider defaults route correctly (kimi→ohmypi, gpt-5.5/gpt-5.6→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
