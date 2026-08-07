@@ -1816,3 +1816,19 @@ Remaining filed and unstruck: PAN-3587 (dead-in-tmux liveness), PAN-3591 (stack 
 Also worth noting the phenomenon is now **reproducible on demand**, which should make it cheap to instrument: spawn a strike, watch the hook execute, see whether the process survives it.
 
 PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 36 — 2026-08-07T07:15Z — both strikes landing; struck PAN-3587 and PAN-3609, the latter scoped to mitigation
+
+**PAN-3599 and PAN-3604 are both in the landing path** (`queued` and `squash-merging`, recovery count 0 on each). No intervention needed.
+
+**Struck PAN-3587** (dead-in-tmux row that boot reconciliation clears but the patrol declines to) and **PAN-3609** (the commit-to-push deaths).
+
+**Deliberately scoped the PAN-3609 strike to the mitigation, not the root cause**, and posted the reasoning to the issue. Root-causing why the push kills an agent needs instrumentation and several controlled runs; the PAN-3599/PAN-3604 pair narrows it but does not settle it. The recovery, by contrast, is two mechanical commands I have now run by hand three times tonight with identical steps, on preconditions that are equally mechanical: agent not alive, branch ahead of `origin/main`, tree clean. **A branch in that state is indistinguishable from one whose agent pushed and signalled normally — the only difference is that nobody ran two commands.**
+
+The reason to take the mitigation first is that it addresses what actually makes this defect dangerous. The danger is not that agents die; it is that **their completed work is invisible when they do**. Three finished fixes came within one unnoticed tick of being discarded tonight, saved only by a doctrine rule that depends on someone remembering to look. Automating the salvage converts every future instance into a non-event while the root cause is investigated at leisure.
+
+Specified guard rails so the automation cannot do harm: require a clean tree (a dirty one means the agent was mid-edit and its last commit may not be coherent), require the agent to be verifiably not alive rather than merely idle (or it races an agent about to push its own follow-up), log the salvage loudly rather than silently doing an agent's job, and do **not** rebase — push what was committed and let the landing door handle conflicts, exactly as happened with PAN-3607 where the door resolved the conflict itself.
+
+**Carry this: when the root cause is expensive and the recovery is cheap and mechanical, automate the recovery first.** It is not a workaround if the manual steps are already the sanctioned repair and the preconditions are decidable — it is moving a known-correct procedure from a human's memory into code, which is where it belongs. The root cause stays open; it just stops charging rent.
+
+Four strikes now in flight (3587, 3609) plus two landing (3599, 3604). PAN-3596 remains the run's only genuine loss.
