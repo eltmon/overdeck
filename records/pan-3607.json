@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-07T04:22:31.422Z",
-  "updated": "2026-08-07T06:02:14.914Z",
+  "updated": "2026-08-07T06:03:43.451Z",
   "pipeline": {
     "issueId": "PAN-3607",
     "reviewStatus": "pending",
@@ -12,11 +12,11 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T06:02:14.894Z",
+    "updatedAt": "2026-08-07T06:03:43.440Z",
     "mergeNotes": "GitHub PR #3608 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3608.",
     "strikeReadyHead": "197423d644236a682023cfe011fd143b6f1ecd3e",
     "strikeReadyAt": "2026-08-07T06:02:14.893Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -40,24 +40,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-terra": {
-            "input": 393181,
-            "output": 21134,
-            "cacheRead": 11580928,
+            "input": 395565,
+            "output": 21226,
+            "cacheRead": 11889152,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 393181,
-          "output": 21134,
-          "cacheRead": 11580928,
+          "input": 395565,
+          "output": 21226,
+          "cacheRead": 11889152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.195222,
-        "pricingAsOf": "2026-08-07T06:02:14.908Z"
+        "usd": 4.279618,
+        "pricingAsOf": "2026-08-07T06:03:43.445Z"
       }
     },
     "merges": [],
