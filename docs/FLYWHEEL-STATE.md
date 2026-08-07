@@ -1653,3 +1653,25 @@ Every one is the same shape: **a system's report of its own action is not eviden
 **PAN-3596 remains stranded with no work and no dispatch door** (`pan strike` refuses as "already running" — PAN-3599; `pan recover` no-ops — PAN-3604). Its fix, per-step patrol timing, is unstarted.
 
 Main green and unchanged at `c311a0cdb2`.
+
+### RUN-82 tick 26 — 2026-08-07T04:05Z — the landing door invalidated its own rebase; re-recorded readiness for the third time this run
+
+**PAN-3594's landing failed twice and is now `recovering` 1/3.** The attempts:
+
+```
+03:50:09Z  transport-failed  "Strike merge request failed: fetch failed"
+03:59:59Z  failed            "Stale strike signal: recorded HEAD c4914117c8… differs from
+                              origin/strike/pan-3594 at c94b3d6746…"
+```
+
+**The new head is the same change, rebased — and no agent produced it.** `origin/strike/pan-3594` is now `c94b3d6746 fix(deacon): suppress stale state writer alerts` sitting on `b2f2417401` (current main), while the strike agent has been dead since 22:57Z. The landing door rebased onto the newer main, pushed the result, and then compared that freshly-pushed head against the signal recorded *before its own rebase* and rejected it as stale. **It invalidated itself.**
+
+At tick 5 I predicted this shape and attributed it to `pan sync-main` racing the patrol. That was too narrow: the door needs neither an agent nor `sync-main` to trigger it. With a dead agent there is nobody to re-signal, so the ladder would have burned all three attempts and landed nothing.
+
+Cleared it as before — `pan strike-ready PAN-3594` → `ready at c94b3d6746…`. **Third time this run a landing has been unstuck by hand-recording a head the system already had on disk** (PAN-3582 at tick 5, PAN-3594 at tick 25, PAN-3594 again now). Posted the full attempt log to PAN-3599.
+
+**Also noted for the fix: a transport failure and a stale signal both increment the same recovery counter toward the same 3-attempt limit.** `fetch failed` is a retryable network condition that says nothing about the branch; consuming a recovery attempt for it means two genuine failures exhaust the ladder. They deserve different accounting.
+
+**Carry this: when a system rejects its own output, look for a value read before the write that produced it.** The staleness check is correct in principle — it exists to catch an agent pushing after signalling. It simply compares against a snapshot taken before an action the door itself performs, and nothing in the code knows those two are the same branch moving. The general smell is a validator whose reference value predates a mutation on the same path.
+
+Main is green and has moved to `b2f2417401` (operator-side, PAN-3605). PAN-3596 still stranded with no work and no dispatch door.
