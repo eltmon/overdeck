@@ -58,6 +58,10 @@ import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './s
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 
+export type RecoverAgentResult =
+  | { action: 'respawned'; state: AgentState }
+  | { action: 'already-running'; state: AgentState };
+
 export interface RestartAgentOptions {
   model?: string;
   harness?: RuntimeName;
@@ -357,7 +361,7 @@ export function detectCrashedAgents(): AgentState[] {
 export async function recoverAgent(
   agentId: string,
   opts: { modelOverride?: string; force?: boolean } = {},
-): Promise<AgentState | null> {
+): Promise<RecoverAgentResult | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycleSync(normalizedId, 'recoverAgent called');
   const state = getAgentStateSync(normalizedId);
@@ -413,7 +417,8 @@ export async function recoverAgent(
   if (sessionExistsSync(normalizedId)) {
     const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
     if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
-      return state;
+      logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
+      return { action: 'already-running', state };
     }
     console.log(`[agents] ${normalizedId} tmux session is a zombie (no ${recoveryHarness} runtime) — killing and recovering`);
     try { killSessionSync(normalizedId); } catch { /* ignore */ }
@@ -493,7 +498,7 @@ export async function recoverAgent(
     markAgentRunning(state);
     saveAgentStateSync(state);
     logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
-    return state;
+    return { action: 'respawned', state };
   }
 
   if (recoveryHarness === 'acp') {
@@ -535,7 +540,7 @@ export async function recoverAgent(
     markAgentRunning(state);
     saveAgentStateSync(state);
     logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (acp)`);
-    return state;
+    return { action: 'respawned', state };
   }
 
   if (recoveryHarness === 'kimi-code') {
@@ -636,7 +641,7 @@ export async function recoverAgent(
     markAgentRunning(state);
     saveAgentStateSync(state);
     logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
-    return state;
+    return { action: 'respawned', state };
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
@@ -682,7 +687,7 @@ export async function recoverAgent(
   saveAgentStateSync(state);
 
   logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
-  return state;
+  return { action: 'respawned', state };
 }
 
 /**
@@ -735,7 +740,7 @@ export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed
   for (const agent of crashed) {
     try {
       const result = await recoverAgent(agent.id);
-      if (result) {
+      if (result?.action === 'respawned') {
         recovered.push(agent.id);
       } else {
         failed.push(agent.id);

@@ -215,6 +215,11 @@ export const postAgentRecoverRoute = HttpRouter.add(
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_failed', { error }));
       return jsonResponse({ success: false, error }, { status: 400 });
     }
+    if (result.action === 'already-running') {
+      const error = `No recovery performed: agent ${id} already has a live harness runtime`;
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_skipped', { error }));
+      return jsonResponse({ success: false, error, action: result.action }, { status: 409 });
+    }
 
     const updatedState = yield* getAgentState(id);
     if (updatedState) {
