@@ -136,6 +136,16 @@ describe('lint-frontend-types.sh', () => {
     expect(result.output).toContain('simulated compiler crash');
   });
 
+  it('fails when the local compiler is missing', () => {
+    const root = makeTempGuard([]);
+    unlinkSync(join(root, 'node_modules', '.bin', 'tsc'));
+
+    const result = runGuard(root);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("missing node_modules/.bin/tsc — run 'bun install' first");
+  });
+
   it('does not relabel a line-shifted known error as new', () => {
     const root = makeTempGuard([ERROR_A]);
     const shiftedErrorA = ERROR_A.replace('(10,5)', '(47,17)');
