@@ -51,7 +51,10 @@
 | [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, status vs state, and skill → CLI → API → UI mapping |
 | [flywheel-brief.md](./flywheel-brief.md) | Default operating contract the Flywheel orchestrator reads at the start of every run |
 | [UAT-BATCH-TRAINS.md](./UAT-BATCH-TRAINS.md) | UAT batch trains (PAN-1737): auto-assembled rolling `uat/*` generations with in-batch conflict resolution, promote-the-batch merge, on-demand live UAT stacks, the reconciler, API, and the "UAT batches" card |
-| [MERGE-WORKFLOW.md](./MERGE-WORKFLOW.md) | Per-issue merge state machine (work-done → review-passed → rebased → merged); the escape-hatch path that batch promotion sits above |
+| [MERGE-WORKFLOW.md](./MERGE-WORKFLOW.md) | Per-issue merge state machine (work-done → review-passed → rebased → merged); the escape-hatch path that batch promotion sits above; post-merge handoff idempotency + Docker cleanup |
+| [AGENT-MESSAGE-DELIVERY.md](./AGENT-MESSAGE-DELIVERY.md) | Orchestrator-to-agent delivery: PTY supervisor transport, legacy Channels fallback, tmux paste fallback, blocking-choice-menu guard |
+| [DASHBOARD-ARCHITECTURE.md](./DASHBOARD-ARCHITECTURE.md) | Dashboard server structure (Effect HTTP + RPC), the two WebSocket endpoints, terminal snapshot/ready protocol, frontend data flow |
+| [PIPELINE-GATES.md](./PIPELINE-GATES.md) | Verification gate, verdict feedback routing, review convergence gate, and agent auto-resume gates |
 | [MERGE-TRAIN.md](./MERGE-TRAIN.md) | Historical PAN-1691 merge-train PRD — superseded by UAT-BATCH-TRAINS.md; retained for the engine/policy decision record |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Consolidated into `flywheel-brief.md` and `FLYWHEEL.md` (redirect only — original content in git history) |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Consolidated into `flywheel-brief.md` (redirect only — original content in git history) |
