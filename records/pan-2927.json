@@ -1,28 +1,20 @@
 {
   "issueId": "PAN-2927",
   "schemaVersion": 2,
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-07T08:17:19Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-2927 needs operator attention after 1 cycle(s).\n1. strike ffc492b1c41581c308a8269378d5966a7053740a; main 3ecd3b8da87061ce1800d1998f31eca7869a9bbe; failed: PR #2928 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-19T14:49:16.613Z",
-  "updated": "2026-08-07T08:17:19.070Z",
+  "updated": "2026-08-07T08:17:53.606Z",
   "pipeline": {
     "issueId": "PAN-2927",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:16:50.328Z",
+    "updatedAt": "2026-08-07T08:17:16.660Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-2927 after its harness exited before push.",
     "strikeReadyHead": "ffc492b1c41581c308a8269378d5966a7053740a",
     "strikeReadyAt": "2026-08-07T08:16:50.328Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
   },
@@ -48,19 +40,12 @@
       },
       "costAtCloseOut": {
         "usd": 9.468958,
-        "pricingAsOf": "2026-08-07T08:16:50.334Z"
+        "pricingAsOf": "2026-08-07T08:17:16.669Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-07T08:17Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-07T08:17:19.070Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
