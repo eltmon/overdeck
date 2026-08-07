@@ -18,15 +18,17 @@
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-07T08:17:48.846Z",
+  "updated": "2026-08-07T08:18:00.696Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "merging",
+    "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:17:16.657Z",
-    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3519 after its harness exited before push.",
+    "updatedAt": "2026-08-07T08:17:23.778Z",
+    "mergeNotes": "Work agent strike-pan-3519 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation)); run pan unpause before merging",
     "strikeReadyHead": "6a82f1aba4e196d5083e909998c8eb126c5b5e6d",
     "strikeReadyAt": "2026-08-07T08:17:05.555Z",
     "strikeLandingState": "landing",
@@ -55,7 +57,7 @@
       },
       "costAtCloseOut": {
         "usd": 70.793972,
-        "pricingAsOf": "2026-08-07T08:17:16.672Z"
+        "pricingAsOf": "2026-08-07T08:17:51.276Z"
       }
     },
     "merges": [],
