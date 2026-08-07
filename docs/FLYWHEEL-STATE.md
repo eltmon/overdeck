@@ -1549,3 +1549,29 @@ Four strikes now in flight — PAN-3602 (red main), PAN-3594, PAN-3596 — with 
 PAN-3594 and PAN-3596 still working. The close-out queue behind red main now holds PAN-3584, and will hold PAN-3602 itself until main goes green — DoD row 6 requires the named checks to pass on the merge commit, so the fix for red main cannot close out until the fix has taken effect. That is correct behaviour, worth noting only because it means close-outs will arrive in a burst rather than one at a time once this clears.
 
 Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 21 — 2026-08-07T02:25Z — PAN-3602 landed; I almost reported its fix broken from a stale worktree
+
+**PAN-3602 landed** — `c311a0cdb2 test(infra): cover scoped pre-push remotes (#3603)`, touching only `tests/unit/scripts/pre-push-hook.test.ts` (+26/-2). Good scope discipline by the strike: it reconciled the assertions with the shipped behaviour of `ec3c5911cf` and **added** coverage for the newly-scoped dimension, rather than reverting the change or deleting the failing cases. `lint`, `build (22)` and `guard` are green on it; `test` is still in progress.
+
+**Near-miss worth recording in full.** Applying the tick-16 rule, I ran the previously-failing file locally to verify by reproduction:
+
+```
+FAIL  tests/unit/scripts/pre-push-hook.test.ts > runs the main-push guard when HEAD is pushed to refs/heads/main
+FAIL  tests/unit/scripts/pre-push-hook.test.ts > audits feature branch ratchets from origin/main merge-base…
+Test Files  1 failed (1)   Tests  2 failed | 2 passed (4)
+```
+
+I was one sentence from writing "the fix does not work". Then I checked what I had actually run against:
+
+```
+$ git log --oneline -1 HEAD
+5e8047697d docs(cli): record RUN-82 tick 20 …
+$ git merge-base --is-ancestor c311a0cdb2 HEAD  →  FIX NOT IN MY WORKTREE
+```
+
+My primary worktree carries my own FLYWHEEL-STATE commits and sits behind `origin/main`, so the local run exercised **pre-fix code**. It proves only that the original failure is real and deterministic rather than a CI-only flake — useful, but nothing about the fix.
+
+**Carry this: verify-by-reproduction has a precondition I had not written down — verify what you ran against.** The rule I have been applying since tick 16 is "re-run the failing thing after the fix lands", and it silently assumes the code under test *is* the fixed code. On a machine where the orchestrator's own worktree drifts behind `origin/main` by design, that assumption is false by default. The check is one command (`git merge-base --is-ancestor <fix> HEAD`) and it belongs before the test run, not after the surprising result. Note the failure mode is asymmetric and nasty: a stale worktree produces a *false negative* that looks exactly like a genuine incomplete fix — the precise shape of PAN-3599, which I filed two ticks ago on evidence I gathered correctly. Had I not checked, I would have filed a second one on evidence I had not.
+
+PAN-3594 and PAN-3596 still working. Close-outs for PAN-3584 and PAN-3602 remain queued behind main's `test` check going green.
