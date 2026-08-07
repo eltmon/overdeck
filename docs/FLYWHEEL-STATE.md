@@ -1870,3 +1870,17 @@ That is PAN-3599's fix confirmed against the precise failing case, on a deployed
 The cheap summary: **a fix is verified when the original failure has been made to disappear on the artifact you actually ship.** Everything else is inference.
 
 Two strikes still working (PAN-3587, PAN-3609) plus the newly-dispatched PAN-3586. PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
+
+### RUN-82 tick 39 — 2026-08-07T08:05Z — PAN-3587 landed and closed out; the stale-signal loop caught PAN-3609, whose own fix targets that class
+
+**PAN-3587 landed, deployed and closed out** — `863344d44f fix(cloister): reconcile dead verify-paused agents (#3612)`, row 6 green on real CI. **Fourteen substrate fixes landed, deployed and closed out this run.**
+
+**PAN-3609's landing hit the self-invalidating stale signal for the fourth time tonight:** recorded `6b9497f2c2` against `origin/strike/pan-3609` at `81b9ea82a9`. Re-recorded readiness at the rebased head — the routine is now four for four.
+
+**The irony is worth stating rather than enjoying: PAN-3609's own commit is `81b9ea82a9 fix(strike): salvage completed dead branches`** — the mitigation I scoped at tick 36 for exactly this family of stranded-work failures — and it is sitting blocked behind a sibling failure in the same landing door. PAN-3599's fix covered the re-dispatch refusal but not the rebase-invalidation, so the door still rejects its own output. That is a useful reminder that the two defects I lumped together at tick 24 under "idle agent handling" were genuinely separate, and fixing one leaves the other fully intact.
+
+**PAN-3586's re-struck agent is working** (workspace still at an old main tip, no commit yet) — it was spawned only 15 minutes ago.
+
+**Carry this: when a fix lands for one member of a defect family, re-test the others rather than assuming the family is closed.** After PAN-3599 landed and I verified it against the refusal case, the natural inference is that idle-agent recovery is now sound. It is not — the stale-signal path is untouched and fired again within the hour, against the very issue meant to reduce this class of loss. Verification proves what it tested and nothing adjacent.
+
+PAN-3596 remains the run's only genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 still awaiting release.
