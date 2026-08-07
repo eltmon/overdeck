@@ -1922,3 +1922,17 @@ No commit from it yet, which is expected at 16 minutes on an investigative scope
 **Struck PAN-3591** — the workspace-stack spawn gate that refuses a rework agent because the branch does not compile. That is the last of my own findings from this run still unstruck; everything else filed tonight has landed, is in flight, or is closed out. It also brings the fleet back to the `minAgents` target of 2.
 
 Main has moved to `0000384475` (operator-side TTS venv resolution). Fifteen substrate fixes landed, deployed and closed out this run. PAN-3596 remains the only genuine loss; PAN-3512 still awaits the UAT ship and PAN-3580 still awaits release.
+
+### RUN-82 tick 43 — 2026-08-07T09:25Z — stopped re-dispatching PAN-3586 after a third identical death; filed it as PAN-3617
+
+**PAN-3586's third strike died like the first two: nothing produced at all.** Cost unchanged at `$0.9533` across two same-session samples 16 minutes apart, clean tree, no diff, branch still at an old main tip — and the harness transcript for that workspace last written at **04:49Z**, four and a half hours before the 08:50Z dispatch. The agent wrote nothing.
+
+**The controlled comparison is what makes this specific rather than general.** `strike-pan-3591` was dispatched at 09:07Z, same model, same harness, same host, minutes apart, and is working normally — `$4.8244` and a real commit (`beef20762a fix(agents): use cycle-free rework status reader`). So spawn, routing and environment are all fine. This is also a different shape from PAN-3609, which covers strikes dying *after* committing; here death precedes any output.
+
+**Stopped re-dispatching and filed PAN-3617** with three candidate causes ordered by cost to check: a reused workspace stuck at a stale main tip across all three attempts; an issue body that has grown to five long comments (two of them my own corrections) and may be overrunning a kickoff prompt limit; or a review-status row corrupted across a planning run plus three strikes.
+
+**Carry this: the third identical failure is not a reason to try harder, it is the finding.** I nearly ran a fourth dispatch — it costs one command and might have worked. But tick 31 already taught me that repeating a manual recovery twice is the trigger to file the pattern, and I had now done it twice on this one issue. The useful output of attempt three was not another attempt; it was noticing that a sibling spawned minutes later worked perfectly, which converts "strikes are flaky tonight" into "something about *this issue* is fatal" and hands whoever picks it up a controlled pair.
+
+PAN-3586 is not lost — it has a written xBRIEF from tick 6 and is reachable through the normal pipeline once released. Only its strike path is broken.
+
+**PAN-3591 is progressing well.** Fifteen substrate fixes landed, deployed and closed out this run.
