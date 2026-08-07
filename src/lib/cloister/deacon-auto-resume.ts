@@ -133,12 +133,14 @@ export async function handleAgentHeartbeatDeadEvent(
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — status=${state.status} (not running/starting)`);
     return [];
   }
-  if (isVerifyPausedAgentState(state)) {
-    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — verify-paused (mergeStatus=merged, tmux session intentionally absent)`);
-    return [];
+  const verifyPaused = isVerifyPausedAgentState(state);
+  let [sessionQuery, retainReason] = queryConfirmedSession(agentId);
+  // A reconcile pass must settle stale registry rows without waiting for the
+  // next stretched patrol, while preserving the two independent tmux misses
+  // required to reject a transient session lookup failure.
+  if (context === 'reconcile' && retainReason?.startsWith('retained after first confirmed tmux miss')) {
+    [sessionQuery, retainReason] = queryConfirmedSession(agentId);
   }
-
-  const [sessionQuery, retainReason] = queryConfirmedSession(agentId);
   if (retainReason) { logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} ${retainReason}`); return []; }
 
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
@@ -201,7 +203,7 @@ export async function handleAgentHeartbeatDeadEvent(
   // will actually retry. Planning agents are one-shot by design.
   const isResumableRole = !agentId.startsWith('planning-');
   const completedReviewArtifact = hasCompletedReviewArtifact(state);
-  if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact) {
+  if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact && !verifyPaused) {
     const rapidPostResumeDeath = isRapidPostResumeDeath(state);
     const preKickoffLaunchDeath = isPreKickoffLaunchDeath(state);
     // PAN-1718: preserve (accumulate) the failure counter for deaths that prove
@@ -226,6 +228,8 @@ export async function handleAgentHeartbeatDeadEvent(
     }
   } else if (completedReviewArtifact) {
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after completed review artifact; not recording orphan failure`);
+  } else if (verifyPaused) {
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after verify pause; not recording orphan failure`);
   }
   const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);

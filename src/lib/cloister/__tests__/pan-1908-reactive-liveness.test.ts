@@ -28,6 +28,7 @@ const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
 const mockIsIssueClosed = vi.fn();
+const mockListAllAgents = vi.fn();
 const mockExistingPaths = vi.hoisted(() => new Set<string>());
 
 vi.mock('effect', async (importOriginal) => {
@@ -128,9 +129,13 @@ vi.mock('../../../lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: vi.fn(),
 }));
 
-vi.mock('../../../lib/database/agents-db.js', () => ({
-  listAllAgents: vi.fn(() => []),
-}));
+vi.mock('../../../lib/overdeck/agents.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../lib/overdeck/agents.js')>();
+  return {
+    ...actual,
+    listAllAgentsSync: (...args: unknown[]) => mockListAllAgents(...args),
+  };
+});
 
 vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: () => ({ active: false, since: null }),
@@ -153,6 +158,7 @@ import {
   handleAgentStoppedEvent,
   handleAgentHeartbeatDeadEvent,
 } from '../deacon.js';
+import { reconcileAgentLiveness } from '../deacon-auto-resume.js';
 
 function makeState(overrides: Record<string, unknown> = {}) {
   return {
@@ -193,6 +199,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
     mockIsIssueClosed.mockResolvedValue(false);
+    mockListAllAgents.mockReturnValue([]);
     mockExistingPaths.clear();
   });
 
@@ -405,6 +412,27 @@ describe('PAN-1908 reactive liveness handlers', () => {
 
       expect(result).toBe('agent-pan-1908');
       expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
+    });
+  });
+
+  describe('reconcileAgentLiveness', () => {
+    it('marks a verify-paused running agent with no tmux session stopped in one pass', async () => {
+      const state = makeState({ id: 'agent-pan-3587', status: 'running', paused: true });
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        mergeStatus: 'merged',
+      });
+      mockListAllAgents.mockReturnValue([state]);
+
+      const actions = await reconcileAgentLiveness({
+        notifyAgentStopped: vi.fn(),
+        notifyAgentStatusChanged: vi.fn(),
+      });
+
+      expect(actions).toEqual(['Recovered orphaned agent agent-pan-3587 (running→stopped)']);
+      expect(mockSaveAgentState.mock.calls[0][0].status).toBe('stopped');
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
     });
   });
 

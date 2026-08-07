@@ -609,11 +609,10 @@ describe('auto-resume gates', () => {
     expect(state?.consecutiveFailures).toBe(1);
   });
 
-  it('does not orphan-recover verify-paused running agents with killed tmux sessions', async () => {
+  it('recovers a verify-paused running agent with no tmux session to stopped', async () => {
     const agentId = 'agent-pan-1141-verify-orphan';
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
     const reviewStatus = await import('../../../src/lib/review-status.js');
-    const logger = await import('../../../src/lib/persistent-logger.js');
     vi.mocked(reviewStatus.getReviewStatusSync).mockReturnValue({
       issueId: 'PAN-1141',
       reviewStatus: 'passed',
@@ -640,10 +639,9 @@ describe('auto-resume gates', () => {
     const actions = await recoverOrphanedAgents('patrol');
 
     const state = agents.getAgentStateSync(agentId);
-    expect(actions).toEqual([]);
-    expect(state?.status).toBe('running');
+    expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
+    expect(state?.status).toBe('stopped');
     expect(state?.consecutiveFailures).toBeUndefined();
-    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
   });
 
   it('counts rapid post-resume orphan deaths toward the troubled gate', async () => {
