@@ -1770,3 +1770,17 @@ Letting the ladder escalate to `needs_you` rather than reaching outside my rails
 **Two more points added to PAN-3599 from this:** a `CONFLICTING` outcome is not retryable and should escalate immediately instead of burning the ladder, joining `transport-failed` as a second outcome class that spends a recovery attempt it cannot benefit from. And the re-dispatch refusal is backwards in exactly the case that matters — a live working agent is when you do *not* want a re-strike; a dead agent holding a conflicted branch is when you do.
 
 Main green at `c93b2f33b3`. PAN-3596 still stranded. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 33 — 2026-08-07T06:20Z — CORRECTION: the conflict was not a dead end. PAN-3607 landed on the next attempt.
+
+**PAN-3607 landed** as `32b14223b3 PAN-3607 (#3608)`, deployed as the live build. **My tick-32 conclusion was wrong.** I wrote that PR #3608's conflict left "a finished, valuable fix on a conflicted PR with no available actor" and framed escalation to `needs_you` as the honest end state. The landing door resolved the conflict on its own next attempt — the ladder I described as burning futile passes was in fact doing the work.
+
+**What I got wrong, precisely: I inferred the absence of a capability from the absence of a *door I could see*.** `pan strike` refused, `pan recover` no-ops, `pan tell` is closed to me — so I concluded nobody could act. But the landing door is an actor too, and it had two attempts left and a rebase capability I had already watched it exercise at tick 26. I reasoned from my own available verbs to the system's, and they are not the same set.
+
+That is the third correction of this kind tonight, and they rhyme: at tick 2 I generalised from a sample that could not show the thing; at tick 11 I attributed a real defect's consequence to something independently gated; now I declared a dead end while an actor I was not counting had retries remaining. **The common failure is treating my own view as the complete one.** The corrective is cheap and I keep skipping it — before declaring "nothing can happen here", enumerate what else acts on this state, not just what I can invoke.
+
+**Close-out is blocked on row 6 pending CI**, and this time I checked rather than assumed: `build (22)=in_progress, lint=in_progress, test=in_progress`. The message still reads "required checks not successful", still conflates running with failed (the PAN-3589 refinement), and at tick 19 that same wording was hiding a genuine failure — so verifying costs one command and settles which case it is.
+
+**Eleventh substrate fix landed and deployed this run**; close-out follows when CI concludes.
+
+PAN-3596 remains the one genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
