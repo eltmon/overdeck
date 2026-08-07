@@ -1936,3 +1936,20 @@ Main has moved to `0000384475` (operator-side TTS venv resolution). Fifteen subs
 PAN-3586 is not lost — it has a written xBRIEF from tick 6 and is reachable through the normal pipeline once released. Only its strike path is broken.
 
 **PAN-3591 is progressing well.** Fifteen substrate fixes landed, deployed and closed out this run.
+
+### RUN-82 tick 44 — 2026-08-07T09:45Z — ran a full scope sweep for the first time since tick 1 and found work I had been blind to
+
+**PAN-3591 is progressing** ($4.8244 → $6.3946, same session). No intervention.
+
+**Ran a full pipeline-membership sweep across all projects — the first since tick 1**, and it surfaced two items I had not been tracking:
+
+- **PAN-2869 in `post_merge_limbo`** — merged 2026-07-18, three weeks ago, never closed out.
+- **PAN-3519 as a `zombie_pr`** — closed issue with an open PR, needing an operator-only residue disposition, joining mind-your-now's seven.
+
+That is worth admitting plainly: **I ran the Observe step properly on tick 1 and then coasted on my own working set for forty-three ticks.** Every tick since has inventoried what I already knew about — my strikes, my filings, the issues I had touched. The read door is cheap to query and would have surfaced PAN-2869 at any point. A loop that only re-examines its own output stops being an inventory and becomes a to-do list.
+
+**PAN-2869's close-out is blocked on row 3 with `verificationStatus: failed`** — and that is a genuinely different case from the one PAN-3581 fixed. That fix taught row 3 to accept green main CI when verification is *missing*; this row is not missing, it is a recorded **negative** verdict. Rows 4, 6 and 8 all pass — PR #2873 merged, required checks green on `a8d3cd4966`, and the live build contains it.
+
+**Not overriding it.** I cannot distinguish "a stale failed verdict that was never cleared before the merge" from "verification genuinely failed and it merged anyway" without investigating a three-week-old branch, and those two have opposite dispositions. `--accept-verification` would paper over the second case, and a failed verdict is evidence of a problem rather than absence of evidence — which is exactly the distinction PAN-3589 spent this run teaching row 6. Surfacing it for the operator instead.
+
+Fifteen substrate fixes landed, deployed and closed out this run. PAN-3512 still awaits the UAT ship; PAN-3580 still awaits release.
