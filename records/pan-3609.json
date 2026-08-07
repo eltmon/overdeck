@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3609",
+  "schemaVersion": 2,
+  "created": "2026-08-07T07:13:28.780Z",
+  "updated": "2026-08-07T07:13:28.780Z",
+  "pipeline": {
+    "issueId": "PAN-3609",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-07T07:13:28.780Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-terra"
+}
