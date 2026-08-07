@@ -1,30 +1,58 @@
 {
   "issueId": "PAN-3591",
   "schemaVersion": 2,
-  "created": "2026-08-07T09:06:28.648Z",
-  "updated": "2026-08-07T14:00:46.663Z",
-  "pipeline": {
-    "issueId": "PAN-3591",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-07T09:06:28.648Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "gpt-5.6-terra",
   "sessionHistory": [
     {
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-07T14:00:46.663Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-08-07T09:06:28.648Z",
+  "updated": "2026-08-07T14:04:31.534Z",
+  "pipeline": {
+    "issueId": "PAN-3591",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-07T14:04:25.640Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3591 after its harness exited before push.",
+    "strikeReadyHead": "beef20762a03cbbebd60a44936756600d1bfe254",
+    "strikeReadyAt": "2026-08-07T14:04:25.640Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-terra": {
+            "input": 659451,
+            "output": 34639,
+            "cacheRead": 19143680,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-terra": {
+          "input": 659451,
+          "output": 34639,
+          "cacheRead": 19143680,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.954167,
+        "pricingAsOf": "2026-08-07T14:04:25.648Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-terra"
 }
