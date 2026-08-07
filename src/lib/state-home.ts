@@ -9,7 +9,7 @@
 
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { lstat, mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from './paths.js';
@@ -54,8 +54,15 @@ export interface StateMigrationInspection {
   migrated: boolean;
   migrationInProgress: boolean;
   remoteTip: string | null;
+  completedAt?: string;
   fallback?: 'cache' | 'local';
   remoteCheckFailed?: true;
+}
+
+export interface LegacyStatePathInspection {
+  postMigrationWrites: string[];
+  inertDirectories: string[];
+  staleFiles: string[];
 }
 
 type StateGit = (repoPath: string, args: string[], signal?: AbortSignal) => Promise<string>;
@@ -66,7 +73,7 @@ interface StateHomeOptions {
   git?: StateGit;
 }
 
-const migrationCache = new Map<string, { remoteTip: string | null; migrated: boolean }>();
+const migrationCache = new Map<string, { remoteTip: string | null; migrated: boolean; completedAt?: string }>();
 
 async function git(repoPath: string, args: string[], signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
@@ -184,6 +191,7 @@ export async function inspectStateMigration(
         migrated: cached.migrated,
         migrationInProgress: listedTip !== null && !cached.migrated,
         remoteTip: listedTip,
+        ...(cached.completedAt ? { completedAt: cached.completedAt } : {}),
       };
     }
     if (listedTip === null) {
@@ -193,8 +201,14 @@ export async function inspectStateMigration(
 
     const remote = await markerAtRemoteTip(repoPath, listedTip, options.signal, runGit);
     const migrated = remote.marker !== null;
-    migrationCache.set(repoPath, { remoteTip: remote.tip, migrated });
-    return { migrated, migrationInProgress: !migrated, remoteTip: remote.tip };
+    const completedAt = remote.marker?.completedAt;
+    migrationCache.set(repoPath, { remoteTip: remote.tip, migrated, completedAt });
+    return {
+      migrated,
+      migrationInProgress: !migrated,
+      remoteTip: remote.tip,
+      ...(completedAt ? { completedAt } : {}),
+    };
   } catch {
     options.signal?.throwIfAborted();
     if (cached?.migrated) {
@@ -202,6 +216,7 @@ export async function inspectStateMigration(
         migrated: true,
         migrationInProgress: false,
         remoteTip: cached.remoteTip,
+        ...(cached.completedAt ? { completedAt: cached.completedAt } : {}),
         fallback: 'cache',
       };
     }
@@ -209,7 +224,13 @@ export async function inspectStateMigration(
       join(stateWorktreePath(project, options), MIGRATION_COMPLETE_MARKER),
     );
     if (localMarker) {
-      return { migrated: true, migrationInProgress: false, remoteTip: null, fallback: 'local' };
+      return {
+        migrated: true,
+        migrationInProgress: false,
+        remoteTip: null,
+        completedAt: localMarker.completedAt,
+        fallback: 'local',
+      };
     }
     return { migrated: false, migrationInProgress: false, remoteTip: null, remoteCheckFailed: true };
   }
@@ -223,20 +244,81 @@ export function shouldCommitLegacyWorkspaceArtifacts(migrated: boolean): boolean
   return !migrated;
 }
 
-export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
-  if (!(await isStateMigrated(project))) return [];
+async function inspectLegacyStatePath(
+  path: string,
+  completedAtMs: number,
+): Promise<LegacyStatePathInspection> {
+  let pathStat;
+  try {
+    pathStat = await lstat(path);
+  } catch {
+    return { postMigrationWrites: [], inertDirectories: [], staleFiles: [] };
+  }
+
+  const postMigrationWrites = pathStat.mtimeMs > completedAtMs ? [path] : [];
+  if (!pathStat.isDirectory()) {
+    return {
+      postMigrationWrites,
+      inertDirectories: [],
+      staleFiles: postMigrationWrites.length === 0 ? [path] : [],
+    };
+  }
+
+  let entries;
+  try {
+    entries = await readdir(path);
+  } catch {
+    return { postMigrationWrites, inertDirectories: [], staleFiles: [] };
+  }
+  if (entries.length === 0) {
+    return {
+      postMigrationWrites,
+      inertDirectories: postMigrationWrites.length === 0 ? [path] : [],
+      staleFiles: [],
+    };
+  }
+  if (postMigrationWrites.length > 0) {
+    return { postMigrationWrites, inertDirectories: [], staleFiles: [] };
+  }
+
+  const children = await Promise.all(entries.sort().map(entry => inspectLegacyStatePath(join(path, entry), completedAtMs)));
+  return children.reduce<LegacyStatePathInspection>((result, child) => ({
+    postMigrationWrites: [...result.postMigrationWrites, ...child.postMigrationWrites],
+    inertDirectories: [...result.inertDirectories, ...child.inertDirectories],
+    staleFiles: [...result.staleFiles, ...child.staleFiles],
+  }), { postMigrationWrites, inertDirectories: [], staleFiles: [] });
+}
+
+/**
+ * Inspects legacy state only after a completed migration. A path is evidence of
+ * a stray writer only when its mtime is newer than the completion marker.
+ */
+export async function inspectLegacyStatePaths(project: ProjectConfig): Promise<LegacyStatePathInspection> {
+  const migration = await inspectStateMigration(project);
+  if (!migration.migrated || !migration.completedAt) {
+    return { postMigrationWrites: [], inertDirectories: [], staleFiles: [] };
+  }
   // The recreation tripwire scans the LEGACY SOURCE (project.path) — the
   // location the migration reads and deletes legacy state from
   // (state-migrate.ts `legacyStateSource`). This is deliberately NOT the state
   // HOST (resolveInfraRepo, used above to gate `isStateMigrated` and to locate
   // where migrated state now lives): for a polyrepo the source is the non-git
   // root while the host is a sub-repo, so a stray writer recreates state at the
-  // root, not the host. Rooting this scan at the host would blind the tripwire
-  // in exactly the polyrepo case.
+  // source root, not the host.
+  const completedAtMs = new Date(migration.completedAt).getTime();
   const legacyStateRoot = project.path;
-  return STATE_BRANCH_PATHS
-    .map((statePath) => join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
-    .filter(existsSync);
+  const inspections = await Promise.all(STATE_BRANCH_PATHS.map(statePath =>
+    inspectLegacyStatePath(join(legacyStateRoot, '.pan', statePath.slice(0, -1)), completedAtMs),
+  ));
+  return inspections.reduce<LegacyStatePathInspection>((result, inspection) => ({
+    postMigrationWrites: [...result.postMigrationWrites, ...inspection.postMigrationWrites],
+    inertDirectories: [...result.inertDirectories, ...inspection.inertDirectories],
+    staleFiles: [...result.staleFiles, ...inspection.staleFiles],
+  }), { postMigrationWrites: [], inertDirectories: [], staleFiles: [] });
+}
+
+export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
+  return (await inspectLegacyStatePaths(project)).postMigrationWrites;
 }
 
 export async function resolveStateHome(project: ProjectConfig, options: StateHomeOptions = {}): Promise<StateHome> {

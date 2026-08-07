@@ -1,5 +1,5 @@
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
-import { ensureStateWorktree, findRecreatedLegacyStatePaths, type StateWorktreeStatus } from '../../lib/state-home.js';
+import { ensureStateWorktree, inspectLegacyStatePaths, type StateWorktreeStatus } from '../../lib/state-home.js';
 
 interface StateWorktreeCheck {
   name: string;
@@ -16,13 +16,25 @@ export async function checkStateWorktrees(
     try {
       const result = await ensure(config, { projectKey: key });
       const name = `State Worktree: ${key} (${config.name})`;
-      const recreated = await findRecreatedLegacyStatePaths(config);
-      if (recreated.length > 0) {
+      const legacy = await inspectLegacyStatePaths(config);
+      if (legacy.postMigrationWrites.length > 0) {
         return {
           name,
           status: 'error',
-          message: `Migrated checkout contains recreated state paths: ${recreated.join(', ')}`,
+          message: `Migrated checkout contains post-migration legacy state writes: ${legacy.postMigrationWrites.join(', ')}`,
           fix: 'Stop the stray writer and move the data through the state write door; do not delete before comparing it with overdeck-state.',
+        };
+      }
+      if (legacy.inertDirectories.length > 0 || legacy.staleFiles.length > 0) {
+        const details = [
+          legacy.inertDirectories.length > 0 ? `inert directories: ${legacy.inertDirectories.join(', ')}` : null,
+          legacy.staleFiles.length > 0 ? `unmigrated content: ${legacy.staleFiles.join(', ')}` : null,
+        ].filter(Boolean).join('; ');
+        return {
+          name,
+          status: 'warn',
+          message: `Migrated checkout retains legacy state (${details}).`,
+          fix: 'Remove empty directories only after confirming them empty; compare unmigrated content with overdeck-state before deletion.',
         };
       }
       switch (result.status) {

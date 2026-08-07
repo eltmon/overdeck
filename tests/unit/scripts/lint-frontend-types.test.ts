@@ -17,7 +17,7 @@ type GuardResult = { ok: boolean; output: string };
 function makeTempGuard(baselineErrors: string[]): string {
   const root = mkdtempSync(join(tmpdir(), 'lint-frontend-types-'));
   mkdirSync(join(root, 'scripts'), { recursive: true });
-  mkdirSync(join(root, 'bin'), { recursive: true });
+  mkdirSync(join(root, 'node_modules', '.bin'), { recursive: true });
 
   writeFileSync(
     join(root, 'scripts', 'lint-frontend-types.sh'),
@@ -29,7 +29,7 @@ function makeTempGuard(baselineErrors: string[]): string {
     `${[...BASELINE_HEADER, ...baselineErrors.sort()].join('\n')}\n`,
   );
   writeFileSync(
-    join(root, 'bin', 'npx'),
+    join(root, 'node_modules', '.bin', 'tsc'),
     '#!/usr/bin/env bash\ncat "$FAKE_TSC_OUTPUT"\nexit "${FAKE_TSC_EXIT:-0}"\n',
     { mode: 0o755 },
   );
@@ -49,7 +49,6 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
       encoding: 'utf-8',
       env: {
         ...process.env,
-        PATH: `${join(root, 'bin')}:${process.env.PATH ?? ''}`,
         FAKE_TSC_OUTPUT: join(root, 'tsc-output.txt'),
         FAKE_TSC_EXIT: String(tscExit),
       },

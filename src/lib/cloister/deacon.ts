@@ -3111,7 +3111,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
   const projectConfigs = listProjectsSync();
   if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileProjectStatePlanes(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
-  for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
+  for (const warning of await recreatedStateWarnings(projectConfigs)) addLog(warning.level, warning.message, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
   if (shouldRunRecoveryJanitor('agent-state', state.patrolCycle)) {

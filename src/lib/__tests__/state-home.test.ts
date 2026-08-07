@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +8,7 @@ import {
   clearStateMigrationCache,
   ensureStateWorktree,
   findRecreatedLegacyStatePaths,
+  inspectLegacyStatePaths,
   inspectStateMigration,
   isStateMigrated,
   parseMigrationCompleteMarker,
@@ -119,6 +120,7 @@ describe('state home', () => {
       migrated: true,
       migrationInProgress: false,
       remoteTip: markedTip,
+      completedAt: '2026-07-09T20:00:00.000Z',
     });
   });
 
@@ -150,6 +152,7 @@ describe('state home', () => {
       migrated: true,
       migrationInProgress: false,
       remoteTip: fetchedTip,
+      completedAt: '2026-07-19T02:43:54.000Z',
     });
     expect(runGit.mock.calls.filter(([, args]) => args[0] === 'fetch')).toHaveLength(2);
   });
@@ -181,6 +184,7 @@ describe('state home', () => {
       migrated: true,
       migrationInProgress: false,
       remoteTip: tip,
+      completedAt: '2026-07-19T02:43:54.000Z',
       fallback: 'cache',
     });
   });
@@ -200,6 +204,7 @@ describe('state home', () => {
       migrated: true,
       migrationInProgress: false,
       remoteTip: null,
+      completedAt: '2026-07-19T02:43:54.000Z',
       fallback: 'local',
     });
   });
@@ -270,7 +275,7 @@ describe('state home', () => {
     expect(resolveStandaloneStateReadHomeSync(project)).toEqual({ root: repo, migrated: false });
   });
 
-  it('trips when a migrated checkout recreates a legacy state directory', async () => {
+  it('trips when a migrated checkout writes a legacy state directory', async () => {
     const parent = pushUnmarkedStateBranch();
     pushCompletionMarker(parent);
     // Polyrepo whose state HOST (infra -> repo, which carries the migration
@@ -286,6 +291,58 @@ describe('state home', () => {
     };
     mkdirSync(join(root, '.pan', 'records'), { recursive: true });
     await expect(findRecreatedLegacyStatePaths(polyrepo)).resolves.toEqual([join(root, '.pan', 'records')]);
+  });
+
+  it('classifies empty legacy directories older than migration as inert', async () => {
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    const records = join(repo, '.pan', 'records');
+    mkdirSync(records, { recursive: true });
+    const staleAt = new Date('2026-07-09T19:59:59.000Z');
+    utimesSync(records, staleAt, staleAt);
+
+    await expect(inspectLegacyStatePaths(project)).resolves.toEqual({
+      postMigrationWrites: [],
+      inertDirectories: [records],
+      staleFiles: [],
+    });
+  });
+
+  it('detects a post-migration file write inside an existing legacy directory', async () => {
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    const records = join(repo, '.pan', 'records');
+    const record = join(records, 'pan-3594.json');
+    const staleAt = new Date('2026-07-09T19:59:59.000Z');
+    const writtenAt = new Date('2026-07-09T20:00:01.000Z');
+    mkdirSync(records, { recursive: true });
+    writeFileSync(record, '{}\n');
+    utimesSync(records, staleAt, staleAt);
+    utimesSync(record, writtenAt, writtenAt);
+
+    await expect(inspectLegacyStatePaths(project)).resolves.toEqual({
+      postMigrationWrites: [record],
+      inertDirectories: [],
+      staleFiles: [],
+    });
+  });
+
+  it('reports legacy files older than migration separately from stray writes', async () => {
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    const records = join(repo, '.pan', 'records');
+    const record = join(records, 'pan-714.json');
+    const staleAt = new Date('2026-07-09T19:59:59.000Z');
+    mkdirSync(records, { recursive: true });
+    writeFileSync(record, '{}\n');
+    utimesSync(records, staleAt, staleAt);
+    utimesSync(record, staleAt, staleAt);
+
+    await expect(inspectLegacyStatePaths(project)).resolves.toEqual({
+      postMigrationWrites: [],
+      inertDirectories: [],
+      staleFiles: [record],
+    });
   });
 
   it('recreates a clean wrong-branch state worktree on overdeck-state', async () => {
