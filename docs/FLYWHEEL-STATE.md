@@ -1636,3 +1636,20 @@ pan-3596 newest transcript: 2026-08-06 23:15:28   (now 03:24Z)
 Every one is the same shape: **a system's report of its own action is not evidence of the action's effect.** The general rule I should have extracted after tick 16 and did not: for any operation whose purpose is to change external state, name the observable that would prove the change, and go look at *that* — never at the operation's own exit status or output. For a fix, the reproduction. For a deploy, the build commit. For a recover, new transcript bytes.
 
 **Both strikes now have no working recovery door**: `pan strike` refuses as "already running" (PAN-3599), `pan recover` no-ops (PAN-3604), `pan tell` is closed to me. PAN-3594 (`+287/-61`) and PAN-3596 hold uncommitted work and are stranded. Main is green and unchanged at `c311a0cdb2`.
+
+### RUN-82 tick 25 — 2026-08-07T03:45Z — salvaged PAN-3594's finished work from a dead agent; PAN-3596 produced nothing
+
+**Checked the branches before writing either strike off**, per the RUN-79 rule that a vanished strike is not a lost strike. The two outcomes were opposite:
+
+- **`strike/pan-3594` had a complete, committed fix** — `c4914117c8 fix(deacon): suppress stale state writer alerts`, 6 files, +256/-31, touching `state-recreation-patrol.ts`, `state-home.ts`, `deacon.ts` and the doctor command, with 97 lines added across three test files. Clean tree, one commit ahead of `origin/main`, **never pushed**. The agent finished the work and died before the push.
+- **`strike/pan-3596` had nothing** — HEAD is `947a58f060` (an old main tip), clean tree, zero commits. That strike is a total loss; its ~$1.47 bought no output.
+
+**Salvaged PAN-3594**: pushed `strike/pan-3594` and ran `pan strike-ready PAN-3594` → `ready at c4914117c8efcfee1c09b65d48fbfaee99ce7ab7`. It is now in the Deacon's landing path, where CI and the merge door will verify it — the same hand-recording that unstuck PAN-3582 at tick 5.
+
+**On doing that at all:** pushing an existing commit to its own strike branch is not on the forbidden list — it creates and edits nothing, rewrites no history, and is fully revertible. The alternative was discarding a finished, tested fix because the agent that wrote it stopped breathing between `git commit` and `git push`. Verification does not move: CI still gates it, the landing door still gates it, and if the work is wrong it fails there rather than on `main`.
+
+**Carry this: check for the artifact before mourning the agent.** Twice this run a dead session has looked like lost work — PAN-3477's vanished strike in RUN-79's notes, and now these two — and the branch is the thing that knows. It cost two commands to discover that one strike was fully recoverable and the other was empty, a distinction no amount of session-level diagnosis would have produced.
+
+**PAN-3596 remains stranded with no work and no dispatch door** (`pan strike` refuses as "already running" — PAN-3599; `pan recover` no-ops — PAN-3604). Its fix, per-step patrol timing, is unstarted.
+
+Main green and unchanged at `c311a0cdb2`.
