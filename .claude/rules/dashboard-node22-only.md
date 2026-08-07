@@ -12,7 +12,7 @@ The database layer now uses runtime-bundled `node:sqlite`/`bun:sqlite`; this Nod
 Two hard blockers for running the dashboard under Bun:
 
 **1. node-pty native addon (breaks /ws/terminal)**
-`@homebridge/node-pty-prebuilt-multiarch` is a native Node addon used to stream
+`@lydell/node-pty` is a native Node addon used to stream
 live tmux sessions to the browser terminal panel. Under Bun's native addon
 compatibility layer, the PTY spawns but exits immediately with code 0, causing
 an infinite "Connection lost / Reconnecting" loop in the terminal panel.

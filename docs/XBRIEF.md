@@ -78,7 +78,7 @@ The canonical spec is immutable after planning except for lifecycle status chang
 
 ```
 .overdeck/
-  continue.json             ← session state and statusOverrides
+  continue.json             ← session state (statusOverrides live in the project-side per-issue record)
   pending-promotion.json    ← finalized plan awaiting server-side promotion recovery
   sessions.jsonl            ← append-only session history
   feedback/
@@ -87,7 +87,7 @@ The canonical spec is immutable after planning except for lifecycle status chang
   context.md                ← feature context for story agents
 ```
 
-Workspace runtime files are local and gitignored. Readers merge the canonical spec with workspace `statusOverrides` so agents and the dashboard see current item status without mutating the spec.
+Workspace runtime files are local and gitignored. Readers merge the canonical spec with `statusOverrides` from the project-side per-issue record (`continues/<issue-lowercase>.xbrief.json`) so agents and the dashboard see current item status without mutating the spec; legacy workspace-side overrides are backfilled one-way into that record.
 
 See [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the permanent, runtime, and liveness planes.
 
@@ -97,7 +97,7 @@ PRDs and xBRIEFs are distinct artifacts that flow through the same pipeline:
 
 1. **PRD drafted** — a human writes a markdown PRD to `drafts/` on `overdeck-state`, or a planning agent authors a workspace-local draft. `pan plan finalize` enforces the PRD's existence (PRD-first gate, PAN-2234) and complete-planning promotes a workspace-authored draft to `drafts/` on `overdeck-state` through the draft write door (`promoteWorkspacePrdDraft()`), never overwriting an existing canonical draft
 2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"` with `plan.metadata.promotionIntent`, and normally calls `complete-planning` to promote it into `specs/` on `overdeck-state`. If the dashboard cannot complete promotion, `pan plan finalize` leaves `.overdeck/pending-promotion.json`; the Deacon retries through the same endpoint on its next eligible patrol and removes the marker after convergence. Explicit `--no-promote` stamps `promotionIntent: "manual"`, so markerless recovery preserves the operator approval gate. The manual fallback is `pan plan done <issue-id>`.
-3. **Work starts** — `pan start` performs one `transitionXBriefOnMain(..., "active", "running")` call that sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition through the state write door before returning. Before first promotion, the fallback updates only the gitignored workspace draft. Work agents read the canonical spec via `findPlan()` and track item progress in workspace `.overdeck/continue.json` `statusOverrides`
+3. **Work starts** — `pan start` performs one `transitionXBriefOnMain(..., "active", "running")` call that sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition through the state write door before returning. Before first promotion, the fallback updates only the gitignored workspace draft. Work agents read the canonical spec via `findPlan()` and track item progress in the project-side record's `statusOverrides` (written via `writeStatusOverrideSync`)
 4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and `writeSpecDocument()` rewrites the same canonical filename through the state write door; matching status overrides continue to apply. Work, task, and inspection surfaces never edit the canonical document directly.
 5. **Work completes** — after merge, `status` is updated to `"completed"` on `overdeck-state`
 
@@ -137,7 +137,7 @@ If `slugify()` receives an empty or all-special-character title, it returns `'pl
 
 ### Workspace Spec (PAN-1124: single-spec-on-main)
 
-There is no workspace-local copy of the spec during work execution. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses. Planning may write a workspace draft; finalization validates that draft, replaces the canonical document through `writeSpecDocument()`, and leaves the draft non-canonical.
+There is no workspace-local copy of the spec during work execution. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the project-side per-issue record's `statusOverrides` flat map (`writeStatusOverrideSync` in `src/lib/pan-dir/record.ts`). `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses. Planning may write a workspace draft; finalization validates that draft, replaces the canonical document through `writeSpecDocument()`, and leaves the draft non-canonical.
 
 ### Concurrency Model
 
@@ -471,7 +471,7 @@ The dashboard exposes the same xBRIEF through three entry points:
 
 `findPlan(workspacePath)` in `src/lib/xbrief/io.ts` resolves the canonical spec on `overdeck-state` first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up), then falls back to the workspace compatibility copy documented in [Migration from vBRIEF](#migration-from-vbrief).
 
-`readWorkspacePlan(workspacePath)` returns a merged view: canonical `overdeck-state` spec + `statusOverrides` from workspace `.overdeck/continue.json`. This is transparent to all callers.
+`readWorkspacePlan(workspacePath)` returns a merged view: canonical `overdeck-state` spec + `statusOverrides` from the project-side per-issue record (`readIssueRecord`). This is transparent to all callers.
 
 `findXBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts` remains the canonical read-only lifecycle lookup for cross-issue queries.
 

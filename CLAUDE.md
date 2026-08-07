@@ -95,15 +95,15 @@ git push origin v0.9.4
 
 **Guards already in place** (if you bypass them, you're working against the system):
 
-- `.husky/pre-push` rejects any `v*` tag whose commit doesn't have matching `package.json` versions and a committed `.release/<tag>.md`.
+- `.husky/pre-push` rejects release-shaped tags (`vX.Y.Z`, `vX.Y.Z-canary.N`) pushed to the overdeck repo whose commit doesn't have matching `package.json` versions and a committed `.release/<tag>.md`. Non-release tags (e.g. `v1-archive`) and non-overdeck remotes are skipped.
 - `.github/workflows/release.yml` re-runs the same check on the runner side; tags missing the artifacts cause the release pipeline to fail loudly before any publish.
-- `.husky/commit-msg` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z`. This catches the failure one step earlier than the push hook.
+- `.husky/commit-msg` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z` or `chore: bump version to X.Y.Z` (merge commits and newly-added package.json files are exempt). This catches the failure one step earlier than the push hook.
 
 **If asked to "release", "tag", "bump version", "publish", or anything similar:** the answer is `pan release stable --version X.Y.Z`. Never a workaround, never a manual tag, never `--no-verify`.
 
 ## Harnesses
 
-Overdeck supports five coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent), and `kimi-code` (Moonshot's own Kimi Code CLI, driven natively — no ACP host, Kimi models only). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. `kimi-code`'s runtime adapter is `src/lib/runtimes/kimi-code.ts`; it coexists with `acp` rather than replacing it — both drive the same `kimi` binary through different surfaces. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only ToS-blocked combination (gate in `src/lib/harness-policy.ts`); the same gate blocks `kimi-code` for any non-Kimi model, since kimi-code runs Kimi models only.
+Overdeck supports five coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent), and `kimi-code` (Moonshot's own Kimi Code CLI, driven natively — no ACP host, Kimi models only). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. `kimi-code`'s runtime adapter is `src/lib/runtimes/kimi-code.ts`; it coexists with `acp` rather than replacing it — both drive the same `kimi` binary through different surfaces. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Ohmypi + Anthropic + subscription auth is the only ToS-blocked combination (gate in `src/lib/harness-policy.ts`, keyed on `ohmypi` — the legacy `pi` name is normalized to `ohmypi` at settings load and is no longer a RuntimeName); the same gate blocks `kimi-code` for any non-Kimi model, since kimi-code runs Kimi models only.
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
@@ -129,7 +129,7 @@ Sub-roles are configuration slots under a role, not standalone pipeline stages. 
 - **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — Overdeck reads `roles/review-<subRole>.md` and inlines the body into each convoy spawn message. Never loaded via Claude's `--agent` flag, never synced into project workspaces.
 - **`work.inspect` / `work.inspect-deep`** — same shape: the inspection prompt is workflow-injected, not auto-discovered.
 
-`.claude/agents/` is **deliberately empty** in this repo. The directory exists in worktrees only as a sync target for the Claude Code harness, but Overdeck ships no ambient subagents there. Two reasons: (1) ambient subagents leak into every Claude Code session and can fire at moments the workflow doesn't intend; (2) ambient subagent definitions can hardcode model assumptions (e.g. `model: haiku`) that break on non-Anthropic-routed agents (CLIProxy → gpt-5.5), since the harness doesn't always thread provider routing through to the subagent call. When a role needs codebase exploration or general-purpose subagent work, it uses Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
+`.claude/agents/` is empty **at the repo root** (gitignored), but it is NOT unused: `pan sync` distributes the 11 ambient subagent definitions from `sync-sources/agents/` into every worktree's `.claude/agents/` (`src/lib/skills-merge.ts`), and Cloister depends on the pipeline agents existing there by name — `claude --agent pan-review-agent` etc. exits immediately without them (`REQUIRED_PIPELINE_AGENTS` in `src/lib/sync.ts`). Beware: three of the shipped definitions (`codebase-explorer`, `triage-agent`, `health-monitor`) hardcode `model: haiku`, which breaks on non-Anthropic-routed agents (CLIProxy → GPT models) because the harness doesn't always thread provider routing through to the subagent call. For ad-hoc codebase exploration prefer Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
 
 `.claude/skills/` is also a workspace sync target, not a source of truth — same gitignore policy (PAN-1090).
 
@@ -141,8 +141,8 @@ Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(i
 
 The `pan` binary's subcommands and Claude Code's `pan-*` skills follow a strict convention:
 
-- **`pan <verb>`** (CLI subcommand) is wrapped by **`/pan-<verb>`** (a skill at `skills/pan-<verb>/SKILL.md`).
-- The `pan-` prefix is also a namespace for workflow / reference / topical skills (`/pan-workflow`, `/pan-code-review`, `/pan-network`) that don't map 1:1 to a single verb.
+- **`pan <verb>`** (CLI subcommand) is wrapped by **`/pan-<verb>`** (a skill at `sync-sources/skills/pan-<verb>/SKILL.md`).
+- The `pan-` prefix is also a namespace for workflow / reference / topical skills (`/pan-code-review`, `/pan-network`) that don't map 1:1 to a single verb.
 - Not every CLI verb gets a wrapper skill — only verbs where the skill adds non-trivial guidance beyond `--help`. The current exclusion list and the criteria are documented in [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md).
 - **When the CLI changes, the wrapper skill changes in the same commit.** `scripts/lint-skills.sh` (wired into `npm run lint`) enforces this by cross-checking every flag and subcommand a wrapper SKILL.md mentions against the actual `pan <verb> --help` output. Drift fails CI.
 
@@ -192,14 +192,14 @@ Operator-curated Flywheel campaigns live as order books on `overdeck-state`. Rea
 - **Dev**: `npm run dev` (tsx watch)
 - **Dashboard**: Must use Node 22 (built dist) — `nohup /home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node dist/dashboard/server.js`
   - **NEVER use `bun run src/dashboard/server/main.ts`** — two reasons:
-    1. **node-pty** (`@homebridge/node-pty-prebuilt-multiarch`) is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits with code 0 immediately, breaking `/ws/terminal` for all workspaces.
+    1. **node-pty** (`@lydell/node-pty`) is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits with code 0 immediately, breaking `/ws/terminal` for all workspaces.
     2. **Circular ESM deps** — the dashboard source has circular imports that Bun tolerates but Node.js strict ESM rejects, so tsx/source-mode also fails under Node.
   - `pan up` handles this automatically — it runs `dist/dashboard/server.js` under Node 22. Run `npm run build` first if the dist is stale.
   - See [docs/OVERDECK_DEV_SOP.md](docs/OVERDECK_DEV_SOP.md) for startup, mode switching, restart guarantees, and failure triage.
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
 - **Package manager**: Bun (bun.lock, `bun install`, `bun add`)
-- **Workspaces**: Bun workspaces — `packages/contracts`, `src/dashboard/server`, `src/dashboard/frontend`
-- **Build configs**: tsdown.config.ts (root for CLI, src/dashboard/server/ for server, packages/contracts/ for contracts, scripts/ for cost script)
+- **Workspaces**: Bun workspaces — `packages/contracts`, `packages/effect-acp`, `packages/moonshine-linux-x64`, `packages/qwen-tts-linux-x64`, `packages/pi-extension`, `packages/ohmypi-extension`, `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`
+- **Build configs**: tsdown.config.ts at the root (CLI), `src/dashboard/server/`, `packages/contracts/`, `packages/pi-extension/`, `packages/ohmypi-extension/`, `apps/desktop/`, and `sync-sources/hooks/` (hook bundle via `build:scripts`)
 
 ## Workspace Setup for Agents
 
@@ -249,7 +249,7 @@ wraps Claude as `node <projectRoot>/dist/pty-supervisor.js claude ...`, exports
 `${OVERDECK_HOME}/agents/<id>/pty-token` before the tmux session starts.
 
 The supervisor is Node 22-only because it owns a real PTY through
-`@homebridge/node-pty-prebuilt-multiarch`; do not run it under Bun. It binds
+`@lydell/node-pty`; do not run it under Bun. It binds
 `${OVERDECK_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
 HTTP-on-unix POSTs, writes each delivered message into Claude's PTY input, and
 echoes the message into the tmux transcript so operators can see what was sent.
@@ -260,7 +260,8 @@ characters, returns HTTP 400 above that limit, and can therefore purge every
 character it accepted before retrying without stacking duplicate composer text.
 
 `deliverAgentMessage(agentId, message, caller?)` is the single delivery
-primitive. In automatic mode it tries, in order:
+primitive. In automatic mode it tries, in order (two earlier tiers — codex app-server
+and ACP sockets — precede these but are no-ops for Claude Code agents):
 
 1. PTY supervisor socket (`path: "supervisor"`)
 2. legacy Claude Code Channels MCP socket for already-wired sessions
@@ -347,9 +348,9 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `src/dashboard/server/server.ts` — Effect HTTP server, route composition, layers
 - `src/dashboard/server/ws-rpc.ts` — Effect RPC over WebSocket at `/ws/rpc`
 - `src/dashboard/server/ws-terminal.ts` — raw WebSocket terminal at `/ws/terminal`
-- `src/dashboard/server/routes/*.ts` — 12 route modules (issues, agents, workspaces, etc.)
-- `src/dashboard/server/services/*.ts` — domain services (event store, read model, cache, enrichment, etc.)
-- `src/dashboard/server/read-model.ts` — in-memory read model, bootstrapped from lib modules
+- `src/dashboard/server/routes/` — ~60 route modules plus domain subdirs (agents/, misc/, resources/, specialists/, workspaces/)
+- `src/dashboard/server/services/*.ts` — domain services (cache, agent enrichment, TTS runtime/playback, etc.)
+- `src/dashboard/server/event-store.ts`, `read-model.ts` — event store and in-memory read model, at the server root
 
 **Two WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
@@ -368,14 +369,15 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   is fatal. Close code `4503` means the dashboard is gracefully restarting, so the UI
   shows calm "Dashboard restarting" copy and uses the same patient reconnect policy;
   `handleShutdownSignal` broadcasts `4503` before server teardown.
-- PTY waits for tmux session to exist (`waitForTmuxSession`) before spawning
-- Data flows immediately on attach — no stale data suppression
-- Dimension toggle at 200ms forces correct-size repaint
+- PTY waits for the tmux session to exist (`sessionExists` + respawn-pending waits) before spawning
+- Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
+  the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
+  unready clients are closed with `terminal-ready-timeout`
 
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
-- `WsTransport.ts` — Effect-based RPC client with auto-reconnection
+- `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
@@ -402,7 +404,7 @@ When a callee returns an Effect, yield it directly; reserve `Effect.promise` and
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
 before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
-agent's tmux session and the completion marker is NOT processed (allowing retry).
+agent's tmux session and the issue does not advance, so the agent can fix and retry.
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
 ## Verdict feedback routing
@@ -415,7 +417,7 @@ The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`.
 
 ## Review Convergence Gate (PAN-3151)
 
-When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. Distinguish from the prompt-level convergence gate (`roles/review.md:62`), which governs single-reviewer filtering within one cycle.
+When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. Distinguish from the prompt-level convergence gate (`roles/review.md` — "Convergence gate (cycle ≥ 3)", currently around line 148), which governs single-reviewer filtering within one cycle.
 
 ## Agent Auto-Resume Gates
 
@@ -473,7 +475,7 @@ These gates are orthogonal to the global Deacon freeze in SQLite
 
 Agent and pipeline state is split into three planes. Do not read or write the wrong one.
 
-1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/<recordsPath>/<issue>.json` containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
+1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/records/<issue>.json` (the `records` subdir is a fixed literal; `pan_records.path` configures the `.pan` base dir) containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
 2. **Runtime plane — local SQLite `~/.overdeck/overdeck.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
 3. **Liveness oracle — tmux on socket `-L overdeck`.** Ground truth for whether an agent process is actually running.
 
@@ -505,7 +507,8 @@ and one row per git worktree Overdeck knows about (`kind`: `main` — exactly
 one per project — `issue`, or `scratch`). Reads go through
 `src/lib/workspaces/resolver.ts`, writes through
 `src/lib/workspaces/writer.ts` — no other module may touch these tables
-directly (`scripts/guard-workspace-doors.sh` enforces this in `npm run lint`).
+directly, except `src/lib/overdeck/infra.ts` which owns their DDL
+(`scripts/guard-workspace-doors.sh` enforces this in `npm run lint`).
 `pan admin db rebuild-workspaces` reconstructs them from `projects.yaml`, a
 worktree scan, and memory-home identity records, the same disposable-cache
 pattern `rebuild-agents` uses for the `agents` table; it also **archives, never
@@ -547,8 +550,8 @@ in-flight operation / diverged / no-upstream / detached — `kind=issue` is
 refused with 409 and keeps using `sync-main`), `PUT /:id/run-command` and
 `POST /:id/run` (per-workspace `run_command` column — never `layout_config`,
 which the panels library rewrites — defaulting to the project's first
-`services[].start_command`, spawned as one `ws-run-<id>` tmux session per
-workspace), and `POST /:id/open` (file manager always; editor only when
+`services[].start_command`, spawned as one `ws-run-<sha256-prefix>` tmux session per
+workspace — the suffix is a 16-hex hash of the workspace id, not the id itself), and `POST /:id/open` (file manager always; editor only when
 `ui.open_in_editor_command` is set in `~/.overdeck/config.yaml`). Git logic
 lives in `src/lib/workspaces/git-state.ts`. The detail and git reads are
 `rejectUnauthorizedDashboardRequest`-guarded — the first returns executable
@@ -583,11 +586,13 @@ local-files-only standing briefing, once per session id.
 Issue IDs are resolved to projects via `resolveProjectFromIssue()` in `src/lib/projects.ts`
 and `parseGitHubRepos()` in `src/lib/tracker-utils.ts`. Resolution order:
 
-1. Match `linear_team` field in `projects.yaml` (e.g., `linear_team: MIN` matches `MIN-123`)
-2. For GitHub-only projects without `linear_team`, derive prefix from the project key
+1. Match the `issue_prefix` field (or any entry in the `issue_prefixes` array) in
+   `projects.yaml` (e.g., `issue_prefix: MIN` matches `MIN-123`). `issue_prefix` was
+   renamed from the legacy `linear_team`, which is no longer read.
+2. For projects with neither field, derive the prefix from the project key
    (e.g., project key `krux` → prefix `KRUX` matches `KRUX-3`)
 
-When adding a new project to `projects.yaml`, either set `linear_team` explicitly or
+When adding a new project to `projects.yaml`, either set `issue_prefix` explicitly or
 ensure the project key (uppercased, hyphens removed) matches the issue prefix you want.
 
 ## Task Enforcement
@@ -600,23 +605,24 @@ Completion and verification are also gated by the xBRIEF checklist. `runVerifica
 `src/lib/cloister/verification-runner.ts` calls `checkIncompletePlanItemsPromise()` and reports
 `failedCheck: 'incomplete-plan-items'` while any item or sub-item is not terminal. Agents update that
 checklist through `pan task`; there is no separate tracker to reconcile at merge or close-out.
-## postMergeLifecycle Idempotency (enforced by a test, not by this note)
+## Post-merge lifecycle Idempotency (enforced by a test, not by this note)
 
-`postMergeLifecycle` must run **at most once per merge**. If it can re-trigger
-itself, you get an infinite loop — that once burned 24,626 tracker API calls
-(PAN-328). The original loop was:
-specialists/done → onMergeComplete → postMergeLifecycle → (re-trigger) → specialists/done.
+The post-merge lifecycle must run **at most once per merge**. ("postMergeLifecycle" survives
+only as a legacy label — `src/core/state-mapping.ts` — the merge agent owns the behavior.)
+If it can re-trigger itself, you get an infinite loop — that once burned 24,626 tracker API
+calls (PAN-328). The original loop was:
+specialists/done → onMergeComplete → post-merge lifecycle → (re-trigger) → specialists/done.
 
 This protection is now **structural, not advisory** — you don't have to remember
 a rule:
 
 - The concurrency guard is `createInFlightGuard()` in
   `src/lib/cloister/in-flight-guard.ts`, used by `firePostMergeLifecycle` in
-  `src/dashboard/server/routes/specialists.ts`. A second *concurrent* call for
-  the same issue is a no-op.
+  `src/dashboard/server/routes/specialists/shared.ts` (re-exported from
+  `specialists.ts`). A second *concurrent* call for the same issue is a no-op.
 - It is locked by `tests/unit/lib/cloister/in-flight-guard.test.ts`. **Weaken or
   delete the guard and that suite goes red** — that is the real protection.
-- `postMergeLifecycle` also checks `mergeStatus` / `_completedPostMerge`
+- The lifecycle also checks `mergeStatus` / `_completedPostMerge`
   (defense-in-depth).
 
 So the rule is just: if you touch the merge-completion path, keep that test
@@ -624,13 +630,16 @@ green. A red guard test means you've reopened the loop. Adding new work to the
 post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
 idempotent and the test stays green.
 
-A merge to `main` can make another open branch stale, but no background sibling
-scan acts on it. Reconcile an affected workspace explicitly with `pan sync-main <id>`
-before it proceeds through review or merge.
+A merge to `main` can make another open branch stale. When the merge-train flag
+(`flywheel.merge_train_enabled`, default off) is ON, `runMergeTrainReconcile()` runs
+inside the post-merge guard and rebases/re-verifies ready siblings (PAN-1691); with the
+flag off, nothing acts on stale siblings automatically — reconcile an affected workspace
+explicitly with `pan sync-main <id>` before it proceeds through review or merge.
 
-## postMergeLifecycle Verify Handoff and Docker Cleanup
+## Post-merge Verify Handoff and Docker Cleanup
 
-`postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
+The merge agent's post-merge handoff (`src/lib/cloister/merge-agent.ts`; the old
+`postMergeLifecycle()` function no longer exists) is non-destructive. After
 merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
 pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and removes
 the workspace Docker containers and `overdeck-feature-<issue>_devnet` network.
@@ -667,7 +676,7 @@ config, closes the tracker issue, and clears review status.
 
 ## CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation
 
-The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace: true` is **irreversible** and destroys:
+The deep-wipe endpoint (`POST /api/issues/:id/deep-wipe`) with `deleteWorkspace: true` is **irreversible** and destroys:
 
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
@@ -709,7 +718,7 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/XBRIEF.md`). Key references:
 
-- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from xBRIEF at v0.7.0; spec now v0.8)
+- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
 - **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
 - **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
 - **Overdeck docs:** [docs/XBRIEF.md](docs/XBRIEF.md) — full schema, lifecycle, and migration notes
@@ -722,10 +731,10 @@ There are four artifacts. They are distinct — do not conflate them.
 | --- | --- | --- | --- |
 | **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`); planning agents author it workspace-side at `.pan/drafts/<ISSUE>.md` and complete-planning promotes it to `overdeck-state` | Human or planning agent | Free-form narrative, human-mutable |
 | **xBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
-| **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
-| **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
+| **Project-side continue state / per-issue record** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback, and the `statusOverrides` map tracking item/subItem completion — one canonical file per issue, never moves |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state; legacy `statusOverrides` are read once as a one-way backfill into the project-side record (from the `.pan/continue.json` path) |
 
-**The PAN-1124 invariant — the canonical spec is immutable after planning.** `findPlan()` resolves the canonical spec on `overdeck-state` via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
+**The PAN-1124 invariant — the canonical spec is immutable after planning.** `findPlan()` resolves the canonical spec on `overdeck-state` via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` from the project-side per-issue record (`readIssueRecord()`). `updateItemStatus()` and `updateSubItemStatus()` (in `src/lib/xbrief/io.ts`) write ONLY to that record's `statusOverrides` map via `writeStatusOverrideSync()` — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
 
 **Gitignore policy.** `.overdeck/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.overdeck/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`specs/`, `continues/`, `drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
 
@@ -734,16 +743,19 @@ There are four artifacts. They are distinct — do not conflate them.
 `plan.status` advances through one canonical file via state-door commits on `overdeck-state`. Files do not move between directories.
 
 ```
-draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► approved ──► active/running ──► completed
-                                       │                                          │
-                                       └──────────► cancelled ◄───────────────────┘
+draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► active/running ──► completed
+                                       │                              │
+                                       └──────────► cancelled ◄───────┘
 ```
+
+(`PanSpecStatus` is `proposed | active | completed | cancelled`; an incoming legacy
+`approved` is mapped down to `proposed` on read.)
 
 | Transition | Trigger | What changes |
 | --- | --- | --- |
 | (new) → draft | `pan plan` starts | Markdown PRD written to `drafts/<issue>.md` |
 | draft → proposed | Planning completes | xBRIEF created in `specs/...` with `plan.status: "proposed"` |
-| proposed → approved/running | `pan start` | Status field flipped on `overdeck-state`; work agent reads spec from main via `findPlan()` |
+| proposed → active/running | `pan start` | Status field flipped on `overdeck-state` (`transitionXBriefOnMain(..., 'active', 'running')`); work agent reads spec from main via `findPlan()` |
 | running → completed | PR merges | Status field flipped to `"completed"` on main |
 | any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
 
@@ -752,25 +764,25 @@ draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► approv
 PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
 
 - `.planning/plan.vbrief.json` — **DELETED.** PAN-967 replaced it with `.pan/spec.vbrief.json`; PAN-1124 later retired new workspace copies. PAN-2541 uses `.overdeck/spec.vbrief.json` only as the renamed workspace-runtime compatibility path. The current canonical spec is `specs/<file>` on `overdeck-state`.
-- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
+- `docs/prds/planned/` — no longer a Overdeck convention for *planning*: canonical PRD drafts live in `drafts/` on `overdeck-state`. But `docs/prds/active|completed/` IS still an active archival surface: lifecycle resets copy the workspace PRD to `docs/prds/active/<issue>` (`src/lib/lifecycle/workflows.ts`), and close-out moves it `active/` → `completed/` (`src/lib/close-out.ts`, paths in `src/lib/prd-locations.ts`).
 - `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyXBriefByIssue` for backward compatibility during migration; pipeline writes target `specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
 If you see an agent referencing `.planning/`, `docs/prds/planned/*.xbrief.json`, or planning a "copy PRD xBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/XBRIEF.md`.
 
 ### Auto-Behaviors
 
-- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to workspace continue.json `statusOverrides` map — they do NOT mutate the spec.
-- `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` overlay from workspace continue.json.
+- `src/lib/xbrief/io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to the project-side per-issue record's `statusOverrides` map (`writeStatusOverrideSync`) — they do NOT mutate the spec.
+- `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` overlay from the project-side record.
 - `complete-planning` writes the xBRIEF to `specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
-- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the xBRIEF in its running/active state.
+- The merge agent's post-merge handoff marks merged work as `verifying_on_main` and preserves the xBRIEF in its running/active state.
 - `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification, and runs verified Docker stack + `_devnet` network teardown (with the closed-issue reaper as a backstop).
 - `findPlan(workspacePath)` resolves `specs/<file>` on `overdeck-state` via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.overdeck/spec.vbrief.json` for migration compatibility.
 
 ### Dashboard Viewer
 
 XBriefViewer components at `src/dashboard/frontend/src/components/xbrief/`:
-- Kanban issue-card and InspectorPanel xBRIEF buttons open `XBriefDialog`.
+- The kanban issue-card xBRIEF button opens `XBriefDialog` (its only importer is `KanbanBoard.tsx`; the old InspectorPanel is gone).
 - The project-tree xBRIEF chip and the drawer/cockpit expand controls open the globally mounted `XBriefFullscreen` List / DAG / Raw viewer.
 - The issue-row tasks chip opens the xBRIEF-backed `TasksPanel`; the PRD chip opens the canonical draft through `PrdViewer` and `ChatMarkdown`.
 - Plan viewers fetch from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat).

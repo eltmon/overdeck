@@ -117,7 +117,7 @@ command: sh -c "bun run dev"   # bun run main.ts
 
 Two hard blockers for running the dashboard server under Bun in containers:
 
-1. **`@homebridge/node-pty-prebuilt-multiarch` native addon** — Bun's addon
+1. **`@lydell/node-pty` native addon** — Bun's addon
    compatibility layer causes the PTY to spawn but exit immediately with code 0,
    breaking `/ws/terminal` for all agent terminal panels.
 
