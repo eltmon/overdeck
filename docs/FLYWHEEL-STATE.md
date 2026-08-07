@@ -1474,3 +1474,24 @@ That puts three strikes in flight (3593, 3594, 3596) against a `minAgents` targe
 **Struck PAN-3584** — the Flywheel doctrine drift. It is the last of my findings that costs real time rather than only clarity: its strike-ownership contradiction is what stranded PAN-3559 and PAN-3562 in `post_merge_limbo` for 34 hours, and its dead `assemble-uat` endpoint wastes a call every tick an orchestrator follows the brief literally. Four strikes now in flight (3584, 3594, 3596, and 3593 finishing post-merge).
 
 **Carry this: a doctrine bug is a substrate bug.** I nearly left PAN-3584 as documentation housekeeping behind the "real" code fixes for six ticks. But the pipeline executes its prompts as literally as it executes its code — two agents told opposite things about who lands a strike produced exactly the same class of stranded state a null pointer would, and cost more hours than any single code defect this run. The instruction set deserves the same file:line rigour and the same strike priority as the source.
+
+### RUN-82 tick 16 — 2026-08-07T00:55Z — the deploy patrol fired on its own; PAN-3593 closed out but its fix is incomplete
+
+**The deploy gate kept its promise.** Last tick it refused me with "the deploy patrol retries automatically" — and it did: the live build is now `f23563f3ad9d`, matching main, with no action from me. Waiting was not merely correct, it was self-resolving. Two deferrals this run, two vindications.
+
+**PAN-3593 closed out clean** — row 6 on real CI evidence (`required checks concluded successfully on f23563f3ad9d…: test, lint, build (22), guard`). **Seventh substrate fix landed, deployed and closed out this run.**
+
+**Then I tested the fix, and it does not do what the issue asked.**
+
+```
+$ pan strike PAN-3586
+✖ Strike PAN-3586 failed: Agent strike-pan-3586 already running. Use 'pan tell' to message it.
+```
+
+`strike-pan-3586` self-aborted at 20:00:59Z and has sat at its prompt since — the exact specimen from PAN-3593's manifestation 2 — and the behaviour is unchanged after the deploy. Manifestation 1 may well be fixed; I have no live specimen left to test it against. Manifestation 2 verifiably is not. Filed as PAN-3599.
+
+**Carry this, and it is the sharpest lesson of the run: a green DoD gate says the change was delivered, not that the reported behaviour changed.** PAN-3593 passed all eight rows — review, tests, verification, merge, post-merge, main-verify on genuine CI, deploy — because the fix compiles, tests and lands correctly. Every mechanical gate the pipeline owns said yes. The only thing that caught the gap was re-running the failing command after the deploy, which takes ten seconds and which nothing in the pipeline requires. **The pipeline verifies delivery; only a reproduction verifies repair.**
+
+That principle generalises past this issue. Six of the seven fixes closed out this run were verified by observing the original symptom afterwards — the rate-limit errors ceasing, `parked` going 0 → 8, row 6 flipping MISS to PASS, PAN-3512 restarting under `--fresh`. PAN-3593 is the one where I nearly skipped that step because the close-out looked so clean, and it is the one that was wrong.
+
+**Four strikes still in flight** (PAN-3584, PAN-3594, PAN-3596) with PAN-3593 now terminal. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
