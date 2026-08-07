@@ -1784,3 +1784,18 @@ That is the third correction of this kind tonight, and they rhyme: at tick 2 I g
 **Eleventh substrate fix landed and deployed this run**; close-out follows when CI concludes.
 
 PAN-3596 remains the one genuine loss. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 34 — 2026-08-07T06:35Z — PAN-3607 closed out; struck the two recovery-path defects that cost the most tonight
+
+**PAN-3607 closed out** on real evidence — `required checks concluded successfully on 32b14223b3…: test, lint, build (22), guard`. **Eleventh substrate fix landed, deployed and closed out this run.**
+
+**Re-saturated the idle fleet with the two findings that cost me most directly:**
+
+- **PAN-3604** — `pan recover` reporting success while doing nothing. I hit this three times tonight and believed it three times; it is the one defect that actively made my reports wrong rather than merely slowing me down.
+- **PAN-3599** — the re-dispatch refusal for an idle-but-alive agent. It stranded PAN-3586 into planning, and at tick 32 it left a conflicted PR looking actorless.
+
+Chose these over PAN-3587, PAN-3591 and PAN-3609 deliberately. All five are real, but these two are the ones a future orchestrator will trip on in the same way I did, and both are recovery-path defects — the class where a wrong answer compounds, because the thing you reach for when something is already broken is exactly the thing you cannot afford to be lying.
+
+**One honest caveat on doing this at all:** PAN-3609's working hypothesis is that the pre-push hook is what kills strike agents. If that holds, striking two more agents is likely to produce two more stranded commits. I went ahead because the salvage path is now well-rehearsed — check the branch, push, record readiness — and a stranded commit is a recoverable outcome rather than a lost one. Worth stating so the next tick reads a stall as expected rather than surprising.
+
+Remaining filed and unstruck: PAN-3587 (dead-in-tmux liveness), PAN-3591 (stack gate deadlock), PAN-3609 (commit-to-push deaths). PAN-3596 remains the one genuine loss of the run. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
