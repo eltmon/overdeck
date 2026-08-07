@@ -1687,3 +1687,22 @@ Main is green and has moved to `b2f2417401` (operator-side, PAN-3605). PAN-3596 
 **Also worth recording: the salvage was vindicated by the failure, not undermined by it.** At tick 25 I argued that pushing a dead agent's finished commit was safe because "if the work is wrong it fails at CI, not on main". The PR did fail — and the failure correctly turned out to be about `main`, not the commit. The gate did its job in exactly the way the argument predicted; the only cost was one landing attempt.
 
 PAN-3594 stays queued behind red main, its readiness recorded at `c94b3d6746`. PAN-3596 still stranded with no work and no dispatch door. PAN-3512 still awaiting the operator's UAT ship; PAN-3580 and PAN-3586 still awaiting release.
+
+### RUN-82 tick 28 — 2026-08-07T04:45Z — PAN-3594 landed, but its squash merge carried a file outside its diff
+
+**PAN-3594 landed** as `c93b2f33b3 PAN-3594 (#3606)`, merged 04:37:37Z by `app/overdeck-agent` — the Deacon's landing door, on its retry after the readiness re-record. Main's CI is in progress.
+
+**Unexpected finding: the squash merge changed `tests/unit/scripts/lint-frontend-types.test.ts`** — the file at the centre of the PAN-3607 red main. It is the only commit since `b2f2417401`, and it is the only thing that has touched that file:
+
+```
+$ git log --oneline b2f2417401..origin/main -- tests/unit/scripts/lint-frontend-types.test.ts
+c93b2f33b3 PAN-3594 (#3606)
+```
+
+That file is **not** in PAN-3594's original commit, whose diff covers `doctor-state-worktree.ts`, `state-home.ts`, `state-recreation-patrol.ts`, `deacon.ts` and two of their test files. So the strike branch acquired the change somewhere between my push of `c4914117c8` and the squash of `c93b2f33b3` — most plausibly during the landing door's rebase, which is also where the self-invalidating stale signal came from at tick 26. Whether that constitutes the red-main fix arriving by an unintended path, or unrelated content riding along, the in-progress CI will settle.
+
+**Two things follow, and I am flagging rather than acting on either.** PAN-3607's strike may now be redundant or actively conflicting — it is fixing a file that something else has already modified on main, which is how two fixes collide. And a squash merge that silently widens beyond its branch's stated diff is worth understanding on its own terms: the whole reason I could confidently attribute PR #3606's CI failure to the base rather than the branch at tick 27 was that the diffs did not overlap. That attribution was correct at the time, but the premise it rested on stopped holding somewhere in the landing path.
+
+**Carry this: "the branch does not touch that file" is a claim about the branch as I last read it, not about what will be merged.** A rebase, a merge, or a squash can all change the answer between the moment I check and the moment the pipeline acts.
+
+PAN-3596 still stranded. PAN-3512 still awaiting the UAT ship; PAN-3580 and PAN-3586 still awaiting release.
