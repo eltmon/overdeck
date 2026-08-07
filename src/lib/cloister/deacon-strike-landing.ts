@@ -61,7 +61,7 @@ export interface StrikeLandingDeps {
   resolveProject: typeof resolveProjectFromIssueSync;
   mergeIssue: StrikeMergeTrigger;
   getMainHead: (projectPath: string) => Promise<string>;
-  deliverRecovery: (agentId: string, message: string) => Promise<MessageDeliveryOutcome>;
+  deliverRecovery: (agentId: string, message: string, dedupKey: string) => Promise<MessageDeliveryOutcome>;
   writeFeedback: (issueId: string, workspacePath: string, markdownBody: string) => Promise<boolean>;
   needsYou: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   now: () => string;
@@ -98,7 +98,10 @@ function defaultDeps(): StrikeLandingDeps {
     resolveProject: resolveProjectFromIssueSync,
     mergeIssue: requestStrikeMerge,
     getMainHead: async (projectPath) => (await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: projectPath, encoding: 'utf8' })).stdout.trim(),
-    deliverRecovery: (agentId, message) => messageAgent(agentId, message, 'deacon-strike-landing', { owesRework: true }),
+    // A recovery must arrive through the live delivery door. A keyed message
+    // bypasses the monitor mail tier, which only becomes visible if the idle
+    // session takes another turn, and makes a repeated patrol safe to retry.
+    deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, 'deacon-strike-landing', { owesRework: true, dedupKey }),
     writeFeedback: async (issueId, workspacePath, markdownBody) => (await Effect.runPromise(writeFeedbackFile({ issueId, workspacePath, specialist: 'merge-agent', outcome: 'needs-you', summary: 'Strike landing needs operator attention', markdownBody }))).success,
     needsYou: surfaceIssueFeedbackNeedsYou,
     now: () => new Date().toISOString(),
@@ -124,7 +127,11 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
   const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nRun pan sync-main ${issueId}, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
   if (!NON_ACTIONABLE.test(detail) && recoveryCount < 3) {
     try {
-      const outcome = await deps.deliverRecovery(`strike-${issueId.toLowerCase()}`, recoveryMessage);
+      const outcome = await deps.deliverRecovery(
+        `strike-${issueId.toLowerCase()}`,
+        recoveryMessage,
+        `strike-landing:${issueId}:${head}:${recoveryCount}`,
+      );
       if (outcome.delivered) {
         deps.setStatus(issueId, { strikeLandingState: 'recovering', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
         return `[strike-landing] ${issueId} at ${head} recovering (${recoveryCount}/3)`;

@@ -235,7 +235,11 @@ describe('patrolStrikeLandings', () => {
     await d.flush();
     expect(d.state).toMatchObject({ strikeLandingState: 'recovering', strikeRecoveryCount: 1 });
     expect(d.state.strikeLandingAttempts).toEqual([{ timestamp: '2026-07-16T00:00:00.000Z', strikeHead: head, mainHead: 'main-head', outcome: 'failed', detail: 'Rebase conflicts in src/a.ts' }]);
-    expect(d.deliverRecovery).toHaveBeenCalledWith('strike-pan-2702', expect.stringContaining('push only strike/pan-2702'));
+    expect(d.deliverRecovery).toHaveBeenCalledWith(
+      'strike-pan-2702',
+      expect.stringContaining('push only strike/pan-2702'),
+      `strike-landing:PAN-2702:${head}:1`,
+    );
     const recoveryMessage = vi.mocked(d.deliverRecovery).mock.calls[0]?.[1] ?? '';
     expect(recoveryMessage).toContain('pan sync-main PAN-2702');
     expect(recoveryMessage).not.toContain('rebase strike/pan-2702');
