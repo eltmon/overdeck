@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-07T10:07:25.197Z",
+  "updated": "2026-08-07T10:07:28.159Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -76,7 +76,7 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
+    "sequence": 7,
     "claims": {},
     "claimHistory": [
       {
@@ -115,8 +115,9 @@
     ],
     "statusReasons": {
       "route-and-page-shell": {
-        "reason": "Required dependency D-9 is unmet: PAN-3410 is open/planned and its display-xl, Geist, chip, soft-card, and page-layout primitives are absent from origin/main. The task explicitly forbids improvising styles.",
-        "updatedAt": "2026-08-01T16:03:28.032Z"
+        "reason": "Recovering invalid task ordering: page shell has no implementation or feedback artifact, but downstream target-row-controls was assigned despite the blocking edge.",
+        "updatedAt": "2026-08-07T10:07:28.158Z",
+        "forced": true
       },
       "resolve-intent-hook": {
         "reason": "Extracted a reusable workspace creation hook with form state, 300ms debounced resolve, stale gating, field findings, isolated target omission, and create submission; added five fake-timer tests and frontend typecheck coverage.",
@@ -129,7 +130,7 @@
     }
   },
   "statusOverrides": {
-    "route-and-page-shell": "blocked",
+    "route-and-page-shell": "pending",
     "resolve-intent-hook": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac1": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac2": "completed",
