@@ -3,17 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-07T06:35:52.618Z",
-  "updated": "2026-08-07T07:05:06.807Z",
+  "updated": "2026-08-07T07:06:13.624Z",
   "pipeline": {
     "issueId": "PAN-3604",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T07:05:06.795Z",
+    "updatedAt": "2026-08-07T07:06:13.581Z",
+    "lastVerifiedCommit": "19bd449b7943222b3eb201eb816d1d7f2f3b3a03",
     "strikeReadyHead": "19bd449b7943222b3eb201eb816d1d7f2f3b3a03",
     "strikeReadyAt": "2026-08-07T06:54:45.987Z",
     "strikeLandingState": "landing",
@@ -35,24 +36,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-terra": {
-            "input": 616156,
-            "output": 31498,
-            "cacheRead": 21364224,
+            "input": 742094,
+            "output": 33744,
+            "cacheRead": 23269888,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 616156,
-          "output": 31498,
-          "cacheRead": 21364224,
+          "input": 742094,
+          "output": 33744,
+          "cacheRead": 23269888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.353954,
-        "pricingAsOf": "2026-08-07T07:05:06.799Z"
+        "usd": 8.178908,
+        "pricingAsOf": "2026-08-07T07:06:13.609Z"
       }
     },
     "merges": [],
