@@ -3,20 +3,30 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T14:49:16.613Z",
-  "updated": "2026-08-07T08:17:53.606Z",
+  "updated": "2026-08-07T08:18:07.844Z",
   "pipeline": {
     "issueId": "PAN-2927",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "failed",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:17:16.660Z",
-    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-2927 after its harness exited before push.",
+    "updatedAt": "2026-08-07T08:17:19.059Z",
+    "mergeNotes": "PR #2928 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator",
     "strikeReadyHead": "ffc492b1c41581c308a8269378d5966a7053740a",
     "strikeReadyAt": "2026-08-07T08:16:50.328Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-07T08:17:19.057Z",
+        "strikeHead": "ffc492b1c41581c308a8269378d5966a7053740a",
+        "mainHead": "3ecd3b8da87061ce1800d1998f31eca7869a9bbe",
+        "outcome": "failed",
+        "detail": "PR #2928 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.; recovery not delivered: agent was stopped by the operator"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -40,7 +50,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.468958,
-        "pricingAsOf": "2026-08-07T08:17:16.669Z"
+        "pricingAsOf": "2026-08-07T08:17:55.859Z"
       }
     },
     "merges": [],
