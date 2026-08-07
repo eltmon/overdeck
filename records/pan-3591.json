@@ -23,17 +23,18 @@
     }
   ],
   "created": "2026-08-07T09:06:28.648Z",
-  "updated": "2026-08-07T14:15:30.877Z",
+  "updated": "2026-08-07T14:16:13.941Z",
   "pipeline": {
     "issueId": "PAN-3591",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T14:11:32.040Z",
+    "updatedAt": "2026-08-07T14:15:30.865Z",
+    "verificationNotes": "Verification FAILED at test (358871ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3591-strike\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3591-strike/src/dashboard/frontend\u001b[39m\n\nNo test files found, exiting with code 0\n\n\u001b[90mstdout\u001b[2m | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts\u001b[2m > \u001b[22m\u001b[2morphan proposed spec reconciler\u001b[2m > \u001b[22m\u001b[2mexcludes in-review issues with stopped work agents before spawning\n\u001b[22m\u001b[39m[orphan-proposed-reconciler] candidate-excluded { issueId: \u001b[32m'PAN-3401'\u001b[39m, reason: \u001b[32m'review-pipeline-presence'\u001b[39m }\n\n\u001b[90mstdout\u001b[2m | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts\u001b[2m > \u001b[22m\u001b[2morphan proposed spec reconciler\u001b[2m > \u001b[22m\u001b[2mexcludes in-review issues with stopped work agents before spawning\n\u001b[22m\u001b[39m[orphan-proposed-reconciler] candidate-excluded { issueId: \u001b[32m'PAN-3401'\u001b[39m, reason: \u001b[32m'review-pipeline-presence'\u001b[39m }\n\n\u001b[90mstdout\u001b[2m | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts\u001b[2m > \u001b[22m\u001b[2morphan proposed spec reconciler\u001b[2m > \u001b[22m\u001b[2muses the default review status reader and keeps review-status exclusions out of the activity feed\n\u001b[22m\u001b[39m[orphan-proposed-reconciler] candidate-excluded { issueId: \u001b[32m'PAN-3403'\u001b[39m, reason: \u001b[32m'review-pipeline-presence'\u001b[39m }\n\n\u001b[90mstdout\u001b[2m | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts\u001b[2m > \u001b[22m\u001b[2morphan proposed spec reconciler\u001b[2m > \u001b[22m\u001b[2mreactive handling re-resolves a migrated project spec from the state worktree\n\u001b[22m\u001b[39m[orphan-proposed-reconciler] spawn-skipped { issueId: \u001b[32m'PAN-3405'\u001b[39m, reason: \u001b[32m'pickup-gate:not-released'\u001b[39m }\n\n\u001b[90mstdout\u001b[2m | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts\u001b[2m > \u001b[22m\u001b[2morphan proposed spec reconciler\u001b[2m > \u001b[22m\u001b[2mpersists an unchanged pickup refusal only once across patrols\n\u001b[22m\u001b[39m[orphan-proposed-reconciler] spa\n…(435337 chars elided)…\nm\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/resolve-spawn-model.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/planning/__tests__/spawn-planning-session-harness.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-review-status-completed.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/services/agent-state-service.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/compliance.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \n...(truncated)",
     "strikeReadyHead": "baede7fcb0660605eeceee3c11d6b1e04782668e",
     "strikeReadyAt": "2026-08-07T14:11:24.294Z",
     "strikeLandingState": "landing",
@@ -70,7 +71,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.954167,
-        "pricingAsOf": "2026-08-07T14:11:42.448Z"
+        "pricingAsOf": "2026-08-07T14:16:03.692Z"
       }
     },
     "merges": [],
