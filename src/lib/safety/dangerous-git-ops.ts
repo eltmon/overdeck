@@ -3,8 +3,8 @@
  *
  * Every code path that wants to run `git clean`, `git checkout -- .`, or any
  * other op that can wipe untracked agent artifacts MUST go through this module.
- * Direct `execAsync('git clean ...')` calls are forbidden — see the lint rule
- * in `.claude/rules/no-direct-git-clean.md`.
+ * Direct `execAsync('git clean ...')` calls are forbidden — this module is the
+ * only sanctioned door.
  *
  * Design (per CLAUDE.md "no bandaids", confirmed in the original audit that
  * found `.devcontainer/` was being silently destroyed by an automatic
