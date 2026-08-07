@@ -34,7 +34,7 @@ pickup via `isAutoPickable` in `src/lib/backlog/pickup.ts`. This registry gives 
 - **TENET-3 — No-loss audit on any surface refactor.** Additive/superset, never silent
   replacement; enumerate the old surface and prove every command/route/status/view/affordance has
   a home; the audit gate blocks until each old item is accounted for. Source:
-  `.claude/rules/` refactor-no-loss rule.
+  `sync-sources/rules/` refactor-no-loss rule.
 
 - **TENET-4 — Blanket-release auto-pickup model.** `auto_pickup_backlog` ON = a blanket release
   satisfying the per-issue `released` gate for the whole backlog; the single predicate

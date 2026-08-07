@@ -117,7 +117,7 @@
 | Document | Description |
 |----------|-------------|
 | [CLAUDE.md](../CLAUDE.md) | Agent instructions (commit rules, messaging API, completion requirements) |
-| [.claude/rules/dashboard-node22-only.md](../.claude/rules/dashboard-node22-only.md) | Why dashboard must run under Node 22 (not Bun): node-pty PTY exits, circular ESM deps |
+| [sync-sources/rules/dashboard-node22-only.md](../sync-sources/rules/dashboard-node22-only.md) | Why dashboard must run under Node 22 (not Bun): node-pty PTY exits, circular ESM deps |
 
 ---
 
@@ -226,7 +226,7 @@
 - **"build"** / **"tsdown"** / **"rolldown"** / **"vite"** → BUILD.md
 - **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
 - **"dist"** / **"production build"** → BUILD.md
-- **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `.claude/rules/dashboard-node22-only.md`, CLAUDE.md
+- **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `sync-sources/rules/dashboard-node22-only.md`, CLAUDE.md
 - **"electron"** / **"desktop"** / **"AppImage"** / **"DMG"** / **"electron-builder"** → DESKTOP-APP.md, BUILD.md
 - **"tray"** / **"system tray"** / **"notification"** / **"auto-start"** / **"nag"** → DESKTOP-APP.md
 - **"command palette"** / **"Cmd+K"** / **"Ctrl+K"** → DESKTOP-APP.md

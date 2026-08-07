@@ -180,4 +180,4 @@ When this contract is implemented, the route should live at `src/dashboard/serve
 4. Add a `GET /events/version` route returning `{ version: 1, catalog: [...] }` for capability discovery.
 5. Unit-test the filter logic; integration-test with a fake event store that appends a handful of events and asserts the consumer receives the expected subset.
 
-No blocking FS or exec calls in the handler — standard dashboard-server rules apply (`CLAUDE.md`, `.claude/rules/no-execsync-server.md`).
+No blocking FS or exec calls in the handler — standard dashboard-server rules apply (`CLAUDE.md`, `sync-sources/rules/no-execsync-server.md`).

@@ -32,7 +32,7 @@ Container and network filters that scan for "workspace stacks" must match on the
 
 Workspace containers must never mount `${HOME}/.overdeck`, and the container `server` service must set `OVERDECK_DISABLE_DEACON=1`. The container server is a development-time read/UI peer, not a second orchestrator.
 
-See `.claude/rules/single-deacon-invariant.md` for the full invariant and failure history.
+See `sync-sources/rules/single-deacon-invariant.md` for the full invariant and failure history.
 
 ## Remote Fly resiliency tiers
 
