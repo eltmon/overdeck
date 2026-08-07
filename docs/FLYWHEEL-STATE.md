@@ -1910,3 +1910,15 @@ This is the discipline from tick 23 applied *before* the mistake instead of afte
 **Carry this: take the baseline when you notice you cannot decide, not when you need the answer.** The instinct at tick 40 was to defer the question entirely — no commit yet, probably still working, check later. Recording one number instead cost nothing and converted a future guess into a measurement. The general form: **when you catch yourself about to say "I can't tell yet", capture whatever would make it tellable next time.**
 
 Fifteen substrate fixes landed, deployed and closed out this run. PAN-3596 remains the only genuine loss; PAN-3586 is now re-dispatched rather than lost.
+
+### RUN-82 tick 42 — 2026-08-07T09:07Z — a lower cost reading than last tick, and why that is not a contradiction
+
+**PAN-3586's re-dispatched strike reads `$0.9533`, below last tick's `$0.9704`.** That is not a frozen counter or a regression — the re-dispatch started a **fresh session**, so the figure is a new session's spend from zero, not a continuation of the dead one's. Cross-session comparison is meaningless here; `$0.9533` is the baseline for *this* agent, recorded now for next tick.
+
+Worth flagging because it is a trap the two-sample rule does not cover on its own: **the rule assumes both samples describe the same process.** A number that goes *down* is the tell that they do not, and if I had applied "unchanged means dead" mechanically I would have called a healthy 16-minute-old agent frozen. The refined form: compare two samples of the same session, and treat a decrease as evidence the identity changed rather than as data about progress.
+
+No commit from it yet, which is expected at 16 minutes on an investigative scope.
+
+**Struck PAN-3591** — the workspace-stack spawn gate that refuses a rework agent because the branch does not compile. That is the last of my own findings from this run still unstruck; everything else filed tonight has landed, is in flight, or is closed out. It also brings the fleet back to the `minAgents` target of 2.
+
+Main has moved to `0000384475` (operator-side TTS venv resolution). Fifteen substrate fixes landed, deployed and closed out this run. PAN-3596 remains the only genuine loss; PAN-3512 still awaits the UAT ship and PAN-3580 still awaits release.
