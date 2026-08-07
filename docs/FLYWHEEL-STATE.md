@@ -1539,3 +1539,13 @@ Filed PAN-3602 with `blocks-main` and struck it immediately — red main is Miss
 **The tick-18 wording complaint turned out to be half wrong, and that is worth recording.** Last tick I read `required checks not successful: test, lint`, found both `in_progress`, and reported that the gate conflates running with failed. It does — but *this* time the same message was hiding a genuine failure that simply had not finished reporting yet. The refinement I asked for on PAN-3589 is still right, and my confident dismissal of the alarm was luck rather than judgment: **I checked the state at the moment the message appeared and concluded the message was wrong, when the correct reading was "not yet known".** Twice now this run I have treated an in-flight or unavailable answer as a settled one; the earlier case was the backlog forecast reporting zeros.
 
 Four strikes now in flight — PAN-3602 (red main), PAN-3594, PAN-3596 — with PAN-3584 landed and awaiting a close-out that cannot pass until main is green again. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
+
+### RUN-82 tick 20 — 2026-08-07T02:10Z — red main confirmed persistent; PAN-3602 fix ready and landing
+
+**Red main confirmed on a second commit.** `dba64a8aa7` (current tip) reports `test=failure, lint=success` — the same single-file breakage seen on `011980b9a06e`. Persistence across two commits rules out a flake and confirms the tick-19 diagnosis: `ec3c5911cf`'s guard-scoping change left its two assertions behind, and every commit that inherits it fails.
+
+**PAN-3602's strike is `strikeLandingState: ready`, `mergeStatus: verifying`** — the fix passed its gates and is in the Deacon's landing path. Nothing to drive; the correct action is to let the door work and verify by reproduction once it lands, per the tick-16 rule that a green gate proves delivery, not repair. For this one the reproduction is unusually clean: main's own `test` check flipping to success is the whole acceptance criterion.
+
+PAN-3594 and PAN-3596 still working. The close-out queue behind red main now holds PAN-3584, and will hold PAN-3602 itself until main goes green — DoD row 6 requires the named checks to pass on the merge commit, so the fix for red main cannot close out until the fix has taken effect. That is correct behaviour, worth noting only because it means close-outs will arrive in a burst rather than one at a time once this clears.
+
+Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
