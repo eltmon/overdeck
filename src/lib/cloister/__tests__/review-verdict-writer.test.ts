@@ -302,6 +302,67 @@ describe('recordReviewVerdict', () => {
       );
     });
 
+    it('Given an orphan restore whose extra carries a historical passed test result at a different evidence head, the persisted testStatus stays "pending"', async () => {
+      // The orphan-restore adapter forwards the restored snapshot's historical
+      // testStatus/testNotes as `extra`. If those landed after the door's
+      // re-gate, a newer reviewed head would look verified with no new test run
+      // and the merge gate could admit it.
+      const rowHead = 'b'.repeat(40);
+      const evidenceHead = 'c'.repeat(40);
+      const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'passed' });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+      mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
+        { repoKey: 'main', dir: '/path/to/repo' },
+      ]);
+      mockAncestorProbe(false);
+
+      const input: VerdictInput = {
+        verdict: 'passed',
+        writer: 'orphan-restore',
+        evidenceHead,
+        extra: { testStatus: 'passed', testNotes: 'tests green on the restored snapshot' },
+      };
+
+      await recordReviewVerdict('PAN-3512', input);
+
+      const update = mocks.setReviewStatusSync.mock.calls[0]![1];
+      expect(update.testStatus).toBe('pending');
+      expect(update.testNotes).toContain('Verdict re-gated');
+    });
+
+    it.each(['passed', 'skipped'] as const)(
+      'Given a row already at testStatus "pending" and an extra carrying a historical "%s" test result at a different evidence head, the persisted testStatus stays "pending"',
+      async (historicalTestStatus) => {
+        // The re-gate must key off what the write would PERSIST, not just what is
+        // already on the row: a 'pending' row makes the row-only check false, so
+        // the forwarded historical result would otherwise land against fresh
+        // evidence and advance with no new test run.
+        const rowHead = 'b'.repeat(40);
+        const evidenceHead = 'c'.repeat(40);
+        const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'pending' });
+        mocks.getReviewStatusSync.mockReturnValue(status);
+        mocks.setReviewStatusSync.mockReturnValue(status);
+        mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
+          { repoKey: 'main', dir: '/path/to/repo' },
+        ]);
+        mockAncestorProbe(false);
+
+        const input: VerdictInput = {
+          verdict: 'passed',
+          writer: 'orphan-restore',
+          evidenceHead,
+          extra: { testStatus: historicalTestStatus, testNotes: 'historical result from the restored snapshot' },
+        };
+
+        await recordReviewVerdict('PAN-3512', input);
+
+        const update = mocks.setReviewStatusSync.mock.calls[0]![1];
+        expect(update.testStatus).toBe('pending');
+        expect(update.testNotes).toContain('Verdict re-gated');
+      },
+    );
+
     it('Given a row whose testStatus is already "pending", the update passed to setReviewStatusSync contains no testStatus key', async () => {
       const rowHead = 'b'.repeat(40);
       const evidenceHead = 'c'.repeat(40);

@@ -140,7 +140,7 @@ async function retryReviewer(state: AgentState, agentId: string, trigger: string
   }
 }
 
-async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentState[]): Promise<string[]> {
+export async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentState[]): Promise<string[]> {
   const actions: string[] = [];
   const now = Date.now();
   const synthesisStates = states.filter(state =>
@@ -222,7 +222,16 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         runId: state.reviewRunId,
         writer: 'fallback',
       });
-      if (outcome.landed && synthesis.verdict === 'blocked') {
+      if (!outcome.landed) {
+        // The verdict of record stays on disk in synthesis.md and the parent stays
+        // alive for the PAN-2584 liveness deadline — killing it here would strand a
+        // rejected verdict with no session left to re-signal it.
+        const rejected = `Deacon fallback verdict for ${state.issueId} was not recorded (${outcome.reason}); left parent ${state.id} alive`;
+        actions.push(rejected);
+        logDeaconEventSync(`monitorReviewConvoySignals: ${rejected}`);
+        continue;
+      }
+      if (synthesis.verdict === 'blocked') {
         await Effect.runPromise(deliverReviewVerdictFeedback({
           issueId: state.issueId,
           verdict: 'blocked',
