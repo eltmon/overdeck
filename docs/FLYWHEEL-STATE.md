@@ -1575,3 +1575,24 @@ My primary worktree carries my own FLYWHEEL-STATE commits and sits behind `origi
 **Carry this: verify-by-reproduction has a precondition I had not written down — verify what you ran against.** The rule I have been applying since tick 16 is "re-run the failing thing after the fix lands", and it silently assumes the code under test *is* the fixed code. On a machine where the orchestrator's own worktree drifts behind `origin/main` by design, that assumption is false by default. The check is one command (`git merge-base --is-ancestor <fix> HEAD`) and it belongs before the test run, not after the surprising result. Note the failure mode is asymmetric and nasty: a stale worktree produces a *false negative* that looks exactly like a genuine incomplete fix — the precise shape of PAN-3599, which I filed two ticks ago on evidence I gathered correctly. Had I not checked, I would have filed a second one on evidence I had not.
 
 PAN-3594 and PAN-3596 still working. Close-outs for PAN-3584 and PAN-3602 remain queued behind main's `test` check going green.
+
+### RUN-82 tick 22 — 2026-08-07T02:45Z — main is GREEN; red-main incident closed end to end in three ticks
+
+**Main is green.** `test=success, lint=success, build (22)=success, guard=success` on `c311a0cdb2`. Red main is cleared, verified against the acceptance criterion named at tick 20 — main's own `test` check flipping to success, which is a reproduction on the real artifact rather than a gate assertion.
+
+**Full incident arc: found at tick 19, diagnosed, struck, landed, deployed and closed out by tick 22** — roughly 50 minutes from detection to green, including CI's ~25-minute delay. The diagnosis held all the way through: `ec3c5911cf`'s guard-scoping change left two assertions behind, and the fix reconciled them plus added coverage for the new dimension.
+
+**Both queued close-outs drained, and one showed the DoD gate doing something genuinely clever.** PAN-3602 closed clean. PAN-3584's row 6 read:
+
+```
+required checks not successful: test; verified on main by later green CI run c311a0cdb2…
+containing the merge (required checks concluded successfully: test, lint, build (22), guard)   PASS
+```
+
+Its own merge commit never got a green run — it landed during the red window — but the gate resolved a **descendant** commit whose CI is green and which contains the merge, and passed on that. That is exactly the right semantics for a commit that lost its CI window (the PAN-3586 superseded-commit case), and it means the delayed/superseded-run problem is less damaging to close-outs than I assessed at tick 12. Worth correcting my earlier framing: I said commits superseded inside the window "will never be verified individually", which is true of their own run and false of their verification — a later green descendant serves.
+
+**PAN-3602 needed one extra step and it was mine: row 8 blocked because the live build did not yet contain the fix.** Deployed, then it closed clean. A recurring shape this run — the pipeline can land a fix but only the deployer makes it real, and the DoD gate is what refuses to pretend otherwise.
+
+**Nine substrate fixes now landed, deployed and closed out this run**: PAN-3581, PAN-3583, PAN-3589, PAN-3582, PAN-3595, PAN-3593, PAN-3584, PAN-3602, plus PAN-3512 carried from dead-for-three-days to merge-ready.
+
+PAN-3594 and PAN-3596 still working. Unchanged for the operator: release labels on PAN-3580 and PAN-3586, and the ship of `uat/pan-flint-0806` carrying PAN-3512.
