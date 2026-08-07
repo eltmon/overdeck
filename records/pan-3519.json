@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-07T08:23:51.764Z",
+  "updated": "2026-08-07T08:23:54.099Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
@@ -27,20 +27,21 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-07T08:23:20.014Z",
-    "mergeNotes": "GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main",
-        "detectedAt": "2026-08-07T08:23:20.014Z"
-      }
-    ],
+    "updatedAt": "2026-08-07T08:23:20.022Z",
+    "mergeNotes": "GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))",
     "strikeReadyHead": "6a82f1aba4e196d5083e909998c8eb126c5b5e6d",
     "strikeReadyAt": "2026-08-07T08:17:05.555Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-07T08:23:20.021Z",
+        "strikeHead": "6a82f1aba4e196d5083e909998c8eb126c5b5e6d",
+        "mainHead": "3ecd3b8da87061ce1800d1998f31eca7869a9bbe",
+        "outcome": "failed",
+        "detail": "GitHub PR #3614 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3614.; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -64,7 +65,7 @@
       },
       "costAtCloseOut": {
         "usd": 70.793972,
-        "pricingAsOf": "2026-08-07T08:23:51.760Z"
+        "pricingAsOf": "2026-08-07T08:23:54.093Z"
       }
     },
     "merges": [],
