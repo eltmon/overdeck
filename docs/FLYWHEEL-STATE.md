@@ -1454,3 +1454,13 @@ That is the delayed-CI model from tick 12 confirmed end to end: the block was **
 **Carry this: when the fleet idles behind operator gates, the right move is to work the substrate backlog I generated, not to report an empty queue.** Eleven issues filed this run and six landed; the remaining five are all real, diagnosed to `file:line`, and none needs an operator decision to start. An idle fleet with a full findings list is a scheduling failure, not a quiet period.
 
 **Unchanged:** PAN-3580 and PAN-3586 still carry `planned` without `released`; PAN-3512 still waits in `uat/pan-flint-0806`.
+
+### RUN-82 tick 14 — 2026-08-07T00:20Z — quiet tick; three strikes in flight, fleet above target
+
+Nothing landed. PAN-3593 reached `strike_landing_state: ready` (+50/-11) and awaits the Deacon; PAN-3594 is still working (+287/-61). Main unchanged at `947a58f060`, green. PAN-3580 and PAN-3586 still carry `planned` without `released`; PAN-3512 still waits in `uat/pan-flint-0806`.
+
+**Struck PAN-3596** — the patrol per-step timing gap — to close a measurement loop I opened myself two ticks ago. At tick 10 I filed it precisely because I could state that a 3–4× patrol overrun remained after PAN-3582 and could **not** attribute it, and I refused to strike a guessed cause. Instrumentation is the only honest next move: once each step is timed, the residual names itself and whatever it turns out to be can be struck on evidence rather than on a shortlist.
+
+That puts three strikes in flight (3593, 3594, 3596) against a `minAgents` target of 2 — all three drawn from findings this run produced, none needing an operator decision to start.
+
+**Carry this: the right response to "I cannot tell which of four candidates is responsible" is to build the measurement, not to pick one.** The temptation at tick 10 was to strike `reconcileFalseMerged` — it was the most plausible of the four and the audit had already described its missing cache. A strike aimed at a guessed cause wastes a revolution and, worse, produces a plausible-looking fix that may leave the real term untouched while appearing to resolve the issue. Filing the instrumentation instead costs one extra cycle and makes the next answer certain.
