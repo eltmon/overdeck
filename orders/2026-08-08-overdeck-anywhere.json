@@ -6,7 +6,62 @@
     "laneAConcurrency": 1,
     "posture": "open"
   },
-  "items": [],
+  "items": [
+    {
+      "issue": "1166",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    },
+    {
+      "issue": "2351",
+      "lane": "A",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    },
+    {
+      "issue": "2352",
+      "lane": "A",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    },
+    {
+      "issue": "2354",
+      "lane": "A",
+      "order": 4,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    },
+    {
+      "issue": "2355",
+      "lane": "A",
+      "order": 5,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    },
+    {
+      "issue": "2353",
+      "lane": "A",
+      "order": 6,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-08-08T14:53:28.630Z",
+      "addedBy": "conv-20260808-7847"
+    }
+  ],
   "createdAt": "2026-08-08T14:53:13.487Z",
-  "updatedAt": "2026-08-08T14:53:13.487Z"
+  "updatedAt": "2026-08-08T14:53:28.630Z"
 }
