@@ -24,51 +24,26 @@ import {
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
 
-const FAILURE_ANCHOR = /\bFAIL\s|[✕×]|(?:Assertion)?Error:|(?:Tests|Test Files)\s+\d+\s+failed\b/gi;
-const DETAILED_FAILURE_ANCHOR = /\bFAIL\s|[✕×]|(?:Assertion)?Error:/i;
-
-function clipGateStream(stream: string, limit: number, focusFailure = false): string {
+function clipGateStream(stream: string, limit: number): string {
   const signal = stream
     .split('\n')
     .filter(line => !/^\s*(?:hint|warning):\s/i.test(line))
     .join('\n');
   if (signal.length <= limit) return signal;
 
-  const anchors = focusFailure ? [...signal.matchAll(FAILURE_ANCHOR)] : [];
-  const anchor = anchors.filter(match => DETAILED_FAILURE_ANCHOR.test(match[0])).at(-1) ?? anchors.at(-1);
-  if (anchor?.index === undefined) {
-    if (focusFailure) {
-      return `…(${signal.length - limit} chars elided; no failure anchor found, showing tail)…\n${signal.slice(-limit)}`;
-    }
-
-    const headLength = Math.floor(limit / 2);
-    const tailLength = limit - headLength;
-    return `${signal.slice(0, headLength)}\n…(${signal.length - limit} chars elided)…\n${signal.slice(-tailLength)}`;
-  }
-
-  const tailLength = Math.floor(limit / 4);
-  const focusLength = limit - tailLength;
-  const focusStart = Math.max(0, Math.min(anchor.index - Math.floor(focusLength / 3), signal.length - focusLength));
-  const focusEnd = focusStart + focusLength;
-  const tailStart = signal.length - tailLength;
-  const clipped = [];
-
-  if (focusStart > 0) clipped.push(`…(${focusStart} chars elided)…`);
-  clipped.push(signal.slice(focusStart, focusEnd));
-  if (focusEnd < tailStart) {
-    clipped.push(`…(${tailStart - focusEnd} chars elided)…`);
-    clipped.push(signal.slice(tailStart));
-  }
-
-  return clipped.join('\n');
+  const headLength = Math.floor(limit / 2);
+  const tailLength = limit - headLength;
+  return `${signal.slice(0, headLength)}\n…(${signal.length - limit} chars elided)…\n${signal.slice(-tailLength)}`;
 }
 
-function formatGateOutput(stdout: string, stderr: string, focusFailure = false): string {
-  const streams = [
-    clipGateStream(stdout, 4000, focusFailure),
-    clipGateStream(stderr, 2000, focusFailure),
-  ].filter(Boolean);
-  return streams.join('\n--- stderr ---\n');
+function formatGatePreview(stdout: string, stderr: string): string {
+  return [clipGateStream(stdout, 4000), clipGateStream(stderr, 2000)]
+    .filter(Boolean)
+    .join('\n--- stderr ---\n');
+}
+
+function formatGateOutput(stdout: string, stderr: string): string {
+  return [stdout, stderr].filter(Boolean).join('\n--- stderr ---\n');
 }
 
 function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
@@ -645,7 +620,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         }
         const { stdout, stderr } = await execPromise;
         passedGate = true;
-        passOutput = formatGateOutput(stdout, stderr);
+        passOutput = formatGatePreview(stdout, stderr);
       } catch (error: any) {
         lastError = error;
         if (attempt < maxAttempts) {
@@ -676,7 +651,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     } else {
       const error: any = lastError;
       const durationMs = Date.now() - startTime;
-      const output = formatGateOutput(error.stdout || '', error.stderr || '', true);
+      const output = formatGateOutput(error.stdout || '', error.stderr || '');
       console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);
       opts.onLog?.(`✗ ${name} FAILED (${Math.round(durationMs/1000)}s): ${error.message?.slice(0, 160)}`);
       results.push({
