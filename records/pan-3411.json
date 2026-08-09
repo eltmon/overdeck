@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T11:57:55.322Z",
+  "updated": "2026-08-09T11:58:09.969Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "target-row-controls": {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 409239,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T11:58:09.969Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -178,7 +186,7 @@
     "resolve-intent-hook.resolve-intent-hook.ac2": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac3": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac4": "completed",
-    "target-row-controls": "pending",
+    "target-row-controls": "running",
     "route-and-page-shell.ac1": "completed",
     "route-and-page-shell.ac2": "completed",
     "route-and-page-shell.ac3": "completed"
