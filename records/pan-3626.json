@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T19:59:49.653Z",
+  "updated": "2026-08-09T20:06:19.005Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "portable-install": {
-        "writerId": "agent-pan-3626",
-        "agentId": "agent-pan-3626",
-        "pid": 413125,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T19:59:49.653Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3626",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Added Windows executable naming and platform-aware executable-mode detection with unit coverage.",
         "releasedAt": "2026-08-09T19:59:40.554Z"
+      },
+      {
+        "writerId": "agent-pan-3626",
+        "agentId": "agent-pan-3626",
+        "pid": 413125,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T19:59:49.653Z",
+        "itemId": "portable-install",
+        "outcome": "completed",
+        "reason": "Made both installers archive-agnostic and filesystem-based, with platform-specific extracted names.",
+        "releasedAt": "2026-08-09T20:06:19.005Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "binary-path-exe": {
         "reason": "Added Windows executable naming and platform-aware executable-mode detection with unit coverage.",
         "updatedAt": "2026-08-09T19:59:40.554Z"
+      },
+      "portable-install": {
+        "reason": "Made both installers archive-agnostic and filesystem-based, with platform-specific extracted names.",
+        "updatedAt": "2026-08-09T20:06:19.005Z"
       }
     }
   },
@@ -123,6 +130,11 @@
     "binary-path-exe.ac1": "completed",
     "binary-path-exe.ac2": "completed",
     "binary-path-exe.ac3": "completed",
-    "portable-install": "running"
+    "portable-install": "completed",
+    "portable-install.ac1": "completed",
+    "portable-install.ac2": "completed",
+    "portable-install.ac3": "completed",
+    "portable-install.ac4": "completed",
+    "portable-install.ac5": "completed"
   }
 }
