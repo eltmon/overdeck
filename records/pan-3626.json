@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T19:56:10.286Z",
+  "updated": "2026-08-09T19:57:12.950Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,18 +69,32 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "win32-asset-mapping": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3626",
         "agentId": "agent-pan-3626",
         "pid": 326792,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T19:56:10.286Z"
+        "claimedAt": "2026-08-09T19:56:10.286Z",
+        "itemId": "win32-asset-mapping",
+        "outcome": "completed",
+        "reason": "Mapped win32 releases to Windows zip assets and covered x64 and arm64 mappings.",
+        "releasedAt": "2026-08-09T19:57:12.949Z"
+      }
+    ],
+    "statusReasons": {
+      "win32-asset-mapping": {
+        "reason": "Mapped win32 releases to Windows zip assets and covered x64 and arm64 mappings.",
+        "updatedAt": "2026-08-09T19:57:12.949Z"
       }
     }
   },
   "statusOverrides": {
-    "win32-asset-mapping": "running"
+    "win32-asset-mapping": "completed",
+    "win32-asset-mapping.ac1": "completed",
+    "win32-asset-mapping.ac2": "completed",
+    "win32-asset-mapping.ac3": "completed"
   }
 }
