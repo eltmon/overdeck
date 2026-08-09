@@ -571,7 +571,7 @@
     "recordedAt": "2026-08-09T13:12:19.089Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-09T13:52:53.213Z",
+  "updated": "2026-08-09T13:52:59.212Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
