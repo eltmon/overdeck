@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:08:47.265Z",
+  "updated": "2026-08-09T20:11:00.836Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "win32-sync-port-probe": {
-        "writerId": "agent-pan-3626",
-        "agentId": "agent-pan-3626",
-        "pid": 636642,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T20:08:47.265Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3626",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Parse CLIProxy version banner from failed --version executions to avoid unnecessary reinstalls.",
         "releasedAt": "2026-08-09T20:08:38.553Z"
+      },
+      {
+        "writerId": "agent-pan-3626",
+        "agentId": "agent-pan-3626",
+        "pid": 636642,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T20:08:47.265Z",
+        "itemId": "win32-sync-port-probe",
+        "outcome": "completed",
+        "reason": "Added netstat listener detection for Windows while preserving the Unix port probe.",
+        "releasedAt": "2026-08-09T20:11:00.836Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "version-probe-nonzero-exit": {
         "reason": "Parse CLIProxy version banner from failed --version executions to avoid unnecessary reinstalls.",
         "updatedAt": "2026-08-09T20:08:38.553Z"
+      },
+      "win32-sync-port-probe": {
+        "reason": "Added netstat listener detection for Windows while preserving the Unix port probe.",
+        "updatedAt": "2026-08-09T20:11:00.836Z"
       }
     }
   },
@@ -163,6 +170,9 @@
     "version-probe-nonzero-exit.ac1": "completed",
     "version-probe-nonzero-exit.ac2": "completed",
     "version-probe-nonzero-exit.ac3": "completed",
-    "win32-sync-port-probe": "running"
+    "win32-sync-port-probe": "completed",
+    "win32-sync-port-probe.ac1": "completed",
+    "win32-sync-port-probe.ac2": "completed",
+    "win32-sync-port-probe.ac3": "completed"
   }
 }
