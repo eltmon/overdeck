@@ -465,9 +465,13 @@ function expectedCliproxyVersion(): string {
 }
 
 /** Parse "CLIProxyAPI Version: 7.1.39, Commit: ..." → "7.1.39". */
-function parseCliproxyVersion(output: string): string | null {
+export function parseCliproxyVersion(output: string): string | null {
   const m = output.match(/Version:\s*v?(\d+\.\d+\.\d+)/i);
   return m ? m[1] : null;
+}
+
+export function execFailureStdout(err: unknown): string {
+  return (err as { stdout?: string | Buffer })?.stdout?.toString() ?? '';
 }
 
 /**
@@ -477,7 +481,8 @@ function parseCliproxyVersion(output: string): string | null {
  * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
  * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
  * An unreadable version is treated as out-of-date so we re-pull rather than
- * trust a mystery binary.
+ * trust a mystery binary. CLIProxyAPI v7.2.113 deliberately does not define
+ * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
 function isCliproxyUpToDateSync(): boolean {
   if (!isCliproxyInstalled()) return false;
@@ -487,8 +492,8 @@ function isCliproxyUpToDateSync(): boolean {
       timeout: 5_000,
     }).toString();
     return parseCliproxyVersion(out) === expectedCliproxyVersion();
-  } catch {
-    return false;
+  } catch (err) {
+    return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();
   }
 }
 
@@ -498,8 +503,8 @@ async function isCliproxyUpToDateTask(): Promise<boolean> {
   try {
     const { stdout } = await execAsync(`"${getCliproxyBinary()}" --version`, { timeout: 5_000 });
     return parseCliproxyVersion(stdout) === expectedCliproxyVersion();
-  } catch {
-    return false;
+  } catch (err) {
+    return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();
   }
 }
 
