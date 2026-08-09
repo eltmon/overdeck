@@ -40,17 +40,17 @@
     "recordedAt": "2026-08-09T20:28:46.594Z"
   },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T21:12:16.973Z",
+  "updated": "2026-08-09T21:12:19.194Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T21:12:16.515Z",
+    "updatedAt": "2026-08-09T21:12:16.830Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3626-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -161,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.814172,
-        "pricingAsOf": "2026-08-09T21:12:16.519Z"
+        "pricingAsOf": "2026-08-09T21:12:19.173Z"
       }
     },
     "merges": [
@@ -170,7 +170,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3626",
