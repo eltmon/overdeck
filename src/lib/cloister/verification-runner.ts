@@ -16,7 +16,11 @@ import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { MERGED_VERIFICATION_REASON } from '../review-status-reconcile.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
-import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
+import {
+  readVerificationArtifact,
+  verificationArtifactPath,
+  writeVerificationArtifact,
+} from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -662,10 +666,8 @@ async function runVerificationForIssuePromise(
     if (failedGate) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = failedGate.name;
-      const rawOutput = failedGate.output || failedGate.error || '(no output)';
-      const truncatedOutput =
-        rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
-      const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms):\n\n${truncatedOutput}`;
+      const fullOutputPath = verificationArtifactPath(workspacePath);
+      const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms).\n\nFull gate output: ${fullOutputPath}`;
 
       setReviewStatusSync(issueId, {
         reviewStatus: 'pending',
@@ -683,7 +685,7 @@ async function runVerificationForIssuePromise(
 
       const feedbackBody = shouldEscalate
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm \`pan show ${issueId}\` or \`pan review pending\` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at \`${fullOutputPath}\` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm \`pan show ${issueId}\` or \`pan review pending\` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change.`;
 
       try {
         const fileResult = await Effect.runPromise(writeFeedbackFile({
