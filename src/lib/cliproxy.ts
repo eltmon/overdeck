@@ -16,13 +16,16 @@
  */
 
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
+  rmSync,
   statSync,
+  writeFileSync,
 } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { spawn, execSync, exec, type ChildProcess } from 'child_process';
@@ -60,6 +63,10 @@ export function getCliproxyDir(): string {
 
 export function getCliproxyBinary(platform: NodeJS.Platform = process.platform): string {
   return join(BIN_DIR, platform === 'win32' ? 'cliproxy.exe' : 'cliproxy');
+}
+
+export function extractedBinaryName(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? 'cli-proxy-api.exe' : 'cli-proxy-api';
 }
 
 export function getCliproxyConfigPath(): string {
@@ -509,7 +516,7 @@ export function installCliproxySync(force = false): void {
   if (!asset) {
     throw new Error(
       `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
-      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+      + `GPT subscription routing requires linux, darwin, or windows on amd64/arm64.`,
     );
   }
 
@@ -519,19 +526,19 @@ export function installCliproxySync(force = false): void {
   const archivePath = join(tmpDir, asset.archive);
 
   execSync(`curl -fsSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
-  execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+  execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
 
-  // Release archives extract a binary named "cli-proxy-api" at the root of the tar
-  // (alongside README/LICENSE/config.example.yaml).
-  const extracted = join(tmpDir, 'cli-proxy-api');
+  const extracted = join(tmpDir, extractedBinaryName());
   if (!existsSync(extracted)) {
-    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+    throw new Error(`cliproxy archive did not contain expected ${extractedBinaryName()} binary`);
   }
 
   const target = getCliproxyBinary();
-  execSync(`install -m 0755 "${extracted}" "${target}"`, { stdio: 'pipe' });
+  rmSync(target, { force: true });
+  copyFileSync(extracted, target);
+  chmodSync(target, 0o755);
   try {
-    execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+    rmSync(tmpDir, { recursive: true, force: true });
   } catch { /* non-fatal */ }
 }
 
@@ -547,7 +554,7 @@ async function installCliproxyTask(force = false): Promise<void> {
   if (!asset) {
     throw new Error(
       `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
-      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+      + `GPT subscription routing requires linux, darwin, or windows on amd64/arm64.`,
     );
   }
 
@@ -557,17 +564,19 @@ async function installCliproxyTask(force = false): Promise<void> {
   const archivePath = join(tmpDir, asset.archive);
 
   await execAsync(`curl -fsSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
-  await execAsync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
+  await execAsync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
 
-  const extracted = join(tmpDir, 'cli-proxy-api');
+  const extracted = join(tmpDir, extractedBinaryName());
   if (!existsSync(extracted)) {
-    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+    throw new Error(`cliproxy archive did not contain expected ${extractedBinaryName()} binary`);
   }
 
   const target = getCliproxyBinary();
-  await execAsync(`install -m 0755 "${extracted}" "${target}"`, { timeout: 10_000 });
+  await rm(target, { force: true });
+  await copyFile(extracted, target);
+  await chmod(target, 0o755);
   try {
-    await execAsync(`rm -rf "${tmpDir}"`, { timeout: 10_000 });
+    await rm(tmpDir, { recursive: true, force: true });
   } catch { /* non-fatal */ }
 }
 
