@@ -15,17 +15,37 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/harnesses.mdx",
+      "src/lib/cliproxy.ts",
+      "tests/lib/cliproxy-platform-asset.test.ts",
+      "tests/lib/cliproxy-version-probe.test.ts",
+      "tests/lib/cliproxy-windows-paths.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/harnesses.mdx",
+      "src/lib/cliproxy.ts",
+      "tests/lib/cliproxy-platform-asset.test.ts",
+      "tests/lib/cliproxy-version-probe.test.ts",
+      "tests/lib/cliproxy-windows-paths.test.ts"
+    ],
+    "recordedAt": "2026-08-09T20:28:46.594Z"
+  },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:28:49.998Z",
+  "updated": "2026-08-09T20:28:52.288Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:28:49.994Z",
+    "updatedAt": "2026-08-09T20:28:51.255Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3635",
     "reviewRequestedAt": "2026-08-09T20:28:49.994Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -45,8 +65,7 @@
         "tests/lib/cliproxy-windows-paths.test.ts"
       ],
       "recordedAt": "2026-08-09T20:28:46.594Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3635"
+    }
   },
   "closeOut": {
     "usage": {
@@ -58,6 +77,14 @@
             "cacheRead": 4631890,
             "cacheWrite": 156689
           }
+        },
+        "work": {
+          "openai/gpt-5.6-terra": {
+            "input": 301828,
+            "output": 26254,
+            "cacheRead": 14089728,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -66,18 +93,26 @@
           "output": 34309,
           "cacheRead": 4631890,
           "cacheWrite": 156689
+        },
+        "openai/gpt-5.6-terra": {
+          "input": 301828,
+          "output": 26254,
+          "cacheRead": 14089728,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.306611,
-        "pricingAsOf": "2026-08-09T19:54:46.018Z"
+        "usd": 12.977448,
+        "pricingAsOf": "2026-08-09T20:28:51.278Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3635"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3626",
@@ -212,24 +247,5 @@
     "win32-sync-port-probe.ac3": "completed",
     "docs-windows-support": "completed",
     "docs-windows-support.ac1": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "configuration/harnesses.mdx",
-      "src/lib/cliproxy.ts",
-      "tests/lib/cliproxy-platform-asset.test.ts",
-      "tests/lib/cliproxy-version-probe.test.ts",
-      "tests/lib/cliproxy-windows-paths.test.ts"
-    ],
-    "actualChangedFiles": [
-      "configuration/harnesses.mdx",
-      "src/lib/cliproxy.ts",
-      "tests/lib/cliproxy-platform-asset.test.ts",
-      "tests/lib/cliproxy-version-probe.test.ts",
-      "tests/lib/cliproxy-windows-paths.test.ts"
-    ],
-    "recordedAt": "2026-08-09T20:28:46.594Z"
   }
 }
