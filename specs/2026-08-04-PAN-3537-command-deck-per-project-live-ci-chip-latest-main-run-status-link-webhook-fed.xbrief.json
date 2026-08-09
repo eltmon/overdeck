@@ -4,17 +4,17 @@
     "created": "2026-08-04T08:15:24.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3537: Command Deck: per-project live CI chip — latest main run status + link, webhook-fed",
-    "updated": "2026-08-04T08:20:48.498Z"
+    "updated": "2026-08-09T21:23:32.001Z"
   },
   "plan": {
     "id": "pan-3537",
     "title": "Command Deck: per-project live CI chip — latest main run status + link, webhook-fed",
-    "status": "running",
+    "status": "completed",
     "uid": "b8a72560-8f6a-4981-998d-519e391a269b",
     "author": "agent:claude-opus-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-04T08:15:24.000Z",
-    "updated": "2026-08-04T08:20:48.498Z",
+    "updated": "2026-08-09T21:23:32.001Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3537",
@@ -698,5 +698,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
