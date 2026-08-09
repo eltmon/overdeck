@@ -266,10 +266,10 @@
       "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
       "tests/unit/dashboard/no-loss-audit.test.ts"
     ],
-    "recordedAt": "2026-08-09T22:44:07.143Z"
+    "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:44:33.549Z",
+  "updated": "2026-08-09T22:44:37.236Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "passed",
