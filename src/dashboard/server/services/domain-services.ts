@@ -14,6 +14,7 @@ import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
 import { startSessionContextWriter } from './session-context-writer.js';
+import { markEventStoreProjectionReady } from './project-ci-refill-startup.js';
 import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
 import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
 import { randomUUID } from 'crypto';
@@ -176,6 +177,7 @@ export const EventStoreServiceLive = Layer.effect(
         payload: event.payload,
       } as any);
     });
+    markEventStoreProjectionReady();
 
     startSessionContextWriter({
       readSnapshot: () => Effect.runPromise(readModel.getSnapshot),
