@@ -154,6 +154,28 @@ function configuredMainVerifyChecks(ctx: LifecycleContext): string[] {
     : DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS;
 }
 
+export async function readContainingDefaultBranchCommits(
+  ctx: LifecycleContext,
+  mergeCommit: string,
+): Promise<string[]> {
+  const options = { cwd: ctx.projectPath, encoding: 'utf-8' as const, timeout: 10000, maxBuffer: 8 * 1024 * 1024 };
+  const { stdout } = await execFileAsync('git', ['rev-list', '--first-parent', 'origin/main'], options);
+  const firstParentCommits = stdout.split('\n').map(line => line.trim()).filter(Boolean);
+  const candidates: string[] = [];
+
+  for (const commit of firstParentCommits) {
+    try {
+      await execFileAsync('git', ['merge-base', '--is-ancestor', mergeCommit, commit], options);
+      candidates.push(commit);
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 1) break;
+      throw error;
+    }
+  }
+
+  return candidates;
+}
+
 const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   readCheckRuns: async (ctx, commit) => {
     if (!ctx.github) return { total: 0, names: [], successful: [], failed: [], pending: [] };
@@ -163,14 +185,7 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
     if (!ctx.github) return configuredMainVerifyChecks(ctx);
     return fetchRequiredStatusChecks(ctx.github.owner, ctx.github.repo, 'main', configuredMainVerifyChecks(ctx));
   },
-  readContainingDefaultBranchCommits: async (ctx, mergeCommit) => {
-    const { stdout } = await execFileAsync(
-      'git',
-      ['rev-list', '--ancestry-path', '--first-parent', `${mergeCommit}..origin/main`],
-      { cwd: ctx.projectPath, encoding: 'utf-8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 },
-    );
-    return stdout.split('\n').map(line => line.trim()).filter(Boolean);
-  },
+  readContainingDefaultBranchCommits,
 };
 
 interface ShipRowDeps {

@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const issueClosureMocks = vi.hoisted(() => ({
@@ -21,6 +25,7 @@ import {
   checkTestsRow,
   checkVerificationRow,
   evaluateDodGate,
+  readContainingDefaultBranchCommits,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
 import { BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
@@ -723,6 +728,64 @@ describe('Definition-of-Done main-verification row', () => {
     expect(row).toMatchObject({ status: 'pass' });
     expect(row.observed).toContain('required checks not successful: test');
     expect(row.observed).toContain('verified on main by later green CI run greenhead containing the merge');
+  });
+
+  it('finds first-parent default-branch candidates when a batch merge arrives through a promote commit second parent', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'pan-3628-dod-gate-'));
+    const git = (args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf-8' }).trim();
+    const commit = (message: string) => {
+      git(['add', '-A']);
+      git(['commit', '--quiet', '-m', message]);
+      return git(['rev-parse', 'HEAD']);
+    };
+
+    try {
+      git(['init', '--quiet', '-b', 'main']);
+      git(['config', 'user.email', 'test@example.com']);
+      git(['config', 'user.name', 'Test']);
+      writeFileSync(join(repo, 'history.txt'), 'base\n', 'utf-8');
+      commit('base');
+
+      git(['checkout', '--quiet', '-b', 'feature/pan-3628']);
+      writeFileSync(join(repo, 'history.txt'), 'feature\n', 'utf-8');
+      const featureCommit = commit('feature work');
+
+      git(['checkout', '--quiet', '-b', 'uat/pan-3628', 'main']);
+      git(['merge', '--quiet', '--no-ff', 'feature/pan-3628', '-m', 'batch merge']);
+      const batchMerge = git(['rev-parse', 'HEAD']);
+
+      git(['checkout', '--quiet', 'main']);
+      git(['merge', '--quiet', '--no-ff', 'uat/pan-3628', '-m', 'promote batch']);
+      const promoteCommit = git(['rev-parse', 'HEAD']);
+      writeFileSync(join(repo, 'history.txt'), 'post-promote\n', 'utf-8');
+      const laterMainCommit = commit('post-promote main commit');
+      git(['update-ref', 'refs/remotes/origin/main', laterMainCommit]);
+
+      const fixtureCtx = { ...ctx, projectPath: repo };
+      expect(await readContainingDefaultBranchCommits(fixtureCtx, batchMerge))
+        .toEqual([laterMainCommit, promoteCommit]);
+
+      const probed: string[] = [];
+      const checkRuns = new Map([
+        [batchMerge, runs(required, required.filter(check => check !== 'test'))],
+        [laterMainCommit, runs(required, required.filter(check => check !== 'test'))],
+        [promoteCommit, runs(required)],
+      ]);
+      const row = await checkMainVerifyRow(fixtureCtx, batchMerge, {
+        readCheckRuns: async (_ctx, commitSha) => {
+          probed.push(commitSha);
+          return checkRuns.get(commitSha) ?? runs([]);
+        },
+        readRequiredChecks: async () => required,
+      });
+
+      expect(probed).toEqual([batchMerge, laterMainCommit, promoteCommit]);
+      expect(probed).not.toContain(featureCommit);
+      expect(row).toMatchObject({ status: 'pass' });
+      expect(row.observed).toContain(`verified on main by later green CI run ${promoteCommit} containing the merge`);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('probes at most the five newest containing commits', async () => {
