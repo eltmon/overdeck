@@ -10,17 +10,17 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T21:08:08.119Z",
+  "updated": "2026-08-09T21:19:09.553Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "mergeStep": "validating-pr",
+    "mergeStatus": "queued",
+    "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T21:08:00.518Z",
+    "updatedAt": "2026-08-09T21:18:33.559Z",
     "mergeNotes": "PR #3632 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.",
     "lastVerifiedCommit": "fac381247daea503a500671cb7946d329c4b7f92",
     "strikeReadyHead": "a4f42f291d12a72d36a3f91a1b6c4a3378979666",
@@ -78,7 +78,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.373866,
-        "pricingAsOf": "2026-08-09T21:08:04.602Z"
+        "pricingAsOf": "2026-08-09T21:19:09.548Z"
       }
     },
     "merges": [],
