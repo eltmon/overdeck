@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:15:37.994Z",
+  "updated": "2026-08-09T12:17:08.805Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "idea-cards": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 758474,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:15:37.994Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -217,6 +209,17 @@
         "outcome": "completed",
         "reason": "Added recency-ordered project chips, sole-project and key/name preset selection, five-chip overflow, add/new project modal launch, and onCreated insertion/selection with focused coverage.",
         "releasedAt": "2026-08-09T12:15:20.492Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 758474,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:15:37.994Z",
+        "itemId": "idea-cards",
+        "outcome": "completed",
+        "reason": "Added the six static mockup idea cards with uppercase mono categories, responsive soft-card layout, hero prefill/focus behavior, and coverage proving the click path performs no network work.",
+        "releasedAt": "2026-08-09T12:17:08.805Z"
       }
     ],
     "statusReasons": {
@@ -247,6 +250,10 @@
       "project-chip-row": {
         "reason": "Added recency-ordered project chips, sole-project and key/name preset selection, five-chip overflow, add/new project modal launch, and onCreated insertion/selection with focused coverage.",
         "updatedAt": "2026-08-09T12:15:20.492Z"
+      },
+      "idea-cards": {
+        "reason": "Added the six static mockup idea cards with uppercase mono categories, responsive soft-card layout, hero prefill/focus behavior, and coverage proving the click path performs no network work.",
+        "updatedAt": "2026-08-09T12:17:08.805Z"
       }
     }
   },
@@ -284,6 +291,9 @@
     "project-chip-row.ac2": "completed",
     "project-chip-row.ac3": "completed",
     "project-chip-row.ac4": "completed",
-    "idea-cards": "running"
+    "idea-cards": "completed",
+    "idea-cards.ac1": "completed",
+    "idea-cards.ac2": "completed",
+    "idea-cards.ac3": "completed"
   }
 }
