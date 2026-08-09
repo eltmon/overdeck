@@ -7,7 +7,6 @@ import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
-import { useNewWorkspaceStore } from '../useNewWorkspaceModal';
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
@@ -504,7 +503,6 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
       if (url === '/api/projects/overdeck/version-sync') return Response.json({ config: null, lastOutcome: null });
       return undefined;
     });
-    useNewWorkspaceStore.setState({ isOpen: false, presetProjectKey: null });
   });
 
   afterEach(async () => {
@@ -531,7 +529,8 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
     expect(onNewWorkspace).toHaveBeenCalledWith('overdeck');
   });
 
-  it('falls back to the shared dialog store when given no handler', () => {
+  it('falls back to the routed creation page when given no handler', () => {
+    window.history.replaceState(null, '', '/command-deck/overdeck');
     render(
       <ProjectOverview
         projectName="Overdeck"
@@ -544,9 +543,8 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
 
     fireEvent.click(screen.getByTestId('project-overview-new-workspace'));
 
-    const state = useNewWorkspaceStore.getState();
-    expect(state.isOpen).toBe(true);
-    expect(state.presetProjectKey).toBe('overdeck');
+    expect(window.location.pathname).toBe('/workspaces/new');
+    expect(window.location.search).toBe('?project=overdeck');
   });
 
   it('renders no affordance for a project with no key', () => {

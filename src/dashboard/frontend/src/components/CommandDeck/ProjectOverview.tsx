@@ -14,7 +14,6 @@ import {
 } from './pipeline-helpers';
 import { PipelineSection } from './PipelineSection';
 import { ProjectSettingsDisclosure } from './ProjectSettingsDisclosure';
-import { useOpenNewWorkspace } from './useNewWorkspaceModal';
 
 export type { IssueCostBreakdown };
 
@@ -233,10 +232,7 @@ export function ProjectOverview({
   onOpenAgents,
   onNewWorkspace,
 }: ProjectOverviewProps) {
-  // Falls back to the dialog store so this button needs no prop drilled
-  // through CommandDeck and ProjectHome; the prop stays for direct testing.
-  const openFromStore = useOpenNewWorkspace();
-  const openNewWorkspace = onNewWorkspace ?? openFromStore;
+  const openNewWorkspace = onNewWorkspace ?? ((key: string) => { window.history.pushState({ tab: 'workspace-new' }, '', `/workspaces/new?project=${encodeURIComponent(key)}`); window.dispatchEvent(new PopStateEvent('popstate')); });
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
   const pipelineRef = useRef<HTMLDivElement>(null);
 

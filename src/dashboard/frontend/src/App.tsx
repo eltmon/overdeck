@@ -492,7 +492,7 @@ export default function App() {
     const path = `/workspace/${encodeURIComponent(workspaceId)}`;
     if (window.location.pathname !== path) window.history.pushState({ tab: 'workspace' }, '', path);
   }, []);
-
+  const onNewWorkspace = useCallback((projectKey?: string) => { const path = projectKey ? `/workspaces/new?project=${encodeURIComponent(projectKey)}` : '/workspaces/new'; setActiveTabState('workspace-new'); window.history.pushState({ tab: 'workspace-new' }, '', path); }, []);
   const onWorkspaceViewBack = useCallback(() => {
     setWorkspaceRouteId(null);
     setActiveTab('home');
@@ -850,7 +850,7 @@ export default function App() {
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
-        onNewWorkspace={() => newWorkspace.open(selectedProjectKey ?? undefined)}
+        onNewWorkspace={() => onNewWorkspace(selectedProjectKey ?? undefined)}
         onOpenUpdater={() => setIsUpdateDialogOpen(true)}
         onSelectWorkspace={onSelectWorkspace}
       />
@@ -997,7 +997,7 @@ export default function App() {
         }}
         onOpenConversationHit={handleOpenConversationHit}
         onSelectWorkspace={onSelectWorkspace}
-        onNewWorkspace={() => newWorkspace.open()}
+        onNewWorkspace={() => onNewWorkspace()}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}
