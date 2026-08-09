@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T22:01:56.950Z",
+  "updated": "2026-08-09T22:01:59.596Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -92,7 +92,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.277308,
-        "pricingAsOf": "2026-08-09T22:01:56.937Z"
+        "pricingAsOf": "2026-08-09T22:01:59.587Z"
       }
     },
     "merges": [],
