@@ -182,6 +182,11 @@
       "reason": "feedback",
       "note": "[2026-08-09T22:34Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-08-09T22:34:32.619Z"
+    },
+    {
+      "timestamp": "2026-08-09T22:44:42.942Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -269,7 +274,7 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:44:38.002Z",
+  "updated": "2026-08-09T22:44:42.985Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -279,9 +284,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:44:37.999Z",
+    "updatedAt": "2026-08-09T22:44:42.933Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
+    "reviewRequestedAt": "2026-08-09T22:44:37.999Z",
     "reviewSpawnedAt": "2026-08-09T22:27:03.496Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -365,8 +371,7 @@
         "tests/unit/dashboard/no-loss-audit.test.ts"
       ],
       "recordedAt": "2026-08-09T22:44:37.234Z"
-    },
-    "reviewRequestedAt": "2026-08-09T22:44:37.999Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -441,20 +446,28 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 24,
+            "output": 2672,
+            "cacheRead": 902356,
+            "cacheWrite": 86971
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4337032,
-            "output": 395509,
-            "cacheRead": 154790400,
+            "input": 4343080,
+            "output": 397436,
+            "cacheRead": 155780608,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7533683,
-          "output": 589438,
-          "cacheRead": 199985152,
+          "input": 7539731,
+          "output": 591365,
+          "cacheRead": 200975360,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -462,11 +475,17 @@
           "output": 175545,
           "cacheRead": 38204416,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 24,
+          "output": 2672,
+          "cacheRead": 902356,
+          "cacheWrite": 86971
         }
       },
       "costAtCloseOut": {
-        "usd": 179.488763,
-        "pricingAsOf": "2026-08-09T22:43:51.608Z"
+        "usd": 180.496584,
+        "pricingAsOf": "2026-08-09T22:44:42.961Z"
       }
     },
     "merges": [
