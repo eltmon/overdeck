@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T11:38:29.047Z",
+  "updated": "2026-08-09T11:55:02.270Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -96,16 +96,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {
-      "route-and-page-shell": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 6109,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T11:38:29.047Z"
-      }
-    },
+    "sequence": 11,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -150,12 +142,23 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3411 dead)",
         "releasedAt": "2026-08-07T14:00:04.988Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 6109,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T11:38:29.047Z",
+        "itemId": "route-and-page-shell",
+        "outcome": "completed",
+        "reason": "Added the routed /workspaces/new page shell, project-query preset state, PAN-3410 display-xl hero input, ordered layout regions, modal mount state, and focused frontend coverage; typecheck, lint, and the frontend test passed.",
+        "releasedAt": "2026-08-09T11:55:02.270Z"
       }
     ],
     "statusReasons": {
       "route-and-page-shell": {
-        "reason": "stale claim released (agent-pan-3411 dead)",
-        "updatedAt": "2026-08-07T14:00:04.988Z"
+        "reason": "Added the routed /workspaces/new page shell, project-query preset state, PAN-3410 display-xl hero input, ordered layout regions, modal mount state, and focused frontend coverage; typecheck, lint, and the frontend test passed.",
+        "updatedAt": "2026-08-09T11:55:02.270Z"
       },
       "resolve-intent-hook": {
         "reason": "Extracted a reusable workspace creation hook with form state, 300ms debounced resolve, stale gating, field findings, isolated target omission, and create submission; added five fake-timer tests and frontend typecheck coverage.",
@@ -168,12 +171,15 @@
     }
   },
   "statusOverrides": {
-    "route-and-page-shell": "running",
+    "route-and-page-shell": "completed",
     "resolve-intent-hook": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac1": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac2": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac3": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac4": "completed",
-    "target-row-controls": "blocked"
+    "target-row-controls": "blocked",
+    "route-and-page-shell.ac1": "completed",
+    "route-and-page-shell.ac2": "completed",
+    "route-and-page-shell.ac3": "completed"
   }
 }
