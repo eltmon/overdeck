@@ -27,6 +27,7 @@ import { FlywheelPage } from '../pages/FlywheelPage';
 import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
+import { NewWorkspacePage } from '../pages/NewWorkspacePage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
 import type { Issue } from '../types';
@@ -131,6 +132,11 @@ export function AppRoutes({
             cockpitIssue={cockpitRoute}
             onCockpitChange={onCockpitChange}
           />
+        </div>
+      )}
+      {activeTab === 'workspace-new' && (
+        <div className="w-full h-full overflow-hidden">
+          <NewWorkspacePage />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (

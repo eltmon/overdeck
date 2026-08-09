@@ -26,6 +26,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   deacon: '/deacon',
   sessions: '/sessions',
   'awaiting-merge': '/awaiting-merge',
+  'workspace-new': '/workspaces/new',
   workspace: '/workspace',
 };
 
@@ -112,6 +113,12 @@ export function getWorkspaceRouteFromPath(path = window.location.pathname): stri
   } catch {
     return m[1] ?? null;
   }
+}
+
+/** Preserve the optional project preset on the routed workspace creation page. */
+export function getNewWorkspaceProjectFromSearch(search = window.location.search): string | null {
+  const project = new URLSearchParams(search).get('project')?.trim();
+  return project || null;
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
