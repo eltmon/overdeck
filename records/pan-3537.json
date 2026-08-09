@@ -393,6 +393,11 @@
       "reason": "feedback",
       "note": "[2026-08-05T02:50Z] uat-agent → FAILED — seq 66",
       "timestamp": "2026-08-05T02:50:47.774Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-09T11:51:03.722Z"
     }
   ],
   "feedback": [
@@ -910,7 +915,7 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-05T02:50:47.774Z",
+  "updated": "2026-08-09T11:51:03.723Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
