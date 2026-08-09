@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:04:31.018Z",
+  "updated": "2026-08-09T12:06:16.098Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "status-strip": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 528334,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:04:31.018Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -184,6 +176,17 @@
         "outcome": "completed",
         "reason": "Added includeArchived main-workspace probing, the Register main workspace action, bootstrap submit body, safe hidden default, and focused coverage for missing and archived-main cases.",
         "releasedAt": "2026-08-09T12:04:10.596Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 528334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:04:31.018Z",
+        "itemId": "status-strip",
+        "outcome": "completed",
+        "reason": "Added the live dot-metadata intent summary for shared/isolated mode, git posture, parent overrides, and inline resolver findings, with focused coverage.",
+        "releasedAt": "2026-08-09T12:06:16.098Z"
       }
     ],
     "statusReasons": {
@@ -202,6 +205,10 @@
       "bootstrap-main-affordance": {
         "reason": "Added includeArchived main-workspace probing, the Register main workspace action, bootstrap submit body, safe hidden default, and focused coverage for missing and archived-main cases.",
         "updatedAt": "2026-08-09T12:04:10.596Z"
+      },
+      "status-strip": {
+        "reason": "Added the live dot-metadata intent summary for shared/isolated mode, git posture, parent overrides, and inline resolver findings, with focused coverage.",
+        "updatedAt": "2026-08-09T12:06:16.098Z"
       }
     }
   },
@@ -224,6 +231,10 @@
     "bootstrap-main-affordance.ac1": "completed",
     "bootstrap-main-affordance.ac2": "completed",
     "bootstrap-main-affordance.ac3": "completed",
-    "status-strip": "running"
+    "status-strip": "completed",
+    "status-strip.ac1": "completed",
+    "status-strip.ac2": "completed",
+    "status-strip.ac3": "completed",
+    "status-strip.ac4": "completed"
   }
 }
