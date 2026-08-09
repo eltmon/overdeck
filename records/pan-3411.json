@@ -184,15 +184,7 @@
       "timestamp": "2026-08-09T22:34:32.619Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-09T22:34:32Z",
-      "markdownBody": "# Test failure\n\nDispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3411.lock is held by agent-pan-3411-review pid=3925260 acquiredAt=2026-08-09T22:34:07.849Z. Retry the command after that writer finishes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3411`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -273,23 +265,20 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:34:51.751Z",
+  "updated": "2026-08-09T22:38:23.996Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "passed",
-    "testStatus": "dispatch_failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T14:08:24.272Z",
-    "updatedAt": "2026-08-09T22:34:32.599Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3411.lock is held by agent-pan-3411-review pid=3925260 acquiredAt=2026-08-09T22:34:07.849Z. Retry the command after that writer finishes.",
+    "updatedAt": "2026-08-09T22:38:23.583Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
-    "reviewedAtCommit": "7b350539d1e15ad05aed9c0cf17bea427aaeaf96",
     "reviewSpawnedAt": "2026-08-09T22:27:03.496Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -382,9 +371,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 1825197,
-            "output": 33862,
-            "cacheRead": 13789184,
+            "input": 1827207,
+            "output": 33955,
+            "cacheRead": 14046208,
             "cacheWrite": 0
           }
         },
@@ -446,30 +435,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4302630,
-            "output": 388680,
-            "cacheRead": 151516160,
+            "input": 4333492,
+            "output": 394935,
+            "cacheRead": 154050048,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7499281,
-          "output": 582609,
-          "cacheRead": 196710912,
+          "input": 7530143,
+          "output": 588864,
+          "cacheRead": 199244800,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 4782093,
-          "output": 175452,
-          "cacheRead": 37947392,
+          "input": 4784103,
+          "output": 175545,
+          "cacheRead": 38204416,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 177.404086,
-        "pricingAsOf": "2026-08-09T22:34:46.603Z"
+        "usd": 179.083667,
+        "pricingAsOf": "2026-08-09T22:38:23.623Z"
       }
     },
     "merges": [
