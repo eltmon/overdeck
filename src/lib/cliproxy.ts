@@ -424,12 +424,14 @@ export function detectPlatformAsset(
 
   if (platform === 'linux') os = 'linux';
   else if (platform === 'darwin') os = 'darwin';
+  else if (platform === 'win32') os = 'windows';
 
   if (arch === 'x64') cpu = 'amd64';
   else if (arch === 'arm64') cpu = 'aarch64';
 
   if (!os || !cpu) return null;
-  return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.tar.gz` };
+  const ext = os === 'windows' ? 'zip' : 'tar.gz';
+  return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.${ext}` };
 }
 
 export function isCliproxyInstalled(): boolean {

@@ -27,8 +27,17 @@ describe('detectPlatformAsset', () => {
     });
   });
 
+  it('maps win32 to the Windows zip assets', () => {
+    expect(detectPlatformAsset('win32', 'x64')).toEqual({
+      archive: expect.stringMatching(/^CLIProxyAPI_[\d.]+_windows_amd64\.zip$/),
+    });
+    expect(detectPlatformAsset('win32', 'arm64')).toEqual({
+      archive: expect.stringMatching(/^CLIProxyAPI_[\d.]+_windows_aarch64\.zip$/),
+    });
+  });
+
   it('returns null for unsupported platforms and arches', () => {
-    expect(detectPlatformAsset('win32', 'x64')).toBeNull();
+    expect(detectPlatformAsset('win32', 'ia32')).toBeNull();
     expect(detectPlatformAsset('darwin', 'ia32')).toBeNull();
   });
 });
