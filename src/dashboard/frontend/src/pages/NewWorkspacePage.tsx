@@ -18,6 +18,7 @@ export function NewWorkspacePage() {
   const [browsing, setBrowsing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [projectTargets, setProjectTargets] = useState<ProjectTargets | null>(null);
+  const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
   const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset });
 
   useEffect(() => {
@@ -46,6 +47,28 @@ export function NewWorkspacePage() {
 
     return () => { cancelled = true; };
   }, [intent.projectKey, intent.setTargetPath]);
+
+  useEffect(() => {
+    setMainWorkspaceMissing(false);
+    if (!intent.projectKey) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetchWithTimeout(
+          `/api/workspace-registry?project=${encodeURIComponent(intent.projectKey)}&kind=main&includeArchived=true`,
+          { credentials: 'include' },
+        );
+        if (cancelled || !response.ok) return;
+        const data = (await response.json()) as { workspaces?: unknown[] };
+        if (!cancelled) setMainWorkspaceMissing((data.workspaces ?? []).length === 0);
+      } catch {
+        // Hiding the action is safer than offering a bootstrap we could not verify.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [intent.projectKey]);
 
   const targetOptions = useMemo(() => {
     if (!projectTargets) return [];
@@ -176,6 +199,26 @@ export function NewWorkspacePage() {
             </div>
           )}
         </div>
+
+        {mainWorkspaceMissing && intent.projectKey && (
+          <div data-testid="new-workspace-bootstrap-main" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+            <span className="text-sm text-muted-foreground">This project has no main workspace registered yet.</span>
+            <button
+              type="button"
+              data-testid="new-workspace-bootstrap-main-button"
+              disabled={intent.creating}
+              onClick={() => {
+                void intent.submitIntent({ project: intent.projectKey, bootstrapMain: true }).then((workspaceId) => {
+                  if (workspaceId) setMainWorkspaceMissing(false);
+                });
+              }}
+              className="shrink-0 rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Register main workspace
+            </button>
+          </div>
+        )}
+
         <div data-testid="new-workspace-hairline-top" data-region="hairline-top" className="mb-5 border-t border-border" />
         <div data-testid="new-workspace-status-strip" data-region="status-strip" className="mb-5 min-h-12" />
         <div data-testid="new-workspace-hairline-bottom" data-region="hairline-bottom" className="mb-8 border-t border-border" />

@@ -70,10 +70,12 @@ beforeEach(() => {
     }
     return currentIntent;
   });
-  mockFetchWithTimeout.mockResolvedValue({
+  mockFetchWithTimeout.mockImplementation(async (url) => ({
     ok: true,
-    json: vi.fn(async () => ({ primaryPath: '/repo', targets: [{ path: '/repo' }, { path: '/work' }] })),
-  } as unknown as Response);
+    json: vi.fn(async () => String(url).includes('project-targets')
+      ? { primaryPath: '/repo', targets: [{ path: '/repo' }, { path: '/work' }] }
+      : { workspaces: [] }),
+  } as unknown as Response));
 });
 
 afterEach(() => {
@@ -176,5 +178,44 @@ describe('NewWorkspacePage shell', () => {
     rerender(<NewWorkspacePage />);
 
     await waitFor(() => expect(nextIntent.setTargetPath).toHaveBeenCalledWith(''));
+  });
+
+  it('offers bootstrap registration when the selected project has no main workspace', async () => {
+    currentIntent = makeIntent('overdeck');
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(mockFetchWithTimeout).toHaveBeenCalledWith(
+      '/api/workspace-registry?project=overdeck&kind=main&includeArchived=true',
+      { credentials: 'include' },
+    ));
+    expect(await screen.findByTestId('new-workspace-bootstrap-main')).toBeInTheDocument();
+  });
+
+  it('submits the bootstrap-main body from the registration action', async () => {
+    currentIntent = makeIntent('overdeck');
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    fireEvent.click(await screen.findByTestId('new-workspace-bootstrap-main-button'));
+    expect(currentIntent.submitIntent).toHaveBeenCalledWith({ project: 'overdeck', bootstrapMain: true });
+  });
+
+  it('hides bootstrap registration when an archived or active main workspace exists', async () => {
+    mockFetchWithTimeout.mockImplementation(async (url) => ({
+      ok: true,
+      json: vi.fn(async () => String(url).includes('project-targets')
+        ? { primaryPath: '/repo', targets: [] }
+        : { workspaces: [{ id: 'main', isArchived: true }] }),
+    } as unknown as Response));
+    currentIntent = makeIntent('overdeck');
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(mockFetchWithTimeout).toHaveBeenCalledWith(
+      '/api/workspace-registry?project=overdeck&kind=main&includeArchived=true',
+      { credentials: 'include' },
+    ));
+    expect(screen.queryByTestId('new-workspace-bootstrap-main')).not.toBeInTheDocument();
   });
 });
