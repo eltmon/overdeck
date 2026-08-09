@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T22:31:42.452Z",
+  "updated": "2026-08-09T22:34:37.539Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -20,12 +20,12 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:31:42.426Z",
+    "updatedAt": "2026-08-09T22:33:57.179Z",
     "mergeNotes": "PR #3632 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.",
     "lastVerifiedCommit": "fac381247daea503a500671cb7946d329c4b7f92",
     "strikeReadyHead": "eb99d522834a18fea63266acaf9808f3e661d7f3",
     "strikeReadyAt": "2026-08-09T22:31:42.425Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -70,9 +70,9 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 667130,
-            "output": 53563,
-            "cacheRead": 33555456,
+            "input": 670646,
+            "output": 54473,
+            "cacheRead": 34362368,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
@@ -85,9 +85,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 667130,
-          "output": 53563,
-          "cacheRead": 33555456,
+          "input": 670646,
+          "output": 54473,
+          "cacheRead": 34362368,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -98,8 +98,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 26.187877,
-        "pricingAsOf": "2026-08-09T22:31:42.442Z"
+        "usd": 26.636213,
+        "pricingAsOf": "2026-08-09T22:33:57.191Z"
       }
     },
     "merges": [],
