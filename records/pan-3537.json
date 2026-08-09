@@ -467,7 +467,16 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/dashboard/server/services/__tests__/project-ci-refill-startup.test.ts",
+      "src/dashboard/server/services/domain-services.ts",
+      "src/dashboard/server/services/project-ci-refill-startup.ts",
+      "src/lib/ci/project-ci-github.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/projects-cache-events.ts",
+      "src/lib/projects.ts",
+      "tests/unit/lib/ci/project-ci-observation-cache.test.ts"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "CLAUDE.md",
@@ -511,20 +520,28 @@
       "src/dashboard/frontend/src/lib/store.ts",
       "src/dashboard/server/main.ts",
       "src/dashboard/server/read-model.ts",
+      "src/dashboard/server/services/__tests__/project-ci-refill-startup.test.ts",
+      "src/dashboard/server/services/domain-services.ts",
+      "src/dashboard/server/services/project-ci-refill-startup.ts",
       "src/lib/__tests__/activity-logger.test.ts",
       "src/lib/activity-logger.ts",
+      "src/lib/ci/project-ci-github.ts",
       "src/lib/ci/project-ci-observation.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
       "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
       "src/lib/overdeck/project-ci-fill.ts",
+      "src/lib/projects-cache-events.ts",
+      "src/lib/projects.ts",
       "src/lib/webhook-handlers.ts",
       "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/ci/project-ci-observation-cache.test.ts",
       "tests/unit/lib/ci/project-ci-observation.test.ts",
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
-    "recordedAt": "2026-08-04T09:26:27.202Z"
+    "recordedAt": "2026-08-09T13:12:19.089Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-09T13:12:06.255Z",
+  "updated": "2026-08-09T13:12:19.091Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "reviewing",
