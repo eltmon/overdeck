@@ -40,20 +40,21 @@
     "recordedAt": "2026-08-09T20:28:46.594Z"
   },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:45:18.190Z",
+  "updated": "2026-08-09T20:47:16.094Z",
   "pipeline": {
     "issueId": "PAN-3626",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:44:46.241Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3626-review",
+    "updatedAt": "2026-08-09T20:47:15.995Z",
+    "reviewNotes": "All four reviewers approved; no blocking or advisory findings.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3635",
+    "reviewedAtCommit": "4baa5fa27d67018b4a09909fb9964bed89eb32f8",
     "lastVerifiedCommit": "4baa5fa27d67018b4a09909fb9964bed89eb32f8",
-    "reviewRequestedAt": "2026-08-09T20:28:49.994Z",
     "reviewSpawnedAt": "2026-08-09T20:30:14.833Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -86,11 +87,19 @@
             "cacheWrite": 156689
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 173109,
+            "output": 4863,
+            "cacheRead": 2037760,
+            "cacheWrite": 0
+          }
+        },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 287701,
-            "output": 18897,
-            "cacheRead": 3388416,
+            "input": 289284,
+            "output": 19290,
+            "cacheRead": 3594240,
             "cacheWrite": 0
           }
         },
@@ -135,9 +144,9 @@
           "cacheWrite": 156689
         },
         "openai/gpt-5.6-sol": {
-          "input": 966680,
-          "output": 50638,
-          "cacheRead": 10251776,
+          "input": 1141372,
+          "output": 55894,
+          "cacheRead": 12495360,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -148,8 +157,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.55663,
-        "pricingAsOf": "2026-08-09T20:45:18.181Z"
+        "usd": 26.709562,
+        "pricingAsOf": "2026-08-09T20:47:16.079Z"
       }
     },
     "merges": [
