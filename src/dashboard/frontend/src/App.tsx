@@ -893,8 +893,7 @@ export default function App() {
             pendingConversationTarget={pendingConversationTarget}
             cockpitRoute={cockpitRoute}
             workspaceRouteId={workspaceRouteId}
-            onWorkspaceViewBack={onWorkspaceViewBack}
-            onWorkspaceCreated={newWorkspace.onCreated}
+            onWorkspaceViewBack={onWorkspaceViewBack} onWorkspaceCreated={newWorkspace.onCreated}
             initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}
