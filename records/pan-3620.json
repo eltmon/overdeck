@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T20:35:40.408Z",
+  "updated": "2026-08-09T20:37:17.267Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -20,8 +20,8 @@
     "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:35:40.378Z",
-    "mergeNotes": "github merge failed: GitHub PR #3632 is closed but not merged",
+    "updatedAt": "2026-08-09T20:36:41.494Z",
+    "mergeNotes": "Stale strike signal: recorded HEAD a97dbb4bbbba0dfd57d51c780ac97d8b7005750b differs from origin/strike/pan-3620 at 41941c6a504c583f026d182ad0e6671bbc44e05d",
     "lastVerifiedCommit": "fac381247daea503a500671cb7946d329c4b7f92",
     "strikeReadyHead": "a97dbb4bbbba0dfd57d51c780ac97d8b7005750b",
     "strikeReadyAt": "2026-08-09T19:57:03.095Z",
@@ -73,7 +73,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.507388,
-        "pricingAsOf": "2026-08-09T20:35:40.399Z"
+        "pricingAsOf": "2026-08-09T20:37:17.260Z"
       }
     },
     "merges": [],
