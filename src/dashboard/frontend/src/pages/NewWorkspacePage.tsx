@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Plus } from 'lucide-react';
 import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
@@ -47,42 +48,45 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
   const [projectTargets, setProjectTargets] = useState<ProjectTargets | null>(null);
   const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
   const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset, onCreated });
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: async (): Promise<RegisteredProject[]> => {
+      const response = await fetchWithTimeout('/api/registered-projects', { credentials: 'include' });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 60_000,
+  });
+  const { data: workspaceRecency = [] } = useQuery({
+    queryKey: ['workspace-registry'],
+    queryFn: async (): Promise<WorkspaceRecency[]> => {
+      const response = await fetchWithTimeout('/api/workspace-registry', { credentials: 'include' });
+      if (!response.ok) return [];
+      const data = await response.json() as { workspaces?: WorkspaceRecency[] };
+      return Array.isArray(data.workspaces) ? data.workspaces : [];
+    },
+    staleTime: 10_000,
+    refetchInterval: 10_000,
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [projectsResponse, workspacesResponse] = await Promise.all([
-          fetchWithTimeout('/api/registered-projects', { credentials: 'include' }),
-          fetchWithTimeout('/api/workspace-registry', { credentials: 'include' }),
-        ]);
-        if (cancelled || !projectsResponse.ok) return;
-        const registered = (await projectsResponse.json()) as RegisteredProject[];
-        const workspacesJson = workspacesResponse.ok
-          ? await workspacesResponse.json() as { workspaces?: WorkspaceRecency[] }
-          : {};
-        if (cancelled) return;
-        const lastAccessedByProject = new Map<string, number>();
-        for (const workspace of workspacesJson.workspaces ?? []) {
-          lastAccessedByProject.set(
-            workspace.projectId,
-            Math.max(lastAccessedByProject.get(workspace.projectId) ?? 0, workspace.lastAccessedAt),
-          );
-        }
-        const ordered = [...registered].sort((a, b) =>
-          (lastAccessedByProject.get(b.key) ?? 0) - (lastAccessedByProject.get(a.key) ?? 0));
-        setProjects(ordered);
-        const presetKey = projectPreset
-          ? ordered.find((project) => project.key === projectPreset || project.name === projectPreset)?.key
-          : undefined;
-        if (presetKey) intent.setProjectKey(presetKey);
-        else if (!intent.projectKey && ordered.length === 1) intent.setProjectKey(ordered[0]?.key ?? '');
-      } catch {
-        // The empty chip row remains usable for adding a project.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [intent.projectKey, intent.setProjectKey, projectPreset]);
+    const lastAccessedByProject = new Map<string, number>();
+    for (const workspace of workspaceRecency) {
+      lastAccessedByProject.set(
+        workspace.projectId,
+        Math.max(lastAccessedByProject.get(workspace.projectId) ?? 0, workspace.lastAccessedAt),
+      );
+    }
+    const ordered = [...registeredProjects].sort((a, b) =>
+      (lastAccessedByProject.get(b.key) ?? 0) - (lastAccessedByProject.get(a.key) ?? 0));
+    setProjects(ordered);
+    const presetKey = projectPreset
+      ? ordered.find((project) => project.key === projectPreset || project.name === projectPreset)?.key
+      : undefined;
+    if (presetKey) intent.setProjectKey(presetKey);
+    else if (!intent.projectKey && ordered.length === 1) intent.setProjectKey(ordered[0]?.key ?? '');
+  }, [intent.projectKey, intent.setProjectKey, projectPreset, registeredProjects, workspaceRecency]);
 
   useEffect(() => {
     intent.setTargetPath('');
@@ -148,6 +152,8 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
     : intent.targetPath || intent.intent?.path || 'Choose target directory';
   const findings = (['name', 'project', 'targetPath', 'parentBranch'] as const)
     .flatMap((field) => intent.findingsFor(field));
+  const resolvedParentBranch = intent.parentBranch || intent.intent?.parentBranch;
+  const resolvedParentBranchInferred = !intent.parentBranch && intent.intent?.parentBranchGuessed;
 
   return (
     <div data-testid="new-workspace-page" className="h-full w-full overflow-y-auto bg-background">
@@ -393,10 +399,12 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
                     <span className="text-destructive-foreground">unregistered target</span>
                   </>
                 )}
-                {intent.parentBranch && (
+                {resolvedParentBranch && (
                   <>
                     <span className="mx-2 opacity-50">·</span>
-                    <span>parent {intent.parentBranch}</span>
+                    <span data-testid="new-workspace-status-parent">
+                      parent {resolvedParentBranch}{resolvedParentBranchInferred ? ' (inferred)' : ''}
+                    </span>
                   </>
                 )}
               </>

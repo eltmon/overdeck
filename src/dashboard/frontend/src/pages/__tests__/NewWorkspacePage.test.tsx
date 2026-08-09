@@ -1,7 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement, ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render as testingRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -34,6 +36,19 @@ import { NewWorkspacePage } from '../NewWorkspacePage.js';
 
 const mockUseWorkspaceCreateIntent = vi.mocked(useWorkspaceCreateIntent);
 const mockFetchWithTimeout = vi.mocked(fetchWithTimeout);
+
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+}
+
+function render(ui: ReactElement, queryClient = createQueryClient()) {
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  }
+  return { queryClient, ...testingRender(ui, { wrapper: Wrapper }) };
+}
 
 function makeResolvedIntent(isGitRepository = true) {
   return {
@@ -261,6 +276,27 @@ describe('NewWorkspacePage shell', () => {
     expect(screen.queryByTestId('new-workspace-bootstrap-main')).not.toBeInTheDocument();
   });
 
+  it('reuses the workspace registry query cache for project recency', async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(['workspace-registry'], [
+      { projectId: 'b', lastAccessedAt: 20 },
+      { projectId: 'a', lastAccessedAt: 30 },
+    ]);
+    mockProjectData([
+      { key: 'a', name: 'Alpha', path: '/a' },
+      { key: 'b', name: 'Beta', path: '/b' },
+    ]);
+
+    render(<NewWorkspacePage />, queryClient);
+
+    await waitFor(() => expect(screen.getAllByTestId('new-workspace-project-chip')).toHaveLength(2));
+    expect(screen.getAllByTestId('new-workspace-project-chip').map((chip) => chip.textContent)).toEqual([
+      'Alpha',
+      'Beta',
+    ]);
+    expect(mockFetchWithTimeout.mock.calls.filter(([url]) => String(url) === '/api/workspace-registry')).toEqual([]);
+  });
+
   it('orders project chips by the most recent workspace access', async () => {
     mockProjectData(
       [
@@ -352,6 +388,19 @@ describe('NewWorkspacePage shell', () => {
     expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent(
       /Memory enabled\s*·\s*Files shared\s*·\s*git repository.*parent release/,
     );
+    expect(screen.getByTestId('new-workspace-status-parent')).not.toHaveTextContent('inferred');
+  });
+
+  it('renders the resolver-inferred parent branch when no override is entered', () => {
+    currentIntent = {
+      ...makeIntent(),
+      intent: makeResolvedIntent(true),
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-status-parent')).toHaveTextContent('parent main (inferred)');
   });
 
   it('renders resolved path, branch, worktree, and unregistered-target posture in place', () => {
