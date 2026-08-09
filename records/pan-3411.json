@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-08-09T14:04Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-09T14:04:35.775Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-09T19:46:12.459Z"
     }
   ],
   "feedback": [],
@@ -140,7 +145,7 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T19:46:11.397Z",
+  "updated": "2026-08-09T19:46:12.482Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "reviewing",
@@ -316,7 +321,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
