@@ -4,17 +4,17 @@
     "created": "2026-08-09T19:57:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3626: Windows: CLIProxy should auto-install the pinned version (prebuilt win32 binaries do exist)",
-    "updated": "2026-08-09T19:54:53.283Z"
+    "updated": "2026-08-09T21:30:24.468Z"
   },
   "plan": {
     "id": "pan-3626",
     "title": "Windows: CLIProxy should auto-install the pinned version (prebuilt win32 binaries do exist)",
-    "status": "running",
+    "status": "completed",
     "uid": "1ffb9370-32e4-4f53-a124-55316a5d8fec",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-09T19:57:00.000Z",
-    "updated": "2026-08-09T19:54:53.283Z",
+    "updated": "2026-08-09T21:30:24.468Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3626",
@@ -453,5 +453,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
