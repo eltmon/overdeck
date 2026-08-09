@@ -274,7 +274,7 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:45:18.416Z",
+  "updated": "2026-08-09T22:48:18.570Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -284,7 +284,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:45:17.919Z",
+    "updatedAt": "2026-08-09T22:48:18.530Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewRequestedAt": "2026-08-09T22:44:37.999Z",
@@ -448,26 +448,26 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 36,
-            "output": 4455,
-            "cacheRead": 1440143,
-            "cacheWrite": 93140
+            "input": 40,
+            "output": 4787,
+            "cacheRead": 1627299,
+            "cacheWrite": 95929
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4348531,
-            "output": 398229,
-            "cacheRead": 156402688,
+            "input": 4359123,
+            "output": 399917,
+            "cacheRead": 157284864,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7545182,
-          "output": 592158,
-          "cacheRead": 201597440,
+          "input": 7555774,
+          "output": 593846,
+          "cacheRead": 202479616,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -477,15 +477,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 36,
-          "output": 4455,
-          "cacheRead": 1440143,
-          "cacheWrite": 93140
+          "input": 40,
+          "output": 4787,
+          "cacheRead": 1627299,
+          "cacheWrite": 95929
         }
       },
       "costAtCloseOut": {
-        "usd": 180.999503,
-        "pricingAsOf": "2026-08-09T22:45:17.975Z"
+        "usd": 181.591923,
+        "pricingAsOf": "2026-08-09T22:48:18.559Z"
       }
     },
     "merges": [
