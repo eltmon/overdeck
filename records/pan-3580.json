@@ -2,7 +2,7 @@
   "issueId": "PAN-3580",
   "schemaVersion": 2,
   "created": "2026-08-06T19:32:10.719Z",
-  "updated": "2026-08-09T13:57:30.911Z",
+  "updated": "2026-08-09T19:43:20.226Z",
   "pipeline": {
     "issueId": "PAN-3580",
     "reviewStatus": "pending",
@@ -31,6 +31,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-07T14:00:33.632Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-09T19:43:20.226Z"
     }
   ],
   "recoveryTrips": [
