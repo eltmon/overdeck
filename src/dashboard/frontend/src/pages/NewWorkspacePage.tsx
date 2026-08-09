@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Folder } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, FolderPlus, Plus } from 'lucide-react';
 import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
 import { NewProjectModal } from '../components/CommandDeck/NewProjectModal.js';
@@ -11,6 +11,17 @@ interface ProjectTargets {
   targets: Array<{ path: string }>;
 }
 
+interface RegisteredProject {
+  key: string;
+  name: string;
+  path: string;
+}
+
+interface WorkspaceRecency {
+  projectId: string;
+  lastAccessedAt: number;
+}
+
 interface NewWorkspacePageProps {
   onCreated?: (workspaceId: string) => void;
 }
@@ -18,12 +29,50 @@ interface NewWorkspacePageProps {
 export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
   const [projectPreset] = useState(() => getNewWorkspaceProjectFromSearch() ?? '');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [projects, setProjects] = useState<RegisteredProject[]>([]);
+  const [projectOverflowOpen, setProjectOverflowOpen] = useState(false);
   const [targetMenuOpen, setTargetMenuOpen] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [projectTargets, setProjectTargets] = useState<ProjectTargets | null>(null);
   const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
   const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset, onCreated });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [projectsResponse, workspacesResponse] = await Promise.all([
+          fetchWithTimeout('/api/registered-projects', { credentials: 'include' }),
+          fetchWithTimeout('/api/workspace-registry', { credentials: 'include' }),
+        ]);
+        if (cancelled || !projectsResponse.ok) return;
+        const registered = (await projectsResponse.json()) as RegisteredProject[];
+        const workspacesJson = workspacesResponse.ok
+          ? await workspacesResponse.json() as { workspaces?: WorkspaceRecency[] }
+          : {};
+        if (cancelled) return;
+        const lastAccessedByProject = new Map<string, number>();
+        for (const workspace of workspacesJson.workspaces ?? []) {
+          lastAccessedByProject.set(
+            workspace.projectId,
+            Math.max(lastAccessedByProject.get(workspace.projectId) ?? 0, workspace.lastAccessedAt),
+          );
+        }
+        const ordered = [...registered].sort((a, b) =>
+          (lastAccessedByProject.get(b.key) ?? 0) - (lastAccessedByProject.get(a.key) ?? 0));
+        setProjects(ordered);
+        const presetKey = projectPreset
+          ? ordered.find((project) => project.key === projectPreset || project.name === projectPreset)?.key
+          : undefined;
+        if (presetKey) intent.setProjectKey(presetKey);
+        else if (!intent.projectKey && ordered.length === 1) intent.setProjectKey(ordered[0]?.key ?? '');
+      } catch {
+        // The empty chip row remains usable for adding a project.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [intent.projectKey, intent.setProjectKey, projectPreset]);
 
   useEffect(() => {
     intent.setTargetPath('');
@@ -103,8 +152,68 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
           data-testid="new-workspace-project-chip-row"
           data-region="project-chip-row"
           data-selected-project={intent.projectKey}
-          className="mb-8 min-h-9"
-        />
+          className="relative mb-8 flex min-h-9 flex-wrap items-center gap-2"
+        >
+          <button
+            type="button"
+            onClick={() => setNewProjectOpen(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <Plus className="h-4 w-4" />
+            add existing
+          </button>
+          <button
+            type="button"
+            onClick={() => setNewProjectOpen(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <FolderPlus className="h-4 w-4" />
+            new project
+          </button>
+          {projects.slice(0, 5).map((project) => (
+            <button
+              key={project.key}
+              type="button"
+              data-testid="new-workspace-project-chip"
+              data-project-key={project.key}
+              aria-pressed={intent.projectKey === project.key}
+              onClick={() => intent.setProjectKey(project.key)}
+              className={`inline-flex h-9 items-center rounded-lg border px-3 text-sm transition-colors ${intent.projectKey === project.key ? 'border-foreground/40 bg-accent text-foreground' : 'border-input text-foreground hover:bg-accent'}`}
+            >
+              {project.name}
+            </button>
+          ))}
+          {projects.length > 5 && (
+            <>
+              <button
+                type="button"
+                aria-expanded={projectOverflowOpen}
+                onClick={() => setProjectOverflowOpen((open) => !open)}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                more projects
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {projectOverflowOpen && (
+                <div data-testid="new-workspace-project-overflow" className="absolute left-0 top-11 z-30 min-w-64 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                  {projects.slice(5).map((project) => (
+                    <button
+                      key={project.key}
+                      type="button"
+                      onClick={() => {
+                        intent.setProjectKey(project.key);
+                        setProjectOverflowOpen(false);
+                      }}
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
+                    >
+                      {project.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         <input
           data-testid="new-workspace-hero-title"
@@ -286,6 +395,7 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
         isOpen={newProjectOpen}
         onClose={() => setNewProjectOpen(false)}
         onCreated={(project) => {
+          setProjects((current) => [project, ...current.filter((candidate) => candidate.key !== project.key)]);
           intent.setProjectKey(project.key);
           setNewProjectOpen(false);
         }}

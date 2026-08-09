@@ -6,8 +6,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../components/CommandDeck/NewProjectModal.js', () => ({
-  NewProjectModal: ({ isOpen }: { isOpen: boolean }) => (
-    <div data-testid="new-project-modal-mount" data-open={String(isOpen)} />
+  NewProjectModal: ({ isOpen, onCreated }: { isOpen: boolean; onCreated: (project: { key: string; name: string; path: string }) => void }) => (
+    <div data-testid="new-project-modal-mount" data-open={String(isOpen)}>
+      {isOpen && <button onClick={() => onCreated({ key: 'new-project', name: 'New Project', path: '/new' })}>Create mocked project</button>}
+    </div>
   ),
 }));
 
@@ -47,6 +49,23 @@ function makeResolvedIntent(isGitRepository = true) {
     unregisteredTargetPath: false,
     findings: [],
   };
+}
+
+function mockProjectData(
+  projects: Array<{ key: string; name: string; path: string }>,
+  workspaces: Array<{ projectId: string; lastAccessedAt: number }> = [],
+) {
+  mockFetchWithTimeout.mockImplementation(async (url) => {
+    const path = String(url);
+    const body = path === '/api/registered-projects'
+      ? projects
+      : path === '/api/workspace-registry'
+        ? { workspaces }
+        : path.includes('project-targets')
+          ? { primaryPath: '/repo', targets: [] }
+          : { workspaces: [{ id: 'main' }] };
+    return { ok: true, json: vi.fn(async () => body) } as unknown as Response;
+  });
 }
 
 function makeIntent(initialProjectKey = ''): ReturnType<typeof useWorkspaceCreateIntent> {
@@ -90,12 +109,15 @@ beforeEach(() => {
     }
     return currentIntent;
   });
-  mockFetchWithTimeout.mockImplementation(async (url) => ({
-    ok: true,
-    json: vi.fn(async () => String(url).includes('project-targets')
-      ? { primaryPath: '/repo', targets: [{ path: '/repo' }, { path: '/work' }] }
-      : { workspaces: [] }),
-  } as unknown as Response));
+  mockFetchWithTimeout.mockImplementation(async (url) => {
+    const path = String(url);
+    const body = path === '/api/registered-projects'
+      ? []
+      : path.includes('project-targets')
+        ? { primaryPath: '/repo', targets: [{ path: '/repo' }, { path: '/work' }] }
+        : { workspaces: [] };
+    return { ok: true, json: vi.fn(async () => body) } as unknown as Response;
+  });
 });
 
 afterEach(() => {
@@ -237,6 +259,62 @@ describe('NewWorkspacePage shell', () => {
       { credentials: 'include' },
     ));
     expect(screen.queryByTestId('new-workspace-bootstrap-main')).not.toBeInTheDocument();
+  });
+
+  it('orders project chips by the most recent workspace access', async () => {
+    mockProjectData(
+      [
+        { key: 'a', name: 'Alpha', path: '/a' },
+        { key: 'b', name: 'Beta', path: '/b' },
+        { key: 'c', name: 'Gamma', path: '/c' },
+      ],
+      [
+        { projectId: 'b', lastAccessedAt: 20 },
+        { projectId: 'a', lastAccessedAt: 30 },
+        { projectId: 'c', lastAccessedAt: 10 },
+      ],
+    );
+    render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(screen.getAllByTestId('new-workspace-project-chip')).toHaveLength(3));
+    expect(screen.getAllByTestId('new-workspace-project-chip').map((chip) => chip.textContent)).toEqual([
+      'Alpha',
+      'Beta',
+      'Gamma',
+    ]);
+  });
+
+  it('preselects the sole registered project when no preset exists', async () => {
+    mockProjectData([{ key: 'solo', name: 'Solo', path: '/solo' }]);
+    render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(currentIntent.setProjectKey).toHaveBeenCalledWith('solo'));
+  });
+
+  it('collapses projects beyond five into a selectable overflow menu', async () => {
+    mockProjectData(Array.from({ length: 6 }, (_, index) => ({
+      key: `project-${index + 1}`,
+      name: `Project ${index + 1}`,
+      path: `/project-${index + 1}`,
+    })));
+    render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(screen.getAllByTestId('new-workspace-project-chip')).toHaveLength(5));
+    fireEvent.click(screen.getByRole('button', { name: /more projects/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Project 6' }));
+    expect(currentIntent.setProjectKey).toHaveBeenCalledWith('project-6');
+  });
+
+  it('opens NewProjectModal and selects the project returned by onCreated', async () => {
+    currentIntent.setProjectKey = vi.fn((key) => { currentIntent.projectKey = key; });
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /new project/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create mocked project' }));
+
+    expect(currentIntent.setProjectKey).toHaveBeenCalledWith('new-project');
+    expect(await screen.findByRole('button', { name: 'New Project' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders the resolved shared-mode status line and parent override', () => {
