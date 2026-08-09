@@ -36,6 +36,19 @@ interface DoneOptions {
   uatNotes?: string;
 }
 
+// PAN-3642: this advisory deadline covers the PR comment, a stopped Claude
+// agent's summary-resume path, and all four same-key supervisor attempts plus
+// their retry sleeps. The previous 30s deadline expired during a valid retry
+// sequence and killed the specialist process before delivery could settle.
+export const FEEDBACK_DELIVERY_TIMEOUT_MS = 120_000;
+
+class FeedbackDeliveryTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`feedback delivery timed out after ${timeoutMs}ms`);
+    this.name = 'FeedbackDeliveryTimeoutError';
+  }
+}
+
 export async function doneCommand(
   specialist: string,
   issueId: string,
@@ -275,8 +288,8 @@ export async function doneCommand(
     // done` is run from inside the review agent's own session, so a hung delivery
     // leaves that agent waiting on a never-returning command and the issue stalls
     // in-review. Bound the whole step in wall-clock time so the CLI always exits;
-    // a missed comment/message is recovered by the deacon feedback janitor.
-    const FEEDBACK_DELIVERY_TIMEOUT_MS = 30_000;
+    // if that outer deadline is exhausted, persist a retryable stuck state before
+    // the specialist process exits instead of relying on an invisible warning.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
       const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
@@ -289,7 +302,7 @@ export async function doneCommand(
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`feedback delivery timed out after ${FEEDBACK_DELIVERY_TIMEOUT_MS}ms`)),
+          () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
           FEEDBACK_DELIVERY_TIMEOUT_MS,
         );
       });
@@ -300,6 +313,19 @@ export async function doneCommand(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof FeedbackDeliveryTimeoutError) {
+        const { surfaceIssueFeedbackNeedsYou } = await import('../../../lib/cloister/feedback-target.js');
+        await surfaceIssueFeedbackNeedsYou(
+          normalizedIssueId,
+          `Review feedback delivery exceeded the ${err.timeoutMs}ms advisory deadline before the keyed retry contract settled; retry remains required.`,
+          {
+            specialist: 'review-agent',
+            retryable: true,
+            source: 'specialists-done-timeout',
+            ...(options.runId ? { runId: options.runId } : {}),
+          },
+        );
+      }
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
     }
   }
