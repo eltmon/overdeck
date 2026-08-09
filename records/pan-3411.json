@@ -142,9 +142,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-09T21:23:57.941Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-09T21:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-09T21:48:00.041Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-09T21:48:00.151Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-09T21:48:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3411\n\n# Review Synthesis — PAN-3411 — 2026-08-09T21:46:00Z\n\n## Verdict: CHANGES REQUESTED — the new React Query conversion can render-loop on a cold cache\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/context.json`\n- Branch: `feature/pan-3411`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411`\n- HEAD reviewed: `7b350539d1e15ad05aed9c0cf17bea427aaeaf96`\n- Cycle number: 3\n- Prior cycle SHA: `649756e5df6850aaf10e0ca0d25843f71d6ed468`\n- PR diff: `6879ca3f49e9c8b436ceec8a584b2430bc9319d9..7b350539d1e15ad05aed9c0cf17bea427aaeaf96` (19 commits)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/correctness.md` | 2 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Cold-loading the page enters an unbounded render loop — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:51`\n\nThe newly introduced React Query destructuring defaults create fresh `[]` identities on every loading render. The current-cycle synchronization effect depends on those arrays and unconditionally writes another fresh `projects` array, triggering an endless render/effect cycle before either query settles. The reviewer reproduced the timeout in the page-shell test. Use stable loading identities or query initial data, and avoid unconditional mirrored state updates; derive the ordered remote list with `useMemo` where possible. This is in the current-cycle diff and survives the cycle-3 convergence gate.\n\n### [correctness] Creating a project immediately removes it from the project chip list — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:459`\n\n`NewProjectModal.onCreated` temporarily prepends the returned project and selects it, but the new current-cycle synchronization effect runs on that selection change and replaces local state from the stale `['registered-projects']` query result. The selected project disappears from the chips until an unrelated refresh or remount. Update and invalidate the canonical query cache on creation, or merge local additions rather than overwriting them. The causal effect is in the current-cycle diff, so this finding remains promotable.\n\n### [requirements] A project preset permanently overrides later chip selections — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:73`\n\nThe current-cycle effect depends on `intent.projectKey` and reapplies a valid `projectPreset` whenever that key changes. A project-scoped entry point therefore restores the URL preset immediately after the operator selects another chip or overflow entry. Apply the preset only once after the registered list resolves and add a regression test that switches away from a preset. The requirements reviewer classified this `Scope: in_pr_scope`, and the cited effect is in the current-cycle diff.\n\n## Non-blocking Findings\n\n### [correctness]\n\n- `~` **Cancel has no in-app fallback for a direct route** — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:417`. A direct or bookmarked visit may have no prior in-app history entry, so `window.history.back()` can do nothing or exit the dashboard. Use an app-navigation fallback.\n\n### [performance]\n\n- `~` **The new docs screenshot loads both full-size theme variants** — `configuration/workspaces.mdx:41`. `ThemedImage` emits two PNG image elements and hides one with CSS, so a cold documentation load transfers about 768 KiB unnecessarily. Use an optimized single image or load only the active theme variant.\n\n### [requirements]\n\n- `~` **[demoted: previously reviewed] The no-loss parity test does not mechanically cover the removed modal surface** — `src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx:3`. The audit compares two hardcoded collections rather than rendered controls or behavioral coverage, but this file is outside the `649756e5..HEAD` cycle diff. At cycle 3, the convergence gate prevents promoting this previously reviewed code to a blocker.\n\n## Clean Sub-roles\n\n- **security:** No blockers or advisories; same-origin protections, mutation-token handling, server-side resolution, and dynamic-text rendering were reviewed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-7b350539/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3411 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -225,7 +243,7 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T21:47:59.235Z",
+  "updated": "2026-08-09T21:48:00.151Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "blocked",
