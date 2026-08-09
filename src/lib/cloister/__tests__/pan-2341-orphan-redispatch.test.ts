@@ -199,6 +199,40 @@ describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
     expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
   });
 
+  it('preserves reviewing when a current-run reviewer has fresh effective activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-07T01:00:00.000Z'));
+    const runId = 'agent-pan-3002-review-abcdef12';
+    const raw = status({
+      issueId: 'PAN-3002',
+      reviewSpawnedAt: Date.parse('2026-07-07T00:44:00.000Z'),
+      updatedAt: '2026-07-07T00:44:00.000Z',
+      reviewRetryCount: 0,
+    });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
+    mocks.getAgentRuntimeStateSync.mockImplementation((agentId: string) =>
+      agentId.endsWith('-correctness')
+        ? { state: 'active', lastActivity: '2026-07-07T00:59:00.000Z' }
+        : null,
+    );
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-3002-review', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:44:00.000Z', reviewRunId: runId },
+      { id: 'agent-pan-3002-review-security', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:44:00.000Z', reviewRunId: runId },
+      { id: 'agent-pan-3002-review-performance', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:44:00.000Z', reviewRunId: runId },
+      { id: 'agent-pan-3002-review-requirements', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:44:00.000Z', reviewRunId: runId },
+      { id: 'agent-pan-3002-review-correctness', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:44:00.000Z', reviewRunId: runId },
+    ]));
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(actions).toEqual([]);
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    expect(raw.reviewStatus).toBe('reviewing');
+    expect(raw.reviewRetryCount).toBe(0);
+  });
+
   it('recovers reviewing when the coordinator stopped but sub-reviewers remain running', async () => {
     const raw = status({ issueId: 'PAN-3002', updatedAt: new Date().toISOString() });
     mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
