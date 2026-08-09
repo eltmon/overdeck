@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:52:42.502Z",
+  "updated": "2026-08-09T13:08:21.894Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "docs-update": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 1550936,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:52:42.501Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -260,6 +252,16 @@
         "itemId": "modal-removal",
         "outcome": "completed",
         "releasedAt": "2026-08-09T12:52:14.438Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 1550936,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:52:42.501Z",
+        "itemId": "docs-update",
+        "outcome": "completed",
+        "releasedAt": "2026-08-09T13:08:21.894Z"
       }
     ],
     "statusReasons": {
@@ -354,6 +356,9 @@
     "modal-removal.ac1": "completed",
     "modal-removal.ac2": "completed",
     "modal-removal.ac3": "completed",
-    "docs-update": "running"
+    "docs-update": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "docs-update.ac3": "completed"
   }
 }
