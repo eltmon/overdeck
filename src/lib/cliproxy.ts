@@ -605,6 +605,14 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+export function netstatShowsListener(output: string, port: number): boolean {
+  const localPort = new RegExp(`[.:]${port}$`);
+  return output.split(/\r?\n/).some((line) => {
+    const columns = line.trim().split(/\s+/);
+    return /\bLISTENING\b/i.test(line) && localPort.test(columns[1] ?? '');
+  });
+}
+
 export function isCliproxyRunningSync(): boolean {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
@@ -612,6 +620,14 @@ export function isCliproxyRunningSync(): boolean {
   // Use bash /dev/tcp instead of lsof — busybox lsof on Alpine ignores -t/-i
   // and returns all processes, making this check both incorrect and dangerous.
   try {
+    if (process.platform === 'win32') {
+      const output = execSync('netstat -ano -p TCP', {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        timeout: 5_000,
+      });
+      return netstatShowsListener(output, CLIPROXY_PORT);
+    }
     execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${CLIPROXY_PORT}'`, {
       encoding: 'utf8',
       stdio: 'pipe',
