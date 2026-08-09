@@ -10,60 +10,22 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T23:05:08.414Z",
+  "updated": "2026-08-09T23:09:11.699Z",
   "pipeline": {
     "issueId": "PAN-3620",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T23:05:08.379Z",
-    "testNotes": "Skipped: issue is already merged",
-    "lastVerifiedCommit": "eb99d522834a18fea63266acaf9808f3e661d7f3",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [
-      {
-        "timestamp": "2026-08-09T20:05:30.512Z",
-        "strikeHead": "a97dbb4bbbba0dfd57d51c780ac97d8b7005750b",
-        "mainHead": "f1a9c5bca16f952b5dab2567d77dfa64a2957f47",
-        "outcome": "transport-failed",
-        "detail": "Strike merge request failed: fetch failed"
-      },
-      {
-        "timestamp": "2026-08-09T20:36:41.504Z",
-        "strikeHead": "a97dbb4bbbba0dfd57d51c780ac97d8b7005750b",
-        "mainHead": "53de20971bbaed62ecb91743a9061f2c6959e0e7",
-        "outcome": "failed",
-        "detail": "Stale strike signal: recorded HEAD a97dbb4bbbba0dfd57d51c780ac97d8b7005750b differs from origin/strike/pan-3620 at 41941c6a504c583f026d182ad0e6671bbc44e05d"
-      },
-      {
-        "timestamp": "2026-08-09T21:37:04.819Z",
-        "strikeHead": "a4f42f291d12a72d36a3f91a1b6c4a3378979666",
-        "mainHead": "812dc53a0c7fa91148722133a29799ea5896cf34",
-        "outcome": "failed",
-        "detail": "PR #3632 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state."
-      },
-      {
-        "timestamp": "2026-08-09T22:01:16.831Z",
-        "strikeHead": "09d3574ce50e5f5cd523a77ea68ceb0fe814aa5a",
-        "mainHead": "812dc53a0c7fa91148722133a29799ea5896cf34",
-        "outcome": "failed",
-        "detail": "PR #3632 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state."
-      },
-      {
-        "timestamp": "2026-08-09T22:17:27.344Z",
-        "strikeHead": "bce733f9da5dcf21e48fb7a532913dc988e9dede",
-        "mainHead": "62b7c24921c452b996a028bafabd7780ea7d7e6d",
-        "outcome": "failed",
-        "detail": "PR #3632 is CLOSED (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state."
-      }
-    ],
     "closedOut": true,
-    "closedOutAt": "2026-08-09T23:05:08.379Z"
+    "closedOutAt": "2026-08-09T23:05:08.379Z",
+    "updatedAt": "2026-08-09T23:08:41.068Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3620 after its harness exited before push.",
+    "strikeReadyHead": "eb99d522834a18fea63266acaf9808f3e661d7f3",
+    "strikeReadyAt": "2026-08-09T23:08:41.068Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -99,92 +61,11 @@
       },
       "costAtCloseOut": {
         "usd": 26.636213,
-        "pricingAsOf": "2026-08-09T22:52:49.369Z"
+        "pricingAsOf": "2026-08-09T23:08:41.077Z"
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-09T23:05:08.397Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at eb99d522834a18fea63266acaf9808f3e661d7f3",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3632 MERGED at 2026-08-09T22:49:17Z",
-          "status": "pass",
-          "mergedAt": "2026-08-09T22:49:17Z",
-          "mergeCommit": "c75c24b39a8343b15b9062b606dda5d680a1d823"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "required checks concluded successfully on c75c24b39a8343b15b9062b606dda5d680a1d823: test, lint, build (22), guard",
-          "status": "pass"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit c75c24b3 contains merge c75c24b3",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3620 not merged to main; Cleaned 7 agent state directories (1 transcript files preserved); Preserved local branch strike/pan-3620 — not merged to main; Preserved remote branch strike/pan-3620 — not merged to main; Pruned 107 checkpoint ref(s) for agent-pan-3620, planning-pan-3620, strike-pan-3620; No specialist registry entries for PAN-3620"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
