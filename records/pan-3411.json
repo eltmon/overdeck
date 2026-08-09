@@ -148,18 +148,19 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T14:04:41.862Z",
+  "updated": "2026-08-09T14:07:02.843Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T14:04:41.853Z",
+    "updatedAt": "2026-08-09T14:07:02.771Z",
     "reviewNotes": "resolved status strip omits the inferred parent branch",
+    "verificationNotes": "Verification FAILED at test (374143ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3411\n\n ❯ src/components/knowledge/KnowledgePage.test.tsx (11 tests | 1 failed) 201ms\n     × registers /knowledge without changing existing tab paths 16ms\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XqZTEN/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-mai\n…(697 chars elided)…\nure-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ykXfDC/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n\n...(truncated)",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "ed530b4752cab236c4a9bdb145f5992d4fc88db0",
@@ -249,9 +250,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 102696,
-            "output": 5201,
-            "cacheRead": 1763840,
+            "input": 103408,
+            "output": 5289,
+            "cacheRead": 1897984,
             "cacheWrite": 0
           }
         },
@@ -289,30 +290,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3873210,
-            "output": 306658,
-            "cacheRead": 130228352,
+            "input": 3933426,
+            "output": 317747,
+            "cacheRead": 134950656,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 1458518,
-          "output": 70448,
-          "cacheRead": 12460544,
+          "input": 1459230,
+          "output": 70536,
+          "cacheRead": 12594688,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3873210,
-          "output": 306658,
-          "cacheRead": 130228352,
+          "input": 3933426,
+          "output": 317747,
+          "cacheRead": 134950656,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 101.49816,
-        "pricingAsOf": "2026-08-09T14:04:41.857Z"
+        "usd": 104.529698,
+        "pricingAsOf": "2026-08-09T14:07:02.799Z"
       }
     },
     "merges": [
