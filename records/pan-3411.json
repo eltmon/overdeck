@@ -52,9 +52,22 @@
       "timestamp": "2026-08-09T13:55:51.681Z",
       "reason": "end",
       "note": "Anomaly first: the final full suite exposed an existing orphan-reconciler fixture that leaked PAN-3604's live closed state; c21197b544 isolates that GitHub App issue-state read and restores deterministic coverage. Implemented the dedicated /workspaces/new page, preserved every modal affordance through the no-loss audit, routed all entry points, removed the modal, updated docs with current screenshots, and recorded wide/narrow plus keyboard-only verification. Final gates passed: typecheck, lint, 13,495 root tests, and 63 frontend parity tests."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-09T14:04Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-09T14:04:35.775Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-09T14:04:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3411\n\n# Review Synthesis — PAN-3411 — 2026-08-09T14:03:00Z\n\n## Verdict: CHANGES REQUESTED — resolved status strip omits the inferred parent branch\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/context.json`\n- Branch: `feature/pan-3411`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411`\n- HEAD reviewed: `ed530b4752cab236c4a9bdb145f5992d4fc88db0`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR diff: `395349da39d942f285257ff92e4abff8f441ef4a..ed530b4752cab236c4a9bdb145f5992d4fc88db0` (16 commits)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] The status strip hides the resolver-inferred parent branch — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:396`\n\nThe normal blank-parent input case does not render the resolved `intent.intent?.parentBranch` or indicate when `parentBranchGuessed` is true; it renders a parent only when the operator explicitly supplied one. The requirements reviewer classified this as `Scope: in_pr_scope`, and the cited page is wholly introduced by this PR (`459` added lines), so it survives the mandatory PR-scope gate. This leaves the resolved-intent preview and the modal-parity parent metadata incomplete: an operator cannot verify the inferred parent before creating an isolated workspace. Render the resolved parent whenever present, label guessed values as inferred, and add coverage for the blank-input/inferred-parent state.\n\n## Non-blocking Findings\n\n### [performance]\n\n- `~` **Reuse the workspace-registry query instead of issuing a second full-list request** — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:56`. The page independently fetches the unpaged registry only to calculate project recency while the mounted sidebar already polls the same endpoint. Reusing the sidebar query cache would avoid an additional O(W) status-read fanout per page visit.\n\n## Clean Sub-roles\n\n- **security:** No blockers or advisories; authenticated mutation-token handling and rendering boundaries were reviewed.\n- **correctness:** No blockers or advisories; route cutover, intent lifecycle, activation/navigation, and focused test coverage were reviewed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3411 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -135,7 +148,7 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T14:04:35.141Z",
+  "updated": "2026-08-09T14:04:35.775Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "blocked",
