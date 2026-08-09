@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import {
+  registerDurableReviewDispatcher,
   registerDurableReviewPipelineHandler,
+  type DurableReviewDispatcher,
   type DurableReviewPipelineInput,
 } from '../../../lib/cloister/durable-review-pipeline.js';
 import { pushLocalReviewBranches } from '../../../lib/cloister/review-branch-push.js';
@@ -41,6 +43,7 @@ interface DashboardWorkspaceInfo extends WorkspaceInfo {
 export interface DurableReviewRegistrationDependencies {
   getWorkspaceInfo: (issueId: string) => DashboardWorkspaceInfo;
   pushRemote: (vmName: string, workspacePath: string, branchName: string) => Promise<void>;
+  dispatchReview: DurableReviewDispatcher;
 }
 
 export async function startDashboardDurableReviewPipeline(
@@ -126,6 +129,7 @@ export async function pushDashboardReviewBranch(
 export function registerDashboardDurableReviewPipeline(
   dependencies: DurableReviewRegistrationDependencies,
 ): void {
+  registerDurableReviewDispatcher(dependencies.dispatchReview);
   registerDurableReviewPipelineHandler((input) => startDashboardDurableReviewPipeline(input, {
     resolveWorkspace: (issueId) => {
       const workspaceInfo = dependencies.getWorkspaceInfo(issueId);

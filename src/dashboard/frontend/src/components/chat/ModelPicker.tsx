@@ -217,6 +217,8 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const liveConversationRef = useRef(liveConversation);
+  liveConversationRef.current = liveConversation;
   const { openUp, align, maxHeight } = usePickerPosition(open, ref);
 
   // Reset search when dropdown closes
@@ -310,11 +312,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             })),
           });
         }
-
         const effectiveGroups = newGroups.length > 0 ? newGroups : FALLBACK_GROUPS;
         syncKnownModels(effectiveGroups);
         if (newGroups.length > 0) setGroups(newGroups);
-
+        const resolved = loadStoredModel(getDefaultConversationModel());
+        if (!liveConversationRef.current && resolved && resolved !== value && isKnownModel(resolved)) onChange(resolved, effectiveGroups.flatMap((g) => g.models).find((m) => m.id === resolved)?.effortLevels ?? []);
         const modelIds = effectiveGroups.flatMap((g) => g.models.map((m) => m.id));
         if (modelIds.length > 0) {
           const policy = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)

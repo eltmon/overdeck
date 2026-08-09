@@ -5,6 +5,12 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // display-xl/display-lg/eyebrow are authored in src/index.css's
+  // `@layer components` but not yet consumed by any .tsx file (PAN-3410
+  // theme-token-scope lands the vocabulary; broadsheet-mechanical-migration
+  // adopts it). Without a safelist entry Tailwind's content-based purge drops
+  // them from the build since no scanned file contains the class name token.
+  safelist: ['display-xl', 'display-lg', 'eyebrow'],
   theme: {
     extend: {
       colors: {
@@ -65,9 +71,9 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-        body: ['"DM Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', '"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
       },
       borderRadius: {
         sm: 'calc(var(--radius) - 4px)',

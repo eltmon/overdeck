@@ -127,6 +127,22 @@ and retry failures are appended to `~/.overdeck/logs/auto-deploy.log`.
 `pan reload` remains the manual deployment door. It builds first, preserves the running dashboard
 when the build fails, restarts the Node 22 bundle after a successful build, and waits for health.
 
+### Post-merge deploy retries and escalation
+
+`postMergeLifecycle()` spawns `scripts/post-merge-deploy.sh`, which re-execs into a transient
+systemd user unit (`overdeck-post-merge-deploy-<ns>`) with `Restart=on-failure` and no start
+limit ([PAN-3386](https://github.com/eltmon/overdeck/issues/3386)): a post-kill failure must never
+leave the machine without a dashboard successor, so retries are unbounded by design. Its output
+goes to `/tmp/overdeck-deploy.log` — not `auto-deploy.log`, which belongs to the patrol path
+above. After 5 consecutive failed runs the script escalates once per unit
+([PAN-3601](https://github.com/eltmon/overdeck/issues/3601)): a durable `activity.entry` (error,
+desktop-notified, with the log tail) plus a priority-0 TTS announcement, posted through
+`POST /api/internal/events/append-once` so the alert is at-most-once even across retries; a POST
+that fails while the dashboard is down is retried on the next unit restart. A successful deploy
+also refreshes the deployment generation's `scripts/` alongside `dist/`, so a fixed deploy script
+reaches the live generation without waiting for a full `pan reload`. To inspect or stop a
+retrying deploy: `systemctl --user list-units 'overdeck-post-merge-deploy-*'`.
+
 ## Dashboard recovery guardian
 
 The local recovery model has two tiers. The `overdeck-supervisor.service` systemd user unit keeps the supervisor sidecar alive, and the supervisor keeps the dashboard alive by polling health and running `pan restart --dashboard` when the dashboard is down. Systemd owns only the supervisor, not the dashboard process, so dashboard recovery still flows through the existing watchdog logic and avoids a second owner fighting the restart path.

@@ -10,6 +10,7 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { parseIssueIdSync } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
+import { resolveProjectKeyForCwdAsync } from '../projects.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -34,6 +35,7 @@ import {
 import {
   isInsideGitWorkTree,
   resolveAllowedHarness,
+  resolveRegisteredProject,
   spawnConversationSession,
   waitForPiTuiReady,
   waitForTmuxSession,
@@ -649,6 +651,18 @@ async function detectIssueIdFromBranch(cwd: string): Promise<string | undefined>
   }
 }
 
+export async function resolveForkProjectKey(
+  requested: string | undefined,
+  source: Pick<Conversation, 'projectKey' | 'cwd'>,
+): Promise<{ projectKey?: string } | { error: string }> {
+  if (requested !== undefined) {
+    const resolved = await resolveRegisteredProject(requested);
+    return 'error' in resolved ? resolved : { projectKey: resolved.key };
+  }
+  if (source.projectKey) return { projectKey: source.projectKey };
+  return { projectKey: await resolveProjectKeyForCwdAsync(source.cwd) ?? undefined };
+}
+
 export async function handleConversationSummaryFork(
   name: string,
   body: Record<string, unknown>,
@@ -695,6 +709,17 @@ export async function handleConversationSummaryFork(
         return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
       }
       explicitIssueId = requestedIssueId.trim();
+    }
+    const requestedProject = body['projectKey'];
+    if (requestedProject !== undefined && (typeof requestedProject !== 'string' || !requestedProject.trim())) {
+      return jsonResponse({ error: 'Invalid projectKey' }, { status: 400 });
+    }
+    const projectResult = await resolveForkProjectKey(
+      typeof requestedProject === 'string' ? requestedProject.trim() : undefined,
+      conv,
+    );
+    if ('error' in projectResult) {
+      return jsonResponse({ error: projectResult.error }, { status: 400 });
     }
     const requestedHandoffAuthor = body['handoffAuthor'];
     let handoffAuthor: HandoffAuthor = 'external';
@@ -772,6 +797,7 @@ export async function handleConversationSummaryFork(
       tmuxSession: newTmux,
       cwd: cwd || conv.cwd || process.cwd(),
       issueId: explicitIssueId ?? conv.issueId ?? branchIssueId ?? undefined,
+      projectKey: projectResult.projectKey,
       title: customTitle || defaultTitle,
       titleSource: 'manual',
       titleSeed: forkMode === 'plain'

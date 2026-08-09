@@ -251,7 +251,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody}`));
         });
       },
     );

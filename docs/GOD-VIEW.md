@@ -57,7 +57,7 @@ and status grounded in dashboard state.
 | Frost / Doldrums | Increasing idle age and work that crossed the stale threshold |
 | Orbit-tinted frost | A parked issue — the frost color names its orbit (amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle) |
 | Sweeper beam | A real parked-population scan (sweep.scan) crossing the Doldrums |
-| Thaw | A parked orb released by the sweeper (sweep.unparked), returning to the river |
+| Thaw | A stale orb whose refreshed state confirms it is active again, returning to the river |
 | Signal flare | A parked orb only a human can release (sweep.escalated) |
 | Portal / wreck | Merge path into `main` and failed merge residue |
 | Flywheel sun / sequencer | Orchestration source and dispatch cadence |
@@ -85,9 +85,8 @@ The river cast comes from the shared dashboard snapshot and Zustand read model.
 `EventRouter` receives the snapshot and subsequent domain events over `/ws/rpc`;
 `useConfluenceData()` derives orbs, hook energy, micro-states, and metadata from
 that same state. The parked cast comes from `GET /api/parked` fetched once and
-invalidated only by real `sweep.*` domain events (the sweeper emits `sweep.scan`
-on population change, `sweep.unparked` on release, `sweep.escalated` on
-operator re-surface) — no polling loop and no synthesized motion. Velocity
+invalidated only by a real `sweep.scan` domain event when the parked population
+changes — no polling loop and no synthesized motion. Velocity
 (`GET /api/velocity`) refreshes on the inherited 30-second cadence shared with
 the host-health and cost queries. Harness heartbeats become domain events
 before they enter the hook stream, so Confluence adds no polling loop for river

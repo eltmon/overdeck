@@ -48,6 +48,22 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const TURN_STALL_MS = 4 * 60_000;
 
 /**
+ * How long a conversation row may show "Starting…" without a live session.
+ * Genuine spawns are seconds-to-a-couple-minutes; anything older with no
+ * session and no endedAt is an interrupted row (reboot/crash), not a
+ * spawn-in-flight. The lifecycle poller eventually stamps endedAt — on the
+ * 2026-08-05 post-reboot boot it took 5.4 minutes, and for that whole window
+ * day-old conversations rendered "Starting…" while their transcripts sat on
+ * disk. The spawn window keeps the placeholder for real spawns only.
+ */
+const SPAWN_PLACEHOLDER_MAX_AGE_MS = 10 * 60 * 1000;
+function isWithinSpawnWindow(createdAt: string | null | undefined, nowMs = Date.now()): boolean {
+  if (!createdAt) return false;
+  const createdMs = Date.parse(createdAt);
+  return Number.isFinite(createdMs) && nowMs - createdMs < SPAWN_PLACEHOLDER_MAX_AGE_MS;
+}
+
+/**
  * Whether the conversation's latest transcript entry is recent enough that the
  * agent could still be mid-turn. Empty/loading history counts as recent (startup).
  */
@@ -620,7 +636,7 @@ export function ConversationPanel({
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
-  const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && isWithinSpawnWindow(conversation.createdAt);
   // v1.2 signal law: blue = machine activity (forking/starting/alive),
   // red = failed, neutral = ended. Amber is reserved for human-action states.
   const statusColor = isForkingHeader || isSpawningHeader
@@ -1079,8 +1095,8 @@ export function ConversationPanel({
           initialFocus={convMutations.forkTargetFocus}
           isPending={convMutations.isForkPending}
           onClose={convMutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
-            convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey) => {
+            convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey);
           }}
         />
       )}
@@ -1280,9 +1296,6 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
   const isSpawnFailed = !!conversation.spawnError;
-  // Conversation was created but the tmux session has not started yet — the spawn is running
-  // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
-  const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1292,6 +1305,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // alone rendered "How can I help you?" over a live agent 250 tool calls deep
   // (agent-pan-3511, 2026-08-04).
   const hasTimelineActivity = messages.length > 0 || workLog.length > 0;
+  // Conversation was created but the tmux session has not started yet — the spawn is running
+  // in the background. Show a "Starting..." placeholder instead of the orphaned empty state —
+  // but ONLY while the row is genuinely new and has no transcript content. After a reboot or
+  // crash the tmux session is gone and endedAt stays null until the lifecycle poller notices
+  // (5.4 min on the 2026-08-05 boot), and for that whole window a day-old conversation showed
+  // "Starting…" while its transcript sat on disk. Past the spawn window, or with any transcript
+  // content parsed, the row is interrupted, not starting.
+  const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
+    && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
   const isFirstMessage = !isLoading && !isDiscovering && !hasTimelineActivity && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old

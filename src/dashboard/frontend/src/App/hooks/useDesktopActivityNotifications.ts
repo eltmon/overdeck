@@ -1,8 +1,7 @@
 /**
  * PAN-1862 (FR-12): fire a desktop notification for activity entries flagged
  * `desktop: true` — operator-facing warnings that shouldn't wait for the
- * operator to be looking at the Activity panel (e.g. a review convoy fork
- * cache miss: the optimization didn't land and reviews proceed at full cost).
+ * operator to be looking at the Activity panel.
  *
  * Same Notification pattern as usePendingInputDialogs (#1102): tag-deduped by
  * entry id, permission-gated, click focuses the dashboard. Entries seen before

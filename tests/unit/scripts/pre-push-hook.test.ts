@@ -27,9 +27,14 @@ function makeHookFixture(): { root: string; hook: string } {
   return { root, hook };
 }
 
-function runHook(root: string, hook: string, input: string): { ok: boolean; output: string } {
+function runHook(
+  root: string,
+  hook: string,
+  input: string,
+  remoteUrl = 'git@github.com:eltmon/overdeck.git',
+): { ok: boolean; output: string } {
   try {
-    const output = execFileSync('sh', [hook], { cwd: root, input, encoding: 'utf-8' });
+    const output = execFileSync('sh', [hook, 'origin', remoteUrl], { cwd: root, input, encoding: 'utf-8' });
     return { ok: true, output };
   } catch (err: any) {
     return { ok: false, output: [err.stdout ?? '', err.stderr ?? ''].join('\n') };
@@ -101,6 +106,25 @@ describe('.husky/pre-push', () => {
     expect(readFileSync(join(root, 'ratchet-args.txt'), 'utf-8').trim()).toBe(
       `--range ${mainSha}..${localSha}`,
     );
+  });
+
+  it('skips repository guards for pushes to a non-overdeck remote', () => {
+    const { root, hook } = makeHookFixture();
+    writeFileSync(
+      join(root, 'scripts', 'guard-agent-main-push.sh'),
+      '#!/usr/bin/env bash\necho unexpected > guard-args.txt\nexit 42\n',
+      { mode: 0o755 },
+    );
+
+    const result = runHook(
+      root,
+      hook,
+      'HEAD 1111111111111111111111111111111111111111 refs/heads/main 2222222222222222222222222222222222222222\n',
+      'git@github.com:eltmon/okf.git',
+    );
+
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(root, 'guard-args.txt'))).toBe(false);
   });
 
   it('skips the release guard for deleted release tags', () => {

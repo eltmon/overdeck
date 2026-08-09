@@ -358,8 +358,8 @@ export interface ProjectConfig {
    * rebasing onto the new main.
    */
   merge_train?: 'enabled' | 'disabled';
-  /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
-  quality_gates?: Record<string, QualityGateConfig>;
+  /** Merge checks: pre-push quality gates and main-verification fallback requirements. */
+  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[];
   /** Version-string propagation performed after a UAT batch merge. */
   version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */
@@ -549,6 +549,38 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
     key,
     config: projectConfig,
   }));
+}
+
+function resolveProjectKeyForCwdFromProjects(
+  cwd: string,
+  projects: ReadonlyArray<{ key: string; config: ProjectConfig }>,
+): string | null {
+  const normalizedCwd = resolve(cwd);
+  let bestMatch: { key: string; pathLength: number } | null = null;
+
+  for (const { key, config } of projects) {
+    if (!config.path) continue;
+    const projectPath = resolve(config.path);
+    const pathPrefix = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
+    if (
+      (normalizedCwd === projectPath || normalizedCwd.startsWith(pathPrefix))
+      && projectPath.length > (bestMatch?.pathLength ?? -1)
+    ) {
+      bestMatch = { key, pathLength: projectPath.length };
+    }
+  }
+
+  return bestMatch?.key ?? null;
+}
+
+/** Resolve the registered project owning a cwd via longest path-prefix match. */
+export function resolveProjectKeyForCwd(cwd: string): string | null {
+  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
+}
+
+/** Async request-path variant of {@link resolveProjectKeyForCwd}. */
+export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
+  return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
 }
 
 /**

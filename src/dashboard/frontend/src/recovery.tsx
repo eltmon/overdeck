@@ -136,7 +136,7 @@ export function showOverlay(message: string, action?: { label: string; onClick: 
     'gap:16px',
     'background:rgba(10,12,16,0.92)',
     'color:#e6e6e6',
-    "font-family:'DM Sans',system-ui,sans-serif",
+    'font-family:var(--font-sans),system-ui,sans-serif',
     'font-size:15px',
   ].join(';');
   el.innerHTML = `
@@ -310,7 +310,7 @@ export class RootErrorBoundary extends React.Component<
           gap: 16,
           background: 'rgba(10,12,16,0.92)',
           color: '#e6e6e6',
-          fontFamily: "'DM Sans',system-ui,sans-serif",
+          fontFamily: 'var(--font-sans),system-ui,sans-serif',
           fontSize: 15,
         }}
       >

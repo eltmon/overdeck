@@ -302,6 +302,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (cacheResult.skills.copied > 0) cacheParts.push(`${cacheResult.skills.copied} skills`);
   if (cacheResult.agents.copied > 0) cacheParts.push(`${cacheResult.agents.copied} agents`);
   if (cacheResult.rules.copied > 0) cacheParts.push(`${cacheResult.rules.copied} rules`);
+  if (cacheResult.pruned.length > 0) cacheParts.push(`pruned ${cacheResult.pruned.length} stale`);
+  if (cacheResult.keptModified.length > 0) cacheParts.push(`kept ${cacheResult.keptModified.length} user-modified stale`);
   cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
   // Distribute bundled skills + agents to Claude and native skill bundles to
@@ -316,6 +318,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   const adoptionSummary = result.adopted.length > 0
     ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
     : '';
+  const prunedCount = result.pruned.length + agentSkillsResult.pruned.length;
+  const keptModifiedCount = result.keptModified.length + agentSkillsResult.keptModified.length;
+  const staleSummary = [
+    ...(prunedCount > 0 ? [`pruned ${prunedCount} stale`] : []),
+    ...(keptModifiedCount > 0 ? [`kept ${keptModifiedCount} user-modified stale`] : []),
+  ];
+  const staleSummaryText = staleSummary.length > 0 ? `, ${staleSummary.join(', ')}` : '';
 
   // Show diffs if requested
   if (result.diffs.length > 0) {
@@ -338,7 +347,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   if (result.conflicts.length + agentSkillsResult.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
+    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
     for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `~/.agents/skills/${name}`)]) {
@@ -347,9 +356,19 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
   } else if (result.skipped.length + agentSkillsResult.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}`);
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText}`);
+  }
+
+  const keptModifiedPaths = [
+    ...result.keptModified,
+    ...agentSkillsResult.keptModified.map((name) => `~/.agents/${name}`),
+  ];
+  if (keptModifiedPaths.length > 0) {
+    console.log('');
+    console.log(chalk.yellow('Kept user-modified stale file(s):'));
+    for (const name of keptModifiedPaths) console.log(chalk.dim(`  - ${name}`));
   }
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).

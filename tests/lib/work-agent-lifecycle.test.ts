@@ -10,8 +10,9 @@ import {
 } from '../../src/lib/agents.js';
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
-import { getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
+import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
 import * as paths from '../../src/lib/paths.js';
+import * as reviewStatus from '../../src/lib/review-status.js';
 import * as tmux from '../../src/lib/tmux.js';
 
 describe('work-agent-lifecycle', () => {
@@ -67,12 +68,14 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain(`pan reset-session ${agentId}`);
     expect(lifecycle.reason).not.toContain('--fresh');
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/resumable Claude session/);
+    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
   });
 
-  it('allows fresh start for a handed-off agent even with a saved session (PAN-3543)', () => {
+  it('requires explicit --fresh to replace a handed-off agent saved session (PAN-3583)', () => {
     const agentId = getUniqueAgentId('handoff-fresh');
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
@@ -92,10 +95,8 @@ describe('work-agent-lifecycle', () => {
       lastActivity: new Date().toISOString(),
     });
     saveSessionId(agentId, 'session-123');
-    // Completion marker: the agent finished and handed off. A blocked review
-    // then owes rework, and --fresh is the ONLY forward path ("nothing to
-    // resume" by design, PAN-3334) — it must not be gated behind a
-    // resumable-session reset the durable plane immediately undoes (PAN-3541).
+    // Completion marker: the agent finished and handed off. A plain start must
+    // preserve its warm session, while explicit --fresh must replace it.
     writeFileSync(join(getAgentDir(agentId), 'completed'), '');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
@@ -104,9 +105,11 @@ describe('work-agent-lifecycle', () => {
 
     expect(lifecycle.handedOff).toBe(true);
     expect(lifecycle.canResumeSession).toBe(false);
-    expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(false);
-    expect(lifecycle.canStartFresh).toBe(true);
+    expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
+    expect(lifecycle.canStartFresh).toBe(false);
     expect(lifecycle.recommendedAction).toBe('none');
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
+    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
@@ -345,6 +348,104 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResetSession).toBe(false);
     expect(lifecycle.reason).toContain('stale/orphaned');
 
+    sessionExistsSpy.mockRestore();
+  });
+
+  function setUpHandedOffAgentOwingRework(prefix: string): string {
+    const agentId = getUniqueAgentId(prefix);
+    const workspace = join('/tmp', agentId);
+    mkdirSync(workspace, { recursive: true });
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-3555',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    });
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    saveSessionId(agentId, 'session-warm');
+    writeFileSync(join(getAgentDir(agentId), 'completed'), '');
+    return agentId;
+  }
+
+  it('reopens the resume doors for a handed-off agent that owes rework (PAN-3555)', () => {
+    const agentId = setUpHandedOffAgentOwingRework('handoff-rework');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
+      issueId: 'PAN-3555',
+      verificationStatus: 'failed',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
+
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+
+    expect(lifecycle.handedOff).toBe(true);
+    expect(lifecycle.owesRework).toBe(true);
+    expect(lifecycle.canResumeSession).toBe(true);
+    // A plain start preserves the owed-rework session; --fresh is explicit.
+    expect(lifecycle.canStartFresh).toBe(false);
+    expect(lifecycle.recommendedAction).toBe('resume');
+    expect(lifecycle.reason).toContain('owes it rework');
+    expect(lifecycle.reason).toContain(`pan resume ${agentId}`);
+
+    reviewSpy.mockRestore();
+    transcriptExistsSpy.mockRestore();
+    sessionExistsSpy.mockRestore();
+  });
+
+  it('refuses a silent fresh start over a resumable owed-rework session; explicit --fresh still passes (PAN-3555)', () => {
+    const agentId = setUpHandedOffAgentOwingRework('handoff-silent-fresh');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
+      issueId: 'PAN-3555',
+      verificationStatus: 'passed',
+      reviewStatus: 'blocked',
+      testStatus: 'pending',
+    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
+
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/owes it rework.*pan resume|PAN-3555/);
+    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+
+    reviewSpy.mockRestore();
+    transcriptExistsSpy.mockRestore();
+    sessionExistsSpy.mockRestore();
+  });
+
+  it('keeps the handed-off nothing-to-resume posture when no rework is owed (PAN-3334)', () => {
+    const agentId = setUpHandedOffAgentOwingRework('handoff-resting');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
+      issueId: 'PAN-3555',
+      verificationStatus: 'passed',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
+
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+
+    expect(lifecycle.handedOff).toBe(true);
+    expect(lifecycle.owesRework).toBe(false);
+    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canStartFresh).toBe(false);
+    expect(lifecycle.recommendedAction).toBe('none');
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
+    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+
+    reviewSpy.mockRestore();
+    transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
   });
 });

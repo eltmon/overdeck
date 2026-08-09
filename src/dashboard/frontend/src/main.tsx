@@ -5,9 +5,15 @@ import { initTelemetry } from './lib/telemetry';
 import { DialogProvider } from './components/DialogProvider';
 import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
+import { useDesignLanguage } from './hooks/useDesignLanguage';
 import './index.css';
 
 void initTelemetry();
+
+// Reconcile the locally-mirrored Overdeck Theme (Ledger/Broadsheet) against
+// config.yaml's resolved ui.theme once at boot — the mirror can be stale
+// relative to a change made on another device or directly in config.yaml.
+void useDesignLanguage.getState().reconcileFromServer();
 
 // Recover from asset/module load failures during a server restart (the blank
 // page + 404 symptom). Install before render so a failure mid-boot is caught.

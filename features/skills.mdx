@@ -219,7 +219,9 @@ pan sync --dry-run
 The `pan sync` command:
 - Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
 - Updates existing skills if versions differ
-- Preserves local customizations (doesn't overwrite modified files)
+- Removes manifest-managed skills from harness directories after their bundled source is removed
+- Preserves user-owned and user-modified files, reporting modified stale files instead of deleting them
+- Ignores empty bundled skill directories so they do not reappear in caches or harness targets
 
 ## Subagents
 

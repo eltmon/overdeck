@@ -266,34 +266,23 @@ describe('planSweepCommands', () => {
     expect(commands.some((command) => command.type === 'ticker' && command.text.includes('12 parked'))).toBe(true);
   });
 
-  it('sweep.unparked thaws the orb and leaves a freed ticker', () => {
-    const commands = planSweepCommands([
-      sweepEvent('sweep.unparked', { issueId: 'PAN-3418', orbit: 'stuck-flag', action: 'stuck-redrive' }),
-    ]);
-    expect(commands).toContainEqual({ type: 'thaw', issueId: 'PAN-3418' });
-    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('PAN-3418 swept free'))).toBe(true);
-  });
-
-  it('sweep.escalated fires a signal flare; sweep.action leaves only a ticker', () => {
+  it('sweep.escalated fires a signal flare without moving the orb', () => {
     const commands = planSweepCommands([
       sweepEvent('sweep.escalated', { issueId: 'MIN-924', orbit: 'operator-gate', reason: 'paused' }),
-      sweepEvent('sweep.action', { issueId: 'PAN-2833', orbit: 'merge-failed', action: 'merge-reevaluate' }),
     ]);
     expect(commands).toContainEqual({ type: 'flare', issueId: 'MIN-924' });
     expect(commands.some((command) => command.type === 'ticker' && command.text.includes('needs operator'))).toBe(true);
-    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('merge-reevaluate'))).toBe(true);
     expect(commands.filter((command) => command.type === 'thaw')).toHaveLength(0);
   });
 
-  it('runs sweep commands through the effects dispatch table', () => {
+  it('runs sweep observation commands through the effects dispatch table', () => {
     const api = effects();
     runConfluenceCommands(planSweepCommands([
       sweepEvent('sweep.scan', { issueCount: 3, rowCount: 3, rows: [] }),
-      sweepEvent('sweep.unparked', { issueId: 'PAN-1', orbit: 'merge-failed', action: 'merge-reevaluate' }),
       sweepEvent('sweep.escalated', { issueId: 'PAN-2', orbit: 'operator-gate', reason: 'paused' }),
     ]), api);
     expect(api.playSweep).toHaveBeenCalledOnce();
-    expect(api.playThaw).toHaveBeenCalledWith('PAN-1');
+    expect(api.playThaw).not.toHaveBeenCalled();
     expect(api.playFlare).toHaveBeenCalledWith('PAN-2');
   });
 

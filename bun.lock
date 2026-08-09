@@ -42,6 +42,7 @@
       "devDependencies": {
         "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^20.5.0",
+        "@effect/language-service": "catalog:",
         "@effect/vitest": "catalog:",
         "@napi-rs/canvas": "^1.0.0",
         "@overdeck/contracts": "workspace:*",

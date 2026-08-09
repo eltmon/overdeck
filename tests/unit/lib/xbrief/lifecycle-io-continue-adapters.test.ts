@@ -25,7 +25,7 @@ import {
   clearFeedbackForIssue,
   readContinueStateForIssue,
 } from '../../../../src/lib/xbrief/lifecycle-io.js';
-import { readIssueRecordSync } from '../../../../src/lib/pan-dir/record.js';
+import { appendFeedbackEntry, readIssueRecordSync } from '../../../../src/lib/pan-dir/record.js';
 
 describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => {
   let projectRoot: string;
@@ -71,6 +71,37 @@ describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => 
     expect(record?.feedback![0].outcome).toBe('CHANGES_REQUESTED');
 
     expect(existsSync(join(projectRoot, '.pan', 'continues', 'pan-1919.vbrief.json'))).toBe(false);
+  });
+
+  it('does not append feedback identical to the last record entry', () => {
+    const entry = {
+      seq: 1,
+      specialist: 'review-agent' as const,
+      outcome: 'CHANGES_REQUESTED',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      markdownBody: '## Issues found\n- Fix X',
+    };
+    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', entry);
+    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', entry);
+
+    const record = readIssueRecordSync({ name: 'test', path: projectRoot }, 'PAN-1919');
+    expect(record?.feedback).toEqual([entry]);
+  });
+
+  it('does not append an asynchronous feedback entry identical to the last record entry', async () => {
+    const entry = {
+      seq: 1,
+      specialist: 'review-agent' as const,
+      outcome: 'CHANGES_REQUESTED',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      markdownBody: '## Issues found\n- Fix X',
+    };
+    const project = { name: 'test', path: projectRoot };
+    await appendFeedbackEntry(project, 'PAN-1919', entry, { autoCommit: false });
+    await appendFeedbackEntry(project, 'PAN-1919', entry, { autoCommit: false });
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.feedback).toEqual([entry]);
   });
 
   it('AC2: clearFeedbackForIssue empties record.feedback', () => {

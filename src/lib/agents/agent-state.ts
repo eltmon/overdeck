@@ -163,14 +163,8 @@ export interface AgentState {
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
-  /** PAN-1862 Phase A (synthesis parent): discovery→fork orchestration state. */
-  reviewDiscoveryPending?: boolean;
+  /** Path to the run's context manifest, used by missing-reviewer recovery. */
   reviewContextManifestPath?: string;
-  reviewDiscoveryReadyAt?: string;
-  reviewConvoyForkedAt?: string;
-  reviewForkCacheChecked?: boolean;
-  /** PAN-1862 Phase A (convoy reviewer): session was forked from the parent's discovery session. */
-  reviewForkedFromParent?: boolean;
   hostOverride?: boolean;
 
   /** Inspect sub-role for inspect-* agents (PAN-1834). */
@@ -290,12 +284,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
-    reviewDiscoveryPending: raw.reviewDiscoveryPending,
     reviewContextManifestPath: raw.reviewContextManifestPath,
-    reviewDiscoveryReadyAt: raw.reviewDiscoveryReadyAt,
-    reviewConvoyForkedAt: raw.reviewConvoyForkedAt,
-    reviewForkCacheChecked: raw.reviewForkCacheChecked,
-    reviewForkedFromParent: raw.reviewForkedFromParent,
     hostOverride: raw.hostOverride,
     inspectSubRole: raw.inspectSubRole,
     slotIndex: raw.slotIndex,

@@ -97,7 +97,7 @@ async function ackIssueTripsDefault(issueId: string): Promise<number> {
   let acked = 0;
   for (const trip of openTrips) {
     try {
-      await acknowledgeRecoveryTrip(project.path, issueId, trip.recoveryPath, trip.obligationGeneration);
+      await acknowledgeRecoveryTrip(resolved.projectPath, issueId, trip.recoveryPath, trip.obligationGeneration);
       acked++;
     } catch (error) {
       console.warn(chalk.yellow(`  ! failed to ack ${issueId} trip ${trip.recoveryPath}: ${error instanceof Error ? error.message : String(error)}`));

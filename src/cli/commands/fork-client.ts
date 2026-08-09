@@ -32,6 +32,7 @@ export interface ForkViaServerOptions {
   title?: string;
   focus?: string;
   issueId?: string;
+  projectKey?: string;
   handoffAuthor?: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
@@ -51,6 +52,7 @@ export interface ForkResultConv {
   sessionAlive?: boolean;
   status?: string;
   issueId?: string | null;
+  projectKey?: string | null;
 }
 
 export class ForkServerError extends Error {}
@@ -89,6 +91,7 @@ export async function forkConversationViaServer(
   if (opts.title) body['title'] = opts.title;
   if (opts.focus) body['focus'] = opts.focus;
   if (opts.issueId) body['issueId'] = opts.issueId;
+  if (opts.projectKey) body['projectKey'] = opts.projectKey;
   if (opts.handoffAuthor) body['handoffAuthor'] = opts.handoffAuthor;
   if (opts.handoffAuthorModel) body['handoffAuthorModel'] = opts.handoffAuthorModel;
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;

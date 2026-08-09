@@ -12,21 +12,13 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearTestVerdictArtifact } from './test-verdict.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
-function dashboardApiUrl(): string {
-  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-  return process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
-}
-
 export function buildTestRolePrompt(options: {
   issueId: string;
   workspace?: string;
   branch?: string;
-  apiUrl?: string;
 }): string {
   const workspaceLine = options.workspace ? `WORKSPACE: ${options.workspace}` : 'WORKSPACE: resolve from the run state';
   const branchLine = options.branch ? `BRANCH: ${options.branch}` : `BRANCH: feature/${options.issueId.toLowerCase()}`;
-  const apiUrl = options.apiUrl ?? dashboardApiUrl();
-
   return `TEST TASK for ${options.issueId}:
 
 ${workspaceLine}
@@ -42,23 +34,17 @@ Required steps:
 5. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 6. If UAT is required, build and run the dashboard from the workspace above, not from main. If a dashboard from another checkout is already running, stop it and start the workspace-built dashboard.
 7. If UAT is required, use the Playwright MCP tools available to the test role. Do not spawn or wake a separate UAT agent.
-8. Record automated gates and browser UAT as separate verdicts. The top-level status is ONLY the configured automated-gate result. When UAT is required, add uatStatus and uatNotes; omit both when UAT is not required. FIRST write .pan/test/result.json so the pipeline can recover both verdicts if the POST is interrupted:
+8. Record automated gates and browser UAT as separate verdicts. The top-level status is ONLY the configured automated-gate result. When UAT is required, add uatStatus and uatNotes; omit both when UAT is not required. FIRST write .pan/test/result.json so the pipeline can recover both verdicts if the signal is interrupted:
    {"status":"passed","notes":"<automated gate evidence>","uatStatus":"passed","uatNotes":"<browser paths and evidence>"}
-   Allowed values for status and uatStatus are "passed" or "failed". A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed", even when status is "passed". Create .pan/test/ if needed and write this artifact BEFORE the POST.
-9. POST the same separate verdicts. Examples:
+   Allowed values for status and uatStatus are "passed" or "failed". A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed", even when status is "passed". Create .pan/test/ if needed and write this artifact BEFORE signaling the verdict.
+9. Signal the same separate verdicts through the local trusted CLI, never by an unauthenticated HTTP request. Examples:
    Automated gates pass and required UAT passes:
-   curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
-     -H "Content-Type: application/json" \\
-     -d '{"testStatus":"passed","testNotes":"<automated gate evidence>","uatStatus":"passed","uatNotes":"<browser evidence>"}'
+   pan admin specialists done test ${options.issueId} --status passed --notes "<automated gate evidence>" --uat-status passed --uat-notes "<browser evidence>"
    Automated gates pass but required UAT fails or cannot run:
-   curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
-     -H "Content-Type: application/json" \\
-     -d '{"testStatus":"passed","testNotes":"<automated gate evidence>","uatStatus":"failed","uatNotes":"<blocking condition and exact unmet criteria>"}'
-   Automated gates fail (include UAT fields too if UAT was attempted):
-   curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
-     -H "Content-Type: application/json" \\
-     -d '{"testStatus":"failed","testNotes":"<failing commands and output>"}'
-10. Make exactly ONE POST attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the POST in a loop. Report the failure in your summary and stop.
+   pan admin specialists done test ${options.issueId} --status passed --notes "<automated gate evidence>" --uat-status failed --uat-notes "<blocking condition and exact unmet criteria>"
+   Automated gates fail (include UAT flags too if UAT was attempted):
+   pan admin specialists done test ${options.issueId} --status failed --notes "<failing commands and output>"
+10. Make exactly ONE CLI signal attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the signal in a loop. Report the failure in your summary and stop.
 11. Report TESTS PASSED only when automated gates and required UAT passed. Otherwise report TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
 
 Boundaries:

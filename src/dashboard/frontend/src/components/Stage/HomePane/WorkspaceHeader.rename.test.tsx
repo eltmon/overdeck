@@ -4,6 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { useProjectRename } from './useProjectRename'
 
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
+}))
+
 /**
  * PAN-3156 — the project rename affordance now lives on the `# <project>`
  * title. These are the rename behaviours previously exercised through
@@ -78,7 +85,10 @@ describe('WorkspaceHeader rename affordance', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/projects/overdeck/rename', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
         body: JSON.stringify({ name: 'Overdeck App' }),
       })
     })

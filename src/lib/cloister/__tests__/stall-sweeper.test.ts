@@ -1,8 +1,12 @@
 /**
- * Fixture tests for the stall sweeper patrol (PAN-3485 phase 2).
- * Proves each orbit takes its documented action, operator gates are never
- * overridden, cooldowns bind, exhaustion escalates, and the scan event fires
- * only on population change.
+ * Fixture tests for the stall sweeper patrol (PAN-3485 phase 2), observability-
+ * only contract (operator directive 2026-08-05).
+ *
+ * The sweeper DETECTS parked work and emits recommendations (sweep.recommendation
+ * events + activity-feed entries). It must never act: there are no action deps
+ * to inject, and every feed entry carries the "Observability-only: no action
+ * taken" trailer. These tests pin each orbit's recommendation, the cooldowns,
+ * the exhaustion escalation, and the no-action-door source guard.
  */
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -18,24 +22,14 @@ const HOUR = 60 * 60_000;
 let home: string;
 let savedHome: string | undefined;
 
-// getAgentStateSync drives the redrive gate — controlled per test.
-const agentStateByAgentId = new Map<string, Record<string, unknown>>();
-vi.mock('../../agents.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../agents.js')>();
-  return {
-    ...original,
-    getAgentStateSync: (id: string) => agentStateByAgentId.get(id) ?? null,
-  };
-});
-
 import {
   runStallSweeperPatrol,
-  SWEEP_MAX_ACTIONS_PER_ROW,
-  SWEEP_RESURFACE_TTL_MS,
+  SWEEP_MAX_RECOMMENDATIONS_PER_ROW,
   type StallSweeperDeps,
 } from '../stall-sweeper.js';
-import { readSweeperRowState, writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
+import { writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
 import type { ParkedRow } from '../../parked/resolver.js';
+import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
 
 function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
   return {
@@ -44,8 +38,6 @@ function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
     parkedAt: new Date(NOW - 5 * HOUR).toISOString(),
     parkReason: 'test park reason',
     unparkCondition: 'test release condition',
-    lastActionAt: null,
-    actionCount: 0,
     ...overrides,
   };
 }
@@ -53,33 +45,21 @@ function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
 interface Harness {
   deps: StallSweeperDeps;
   calls: {
-    spawn: string[];
-    stop: string[];
-    message: string[];
-    feedback: string[];
-    review: string[];
-    clearStuck: string[];
-    resetMerge: string[];
     events: { type: string; payload: Record<string, unknown> }[];
     activity: { level: string; issueId?: string; message: string }[];
   };
 }
 
-function harness(rows: ParkedRow[], opts: { liveAgents?: string[] } = {}): Harness {
-  const calls: Harness['calls'] = {
-    spawn: [], stop: [], message: [], feedback: [], review: [], clearStuck: [], resetMerge: [], events: [], activity: [],
-  };
+function harness(
+  rows: ParkedRow[],
+  opts: { liveAgents?: string[]; artifact?: SynthesisArtifactVerdict | null } = {},
+): Harness {
+  const calls: Harness['calls'] = { events: [], activity: [] };
   const live = new Set(opts.liveAgents ?? []);
   const deps: StallSweeperDeps = {
     now: NOW,
     resolveRows: async () => rows,
-    spawnWorkAgent: async (issueId) => { calls.spawn.push(issueId); return { spawned: true }; },
-    stopAgent: async (agentId) => { calls.stop.push(agentId); },
-    messageAgent: async (agentId, text) => { calls.message.push(`${agentId}::${text}`); return { delivered: true, queuedToMail: false }; },
-    writeFeedback: async (issueId, stage, summary) => { calls.feedback.push(`${issueId}::${stage}::${summary}`); },
-    dispatchReview: async (issueId) => { calls.review.push(issueId); },
-    clearStuck: (issueId) => { calls.clearStuck.push(issueId); },
-    resetMergeForEvaluation: (issueId) => { calls.resetMerge.push(issueId); },
+    readArtifact: () => opts.artifact ?? null,
     isAgentLive: (agentId) => live.has(agentId),
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
@@ -87,11 +67,14 @@ function harness(rows: ParkedRow[], opts: { liveAgents?: string[] } = {}): Harne
   return { deps, calls };
 }
 
+function recommendations(h: Harness): { type: string; payload: Record<string, unknown> }[] {
+  return h.calls.events.filter((e) => e.type === 'sweep.recommendation');
+}
+
 beforeEach(() => {
   savedHome = process.env.OVERDECK_HOME;
   home = mkdtempSync(join(tmpdir(), 'sweeper-test-'));
   process.env.OVERDECK_HOME = home;
-  agentStateByAgentId.clear();
 });
 
 afterEach(() => {
@@ -100,193 +83,160 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-describe('runStallSweeperPatrol — per-orbit actions', () => {
-  it('zombie-session: stops the agent and emits sweep.unparked', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'zombie-session', details: { agentId: 'strike-pan-1' } })]);
-    const actions = await runStallSweeperPatrol(deps);
-    expect(calls.stop).toEqual(['strike-pan-1']);
-    expect(calls.events.some((e) => e.type === 'sweep.unparked' && e.payload['issueId'] === 'PAN-1')).toBe(true);
-    expect(actions.some((a) => a.includes('reaped zombie'))).toBe(true);
+describe('runStallSweeperPatrol — per-orbit recommendations (observability-only)', () => {
+  it('zombie-session: recommends reaping the zombie, never reaps', async () => {
+    const h = harness([parkedRow({ orbit: 'zombie-session', details: { agentId: 'agent-pan-1' } })]);
+    const actions = await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('reap zombie session agent-pan-1');
+    expect(actions.join(' ')).toContain('recommended');
+    expect(h.calls.activity[0]!.message).toContain('Observability-only: no action taken.');
   });
 
-  it('merge-failed: resets merge for re-evaluation, bounded by cooldown', async () => {
-    const row = parkedRow({ orbit: 'merge-failed' });
-    const { deps, calls } = harness([row]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.resetMerge).toEqual(['PAN-1']);
-    // Second scan inside the cooldown window takes no action.
-    const again = await runStallSweeperPatrol(deps);
-    expect(calls.resetMerge).toEqual(['PAN-1']);
-    expect(again).toHaveLength(0);
+  it('merge-failed: recommends a merge re-evaluation', async () => {
+    const h = harness([parkedRow({ orbit: 'merge-failed' })]);
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('merge for re-evaluation');
   });
 
-  it('uat-failed: writes feedback and resumes the work agent', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'login flow broken' } })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.feedback[0]).toContain('PAN-1::uat');
-    expect(calls.spawn).toEqual(['PAN-1']);
-    expect(calls.events.some((e) => e.type === 'sweep.action' && e.payload['action'] === 'uat-redrive')).toBe(true);
+  it('uat-failed: recommends starting work after the relay found no live target', async () => {
+    const h = harness([parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'login flow broken' } })]);
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('pan start');
+    expect(String(recs[0]!.payload.recommendation)).toContain('UAT-failure relay found no live target');
+    expect(String(recs[0]!.payload.uatNotes)).toContain('login flow broken');
   });
 
-  it('stuck-flag review_infrastructure_failure: clears the flag and re-dispatches review', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'review_infrastructure_failure' } })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.clearStuck).toEqual(['PAN-1']);
-    expect(calls.review).toEqual(['PAN-1']);
-    expect(calls.events.some((e) => e.type === 'sweep.unparked')).toBe(true);
+  it('stuck-flag review_infrastructure_failure: recommends clear + re-dispatch, never clears', async () => {
+    const h = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'review_infrastructure_failure' } })]);
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('re-dispatch the review');
   });
 
-  it('stuck-flag feedback_delivery_needs_you: resumes with rework feedback and clears the flag', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.feedback[0]).toContain('PAN-1::rework');
-    expect(calls.spawn).toEqual(['PAN-1']);
-    expect(calls.clearStuck).toEqual(['PAN-1']);
+  it('stuck-flag feedback_delivery_needs_you: recommends a rework resume', async () => {
+    const h = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })]);
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('rework');
   });
 
-  it('conflicts: resumes the work agent with conflict-resolution feedback', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'conflicts', details: { sha: 'abc', paths: [] } })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.feedback[0]).toContain('PAN-1::conflicts');
-    expect(calls.spawn).toEqual(['PAN-1']);
+  it.each([
+    'review_infrastructure_failure',
+    'feedback_delivery_needs_you',
+    'verification_stuck',
+  ])('stuck-flag %s + fresh PASSED artifact: preserves evidence and awaits the canonical signal', async (stuckReason) => {
+    const artifact = {
+      verdict: 'passed',
+      runId: 'agent-pan-1-review-run-att1',
+      headSha: 'a'.repeat(40),
+      mtimeMs: NOW - 60_000,
+    } as const;
+    const h = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason } })],
+      { artifact },
+    );
+
+    await runStallSweeperPatrol(h.deps);
+
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('preserve PAN-1');
+    expect(String(recs[0]!.payload.recommendation)).toContain('do not re-dispatch or resume rework');
+    expect(recs[0]!.payload).toMatchObject({
+      artifactVerdict: 'passed',
+      artifactRunId: artifact.runId,
+      artifactHead: artifact.headSha,
+    });
+    expect(h.calls.activity[0]!.message).toContain('Observability-only: no action taken.');
   });
 
-  it('idle-running: nudges first, then stops only when the agent never moves', async () => {
-    const row = parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 420 } });
-    agentStateByAgentId.set('agent-pan-1', { lastActivity: '2026-08-02T07:00:00.000Z' });
-    const { deps, calls } = harness([row]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.message).toHaveLength(1);
-    expect(calls.message[0]).toContain('agent-pan-1');
-    expect(calls.stop).toHaveLength(0);
+  it('stuck-flag + fresh BLOCKED artifact: recommends rework with the reviewer blocker as evidence', async () => {
+    const artifact = {
+      verdict: 'blocked',
+      runId: 'agent-pan-1-review-run-att1',
+      notes: 'null deref in the parser',
+      mtimeMs: NOW - 60_000,
+    } as const;
+    const h = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
+      { artifact },
+    );
 
-    // Grace elapsed, activity stamp unchanged → stop.
-    const state = readSweeperRowState('PAN-1', 'idle-running');
-    expect(state?.nudgedActivityAt).toBe('2026-08-02T07:00:00.000Z');
-    const laterDeps = { ...deps, now: NOW + 2 * HOUR };
-    await runStallSweeperPatrol(laterDeps);
-    expect(calls.stop).toEqual(['agent-pan-1']);
-    expect(calls.events.some((e) => e.type === 'sweep.unparked' && e.payload['action'] === 'stopped-idle')).toBe(true);
+    await runStallSweeperPatrol(h.deps);
+
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain(`review run ${artifact.runId}`);
+    expect(recs[0]!.payload.reviewNotes).toBe(artifact.notes);
   });
 
-  it('idle-running: an agent that moved after the nudge is NOT stopped', async () => {
-    const row = parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 60 } });
-    agentStateByAgentId.set('agent-pan-1', { lastActivity: '2026-08-02T13:00:00.000Z' });
-    const { deps, calls } = harness([row]);
-    await runStallSweeperPatrol(deps);
-    // Agent moved (new lastActivity) before the grace check.
-    agentStateByAgentId.set('agent-pan-1', { lastActivity: '2026-08-02T13:30:00.000Z' });
-    await runStallSweeperPatrol({ ...deps, now: NOW + 2 * HOUR });
-    expect(calls.stop).toHaveLength(0);
+  it('idle-running: recommends a nudge, then stopping if nothing moves', async () => {
+    const row = parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 7200 } });
+    const h = harness([row], { liveAgents: ['agent-pan-1'] });
+    await runStallSweeperPatrol(h.deps);
+    let recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('nudge agent-pan-1');
+
+    // Second scan past the grace window with the agent still idle: recommend stopping.
+    writeSweeperRowState('PAN-1', 'idle-running', {
+      recommendationCount: 1,
+      lastRecommendedAt: new Date(NOW - 2 * HOUR).toISOString(),
+      episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
+      });
+    const h2 = harness([row], { liveAgents: ['agent-pan-1'] });
+    await runStallSweeperPatrol(h2.deps);
+    recs = recommendations(h2);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('stop or resume agent-pan-1');
   });
 });
 
 describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
-  it('operator-gate rows are NEVER acted on, only re-surfaced on TTL', async () => {
-    const { deps, calls } = harness([parkedRow({ orbit: 'operator-gate' })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.spawn).toHaveLength(0);
-    expect(calls.stop).toHaveLength(0);
-    expect(calls.events.some((e) => e.type === 'sweep.escalated')).toBe(true);
-    // Re-surfaced once — inside the TTL a second scan stays silent.
-    await runStallSweeperPatrol({ ...deps, now: NOW + HOUR });
-    expect(calls.events.filter((e) => e.type === 'sweep.escalated')).toHaveLength(1);
-    // TTL elapsed → re-surfaces again (the anti-silence property).
-    await runStallSweeperPatrol({ ...deps, now: NOW + SWEEP_RESURFACE_TTL_MS + HOUR });
-    expect(calls.events.filter((e) => e.type === 'sweep.escalated')).toHaveLength(2);
+  it('operator-gate rows are NEVER recommended, only re-surfaced on TTL', async () => {
+    const h = harness([parkedRow({ orbit: 'operator-gate' })]);
+    await runStallSweeperPatrol(h.deps);
+    expect(recommendations(h)).toHaveLength(0);
+    expect(h.calls.events.some((e) => e.type === 'sweep.escalated')).toBe(true);
   });
 
-  it('a row that exhausted its action budget escalates instead of acting', async () => {
+  it('a row that exhausted its recommendation budget escalates instead of recommending', async () => {
     writeSweeperRowState('PAN-1', 'merge-failed', {
-      actionCount: SWEEP_MAX_ACTIONS_PER_ROW,
-      lastActionAt: new Date(NOW - 3 * HOUR).toISOString(),
-      episodeStartedAt: new Date(NOW - 30 * HOUR).toISOString(),
+      recommendationCount: SWEEP_MAX_RECOMMENDATIONS_PER_ROW,
+      lastRecommendedAt: new Date(NOW - 3 * HOUR).toISOString(),
+      episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
     });
-    const { deps, calls } = harness([parkedRow({ orbit: 'merge-failed' })]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.resetMerge).toHaveLength(0);
-    expect(calls.events.some((e) => e.type === 'sweep.escalated' && String(e.payload['reason']).includes('exhausted'))).toBe(true);
+    const h = harness([parkedRow({ orbit: 'merge-failed' })]);
+    await runStallSweeperPatrol(h.deps);
+    expect(recommendations(h)).toHaveLength(0);
+    expect(h.calls.events.some((e) => e.type === 'sweep.escalated'
+      && String(e.payload.reason).includes('exhausted'))).toBe(true);
   });
 
-  it('re-drive deferred by the redrive gate records no action (operator stop wins)', async () => {
-    agentStateByAgentId.set('agent-pan-1', { stoppedByUser: true, status: 'stopped' });
-    const { deps, calls } = harness([parkedRow({ orbit: 'uat-failed', details: {} })]);
-    const actions = await runStallSweeperPatrol(deps);
-    expect(calls.spawn).toHaveLength(0);
-    expect(calls.feedback).toHaveLength(0);
-    expect(actions.some((a) => a.includes('deferred'))).toBe(true);
-    expect(readSweeperRowState('PAN-1', 'uat-failed')?.actionCount ?? 0).toBe(0);
+  it('recommendations cool down per orbit', async () => {
+    writeSweeperRowState('PAN-1', 'merge-failed', {
+      recommendationCount: 1,
+      lastRecommendedAt: new Date(NOW - 30 * 60_000).toISOString(), // inside the 2h cooldown
+      episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
+    });
+    const h = harness([parkedRow({ orbit: 'merge-failed' })]);
+    await runStallSweeperPatrol(h.deps);
+    expect(recommendations(h)).toHaveLength(0);
   });
 
   it('sweep.scan fires on population change only', async () => {
-    const row = parkedRow({ orbit: 'operator-gate' });
-    writeSweeperSignature('PAN-1:operator-gate');
-    const { deps, calls } = harness([row]);
-    await runStallSweeperPatrol(deps);
-    expect(calls.events.some((e) => e.type === 'sweep.scan')).toBe(false);
-    // Population changed → scan fires with the new rows.
-    await runStallSweeperPatrol({ ...deps, resolveRows: async () => [row, parkedRow({ issueId: 'PAN-2', orbit: 'merge-failed' })] });
-    const scans = calls.events.filter((e) => e.type === 'sweep.scan');
-    expect(scans).toHaveLength(1);
-    expect(scans[0].payload['rowCount']).toBe(2);
-  });
-
-  it('the per-scan action budget bounds a graveyard census', async () => {
-    const rows = Array.from({ length: 8 }, (_, index) => parkedRow({ issueId: `PAN-${index + 10}`, orbit: 'merge-failed' }));
-    const { deps, calls } = harness(rows);
-    await runStallSweeperPatrol(deps);
-    expect(calls.resetMerge.length).toBeLessThanOrEqual(4);
+    writeSweeperSignature('PAN-1:merge-failed');
+    const h = harness([parkedRow({ orbit: 'merge-failed' })]);
+    await runStallSweeperPatrol(h.deps);
+    expect(h.calls.events.some((e) => e.type === 'sweep.scan')).toBe(false);
   });
 });
 
-describe('warm-agent re-drive (PAN-2579)', () => {
-  it('stuck re-drive MESSAGES a live warm agent instead of spawning a duplicate', async () => {
-    const { deps, calls } = harness(
-      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
-      { liveAgents: ['agent-pan-1'] },
-    );
-    await runStallSweeperPatrol(deps);
-    expect(calls.spawn).toHaveLength(0);
-    expect(calls.message).toHaveLength(1);
-    expect(calls.message[0]).toContain('agent-pan-1');
-    expect(calls.message[0]).toContain('.pan/feedback');
-    expect(calls.clearStuck).toEqual(['PAN-1']);
-    expect(calls.feedback).toHaveLength(1);
-  });
-
-  it('uat re-drive also prefers the warm path for a live agent', async () => {
-    const { deps, calls } = harness(
-      [parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'broken' } })],
-      { liveAgents: ['agent-pan-1'] },
-    );
-    await runStallSweeperPatrol(deps);
-    expect(calls.spawn).toHaveLength(0);
-    expect(calls.message).toHaveLength(1);
-    expect(calls.events.some((e) => e.type === 'sweep.action' && e.payload['action'] === 'uat-redrive')).toBe(true);
-  });
-});
-
-describe('delivery-outcome honesty', () => {
-  it('an unconfirmed warm delivery is NOT a re-drive: no feedback write, no stuck clear', async () => {
-    const { deps, calls } = harness(
-      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
-      { liveAgents: ['agent-pan-1'] },
-    );
-    deps.messageAgent = async () => ({ delivered: false, queuedToMail: false, reason: 'composer unverified' });
-    const actions = await runStallSweeperPatrol(deps);
-    expect(calls.feedback).toHaveLength(0);
-    expect(calls.clearStuck).toHaveLength(0);
-    expect(calls.events.some((e) => e.type === 'sweep.unparked')).toBe(false);
-    expect(actions.some((a) => a.includes('delivery unconfirmed'))).toBe(true);
-    expect(readSweeperRowState('PAN-1', 'stuck-flag')?.actionCount ?? 0).toBe(0);
-  });
-
-  it('an unconfirmed idle nudge records no nudge state (retries next scan)', async () => {
-    const { deps } = harness(
-      [parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 420 } })],
-    );
-    deps.messageAgent = async () => ({ delivered: false, queuedToMail: false, reason: 'composer unverified' });
-    await runStallSweeperPatrol(deps);
-    expect(readSweeperRowState('PAN-1', 'idle-running')?.lastNudgedAt).toBeUndefined();
-  });
-});

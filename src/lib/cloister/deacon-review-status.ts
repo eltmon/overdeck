@@ -10,7 +10,8 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
-import { readLatestSynthesisVerdict } from './synthesis-verdict.js';
+import { observeActiveReviewArtifact } from './verdict-restore.js';
+import { recordOrphanRestoreVerdict } from './orphan-restore-verdict.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -339,6 +340,38 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
   return false;
 }
 
+// Reads workspace evidence asynchronously for diagnostics; artifacts never write review status.
+async function observeActiveReviewArtifactForRecovery(
+  issueId: string,
+  status: Pick<ReviewStatus, 'lastVerifiedCommit'>,
+  caller: string,
+) {
+  const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  return observeActiveReviewArtifact(issueId, {
+    runId: state?.reviewRunId,
+    workspacePath: state?.workspace,
+    rowHead: status.lastVerifiedCommit,
+    caller,
+  });
+}
+
+async function recordArtifactObservationAtBreaker(issueId: string, status: Pick<ReviewStatus, 'lastVerifiedCommit'>, actions: string[]): Promise<void> {
+  try {
+    const result = await observeActiveReviewArtifactForRecovery(
+      issueId,
+      status,
+      'review-infrastructure-breaker',
+    );
+    if (result.outcome !== 'no-artifact') {
+      actions.push(
+        `Preserved ${issueId}'s active-run ${result.artifact.verdict} artifact for diagnosis; continuing bounded review-infrastructure recovery`,
+      );
+    }
+  } catch (err) {
+    console.warn(`[deacon] Artifact observation failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /**
  * PAN-1908: react to review.coordinator.died by resetting the issue to a
  * pending review state and re-dispatching the review role. No review-status
@@ -369,12 +402,13 @@ export async function handleReviewCoordinatorDied(
 
   const completedSnapshot = completedReviewSnapshotAfterCoordinatorExit(status);
   if (completedSnapshot) {
-    setReviewStatusSync(issueId, completedSnapshot);
-    actions.push(`Restored completed review for ${issueId} after coordinator exit; no re-dispatch`);
+    const restored = await recordOrphanRestoreVerdict(issueId, completedSnapshot);
+    actions.push(restored.landed ? `Restored completed review for ${issueId} after coordinator exit; no re-dispatch` : `Completed-review restore for ${issueId} not recorded (${restored.reason})`);
     return actions;
   }
 
   if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+    await recordArtifactObservationAtBreaker(issueId, status, actions);
     markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
       reviewRetryCount: status.reviewRetryCount ?? 0,
       recoveryStartedAt: status.recoveryStartedAt,
@@ -562,38 +596,29 @@ async function reconcileReviewStatusOrphan(
           reviewUpdate['mergeStatus'] = 'pending';
         }
       }
-      setReviewStatusSync(issueId, reviewUpdate);
+      const restored = await recordOrphanRestoreVerdict(issueId, reviewUpdate);
       actions.push(
-        `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
+        (restored.landed ? `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` : `Orphaned review snapshot for ${issueId} not recorded (${restored.reason})`) +
         (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
       );
       return actions;
     }
     if (!hasPassedReview) {
-      // RACE GUARD (PAN-1577 loop, 2026-08-02): consult the synthesis artifact
-      // of record before declaring this review dead. A just-finished convoy's
-      // synthesis.md lands on disk before the history entry syncs into the
-      // row; resetting here wiped APPROVED verdicts five times in one evening.
-      const artifact = readLatestSynthesisVerdict(issueId);
-      if (artifact?.verdict === 'passed') {
-        const artifactUpdate: Record<string, unknown> = {
-          reviewStatus: 'passed',
-          reviewNotes: artifact.notes,
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-          ...(artifact.headSha ? { reviewedAtCommit: artifact.headSha } : {}),
-        };
-        if (status.stuckReason === 'review_infrastructure_failure') {
-          artifactUpdate['stuck'] = false;
-          artifactUpdate['stuckReason'] = undefined;
-          artifactUpdate['stuckAt'] = undefined;
-          artifactUpdate['stuckDetails'] = undefined;
-        }
-        setReviewStatusSync(issueId, artifactUpdate);
-        actions.push(
-          `Restored orphaned review verdict for ${issueId} from the synthesis artifact (race guard — history sync had not landed)`,
+      // RACE GUARD (PAN-1577): preserve active-run evidence for diagnosis, but
+      // a workspace-writable artifact cannot complete the review by itself.
+      try {
+        const observation = await observeActiveReviewArtifactForRecovery(
+          issueId,
+          status,
+          'orphan-review-recovery',
         );
-        return actions;
+        if (observation.outcome !== 'no-artifact') {
+          actions.push(
+            `Preserved orphaned ${observation.artifact.verdict} evidence for ${issueId} from active run ${observation.artifact.runId}; continuing bounded recovery`,
+          );
+        }
+      } catch (err) {
+        console.warn(`[deacon] Artifact observation failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       const nextRetry = (status.reviewRetryCount ?? 0) + 1;
       const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
@@ -618,6 +643,7 @@ async function reconcileReviewStatusOrphan(
   ) {
     if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
       try {
+        await recordArtifactObservationAtBreaker(issueId, status, actions);
         markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
           reviewRetryCount: status.reviewRetryCount ?? 0,
           recoveryStartedAt: status.recoveryStartedAt,

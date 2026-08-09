@@ -61,7 +61,7 @@ draft → ready → running → drained → complete → next ready book
 ```
 
 1. **Draft.** The operator assembles lanes, prerequisites, flags, and run settings.
-2. **Ready.** The book joins the queue in `orders/index.json`. The dashboard's **Queue book** action moves a valid draft to this state.
+2. **Ready.** The book joins the queue in `orders/index.json`. The dashboard's **Queue book** action and `pan orders queue <id>` both move a valid draft to this state through the write door; a book that is not a draft is refused with `Order book <id> must be draft before it can be queued`.
 3. **Running.** `pan orders start <id>` or `pan flywheel start --orders <id>` validates the ready book, acquires the singleton Flywheel run gate, writes `launch.json.orders.bookId`, and then marks the book running. A failed validation or gate acquisition leaves the book ready.
 4. **Drained.** Progress is drained when every item is closed or parked. The issues resolver supplies this state; the orchestrator cannot self-report it.
 5. **Complete.** `pan flywheel complete` writes the report, includes the retrospective result, clears the active-run gate, marks the book complete, and advances the queue.
@@ -146,8 +146,33 @@ After completion, continuation is deterministic:
 | Condition | Result |
 | --- | --- |
 | A ready book remains in `index.json` | Start the first ready book in queue order, in-process. |
-| No ready book and `flywheel.auto_pickup_backlog=true` | Start a bookless backlog-mode run. |
-| No ready book and auto-pickup is off | Stay stopped and emit `needs-you: pipeline idle — no order book queued and auto-pickup is off`. |
+| No ready book locally, but a ready book in another tracked project | Scan every project in `projects.yaml` registry order, skipping the project that just drained, and start the first ready book found. The run starts in that project's own primary root with no brief argument, so `requireFlywheelBrief` resolves the target project's `docs/flywheel-brief.md` rather than carrying the previous project's brief over. `pan flywheel complete` names the project in its output: `started <runId> with order book <bookId> (project: <key>)`. |
+| No ready book in any project and `flywheel.auto_pickup_backlog=true` | Start a bookless backlog-mode run. |
+| No ready book in any project and auto-pickup is off | Stay stopped and emit `needs-you: pipeline idle — no order book queued and auto-pickup is off`. |
+
+Cross-project continuation is deliberately not gated on the completing run's scope. Marking a book ready is an explicit operator release, so a ready book anywhere is work the operator has already authorized; run scope governs backlog pickup only.
+
+## CLI surface
+
+```bash
+pan orders create "Campaign name"
+pan orders list
+pan orders show <id>
+pan orders add <id> <issue...> [--lane B] [--after <issue>] [--reverify]
+pan orders remove <id> <issue>
+pan orders move <id> <issue> [--lane A] [--order 2]
+pan orders queue <id>
+pan orders start <id>
+```
+
+`queue` is the CLI equivalent of the dashboard's **Queue book** action: it moves a draft to ready through the write door so the Flywheel can pick the book up from the ready queue.
+
+Every verb accepts `--project <key>` to resolve the book in another registered project instead of the one containing the current directory. Omitting it keeps resolving from cwd. An unregistered key exits non-zero with `Unknown project: <key>`.
+
+```bash
+pan orders list --project mind-your-now
+pan orders queue 2026-08-01-frontend-sweep --project mind-your-now
+```
 
 ## HTTP surface
 
@@ -165,6 +190,17 @@ All routes are under `/api/orders` and delegate to the two doors:
 - `POST /api/orders/:id/start`
 
 Mutation routes use the dashboard's normal CSRF protection. Server-reachable code remains async and does not use `execSync`.
+
+### Project scoping
+
+Order books are per-project state, so every route above accepts an optional `project=<key>` query parameter naming a key from `projects.yaml`. The key is resolved through the projects registry to that project's state read home, and the resolved key is echoed back on each response — `GET /api/orders` returns it as a top-level `project` field, and every single-book projection carries it as `project`.
+
+- **Omitted.** The route resolves the project containing the dashboard server's own working directory, which is the historical behavior. Existing callers keep working unchanged.
+- **Unknown key.** The route answers HTTP 400 naming the key (`Unknown project: <key>`), never a 404 for the book. A bad key is a caller error, not a missing book.
+- **Single-book miss.** `GET /api/orders/:id` with no `project=` falls back to scanning the other registered projects' state roots in registry order and returns the first match, so a deep link or the Flywheel-page widget still resolves a book that lives in another project. An explicit `project=` never scans — it either finds the book in that project or 404s.
+- **`POST /api/orders/:id/start`** launches the Flywheel in the book's own project root rather than the server's cwd, so a cross-project book runs against the right repo.
+
+The `/orders` page carries the resolved key on every fetch it makes and mirrors the selection into the URL as `/orders?project=<key>`, which is also the deep link the Flywheel order-book widget points at.
 
 ## Verification
 

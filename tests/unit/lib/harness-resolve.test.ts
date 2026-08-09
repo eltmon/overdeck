@@ -78,6 +78,7 @@ describe('resolveHarness', () => {
 
     setConfig({ providerHarnesses: { openai: 'ohmypi' } });
     await expect(resolveHarness({ explicit: 'claude-code', model: 'gpt-5.5' })).resolves.toBe('claude-code');
+    await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('ohmypi');
 
     // No explicit pick or config → built-in provider default.
     setConfig({});

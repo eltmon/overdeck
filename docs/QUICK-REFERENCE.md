@@ -42,7 +42,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan strike-ready <id>` | Persist the pushed `strike/<id>` HEAD so Deacon can land it through the verified merge door; Flywheel is not required |
 | `pan swarm <id>` | Per-item DAG dispatch across plan items (slot-per-item). See [SWARM.md](./SWARM.md). `--dry-run`, `--max-slots`, `--auto-advance`, `--host`, `--task <next\|show\|claim\|done\|block\|unblock\|cancel>` |
 | `pan staffing <id>` | Show or set per-issue work-model and swarm overrides. Use `--model <model>\|default` and `--swarm off\|auto\|always\|default`. |
-| Issue-header Policies control | Open **Policies** from an issue header to set Review (mode, re-review scope, model) and Work (model, swarm) overrides. Active overrides surface as chips beside the control. Model changes apply to the next fresh run; they never restart agents automatically. |
+| Issue-header Policies control | Open **Policies** from an issue header to set Review (mode, model) and Work (model, swarm) overrides. Active overrides surface as chips beside the control. Model changes apply to the next fresh run; they never restart agents automatically. |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |
 | Dashboard MERGE | Click MERGE button when review passes (handles rebase, verify, merge, cleanup) |
 | `pan inspect <id>` | Request human inspection before proceeding |

@@ -30,12 +30,13 @@ completion condition; this brief still supplies all other run configuration. You
     backlog (Planning floor) so the awaiting-release queue stays deep.
   - **ON** — blanket release: auto-start `ready && planned` backlog in sequencer-priority order
     up to `maxAgents`. `vetoed`/`parked`/`objection`/relevance-vet still gate.
-- **`require_uat_before_merge` (default ON):** ON — assemble the UAT candidate each tick, never
-  schedule merges. OFF — schedule eligible auto-merges. (See the role's Merge policy.)
-- **Strike merge ownership:** whoever spawns a strike owns its merge. On a strike readiness
-  signal, review the `strike/<id>` diff, run the quality gates, land via gh-API squash-merge
-  (`gh pr create` if needed, then `gh pr merge --squash`) — never a local git push to
-  `origin/main` — then run `pan done <id> --strike`.
+- **`require_uat_before_merge` (default ON):** ON — observe the UAT merge train's automatically
+  assembled generations, never schedule merges. OFF — schedule eligible auto-merges. (See the
+  role's Merge policy.)
+- **Strike merge ownership:** the Deacon lands ready strikes through its server merge door. On a
+  strike readiness signal, observe `strikeLandingState`; intervene only when it reaches
+  `needs_you`. Never merge `strike/<id>` locally, push it to `origin/main`, or run
+  `pan done <id> --strike`.
 - **Run-specific focus:** none unless given at launch.
 - **Metric-aware prioritization:** within the substrate-hardening tier, keep operator-filed
   substrate bugs first, then order each filing-source group by the weight returned from

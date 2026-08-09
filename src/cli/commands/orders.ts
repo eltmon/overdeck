@@ -8,14 +8,16 @@ import {
   createBook,
   moveItem,
   removeItem,
+  setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
-import { findProjectByPathSync } from '../../lib/projects.js';
+import { findProjectByPathSync, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 
 interface OrdersCommandDeps {
   cwd?: string;
   stateRoot?: string;
+  projectKey?: string;
   now?: () => Date;
   actor?: string;
   startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
@@ -25,19 +27,35 @@ interface OrdersAddOptions {
   lane?: OrderBookLane;
   after?: string;
   reverify?: boolean;
+  project?: string;
 }
 
 interface OrdersMoveOptions {
   lane?: OrderBookLane;
   order?: number;
+  project?: string;
 }
 
-function stateRootFor(deps: OrdersCommandDeps = {}): string {
-  if (deps.stateRoot) return deps.stateRoot;
+interface OrdersProjectResolution {
+  stateRoot: string;
+  projectConfig?: ProjectConfig;
+}
+
+function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolution {
+  if (deps.stateRoot) return { stateRoot: deps.stateRoot };
+  if (deps.projectKey !== undefined) {
+    const project = getProjectSync(deps.projectKey);
+    if (!project) throw new Error(`Unknown project: ${deps.projectKey}`);
+    return { stateRoot: resolveStateReadHomeSync(project, deps.projectKey).root, projectConfig: project };
+  }
   const cwd = deps.cwd ?? process.cwd();
   const project = findProjectByPathSync(cwd);
   if (!project) throw new Error(`No configured project contains ${cwd}`);
-  return resolveStateReadHomeSync(project).root;
+  return { stateRoot: resolveStateReadHomeSync(project).root, projectConfig: project };
+}
+
+function stateRootFor(deps: OrdersCommandDeps = {}): string {
+  return resolveOrdersProject(deps).stateRoot;
 }
 
 function requireBook(stateRoot: string, bookId: string): OrderBook {
@@ -101,9 +119,9 @@ export function formatBookList(books: readonly OrderBook[]): string {
   ].join('\n');
 }
 
-async function defaultStartOrderBook(bookId: string): Promise<{ runId: string }> {
+async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<{ runId: string }> {
   const { startFlywheelRun } = await import('./flywheel.js');
-  return startFlywheelRun({ orders: bookId });
+  return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
 }
 
 export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
@@ -195,8 +213,16 @@ export async function runOrdersMove(
 }
 
 export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
-  requireBook(stateRootFor(deps), bookId);
-  return (deps.startOrderBook ?? defaultStartOrderBook)(bookId);
+  const resolved = resolveOrdersProject(deps);
+  requireBook(resolved.stateRoot, bookId);
+  return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
+}
+
+export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const stateRoot = stateRootFor(deps);
+  const book = requireBook(stateRoot, bookId);
+  if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
+  return setStatus(stateRoot, bookId, 'ready');
 }
 
 async function commandAction(action: () => Promise<void>): Promise<void> {
@@ -215,22 +241,25 @@ export function createOrdersCommand(): Command {
   orders
     .command('create <name>')
     .description('Create a draft order book')
-    .action((name: string) => commandAction(async () => {
-      console.log(formatBook(await runOrdersCreate(name)));
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((name: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersCreate(name, { projectKey: options.project })));
     }));
 
   orders
     .command('list')
     .description('List order books')
-    .action(() => commandAction(async () => {
-      console.log(formatBookList(runOrdersList()));
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((options: { project?: string }) => commandAction(async () => {
+      console.log(formatBookList(runOrdersList({ projectKey: options.project })));
     }));
 
   orders
     .command('show <id>')
     .description('Show an order book')
-    .action((id: string) => commandAction(async () => {
-      console.log(formatBook(runOrdersShow(id)));
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(runOrdersShow(id, { projectKey: options.project })));
     }));
 
   orders
@@ -239,15 +268,17 @@ export function createOrdersCommand(): Command {
     .option('--lane <lane>', 'Target lane: A or B', parseLane, 'A')
     .option('--after <issue>', 'Insert after an issue in the target lane')
     .option('--reverify', 'Require PRD re-verification before pickup')
+    .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issues: string[], options: OrdersAddOptions) => commandAction(async () => {
-      console.log(formatBook(await runOrdersAdd(id, issues, options)));
+      console.log(formatBook(await runOrdersAdd(id, issues, options, { projectKey: options.project })));
     }));
 
   orders
     .command('remove <id> <issue>')
     .description('Remove an issue from an order book')
-    .action((id: string, issue: string) => commandAction(async () => {
-      console.log(formatBook(await runOrdersRemove(id, issue)));
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, issue: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersRemove(id, issue, { projectKey: options.project })));
     }));
 
   orders
@@ -255,15 +286,25 @@ export function createOrdersCommand(): Command {
     .description('Move an issue within or between lanes')
     .option('--lane <lane>', 'Target lane: A or B', parseLane)
     .option('--order <n>', 'One-based position in the target lane', parsePositiveInteger)
+    .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issue: string, options: OrdersMoveOptions) => commandAction(async () => {
-      console.log(formatBook(await runOrdersMove(id, issue, options)));
+      console.log(formatBook(await runOrdersMove(id, issue, options, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('queue <id>')
+    .description('Mark a draft order book ready for dispatch')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersQueue(id, { projectKey: options.project })));
     }));
 
   orders
     .command('start <id>')
     .description('Start a Flywheel run bound to an order book')
-    .action((id: string) => commandAction(async () => {
-      const result = await runOrdersStart(id);
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      const result = await runOrdersStart(id, { projectKey: options.project });
       console.log(`Flywheel started: ${result.runId}`);
       console.log(`Order book: ${id}`);
     }));

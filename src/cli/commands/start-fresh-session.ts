@@ -46,7 +46,7 @@ export interface FreshSessionOptions {
 
 export interface FreshSessionDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
-  assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean }) => unknown;
+  assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean; explicitFresh?: boolean }) => unknown;
 }
 
 export async function prepareFreshWorkAgentSession(
@@ -84,6 +84,7 @@ export async function prepareFreshWorkAgentSession(
     assertCanStartFresh(issueId, {
       allowPausedForce: false,
       allowLiveSessionReplacement: true,
+      explicitFresh: true,
     });
   } catch (error) {
     return {

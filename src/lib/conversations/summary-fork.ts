@@ -559,8 +559,7 @@ export async function generateSummaryForFork(
 }async function reserveSummaryForkSessionPromise(
   cwd: string,
 ): Promise<{ sessionId: string; sessionFile: string }> {
-  // PAN-1862 (NFR-3): delegates to the shared session-fork primitive so the
-  // conversation panel and the review convoy fork through one code path.
+  // Delegate session reservation to the shared conversation-fork primitive.
   const { reserveForkSession } = await import('./session-fork.js');
   return reserveForkSession(cwd);
 }

@@ -2,11 +2,12 @@
 name: pan-style-guide
 description: >
   Overdeck dashboard UI style guide — canonical typography, color-signal
-  semantics, badge formula, and color-restraint rules. Use whenever writing,
-  reviewing, or mocking up dashboard frontend UI (components, badges, colors,
-  fonts, status indicators, kanban cards, tree rows). Prevents the common
-  violations: Inter/bold fonts, pill badges, decorative color, green "running"
-  agents, cyan misuse.
+  semantics, badge formula, and color-restraint rules, for both the Ledger
+  (legacy) and Broadsheet (default) themes. Use whenever writing, reviewing,
+  or mocking up dashboard frontend UI (components, badges, colors, fonts,
+  status indicators, kanban cards, tree rows). Prevents the common
+  violations: Inter as a font, bold/semibold outside its weight tier, pill
+  badges, decorative color, green "running" agents, cyan misuse.
 triggers:
   - dashboard UI
   - frontend component
@@ -26,22 +27,65 @@ allowed-tools:
 
 ## Sources of truth — read in this order
 
-1. **The law:** `design/style-guide/STYLE-GUIDE.md` (v1.2) — typography canon,
-   color system, surfaces, radius/spacing scales, component specs, forbidden
-   patterns. Everything below is a distillation; when in doubt, the guide wins.
-2. **Visual reference:** `design/style-guide/mockups/system-map.html` — open in a
-   browser. Section **05 · Color discipline** is the signal-color table as live
-   swatches; sections 02–03 show the surfaces and shared primitives composed.
+1. **The law:** `design/style-guide/STYLE-GUIDE.md` (v2.0) — typography canon
+   for both themes, color system, surfaces, radius/spacing scales, component
+   specs, forbidden patterns. Everything below is a distillation; when in
+   doubt, the guide wins.
+2. **Visual reference:** `design/style-guide/mockups/system-map.html` — the
+   PAN-1148 unified-redesign system map; open in a browser. Section
+   **05 · Color discipline** is the signal-color table as live swatches;
+   sections 02–03 show the surfaces and shared primitives composed. For the
+   Broadsheet-specific vocabulary (display scale, chips, soft cards, keycap
+   CTAs, dot-metadata lines), see
+   `design/style-guide/mockups/style-guide-v2.html` — the working prototype
+   the theme-scoped tokens and pattern recipes were ported from.
 3. **Written tightening:** `docs/prds/planned/pan-dashboard-unified-redesign.md`
    §4.5 ("Color & Style Discipline") — the PAN-1148 "Always means / Never used
    for" table now folded into the guide.
-4. **Tokens:** `src/dashboard/frontend/src/index.css` (light + dark blocks) and
+4. **Tokens:** `src/dashboard/frontend/src/index.css` (light/dark color
+   blocks, `@font-face` declarations, theme font tokens, and the
+   `.display-xl`/`.display-lg`/`.eyebrow` Broadsheet utilities) and
    `src/dashboard/frontend/tailwind.config.js`. Conformance is exercised by
    `tests/e2e/styleguide-conformance.spec.ts`.
 
+## Themes: Ledger (legacy) vs. Broadsheet (default)
+
+Overdeck ships two named design languages behind a single `ui.theme` setting
+(`~/.overdeck/config.yaml`, default `broadsheet`) and a `data-theme` attribute
+on `<html>`. **Ledger** is the pre-PAN-3410 style — DM Sans, flat
+`font-medium` cap, no display tier — now frozen: bug fixes only, never new
+patterns. **Broadsheet** is the active theme: Geist/Geist Mono, a tiered
+weight system, a display scale, and the new component vocabulary below.
+
+**The theme rule for new surfaces:** author against the Broadsheet
+vocabulary (`.display-xl`, `.display-lg`, `.eyebrow`, chips, soft cards,
+keycap CTAs, dot-metadata lines) using the class names as given. Never write
+`if (theme === 'broadsheet')` or any other conditional-markup branch. This is
+not optional — a component that branches on theme is a style-guide violation
+regardless of which theme it produces correct output for.
+
+Only three of those classes actually have a Ledger-safe fallback — they
+resolve to a scaled-down value at `:root` instead of being conditionally
+rendered, so a surface built from them degrades in scale and texture under
+Ledger but never breaks:
+
+| Broadsheet class | Ledger-safe fallback |
+|---|---|
+| `.display-xl` | `text-xl font-medium` |
+| `.display-lg` | `text-lg font-medium` |
+| `.eyebrow` | `text-xs uppercase tracking-wider font-medium` |
+
+Chips, soft cards, keycap CTAs, and dot-metadata lines have **no** Ledger
+fallback — no `:root` or `[data-theme="ledger"]` rule exists for them at all.
+This is authoring discipline, not a CSS or runtime guard: nothing detects or
+blocks their use under Ledger, they would just render unstyled (bare Tailwind
+utilities, no theming) if reached while Ledger is active. A component built
+with them is a Broadsheet-only component by construction; don't reach for
+them on a surface that must still render under Ledger.
+
 ## The rules agents violate most (memorize these)
 
-### Typography (PAN-698 canon — absolute)
+### Typography — Ledger (legacy baseline, verbatim)
 
 - **DM Sans** for ALL UI prose. Inter, SF Pro, Segoe UI, -apple-system are
   **deprecated — never reintroduce**.
@@ -52,6 +96,21 @@ allowed-tools:
   wordmark. Nowhere else (God View is the lone scoped exception).
 - **`font-medium` (500) for everything.** No semibold, no bold. Hierarchy
   comes from size and color contrast, not weight.
+
+### Typography — Broadsheet (tiered weights replace the flat cap)
+
+- **Geist Variable** (`font-body`/`font-display`) for ALL UI prose and the
+  sidebar wordmark. **Geist Mono Variable** (`font-mono`) for technical
+  identifiers *and* the eyebrow pattern below — the one deliberate widening
+  of the mono rule. All four families (Geist, Geist Mono, DM Sans, Space
+  Grotesk) are self-hosted `woff2` — never a Google Fonts `<link>`, never a
+  hardcoded font-family string in component code.
+- **Weight tiers, not a flat cap:** body/UI 400–500, headings 500–600,
+  **display tiers only 600–800** (`.display-xl` weight 750, `.display-lg`
+  weight 680). Nothing outside `.display-xl`/`.display-lg` may exceed 600 —
+  "no bold outside its tier" replaces Ledger's "no bold anywhere."
+- **Display scale** (`.display-xl`, `.display-lg`) — page/section heroes and
+  hero-editable titles only. One `.display-xl` per page.
 
 ### Signal colors — each token means exactly one thing
 
@@ -81,11 +140,42 @@ purple = specialist verb, cyan = money, neutral = everything else.**
 
 ### Badges & indicators
 
-- `rounded-sm`, h-5, `font-medium`; tint formula: **8% background / 32%
-  border** (`bg-{signal}/8 border-{signal}/32 text-{signal}-foreground`).
-  No pills (`rounded-full`) for status badges.
+- Tint formula: **8% background / 32% border**
+  (`bg-{signal}/8 border-{signal}/32 text-{signal}-foreground`) — identical
+  in both themes (D-11, unchanged). No pills (`rounded-full`) for status
+  badges.
+- Radius: `rounded-sm` under Ledger, `rounded-md` under Broadsheet — the
+  **one** deliberate radius change in the whole theme revision. Nothing else
+  about the badge formula differs between themes.
 - Pick ONE indicator pattern per context — don't mix dots + badges + colored
   text for the same concept in one view.
+
+### Broadsheet-only patterns (never under Ledger)
+
+- **Eyebrow** — uppercase `font-mono`, `text-[11px]`, `tracking-[0.12em]`,
+  `text-muted-foreground`. Category/kicker labels and quiet text-buttons.
+- **Chip** — `rounded-lg h-9 border border-border`, leading 16px icon.
+  Dashed variant (`border-dashed`) = additive/tentative action. Selected =
+  `border-foreground/40 bg-muted`, never a color.
+- **Soft card** — `rounded-xl bg-muted/50 p-5`, optional hairline border, no
+  hard border by default. Suggestion/idea/preview content.
+- **Keycap hint** — `rounded-md bg-foreground/8 px-1.5 font-mono text-xs`
+  glyph (↵, ⌘L) inside or beside a large CTA button (`h-12 rounded-xl`).
+  One CTA per view — same single-primary rule as ordinary buttons.
+- **Dot-metadata line** — 6px status dot + `font-mono` quiet text, items
+  joined by ` · `. Ambient state summaries only.
+
+None of these exist under Ledger — don't backport them, and don't gate them
+behind a theme conditional (see "The theme rule for new surfaces" above).
+
+### Page-not-modal doctrine (theme-independent)
+
+Major creation/composition flows (new project, new workspace, future
+editors) are **routed pages**, not modals. Modals are reserved for
+confirmations and forms of **4 fields or fewer**. This applies under either
+theme — it is not a Broadsheet-only rule. If a diff adds a modal for a
+flow with more than 4 fields or a genuine "create X" action, that's a
+finding.
 
 ### Forbidden patterns (hard bans)
 
@@ -100,7 +190,7 @@ Surfaces: depth via tonal layering (`--card`, `--card-2`), not shadows;
 borders `white/6%` dark, `black/5%` light; light-mode cards are borderless
 (ambient shadow instead).
 
-### Brand mark — the control ring (guide §18)
+### Brand mark — the control ring (guide §19)
 
 The Overdeck logo is the **control ring**: orbit ring + center hub + one agent
 satellite on the ring (reads as the O of Overdeck). In-app, render it ONLY via
@@ -113,11 +203,15 @@ Eye, the old stacked diamonds, or tan/copper colors. Canonical SVGs:
 
 ## Workflow
 
-- Before styling anything new, open the system map mockup and find the
-  nearest existing primitive — match it, don't invent.
-- For mockups: build with the real tokens (copy the dark/light blocks from
-  `index.css`), DM Sans via Google Fonts, and state conformance deltas
-  explicitly. Put mockups in `docs/design/`.
+- Before styling anything new, open the system map mockup (or, for
+  Broadsheet-specific patterns, `style-guide-v2.html`) and find the nearest
+  existing primitive — match it, don't invent.
+- For mockups: build with the real tokens — copy the `@font-face`
+  declarations and the light/dark color blocks from `index.css`, self-hosted
+  (never a Google Fonts `<link>`) — and state conformance deltas explicitly.
+  Put mockups in `docs/design/`.
 - Reviewing UI diffs: grep the diff for forbidden patterns above and for
-  `font-bold|font-semibold|Inter|rounded-full.*badge|slate-` — each hit is a
-  finding.
+  `font-bold|font-semibold` outside `.display-xl`/`.display-lg`, `Inter`,
+  `rounded-full.*badge`, `slate-`, and any hardcoded `font-family:` string in
+  component code (it should always be `font-body`/`font-display`/`font-mono`)
+  — each hit is a finding.

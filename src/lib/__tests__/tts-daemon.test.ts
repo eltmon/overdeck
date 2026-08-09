@@ -247,3 +247,77 @@ describe('tts daemon lifecycle state', () => {
     }
   });
 });
+
+describe('resolveQwenTtsPackageDirPromise', () => {
+  const GEN_ROOT = '/home/u/.overdeck/deployments/dashboard/.pan-reload-generation-a';
+  const CHECKOUT = '/home/u/Projects/overdeck';
+
+  function existsAmong(paths: string[]): (path: string) => Promise<boolean> {
+    return async (path: string) => paths.includes(path);
+  }
+
+  it('redirects a generation root to the active checkout whose venv exists', async () => {
+    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDirPromise({
+      pkgRoot: GEN_ROOT,
+      repoRoot: () => CHECKOUT,
+      exists: existsAmong([
+        join(GEN_ROOT, 'packages', 'qwen-tts-linux-x64'),
+        join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'),
+        join(CHECKOUT, 'packages', 'qwen-tts-linux-x64', '.venv', 'bin', 'python'),
+      ]),
+    });
+    expect(result).toBe(join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'));
+  });
+
+  it('prefers the checkout package dir from a generation even without a venv, so installs land where they survive redeploys', async () => {
+    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDirPromise({
+      pkgRoot: GEN_ROOT,
+      repoRoot: () => CHECKOUT,
+      exists: existsAmong([
+        join(GEN_ROOT, 'packages', 'qwen-tts-linux-x64'),
+        join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'),
+      ]),
+    });
+    expect(result).toBe(join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'));
+  });
+
+  it('keeps a non-generation root on its own package dir', async () => {
+    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDirPromise({
+      pkgRoot: CHECKOUT,
+      repoRoot: () => {
+        throw new Error('marker must not be read outside a generation');
+      },
+      exists: existsAmong([
+        join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'),
+        join(CHECKOUT, 'packages', 'qwen-tts-linux-x64', '.venv', 'bin', 'python'),
+      ]),
+    });
+    expect(result).toBe(join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'));
+  });
+
+  it('falls back to generation candidates when no active-bundle marker resolves', async () => {
+    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDirPromise({
+      pkgRoot: GEN_ROOT,
+      repoRoot: () => null,
+      exists: existsAmong([join(GEN_ROOT, 'packages', 'qwen-tts-linux-x64')]),
+    });
+    expect(result).toBe(join(GEN_ROOT, 'packages', 'qwen-tts-linux-x64'));
+  });
+
+  it('creates the first candidate when nothing exists', async () => {
+    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const made: string[] = [];
+    const result = await resolveQwenTtsPackageDirPromise({
+      pkgRoot: GEN_ROOT,
+      repoRoot: () => CHECKOUT,
+      exists: async () => false,
+      ensureDir: async (path: string) => { made.push(path); },
+    });
+    expect(result).toBe(join(CHECKOUT, 'packages', 'qwen-tts-linux-x64'));
+    expect(made).toEqual([join(CHECKOUT, 'packages', 'qwen-tts-linux-x64')]);
+  });
+});

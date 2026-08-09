@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   setReviewStatus: vi.fn(),
   messageAgent: vi.fn(),
   snapshotWorkspaceHeads: vi.fn(),
+  recordReviewVerdict: vi.fn(),
   deliverReviewVerdictFeedback: vi.fn(),
   emitActivityEntry: vi.fn(),
 }));
@@ -55,6 +56,10 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 vi.mock('../../../../src/lib/git-utils.js', () => ({
   rehydrateHeadAnchor: (anchor: string) => anchor,
   snapshotWorkspaceHeadsPromise: (...args: unknown[]) => mocks.snapshotWorkspaceHeads(...args),
+}));
+
+vi.mock('../../../../src/lib/cloister/review-verdict-writer.js', () => ({
+  recordReviewVerdict: (...args: unknown[]) => mocks.recordReviewVerdict(...args),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
@@ -119,6 +124,7 @@ describe('reconcileUnappliedReviewVerdicts', () => {
     mocks.setReviewStatus.mockReset();
     mocks.messageAgent.mockReset().mockResolvedValue({ delivered: true });
     mocks.snapshotWorkspaceHeads.mockReset().mockResolvedValue(HEAD);
+    mocks.recordReviewVerdict.mockReset().mockResolvedValue({ landed: true, classification: 'anchor-match' });
     mocks.deliverReviewVerdictFeedback.mockReset().mockReturnValue(Effect.succeed({
       prCommentPosted: false,
       agentMessageSent: true,
@@ -140,21 +146,31 @@ describe('reconcileUnappliedReviewVerdicts', () => {
       expect.stringContaining('reconcileUnappliedReviewVerdicts deacon sweep applied passed'),
     ]);
 
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, {
-      reviewStatus: 'passed',
-      reviewNotes: 'Review passed applied by deacon sweep from on-disk synthesis.md',
-      reviewedAtCommit: HEAD,
+    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(ISSUE_ID, {
+      verdict: 'passed',
+      notes: 'Review passed applied by deacon sweep from on-disk synthesis.md',
+      evidenceHead: HEAD,
+      runId: RUN_ID,
+      writer: 'unsignaled-recovery',
     });
-    const recoveredAnchor = mocks.setReviewStatus.mock.calls[0]?.[1]?.reviewedAtCommit;
-    expect(recoveredAnchor).toBe(HEAD);
-    mocks.snapshotWorkspaceHeads.mockResolvedValueOnce('b'.repeat(40));
-    const subsequentHead = await mocks.snapshotWorkspaceHeads();
-    expect(subsequentHead).not.toBe(recoveredAnchor);
     expect(mocks.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       source: 'cloister',
       level: 'warn',
       issueId: ISSUE_ID,
       message: expect.stringContaining('reconcileUnappliedReviewVerdicts deacon sweep applied passed'),
+    }));
+  });
+
+  it('converges a settled reviewing row through the verdict write door', async () => {
+    await writeReviewFixture({ body: '## Verdict: APPROVED\n\nNo blockers.' });
+    mocks.statuses[ISSUE_ID] = pendingStatus({ reviewStatus: 'reviewing' });
+
+    await reconcileUnappliedReviewVerdicts();
+
+    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
+      verdict: 'passed',
+      evidenceHead: HEAD,
+      writer: 'unsignaled-recovery',
     }));
   });
 
@@ -167,10 +183,12 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, {
-      reviewStatus: 'blocked',
-      reviewNotes: 'verdict status is never persisted — applied by deacon sweep from on-disk review.md',
-      reviewedAtCommit: HEAD,
+    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(ISSUE_ID, {
+      verdict: 'blocked',
+      notes: 'verdict status is never persisted — applied by deacon sweep from on-disk review.md',
+      evidenceHead: HEAD,
+      runId: RUN_ID,
+      writer: 'unsignaled-recovery',
     });
     expect(mocks.deliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: ISSUE_ID,
@@ -189,7 +207,7 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
   });
 
   it('applies a polyrepo verdict when every reviewed repository HEAD matches', async () => {
@@ -207,10 +225,13 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
-      reviewStatus: 'passed',
-      reviewedAtCommit: compositeHead,
-    }));
+    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(ISSUE_ID, {
+      verdict: 'passed',
+      notes: 'Review passed applied by deacon sweep from on-disk synthesis.md',
+      evidenceHead: compositeHead,
+      runId: RUN_ID,
+      writer: 'unsignaled-recovery',
+    });
   });
 
   it('skips a polyrepo verdict when one reviewed repository HEAD has moved', async () => {
@@ -227,7 +248,7 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
   });
 
   it('continues past a malformed review run and applies the valid run', async () => {
@@ -248,9 +269,10 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
-      reviewStatus: 'passed',
-      reviewedAtCommit: HEAD,
+    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
+      verdict: 'passed',
+      evidenceHead: HEAD,
+      writer: 'unsignaled-recovery',
     }));
   });
 
@@ -262,7 +284,7 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
   });
 
   it('skips a verdict inside the five-minute settle window', async () => {
@@ -271,10 +293,10 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
   });
 
-  it('nudges a live review session, then applies directly after the thirty-minute grace', async () => {
+  it('does not converge a live session report after it exceeds the artifact freshness bound', async () => {
     await writeReviewFixture({ body: '## Verdict: APPROVED' });
     mocks.statuses[ISSUE_ID] = pendingStatus();
     mocks.sessionAlive = true;
@@ -285,14 +307,12 @@ describe('reconcileUnappliedReviewVerdicts', () => {
       'agent-pan-3206-review',
       expect.stringContaining('pan admin specialists done review'),
     );
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1);
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
-      reviewStatus: 'passed',
-    }));
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
   });
 
   it('shell-quotes every report-derived completion argument', () => {
@@ -349,7 +369,7 @@ describe('reconcileUnappliedReviewVerdicts', () => {
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
     expect(mocks.snapshotWorkspaceHeads).not.toHaveBeenCalled();
   });
 });

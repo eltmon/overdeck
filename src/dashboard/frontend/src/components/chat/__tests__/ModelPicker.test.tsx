@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelPicker, loadStoredModel, onKnownModelsSync } from '../ModelPicker';
+import { applyDefaultConversationModel } from '../defaultConversationModel';
 
 vi.mock('sonner', () => ({
   toast: { message: vi.fn() },
@@ -10,10 +11,11 @@ vi.mock('sonner', () => ({
 
 type HarnessPolicyDecisionsMap = Record<string, Record<string, { allowed: boolean; reason?: string }>>;
 
-function installFetchMock(options: { showHarnessModelPermutations?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap } = {}) {
+function installFetchMock(options: { showHarnessModelPermutations?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input.toString();
     if (url === '/api/settings/available-models') {
+      await options.availableModelsGate;
       return new Response(JSON.stringify({
         anthropic: [
           { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
@@ -47,7 +49,7 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; har
     if (url === '/api/settings') {
       return new Response(JSON.stringify({
         models: {
-          default_conversation_model: 'claude-sonnet-4-6',
+          default_conversation_model: options.defaultConversationModel ?? 'claude-sonnet-4-6',
           provider_harnesses: {},
           provider_default_harnesses: {
             anthropic: 'claude-code',
@@ -208,6 +210,63 @@ describe('chat ModelPicker live harness labels', () => {
     expect(onComboChange).toHaveBeenCalledWith('gpt-5.5', [], 'codex');
     expect(onChange).not.toHaveBeenCalled();
     expect(onHarnessChange).not.toHaveBeenCalled();
+  });
+
+  it('re-seeds a stored model after the available model list resolves', async () => {
+    localStorage.setItem('conv-composer-model', 'kimi-k2.6-flash');
+    const onChange = vi.fn();
+
+    render(<ModelPicker value="" onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith('kimi-k2.6-flash', []);
+    });
+  });
+
+  it('does not re-seed a live conversation', async () => {
+    localStorage.setItem('conv-composer-model', 'kimi-k2.6-flash');
+    const onChange = vi.fn();
+
+    render(<ModelPicker value="" onChange={onChange} liveConversation />);
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('uses the current live-conversation state when model discovery finishes', async () => {
+    vi.unstubAllGlobals();
+    let releaseAvailableModels!: () => void;
+    const availableModelsGate = new Promise<void>((resolve) => {
+      releaseAvailableModels = resolve;
+    });
+    installFetchMock({ availableModelsGate });
+    localStorage.setItem('conv-composer-model', 'kimi-k2.6-flash');
+    const onChange = vi.fn();
+
+    const view = render(<ModelPicker value="" onChange={onChange} />);
+    view.rerender(<ModelPicker value="" onChange={onChange} liveConversation />);
+    releaseAvailableModels();
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('preserves an empty selection when no stored or configured default exists', async () => {
+    vi.unstubAllGlobals();
+    installFetchMock({ defaultConversationModel: '' });
+    applyDefaultConversationModel('');
+    const onChange = vi.fn();
+
+    render(<ModelPicker value="" onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
+    });
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
 

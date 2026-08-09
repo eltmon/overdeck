@@ -26,6 +26,12 @@ Focus on correctness bugs:
 
 Do not review security vulnerabilities, performance regressions, style, architecture, or requirements coverage. Requirements and acceptance criteria belong to the requirements reviewer.
 
+## Effect diagnostics ratchet
+
+Run `npm run lint:effect-diagnostics` for the branch under review.
+Any `NEW:` finding is a blocking correctness finding and must prevent approval.
+`known:` findings are baselined, pre-existing debt and are not the author's to fix.
+
 ## Method
 
 1. Review the inline shared context summary in your spawn prompt.

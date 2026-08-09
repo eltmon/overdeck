@@ -4,7 +4,11 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { loadReviewStatuses, getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
+import { listProjectsAsync, resolveProjectFromIssueSync } from '../projects.js';
+import { getAgentState } from '../agents/agent-state.js';
+import { hasAgentRuntimeInSubtree } from '../agents/runtime-command.js';
+import { supervisorProcessAlive } from '../agents/supervisor-liveness.js';
+import { listPaneValues } from '../tmux.js';
 import { messageAgent, type MessageDeliveryOutcome } from '../agents/messaging.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -61,13 +65,16 @@ export interface StrikeLandingDeps {
   resolveProject: typeof resolveProjectFromIssueSync;
   mergeIssue: StrikeMergeTrigger;
   getMainHead: (projectPath: string) => Promise<string>;
-  deliverRecovery: (agentId: string, message: string) => Promise<MessageDeliveryOutcome>;
+  deliverRecovery: (agentId: string, message: string, dedupKey: string) => Promise<MessageDeliveryOutcome>;
   writeFeedback: (issueId: string, workspacePath: string, markdownBody: string) => Promise<boolean>;
   needsYou: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   now: () => string;
   schedule: (key: string, work: () => Promise<void>) => void;
   isScheduled: (key: string) => boolean;
   isPersistentlyOwned: (issueId: string) => boolean;
+  listProjects: typeof listProjectsAsync;
+  git: (args: string[], cwd: string) => Promise<string>;
+  isStrikeAgentAlive: (agentId: string) => Promise<boolean>;
 }
 
 export class StrikeLandingSupervisor {
@@ -90,6 +97,32 @@ export class StrikeLandingSupervisor {
 }
 const strikeLandingSupervisor = new StrikeLandingSupervisor();
 
+/**
+ * A keep-alive tmux shell survives after its harness exits, while a supervisor
+ * can keep a harness alive after tmux disappears. Both probes must report no
+ * runtime before the Deacon can safely take over a dead strike's branch.
+ */
+async function defaultIsStrikeAgentAlive(agentId: string): Promise<boolean> {
+  try {
+    const state = await Effect.runPromise(getAgentState(agentId));
+    if (!state) return true;
+
+    const [supervisorAlive, panePids] = await Promise.all([
+      supervisorProcessAlive(agentId),
+      Effect.runPromise(listPaneValues(agentId, '#{pane_pid}')),
+    ]);
+    if (supervisorAlive) return true;
+
+    return (await Promise.all(
+      panePids.map((panePid) => hasAgentRuntimeInSubtree(panePid, state.harness ?? 'claude-code')),
+    )).some(Boolean);
+  } catch {
+    // A failed liveness probe is not proof that the agent stopped. Fail closed
+    // rather than racing an agent whose process tree could not be inspected.
+    return true;
+  }
+}
+
 function defaultDeps(): StrikeLandingDeps {
   return {
     loadStatuses: loadReviewStatuses,
@@ -98,13 +131,19 @@ function defaultDeps(): StrikeLandingDeps {
     resolveProject: resolveProjectFromIssueSync,
     mergeIssue: requestStrikeMerge,
     getMainHead: async (projectPath) => (await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: projectPath, encoding: 'utf8' })).stdout.trim(),
-    deliverRecovery: (agentId, message) => messageAgent(agentId, message, 'deacon-strike-landing', { owesRework: true }),
+    // A recovery must arrive through the live delivery door. A keyed message
+    // bypasses the monitor mail tier, which only becomes visible if the idle
+    // session takes another turn, and makes a repeated patrol safe to retry.
+    deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, 'deacon-strike-landing', { owesRework: true, dedupKey }),
     writeFeedback: async (issueId, workspacePath, markdownBody) => (await Effect.runPromise(writeFeedbackFile({ issueId, workspacePath, specialist: 'merge-agent', outcome: 'needs-you', summary: 'Strike landing needs operator attention', markdownBody }))).success,
     needsYou: surfaceIssueFeedbackNeedsYou,
     now: () => new Date().toISOString(),
     schedule: (key, work) => strikeLandingSupervisor.enqueue(key, work),
     isScheduled: key => strikeLandingSupervisor.has(key),
     isPersistentlyOwned: () => false,
+    listProjects: listProjectsAsync,
+    git: async (args, cwd) => (await execFileAsync('git', args, { cwd, encoding: 'utf8' })).stdout.trim(),
+    isStrikeAgentAlive: defaultIsStrikeAgentAlive,
   };
 }
 
@@ -124,7 +163,11 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
   const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nRun pan sync-main ${issueId}, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
   if (!NON_ACTIONABLE.test(detail) && recoveryCount < 3) {
     try {
-      const outcome = await deps.deliverRecovery(`strike-${issueId.toLowerCase()}`, recoveryMessage);
+      const outcome = await deps.deliverRecovery(
+        `strike-${issueId.toLowerCase()}`,
+        recoveryMessage,
+        `strike-landing:${issueId}:${head}:${recoveryCount}`,
+      );
       if (outcome.delivered) {
         deps.setStatus(issueId, { strikeLandingState: 'recovering', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
         return `[strike-landing] ${issueId} at ${head} recovering (${recoveryCount}/3)`;
@@ -181,9 +224,114 @@ async function handleTransportFailure(issueId: string, head: string, detail: str
   return `[strike-landing] ${issueId} at ${head} needs-you`;
 }
 
+interface StrandedStrikeCandidate {
+  issueId: string;
+  branchName: string;
+  workspacePath: string;
+  head: string;
+}
+
+function parseStrikeWorktrees(porcelain: string): Array<{ branchName: string; workspacePath: string }> {
+  const worktrees: Array<{ branchName: string; workspacePath: string }> = [];
+  let workspacePath: string | undefined;
+  for (const line of porcelain.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      workspacePath = line.slice('worktree '.length).trim();
+    } else if (workspacePath && line.startsWith('branch refs/heads/strike/')) {
+      worktrees.push({
+        workspacePath,
+        branchName: line.slice('branch refs/heads/'.length).trim(),
+      });
+    } else if (line.length === 0) {
+      workspacePath = undefined;
+    }
+  }
+  return worktrees;
+}
+
+async function findStrandedStrikeCandidates(deps: StrikeLandingDeps): Promise<StrandedStrikeCandidate[]> {
+  const candidates: StrandedStrikeCandidate[] = [];
+  let projects: Awaited<ReturnType<typeof deps.listProjects>>;
+  try {
+    projects = await deps.listProjects();
+  } catch {
+    return candidates;
+  }
+
+  for (const { config } of projects) {
+    let worktrees: Array<{ branchName: string; workspacePath: string }>;
+    try {
+      worktrees = parseStrikeWorktrees(await deps.git(['worktree', 'list', '--porcelain'], config.path));
+    } catch {
+      continue;
+    }
+
+    for (const { branchName, workspacePath } of worktrees) {
+      const issueId = branchName.slice('strike/'.length).toUpperCase();
+      if (!/^[A-Z][A-Z0-9]*-\d+$/.test(issueId)) continue;
+      if (await deps.isStrikeAgentAlive(`strike-${issueId.toLowerCase()}`)) continue;
+
+      try {
+        const [dirty, ahead, head] = await Promise.all([
+          deps.git(['status', '--porcelain'], workspacePath),
+          deps.git(['rev-list', '--count', 'origin/main..HEAD'], workspacePath),
+          deps.git(['rev-parse', 'HEAD'], workspacePath),
+        ]);
+        if (dirty || Number(ahead) <= 0 || !/^[0-9a-f]{40}$/i.test(head)) continue;
+        candidates.push({ issueId, branchName, workspacePath, head });
+      } catch {
+        // Cannot prove that this worktree is clean and ahead of main. Leave it
+        // untouched for a later patrol rather than guessing at agent intent.
+      }
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Push and mark ready a completed strike whose harness has exited before it
+ * could finish the commit → push → strike-ready handoff. The status update is
+ * durable issue evidence and the returned action is recorded in the ship log.
+ */
+export async function salvageStrandedStrikeBranches(deps: StrikeLandingDeps): Promise<string[]> {
+  const actions: string[] = [];
+  for (const candidate of await findStrandedStrikeCandidates(deps)) {
+    const current = deps.getStatus(candidate.issueId);
+    if (current?.strikeReadyHead === candidate.head) continue;
+
+    // Recheck immediately before the push to narrow the liveness race with an
+    // agent that may have resumed after the initial branch scan.
+    if (await deps.isStrikeAgentAlive(`strike-${candidate.issueId.toLowerCase()}`)) continue;
+
+    try {
+      const [dirty, head] = await Promise.all([
+        deps.git(['status', '--porcelain'], candidate.workspacePath),
+        deps.git(['rev-parse', 'HEAD'], candidate.workspacePath),
+      ]);
+      if (dirty || head !== candidate.head) continue;
+
+      await deps.git(['push', 'origin', candidate.branchName], candidate.workspacePath);
+      deps.setStatus(candidate.issueId, {
+        strikeReadyHead: candidate.head,
+        strikeReadyAt: deps.now(),
+        strikeLandingState: 'ready',
+        strikeRecoveryCount: 0,
+        strikeTransportRetryCount: undefined,
+        strikeNextAttemptAt: undefined,
+        strikeLandingAttempts: current?.strikeLandingAttempts ?? [],
+        mergeNotes: `Automatically salvaged completed strike branch ${candidate.branchName} after its harness exited before push.`,
+      });
+      actions.push(`[strike-salvage] pushed ${candidate.issueId} at ${candidate.head}`);
+    } catch (error) {
+      console.warn(`[strike-salvage] could not push ${candidate.issueId} at ${candidate.head}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return actions;
+}
+
 export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps> = {}): Promise<string[]> {
   const deps = { ...defaultDeps(), ...overrides };
-  const actions: string[] = [];
+  const actions = await salvageStrandedStrikeBranches(deps);
   for (const [key, candidate] of Object.entries(deps.loadStatuses())) {
     const issueId = (candidate.issueId || key).toUpperCase();
     const head = candidate.strikeReadyHead;

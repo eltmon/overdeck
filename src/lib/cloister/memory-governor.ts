@@ -92,6 +92,11 @@ export function readGovernorReserves(): GovernorReserves {
   };
 }
 
+/** PAN-3550: the activity-feed warn reserve, always above the SOFT reserve. */
+export function readGovernorWatchReserveBytes(): number {
+  return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
+}
+
 export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {

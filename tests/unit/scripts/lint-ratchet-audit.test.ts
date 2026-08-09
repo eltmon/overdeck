@@ -39,6 +39,14 @@ function writeCircularBaseline(root: string, cycles: string[]): void {
   writeFileSync(join(root, 'scripts', 'circular-deps-baseline.txt'), `${cycles.join('\n')}\n`);
 }
 
+function writeEffectDiagnosticsBaseline(root: string, findings: string[], header = '# Effect diagnostics baseline'): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts', 'effect-diagnostics-baseline.txt'),
+    `${header}\n# Findings ending in effect(<ruleName>)\n${findings.join('\n')}\n`,
+  );
+}
+
 function commitAll(root: string, message: string): string {
   execFileSync('git', ['add', '-A'], { cwd: root });
   execFileSync('git', ['commit', '-m', message, '--quiet'], { cwd: root });
@@ -228,6 +236,87 @@ describe('lint-ratchet-audit.sh', () => {
     expect(result.ok).toBe(false);
     expect(result.output).toContain(commit.slice(0, 12));
     expect(result.output).toContain('circular baseline added: src/new.ts > src/shared.ts');
+  });
+
+  it('rejects an Effect diagnostics baseline increase without an issue reference', () => {
+    const root = setupRepo();
+    writeEffectDiagnosticsBaseline(root, ['src/known.ts: error TS3: known    effect(floatingEffect)']);
+    commitAll(root, 'seed Effect diagnostics PAN-1');
+    writeEffectDiagnosticsBaseline(root, [
+      'src/known.ts: error TS3: known    effect(floatingEffect)',
+      'src/new.ts: error TS3: new    effect(floatingEffect)',
+    ]);
+    const commit = commitAll(root, 'add Effect diagnostics finding');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(commit.slice(0, 12));
+    expect(result.output).toContain('effect diagnostics baseline added: src/new.ts: error TS3: new');
+  });
+
+  it('allows an Effect diagnostics baseline increase with an issue reference', () => {
+    const root = setupRepo();
+    writeEffectDiagnosticsBaseline(root, ['src/known.ts: error TS3: known    effect(floatingEffect)']);
+    commitAll(root, 'seed Effect diagnostics PAN-1');
+    writeEffectDiagnosticsBaseline(root, [
+      'src/known.ts: error TS3: known    effect(floatingEffect)',
+      'src/new.ts: error TS3: new    effect(floatingEffect)',
+    ]);
+    commitAll(root, 'add Effect diagnostics finding PAN-3568');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('allows an Effect diagnostics baseline shrinking without an issue reference', () => {
+    const root = setupRepo();
+    writeEffectDiagnosticsBaseline(root, [
+      'src/known.ts: error TS3: known    effect(floatingEffect)',
+      'src/removed.ts: error TS3: removed    effect(floatingEffect)',
+    ]);
+    commitAll(root, 'seed Effect diagnostics PAN-1');
+    writeEffectDiagnosticsBaseline(root, ['src/known.ts: error TS3: known    effect(floatingEffect)']);
+    commitAll(root, 'remove resolved Effect finding');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('allows initial Effect diagnostics baseline creation without an issue reference', () => {
+    const root = setupRepo();
+    writeEffectDiagnosticsBaseline(root, ['src/known.ts: error TS3: known    effect(floatingEffect)']);
+    commitAll(root, 'initialize Effect diagnostics baseline');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('ignores Effect diagnostics baseline header-only edits', () => {
+    const root = setupRepo();
+    writeEffectDiagnosticsBaseline(
+      root,
+      ['src/known.ts: error TS3: known    effect(floatingEffect)'],
+      '# Original Effect diagnostics baseline header',
+    );
+    commitAll(root, 'seed Effect diagnostics PAN-1');
+    writeEffectDiagnosticsBaseline(
+      root,
+      ['src/known.ts: error TS3: known    effect(floatingEffect)'],
+      '# Updated Effect diagnostics baseline header',
+    );
+    commitAll(root, 'clarify baseline header');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
   });
 
   it('does not attribute already-main ratchet additions to a local merge commit', () => {

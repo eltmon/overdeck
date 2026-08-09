@@ -1,14 +1,48 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { createHash } from 'crypto';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { cleanupGitignoreSync, cleanupWorkspaceGitignoreSync } from '../../../src/lib/skills-merge.js';
+
+const cacheDirs = vi.hoisted(() => ({ skills: '', agents: '', rules: '' }));
+
+vi.mock('../../../src/lib/paths.js', () => ({
+  SKILLS_DIR: cacheDirs.skills,
+  CACHE_AGENTS_DIR: cacheDirs.agents,
+  CACHE_RULES_DIR: cacheDirs.rules,
+}));
+
+let cleanupGitignoreSync: typeof import('../../../src/lib/skills-merge.js').cleanupGitignoreSync;
+let cleanupWorkspaceGitignoreSync: typeof import('../../../src/lib/skills-merge.js').cleanupWorkspaceGitignoreSync;
+let mergeSkillsIntoWorkspaceSync: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspaceSync;
+
+function hash(content: string): string {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`;
+}
+
+function write(path: string, content: string): void {
+  mkdirSync(join(path, '..'), { recursive: true });
+  writeFileSync(path, content, 'utf-8');
+}
 
 describe('skills-merge', () => {
   let testDir: string;
+  let cacheBase: string;
+
+  beforeAll(async () => {
+    cacheBase = mkdtempSync(join(tmpdir(), 'overdeck-skills-merge-cache-'));
+    cacheDirs.skills = join(cacheBase, 'skills');
+    cacheDirs.agents = join(cacheBase, 'agent-definitions');
+    cacheDirs.rules = join(cacheBase, 'rules');
+    const module = await import('../../../src/lib/skills-merge.js');
+    cleanupGitignoreSync = module.cleanupGitignoreSync;
+    cleanupWorkspaceGitignoreSync = module.cleanupWorkspaceGitignoreSync;
+    mergeSkillsIntoWorkspaceSync = module.mergeSkillsIntoWorkspaceSync;
+  });
 
   beforeEach(() => {
-    // Create a unique temp directory for each test
+    rmSync(cacheBase, { recursive: true, force: true });
+    mkdirSync(cacheBase, { recursive: true });
     testDir = join(tmpdir(), `overdeck-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
   });
@@ -18,6 +52,63 @@ describe('skills-merge', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
+  });
+
+  afterAll(() => {
+    rmSync(cacheBase, { recursive: true, force: true });
+  });
+
+  describe('mergeSkillsIntoWorkspaceSync pruning', () => {
+    it('deletes and reports stale manifest-tracked workspace files', () => {
+      const workspacePath = join(testDir, 'workspace');
+      const relativePath = 'skills/old-skill/SKILL.md';
+      const targetPath = join(workspacePath, '.claude', relativePath);
+      const manifestPath = join(workspacePath, '.claude', '.overdeck-manifest.json');
+      write(targetPath, 'old skill\n');
+      write(manifestPath, JSON.stringify({
+        version: 1,
+        managed_by: 'overdeck',
+        installed: {
+          [relativePath]: {
+            hash: hash('old skill\n'), source: 'overdeck', installed_at: '2026-08-01T00:00:00.000Z',
+          },
+        },
+      }));
+
+      const result = mergeSkillsIntoWorkspaceSync(workspacePath);
+
+      expect(result.pruned).toEqual([relativePath]);
+      expect(result.keptModified).toEqual([]);
+      expect(existsSync(targetPath)).toBe(false);
+      expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed).toEqual({});
+    });
+
+    it('preserves modified and unmanifested workspace files', () => {
+      const workspacePath = join(testDir, 'workspace');
+      const modifiedRelativePath = 'rules/modified.md';
+      const modifiedPath = join(workspacePath, '.claude', modifiedRelativePath);
+      const userPath = join(workspacePath, '.claude', 'skills', 'user-skill', 'SKILL.md');
+      const manifestPath = join(workspacePath, '.claude', '.overdeck-manifest.json');
+      write(modifiedPath, 'user modified\n');
+      write(userPath, 'user skill\n');
+      write(manifestPath, JSON.stringify({
+        version: 1,
+        managed_by: 'overdeck',
+        installed: {
+          [modifiedRelativePath]: {
+            hash: hash('original\n'), source: 'overdeck', installed_at: '2026-08-01T00:00:00.000Z',
+          },
+        },
+      }));
+
+      const result = mergeSkillsIntoWorkspaceSync(workspacePath);
+
+      expect(result.pruned).toEqual([]);
+      expect(result.keptModified).toEqual([modifiedRelativePath]);
+      expect(readFileSync(modifiedPath, 'utf-8')).toBe('user modified\n');
+      expect(readFileSync(userPath, 'utf-8')).toBe('user skill\n');
+      expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed).toEqual({});
+    });
   });
 
   describe('cleanupGitignore', () => {

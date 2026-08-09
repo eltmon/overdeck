@@ -7,7 +7,7 @@ scope: dev
 
 **Why:** two hard blockers under Bun:
 
-1. **node-pty native addon** — `@homebridge/node-pty-prebuilt-multiarch` is a native Node addon used to stream live tmux sessions to the browser terminal panel. Under Bun's native addon compatibility layer the PTY spawns but exits with code 0, causing an infinite "Connection lost / Reconnecting" loop. The PTY works correctly only under Node 22.
+1. **node-pty native addon** — `@lydell/node-pty` is a native Node addon used to stream live tmux sessions to the browser terminal panel. Under Bun's native addon compatibility layer the PTY spawns but exits with code 0, causing an infinite "Connection lost / Reconnecting" loop. The PTY works correctly only under Node 22.
 2. **Circular ESM dependencies** — the dashboard TypeScript source has circular ESM imports (e.g. `health-filtering.ts → cloister/config → …`). Bun tolerates these; Node.js strict ESM rejects them with "Cannot require() ES Module … in a cycle". You cannot run the dashboard with `tsx` under Node either — you must run the pre-built `dist/dashboard/server.js` which resolves circular deps at build time via tsdown/rolldown bundling.
 
 **Rules:**

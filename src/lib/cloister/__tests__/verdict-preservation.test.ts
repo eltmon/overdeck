@@ -7,15 +7,12 @@ const mocks = vi.hoisted(() => ({
   evaluateWorkspaceAnchorDrift: vi.fn(),
 }));
 
-vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
-}));
-
 vi.mock('../../workspace-anchor-drift.js', () => ({
   evaluateWorkspaceAnchorDrift: mocks.evaluateWorkspaceAnchorDrift,
 }));
 
 import { shouldPreservePipelineVerdicts } from '../verdict-preservation.js';
+import { registerVerdictPreservationStatusReader } from '../work-start-verdicts.js';
 
 const reviewedAnchor = rehydrateHeadAnchor('a'.repeat(40));
 const currentAnchor = rehydrateHeadAnchor('b'.repeat(40));
@@ -40,6 +37,7 @@ describe('shouldPreservePipelineVerdicts', () => {
     mocks.getReviewStatusSync.mockReset();
     mocks.evaluateWorkspaceAnchorDrift.mockReset();
     mocks.getReviewStatusSync.mockReturnValue(reviewStatus());
+    registerVerdictPreservationStatusReader(mocks.getReviewStatusSync);
   });
 
   it('preserves passed verdicts when the reviewed anchor is current', async () => {

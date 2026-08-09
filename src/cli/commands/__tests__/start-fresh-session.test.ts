@@ -70,6 +70,7 @@ describe('prepareFreshWorkAgentSession', () => {
     expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-3228', {
       allowPausedForce: false,
       allowLiveSessionReplacement: true,
+      explicitFresh: true,
     })
     expect(agentMocks.stopAgentSync).not.toHaveBeenCalled()
     expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()

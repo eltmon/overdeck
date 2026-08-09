@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2, Rows2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2, Rows2, FolderInput } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
+import { fetchRegisteredProjects } from './UnknownProjectState';
+import { resolveEffectiveProjectKey } from './projectsData';
 import { useConfirm } from '../DialogProvider';
 import styles from './styles/command-deck.module.css';
 
@@ -38,6 +41,12 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
   const [draft, setDraft] = useState(conversation.title ?? conversation.name);
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  const [moveSubmenuOpen, setMoveSubmenuOpen] = useState(false);
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
+  });
 
   // Dismiss on Escape / scroll / resize (portaled; position isn't tracked).
   useEffect(() => {
@@ -165,6 +174,48 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 : <Sparkles size={14} />}
               Regenerate title
             </button>
+            {registeredProjects.length > 0 && (
+              <span style={{ position: 'relative', display: 'block' }}>
+                <button
+                  role="menuitem"
+                  className={styles.headerMenuItem}
+                  aria-haspopup="menu"
+                  aria-expanded={moveSubmenuOpen}
+                  onClick={() => setMoveSubmenuOpen((open) => !open)}
+                >
+                  <FolderInput size={14} />
+                  Move
+                </button>
+                {moveSubmenuOpen && (
+                  <>
+                    <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
+                    <div role="menu" className={styles.headerSubmenu}>
+                      {registeredProjects.map((project) => {
+                        const isCurrent = resolveEffectiveProjectKey(conversation, registeredProjects) === project.key;
+                        const projectName = project.name ?? project.key;
+                        return (
+                          <button
+                            key={project.key}
+                            role="menuitem"
+                            className={styles.headerMenuItem}
+                            disabled={isCurrent}
+                            onClick={() => {
+                              if (isCurrent) return;
+                              mutations.move({ name: conversation.name, projectKey: project.key, projectName });
+                              setMoveSubmenuOpen(false);
+                              onClose();
+                            }}
+                          >
+                            {projectName}
+                            {isCurrent && <Check size={14} className={styles.headerMenuItemCheck} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </span>
+            )}
 
             {/* Tab conveniences (PAN-1591): pop out + multi-close. Only rendered
                 when this menu was opened from a pane tab (onCloseTab present). */}

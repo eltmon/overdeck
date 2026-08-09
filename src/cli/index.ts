@@ -424,6 +424,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
@@ -433,6 +434,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--issue <id>', 'Issue ID to associate with the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')

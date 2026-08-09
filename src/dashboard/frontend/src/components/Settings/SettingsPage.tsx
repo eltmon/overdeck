@@ -140,6 +140,11 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
       ...(latestRouting.roles !== undefined
         ? { roles: latestRouting.roles }
         : {}),
+      // AppearanceSection (useDesignLanguage) saves ui.theme directly through
+      // its own GET/PUT, bypassing formData the same way WorkhorsePanel and
+      // RolesPanel bypass it — overlay the freshest value so a later
+      // top-level save doesn't revert the operator's theme choice (PAN-3410).
+      ...(latest.ui !== undefined ? { ui: latest.ui } : {}),
     } as SettingsConfig;
   } catch (err) {
     // Non-fatal — fall back to the parent's payload rather than blocking the

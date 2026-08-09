@@ -3,6 +3,7 @@ import type { OrderBookLane } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { OrderBookView } from './BookStrip';
+import { withProject } from './projectScope';
 
 interface BacklogCandidate {
   issue: string;
@@ -13,9 +14,10 @@ interface BacklogCandidate {
 interface BacklogCandidatesRailProps {
   book: OrderBookView;
   onBookChange: (book: OrderBookView) => void;
+  project?: string | null;
 }
 
-export function BacklogCandidatesRail({ book, onBookChange }: BacklogCandidatesRailProps) {
+export function BacklogCandidatesRail({ book, onBookChange, project }: BacklogCandidatesRailProps) {
   const [candidates, setCandidates] = useState<BacklogCandidate[]>([]);
   const [lane, setLane] = useState<OrderBookLane>('A');
   const [adding, setAdding] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function BacklogCandidatesRail({ book, onBookChange }: BacklogCandidatesR
 
   useEffect(() => {
     let current = true;
-    void fetch('/api/orders/backlog-candidates?limit=10')
+    void fetch(withProject('/api/orders/backlog-candidates?limit=10', project))
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as { candidates?: BacklogCandidate[]; error?: string } | null;
         if (!response.ok) throw new Error(payload?.error ?? `Could not load backlog candidates (${response.status})`);
@@ -36,13 +38,13 @@ export function BacklogCandidatesRail({ book, onBookChange }: BacklogCandidatesR
       })
       .catch((cause) => { if (current) setError(cause instanceof Error ? cause.message : String(cause)); });
     return () => { current = false; };
-  }, [book.id, book.items]);
+  }, [book.id, book.items, project]);
 
   const add = async (issueId: string) => {
     setAdding(issueId);
     setError(null);
     try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(book.id)}/items`, {
+      const response = await fetch(withProject(`/api/orders/${encodeURIComponent(book.id)}/items`, project), {
         method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ item: { issue: issueId, lane } }),
       });

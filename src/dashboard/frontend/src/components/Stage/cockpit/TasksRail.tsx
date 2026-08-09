@@ -66,7 +66,8 @@ function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
   )
 }
 
-export function useTasksQuery(issueId: string): UseQueryResult<TasksResponse> {
+export function useTasksQuery(issueId: string, options?: { enabled?: boolean }): UseQueryResult<TasksResponse> {
+  const enabled = options?.enabled ?? Boolean(issueId)
   const queryClient = useQueryClient()
   const query = useQuery<TasksResponse>({
     queryKey: ['tasks', issueId],
@@ -76,6 +77,7 @@ export function useTasksQuery(issueId: string): UseQueryResult<TasksResponse> {
       return res.json() as Promise<TasksResponse>
     },
     refetchInterval: 10_000,
+    enabled,
   })
 
   useEffect(() => {

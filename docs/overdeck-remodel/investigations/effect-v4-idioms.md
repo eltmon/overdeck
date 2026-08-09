@@ -345,7 +345,7 @@ is unchanged from v3 and remains the right tool for non-serialized internal erro
   repo — the rewrite must add the driver dependency first.
 
 **Driver question for the rewrite:** the dashboard server is **Node-22-only** (node-pty +
-circular-ESM constraints — see `.claude/rules/dashboard-node22-only.md`). A `-bun` SQLite
+circular-ESM constraints — see `sync-sources/rules/dashboard-node22-only.md`). A `-bun` SQLite
 driver runs under Bun; targeting `@effect/sql-sqlite-bun` for a Node-only server is likely
 the wrong adapter. Resolve node-vs-bun driver choice before standardizing on `@effect/sql-*`.
 

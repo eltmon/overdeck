@@ -1,0 +1,46 @@
+---
+title: Appearance
+description: The Overdeck Theme setting — Ledger vs. Broadsheet — and how it applies live without a restart
+---
+
+# Appearance
+
+Overdeck ships two complete, named design languages for the dashboard, and the choice between them is a single setting rather than a migration you have to absorb all at once.
+
+## The two themes
+
+- **Ledger** — the classic dense monitoring style: DM Sans for prose, SF Mono for technical identifiers (code, IDs, hashes — same as Broadsheet), a flat medium-weight cap on everything else, panel-first layout. The one exception is the "Overdeck" sidebar wordmark, set in Space Grotesk. Ledger is now the **frozen legacy theme** — it keeps working exactly as it does today and continues to receive bug fixes, but it does not gain new visual patterns going forward.
+- **Broadsheet** — the **default** theme. Geist and Geist Mono typefaces, a real type hierarchy (body text through page-level display headings), chips, soft cards, hero placeholders, and dot-metadata lines. New Overdeck UI patterns land here first, and only here.
+
+Both themes are fully self-hosted — the dashboard makes zero external font requests in either theme, so switching (or working offline) never depends on a CDN.
+
+## Choosing a theme
+
+Go to **Settings → Appearance**. The **Overdeck Theme** picker shows both themes as selectable cards, each with a one-line description and a live mini-specimen rendered in that theme's own fonts, so you can compare them side by side before choosing.
+
+Selecting a card applies the theme immediately — no page reload, no rebuild, no restart. Your choice is saved to `~/.overdeck/config.yaml` and mirrored to the browser so it survives a reload.
+
+## Configuration
+
+The setting is `ui.theme` in `~/.overdeck/config.yaml`:
+
+```yaml
+ui:
+  theme: broadsheet # or: ledger
+```
+
+- Accepted values are `ledger` and `broadsheet`.
+- Leaving it unset resolves to `broadsheet`.
+- Any other value fails loudly with a clear error naming the field and the two allowed values — Overdeck never silently falls back to a default when a config value is invalid.
+
+## What stays the same either way
+
+This is a typography, texture, and scale change — not a color change. The color palette, the meaning of each status color (amber = a human needs to act, blue = a machine is working, and so on), and the badge tint formula are identical under both themes. The one small visual difference outside typography is that badges use a slightly larger corner radius under Broadsheet for texture consistency with its softer vocabulary; Ledger's badge radius is unchanged.
+
+## Creation flows are pages, not modals
+
+Independent of which theme you use, Overdeck is moving major creation and composition flows — new project, new workspace, and future editors — out of modal dialogs and into full routed pages. Modals remain for what they're good at: confirmations and short forms of four fields or fewer. You'll see this rolled out incrementally, starting with the New Workspace flow; existing modal-based flows are migrated one at a time rather than all at once.
+
+## For developers: why this is safe to adopt gradually
+
+New dashboard surfaces are written against the Broadsheet vocabulary directly — no per-component "if the theme is X" logic. The display-scale utilities (page and section headings) and the eyebrow label resolve to a matching, already-shipped Ledger style when Broadsheet isn't active, so a surface built only from those renders correctly under either theme without extra work: it just looks a little denser and smaller under Ledger. The newer component vocabulary — chips, soft cards, hero placeholders, the large CTA + keycap pattern, and dot-metadata lines — has no Ledger equivalent at all; a surface built with those is a Broadsheet-only surface by design (Ledger is frozen legacy and doesn't receive new patterns). See `design/style-guide/STYLE-GUIDE.md` for the full component-level specification, including which utilities fall into each category.

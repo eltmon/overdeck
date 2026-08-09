@@ -16,6 +16,11 @@ import { shouldRestartForPostMerge } from './merge-agent-step0.js'; import { cap
 import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
 import { withPostMergeLifecycleLock } from './post-merge-lifecycle-lock.js';
 import {
+  completedPostMerge as _completedPostMerge,
+  postMergeInFlight as _postMergeInFlight,
+  resetPostMergeState,
+} from './post-merge-state.js';
+import {
   ensureSyncGitQuiescent,
   probeGitOperationHeads,
   runSyncGitCommand,
@@ -279,11 +284,6 @@ export async function notifyTldrDaemon(projectPath: string, _sourceBranch: strin
  * issues and returns immediately on re-entry. This is defense-in-depth against
  * the infinite loop that burned 24,626 Linear API calls (PAN-328).
  */
-
-// Defense-in-depth: track issues that have completed postMergeLifecycle.
-// Prevents re-execution even if caller guards fail. Persists for server lifetime.
-const _completedPostMerge = new Set<string>();
-const _postMergeInFlight = new Map<string, Promise<void>>();
 
 // PAN-1531: dropLingeringPreMergeStashes removed. The pre-merge stash kind
 // is no longer created by Overdeck, so there's nothing for the post-merge
@@ -713,13 +713,7 @@ async function maybeSpawnPostMergeKnowledgeRetro(issueId: string, projectPath: s
   }
 }
 
-/**
- * Reset postMergeLifecycle completion tracking for an issue (used by reopen).
- */
-export function resetPostMergeState(issueId: string): void {
-  _completedPostMerge.delete(issueId);
-  _postMergeInFlight.delete(issueId);
-}
+export { resetPostMergeState } from './post-merge-state.js';
 
 /**
  * Parse result markers from agent output

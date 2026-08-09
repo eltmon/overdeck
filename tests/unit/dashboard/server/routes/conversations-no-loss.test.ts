@@ -43,6 +43,7 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'POST /api/conversations/:name/delivery-method',
   'POST /api/conversations/:name/control-ack',
   'PATCH /api/conversations/:name',
+  'PATCH /api/conversations/:name/move',
   'DELETE /api/conversations/:name',
   'POST /api/conversations/:name/archive',
   'POST /api/conversations/:name/unarchive',
@@ -78,7 +79,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(conversationsRouteLayer).toBeDefined();
   });
 
-  it('keeps all 35 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 36 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -101,6 +102,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(35);
+    expect(liveRoutes.size).toBe(36);
   });
 });

@@ -8,19 +8,19 @@ interface LegacyCommand {
 }
 
 const PRE_ADAPTER_COMMANDS = preAdapterCommands as LegacyCommand[];
-
-const LEGACY_TO_PORTABLE_MAPPINGS = PRE_ADAPTER_COMMANDS.map(command => {
-  if (!command.label.startsWith('pan ')) {
-    return { legacy: command, portable: command };
-  }
-  return {
-    legacy: command,
-    portable: {
-      label: `/${command.label}`,
-      insert: `/${command.label}${command.insert.endsWith(' ') ? ' ' : ''}`,
-    },
-  };
-});
+const LEGACY_TO_PORTABLE_MAPPINGS = PRE_ADAPTER_COMMANDS
+  .map(command => {
+    if (!command.label.startsWith('pan ')) {
+      return { legacy: command, portable: command };
+    }
+    return {
+      legacy: command,
+      portable: {
+        label: `/${command.label}`,
+        insert: `/${command.label}${command.insert.endsWith(' ') ? ' ' : ''}`,
+      },
+    };
+  });
 
 function findMissingMappings(commands: readonly { label: string; insert: string }[]) {
   return LEGACY_TO_PORTABLE_MAPPINGS.filter(({ portable }) =>
@@ -30,7 +30,7 @@ function findMissingMappings(commands: readonly { label: string; insert: string 
 
 describe('slash command no-loss audit', () => {
   it('maps every pre-adapter command to its portable equivalent', () => {
-    expect(PRE_ADAPTER_COMMANDS).toHaveLength(262);
+    expect(PRE_ADAPTER_COMMANDS).toHaveLength(260);
     expect(findMissingMappings(SLASH_COMMANDS)).toEqual([]);
   });
 

@@ -210,10 +210,10 @@ export const postAgentRecoverRoute = HttpRouter.add(
       ...(recoveryModel ? { modelOverride: recoveryModel } : {}),
       force,
     }));
-    if (!result) {
-      const error = `Could not recover agent ${id}`;
-      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_failed', { error }));
-      return jsonResponse({ success: false, error }, { status: 400 });
+    if (!result || result.action === 'already-running') {
+      const error = result ? `No recovery performed: agent ${id} already has a live harness runtime` : `Could not recover agent ${id}`;
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, result ? 'agent.recover_skipped' : 'agent.recover_failed', { error }));
+      return jsonResponse({ success: false, error }, { status: result ? 409 : 400 });
     }
 
     const updatedState = yield* getAgentState(id);

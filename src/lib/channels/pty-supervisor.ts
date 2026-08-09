@@ -136,22 +136,24 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(text || '{}');
 }
 
-function parsePayload(value: unknown): PtySupervisorPayload | null {
-  if (value === null || typeof value !== 'object') return null;
+function parsePayload(value: unknown): { payload: PtySupervisorPayload | null; error?: string } {
+  if (value === null || typeof value !== 'object') return { payload: null };
   const payload = value as Partial<PtySupervisorPayload>;
-  if (typeof payload.content !== 'string' || payload.content.length === 0) return null;
-  if (payload.content.length > INPUT_PURGE_MAX_CHARS) return null;
-  if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return null;
-  if (payload.caller !== undefined && typeof payload.caller !== 'string') return null;
+  if (typeof payload.content !== 'string' || payload.content.length === 0) return { payload: null };
+  if (payload.content.length > INPUT_PURGE_MAX_CHARS) {
+    return { payload: null, error: `content exceeds ${INPUT_PURGE_MAX_CHARS} chars` };
+  }
+  if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return { payload: null };
+  if (payload.caller !== undefined && typeof payload.caller !== 'string') return { payload: null };
   if (payload.dedupKey !== undefined
-    && (typeof payload.dedupKey !== 'string' || payload.dedupKey.length === 0 || payload.dedupKey.length > DEDUP_KEY_MAX_CHARS)) return null;
+    && (typeof payload.dedupKey !== 'string' || payload.dedupKey.length === 0 || payload.dedupKey.length > DEDUP_KEY_MAX_CHARS)) return { payload: null };
   if (payload.meta !== undefined) {
-    if (payload.meta === null || typeof payload.meta !== 'object' || Array.isArray(payload.meta)) return null;
+    if (payload.meta === null || typeof payload.meta !== 'object' || Array.isArray(payload.meta)) return { payload: null };
     for (const [key, metaValue] of Object.entries(payload.meta)) {
-      if (typeof key !== 'string' || typeof metaValue !== 'string') return null;
+      if (typeof key !== 'string' || typeof metaValue !== 'string') return { payload: null };
     }
   }
-  return payload as PtySupervisorPayload;
+  return { payload: payload as PtySupervisorPayload };
 }
 
 function payloadCaller(payload: PtySupervisorPayload): string | undefined {
@@ -485,9 +487,9 @@ export function createPtySupervisorServer(
       return;
     }
 
-    const payload = parsePayload(body);
+    const { payload, error } = parsePayload(body);
     if (!payload) {
-      writeJson(res, 400, { error: 'content is required and must be a non-empty string' });
+      writeJson(res, 400, { error: error ?? 'content is required and must be a non-empty string' });
       return;
     }
 

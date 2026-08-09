@@ -207,46 +207,6 @@ describe('checkPostReviewCommits blocked review drift', () => {
     expect(mocks.spawnReview).not.toHaveBeenCalled();
   });
 
-  it('derives a missing blocked anchor only when every reviewer verdict agrees', async () => {
-    mocks.statuses['PAN-3148-C'] = {
-      issueId: 'PAN-3148-C',
-      reviewStatus: 'blocked',
-      reviewerVerdicts: {
-        security: { status: 'passed', atCommit: 'reviewed-head' },
-        correctness: { status: 'blocked', atCommit: 'reviewed-head' },
-      },
-    };
-    mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'new-head' });
-
-    await checkPostReviewCommits();
-    await checkPostReviewCommits();
-
-    expect(mocks.evaluateDrift).toHaveBeenCalledWith(
-      'PAN-3148-C',
-      '/project/workspaces/feature-pan-3148-c',
-      'reviewed-head',
-    );
-    expect(mocks.spawnReview).toHaveBeenCalledOnce();
-
-    mocks.spawnReview.mockClear();
-    mocks.evaluateDrift.mockClear();
-    mocks.statuses['PAN-3148-D'] = {
-      issueId: 'PAN-3148-D',
-      reviewStatus: 'blocked',
-      reviewerVerdicts: {
-        security: { status: 'passed', atCommit: 'head-one' },
-        correctness: { status: 'blocked', atCommit: 'head-two' },
-      },
-    };
-
-    await expect(checkPostReviewCommits()).resolves.toEqual([]);
-    expect(mocks.evaluateDrift).not.toHaveBeenCalled();
-    expect(mocks.spawnReview).not.toHaveBeenCalled();
-    expect(mocks.logDeaconEvent).toHaveBeenCalledWith(
-      'checkPostReviewCommits: PAN-3148-D blocked without anchor — cannot detect drift',
-    );
-  });
-
   it('clears the debounce when review status changes before the second tick', async () => {
     mocks.statuses['PAN-3148-E'] = {
       issueId: 'PAN-3148-E',

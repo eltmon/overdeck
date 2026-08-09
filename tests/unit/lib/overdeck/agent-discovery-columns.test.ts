@@ -1,14 +1,7 @@
 /**
- * PAN-2585: the PAN-1862 discovery-fork fields must be real agents-table columns.
- * They were state.json-only, which made them write-only under the PAN-1908
- * DB-first reader — the discovery-ready signal and the deacon's stalled-discovery
- * backstop read `undefined` forever and the convoy never launched.
- *
- * Two protections:
- *  1. Structural audit — the codec's column list and the drizzle DDL must agree,
- *     so a field added to one but not the other fails at build time.
- *  2. Behavioral round-trip — the discovery fields survive state → row → state
- *     through the real overdeck DB.
+ * Missing-reviewer recovery needs the parent review run's context manifest after
+ * the runtime registry has been rebuilt, so it must survive state → row → state.
+ * The structural audit keeps its DDL and codec projections aligned.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -29,7 +22,7 @@ function ddlAgentColumns(): string[] {
   return [...create[1].matchAll(/^\s*`([a-z_]+)`/gm)].map((m) => m[1]);
 }
 
-describe('agents-table discovery columns (PAN-2585)', () => {
+describe('agents-table review recovery metadata', () => {
   it('codec column list and drizzle DDL agree exactly', () => {
     const ddl = ddlAgentColumns().sort();
     const codec = [...AGENT_COLUMNS_FOR_DB].sort();
@@ -47,7 +40,7 @@ describe('agents-table discovery columns (PAN-2585)', () => {
       teardownOverdeckTestDb(odb);
     });
 
-    it('discovery-fork fields survive state → row → state', () => {
+    it('review context manifest survives state → row → state', () => {
       const state: AgentState = {
         id: 'agent-pan-9999-review',
         issueId: 'PAN-9999',
@@ -58,24 +51,35 @@ describe('agents-table discovery columns (PAN-2585)', () => {
         startedAt: '2026-07-12T02:00:00.000Z',
         reviewRunId: 'agent-pan-9999-review-abcd1234',
         startedBy: 'flywheel:RUN-71',
-        reviewDiscoveryPending: true,
         reviewContextManifestPath: '/tmp/ws/.pan/review/run/context.json',
-        reviewDiscoveryReadyAt: '2026-07-12T02:05:00.000Z',
-        reviewConvoyForkedAt: '2026-07-12T02:06:00.000Z',
-        reviewForkCacheChecked: false,
-        reviewForkedFromParent: true,
       };
       saveOverdeckAgentStateSync(state);
 
       const readBack = getOverdeckAgentStateSync('agent-pan-9999-review');
       expect(readBack).not.toBeNull();
       expect(readBack?.startedBy).toBe('flywheel:RUN-71');
-      expect(readBack?.reviewDiscoveryPending).toBe(true);
       expect(readBack?.reviewContextManifestPath).toBe('/tmp/ws/.pan/review/run/context.json');
-      expect(readBack?.reviewDiscoveryReadyAt).toBe('2026-07-12T02:05:00.000Z');
-      expect(readBack?.reviewConvoyForkedAt).toBe('2026-07-12T02:06:00.000Z');
-      expect(readBack?.reviewForkCacheChecked).toBe(false);
-      expect(readBack?.reviewForkedFromParent).toBe(true);
+    });
+
+    // PAN-3362 UAT: `branch` was a real `agents` column that AGENT_COLUMNS_FOR_DB
+    // never wired up, so it was silently dropped for every agent, not just
+    // fixtures — GET /api/agents always reported branch: null.
+    it('branch survives state → row → state', () => {
+      const state: AgentState = {
+        id: 'agent-pan-9998-work',
+        issueId: 'PAN-9998',
+        workspace: '/tmp/ws-9998',
+        role: 'work',
+        model: 'sonnet',
+        status: 'stopped',
+        startedAt: '2026-08-06T00:00:00.000Z',
+        branch: 'feature/pan-9998',
+      };
+      saveOverdeckAgentStateSync(state);
+
+      const readBack = getOverdeckAgentStateSync('agent-pan-9998-work');
+      expect(readBack).not.toBeNull();
+      expect(readBack?.branch).toBe('feature/pan-9998');
     });
   });
 });

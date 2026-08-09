@@ -24,12 +24,11 @@ export type ChoreographyCommand =
   | { type: 'spawn'; issueId: string };
 
 /**
- * Sweep event → visual command mapping (PAN-3490). Pure and fixture-tested.
+ * Sweep observation → visual command mapping (PAN-3490). Pure and fixture-tested.
  * sweep.scan (population changed) raises the lantern beam across the Doldrums;
- * sweep.unparked thaws that issue's orb back into the river; sweep.escalated
- * fires a signal flare off the orb. sweep.action alone (nudge, merge reset)
- * leaves a ticker trace but no orb motion — the orb moves when the row
- * actually resolves (sweep.unparked / the next scan's cast).
+ * sweep.escalated fires a signal flare off the orb. The sweeper is read-only,
+ * so it never produces action or release choreography; the normal data stream
+ * drives an orb's thaw when its state actually changes.
  */
 export function planSweepCommands(events: readonly DomainEvent[]): ChoreographyCommand[] {
   const commands: ChoreographyCommand[] = [];
@@ -41,14 +40,9 @@ export function planSweepCommands(events: readonly DomainEvent[]): ChoreographyC
         commands.push({ type: 'ticker', text: `🧹 sweeper scan · ${event.payload.issueCount} parked`, color: SWEEP_BEAM_COLOR });
         tideQueued = true;
       }
-    } else if (event.type === 'sweep.unparked') {
-      commands.push({ type: 'thaw', issueId: event.payload.issueId });
-      commands.push({ type: 'ticker', text: `🧹 ${event.payload.issueId} swept free`, color: SWEEP_BEAM_COLOR });
     } else if (event.type === 'sweep.escalated') {
       commands.push({ type: 'flare', issueId: event.payload.issueId });
       commands.push({ type: 'ticker', text: `⚑ ${event.payload.issueId} needs operator`, color: SWEEP_FLARE_COLOR });
-    } else if (event.type === 'sweep.action') {
-      commands.push({ type: 'ticker', text: `🧹 ${event.payload.issueId} · ${event.payload.action}`, color: SWEEP_BEAM_COLOR });
     }
   }
   return commands;

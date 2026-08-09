@@ -19,8 +19,10 @@ afterEach(() => { teardownOverdeckTestDb(odb); });
 import {
   getClosedIssueIdsForReadSource,
   pruneAgentsForReadSource,
+  pruneReviewStatusesForReadSource,
 } from '../read-model.js';
 import type { AgentState } from '../../../lib/agents.js';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 function baseAgent(id: string, issueId: string, role: AgentState['role'] = 'work'): AgentState {
   return {
@@ -43,6 +45,17 @@ function agent(id: string, issueId: string, role?: AgentSnapshot['role']): Agent
     status: 'stopped',
     startedAt: '2026-05-23T00:00:00.000Z',
     ...(role ? { role } : {}),
+  };
+}
+
+function reviewStatus(issueId: string, prUrl?: string): ReviewStatusSnapshot {
+  return {
+    issueId,
+    reviewStatus: 'passed',
+    testStatus: 'passed',
+    readyForMerge: false,
+    updatedAt: '2026-05-23T00:00:00.000Z',
+    ...(prUrl ? { prUrl } : {}),
   };
 }
 
@@ -114,6 +127,40 @@ describe('read model agent source pruning', () => {
     expect(pruned.agentsById['strike-pan-1506']?.role).toBe('strike');
     expect(pruned.agentsById['planning-pan-1234']?.role).toBe('plan');
     expect(pruned.agentsById['agent-pan-1419']?.role).toBe('work');
+    expect(pruned.prunedCount).toBe(0);
+  });
+
+  // PAN-3362 UAT cycle 3 review finding: mergeDbOnlyReviewStatuses() can
+  // hydrate a review_status row for an issue reconstructCacheAuto() never
+  // covered (e.g. the FIX-1 fixture). If that issue is later closed,
+  // close-out deletes the DB row but emits no removal event — pruning on
+  // every snapshot request is what keeps the in-memory copy from lingering.
+  it('drops review statuses for closed issues, live or DB-only alike', () => {
+    const pruned = pruneReviewStatusesForReadSource({
+      'PAN-1331': reviewStatus('PAN-1331', 'https://github.com/eltmon/overdeck/pull/1331'),
+      'PAN-1419': reviewStatus('PAN-1419'),
+      'FIX-1': reviewStatus('FIX-1', 'https://github.com/uat-fixtures/repo/pull/1'),
+    }, [
+      { identifier: 'PAN-1331', status: 'done' },
+      { identifier: 'PAN-1419', status: 'in_progress' },
+      { identifier: 'FIX-1', canonicalStatus: 'in_progress' },
+    ]);
+
+    expect(Object.keys(pruned.reviewStatusByIssueId).sort()).toEqual(['FIX-1', 'PAN-1419']);
+    expect(pruned.reviewStatusByIssueId['FIX-1']?.prUrl).toBe('https://github.com/uat-fixtures/repo/pull/1');
+    expect(pruned.prunedCount).toBe(1);
+  });
+
+  it('keeps a DB-only review status whose issue is absent from the live issues list entirely', () => {
+    // FIX-1 has no per-issue record, so reconstructCacheAuto() never surfaces
+    // it — but it is also not "closed" per getClosedIssueIdsForReadSource,
+    // which only marks an issueId closed when it actually appears in the
+    // issues list with a terminal state. Absence alone must not prune it.
+    const pruned = pruneReviewStatusesForReadSource({
+      'FIX-1': reviewStatus('FIX-1', 'https://github.com/uat-fixtures/repo/pull/1'),
+    }, []);
+
+    expect(pruned.reviewStatusByIssueId['FIX-1']).toBeDefined();
     expect(pruned.prunedCount).toBe(0);
   });
 });

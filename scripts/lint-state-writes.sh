@@ -116,9 +116,22 @@ CONTINUE_EXCLUDES=(
   ':!*.md'
 )
 
+# Single, narrow, documented exception (PAN-3362 review cycle 3): the UAT
+# fixture seeder writes an obviously-fake workspace's .overdeck/continue.json
+# so findPlan()'s workspace-continue fallback can read the seeded FIX-1
+# fixture. This is NOT the real Overdeck-managed continue-state domain
+# (.pan/continue.json, .pan/continues/) that PAN-1919 retired writers for —
+# it is a synthetic file under the reserved `uat-fixtures` project. Exactly
+# one path is exempted here; any other new continue.json write anywhere else
+# in src/ still fails this guard. Keep this list to exactly one entry —
+# tests/unit/scripts/lint-state-writes.test.ts asserts that.
+CONTINUE_FIXTURE_EXCEPTIONS=(
+  ':!src/lib/uat-fixtures/seed.ts'
+)
+
 cont_candidates=$(
   { git grep -nE -e 'PAN_CONTINUE_FILENAME' -e "continue\\.json" -e 'continuePath' \
-      -- 'src/' "${CONTINUE_EXCLUDES[@]}"; } || true
+      -- 'src/' "${CONTINUE_EXCLUDES[@]}" "${CONTINUE_FIXTURE_EXCEPTIONS[@]}"; } || true
 )
 cont_violations=$(
   printf '%s\n' "$cont_candidates" | comment_filter | perl -ne '

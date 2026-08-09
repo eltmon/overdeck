@@ -5,8 +5,8 @@ import type {
   OrderBookSettings,
   OrderBookStatus,
 } from '@overdeck/contracts';
-import { getBook, listBooks, membership } from './resolver.js';
-import { readOrderBookIndex, writeOrderBookState } from './io.js';
+import { firstReadyBookInQueue, getBook, listBooks, membership } from './resolver.js';
+import { writeOrderBookState } from './io.js';
 
 export interface CreateOrderBookInput {
   id: string;
@@ -212,10 +212,5 @@ export async function advanceQueue(
   if (current.status !== 'complete') {
     await setStatus(stateRoot, completedBookId, 'complete', { at });
   }
-  const order = readOrderBookIndex(stateRoot).map((entry) => entry.id);
-  for (const id of order) {
-    const book = getBook(stateRoot, id);
-    if (book?.status === 'ready') return book;
-  }
-  return null;
+  return firstReadyBookInQueue(stateRoot);
 }

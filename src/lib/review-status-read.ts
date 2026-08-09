@@ -1,3 +1,5 @@
+import { readActiveReviewArtifactContext } from './agents/agent-state-source.js';
+import { readMemoizedArtifactVerdict } from './cloister/synthesis-verdict.js';
 import { enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import {
   reconcileJournalIntoCacheSync,
@@ -36,6 +38,34 @@ export function resolveJournalReconciledReviewStatusSync(
         )
       : null;
     if (staleSnapshot) {
+      const liveStatus = dbStatus!;
+      // PAN-3511: the normal status-read path stays filesystem-free. Only after
+      // the existing stale-refusal predicate matches do we consult the bounded
+      // active-run memo, and only to corroborate a terminal journal verdict.
+      const journalVerdict = (journal.durable as { reviewStatus?: unknown }).reviewStatus;
+      const review = readActiveReviewArtifactContext(issueId);
+      const artifact = typeof journalVerdict === 'string' && review
+        ? readMemoizedArtifactVerdict(issueId, review)
+        : null;
+      const hostRunHeadMatchesLive = Boolean(
+        review?.roleRunHead
+        && liveStatus.lastVerifiedCommit
+        && review.roleRunHead === liveStatus.lastVerifiedCommit,
+      );
+      const artifactHeadMatchesHostRun = Boolean(
+        !artifact?.headSha || artifact.headSha === review?.roleRunHead,
+      );
+      if (
+        artifact
+        && artifact.verdict === journalVerdict
+        && hostRunHeadMatchesLive
+        && artifactHeadMatchesHostRun
+      ) {
+        console.log(
+          `[review-status] Active-run artifact corroborated the stale journal verdict with a live review-head binding for ${issueId}; replaying the terminal journal result.`,
+        );
+        return reconcileJournalIntoCacheSync(issueId, dbStatus ?? null, journal, hooks);
+      }
       console.warn(
         `[review-status] Refusing stale journal verdict replay for ${issueId}: `
         + `live cycle ${new Date(staleSnapshot.liveCycle).toISOString()} at HEAD ${staleSnapshot.liveHead ?? 'unknown'} `

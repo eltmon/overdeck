@@ -19,6 +19,7 @@ import {
   toMergeStatus,
   toVerificationStatus,
   toReviewStatusSnapshot,
+  mergeDbOnlyReviewStatuses,
 } from '../../src/dashboard/server/read-model.js'
 
 // ─── toAgentStatus ────────────────────────────────────────────────────────────
@@ -250,5 +251,73 @@ describe('toReviewStatusSnapshot', () => {
     expect(snapshot.stuck).toBe(true)
     expect(snapshot.stuckReason).toBe('planning_auto_handoff_failed')
     expect(snapshot.stuckDetails).toBe(stuckDetails)
+  })
+})
+
+// ─── mergeDbOnlyReviewStatuses ─────────────────────────────────────────────────
+
+describe('mergeDbOnlyReviewStatuses', () => {
+  it('includes a DB row for an issue reconstructCacheAuto never covered (PAN-3362)', () => {
+    // FIX-1: an obviously-fake UAT fixture issue with no real per-issue
+    // record, so reconstructCacheAuto()'s tracker-driven enumeration never
+    // sees it — but seedUatFixturesLocal() wrote a real review_status row.
+    const dbOnly = mergeDbOnlyReviewStatuses(
+      {},
+      {
+        'FIX-1': {
+          issueId: 'FIX-1',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          updatedAt: '2026-08-06T00:00:00.000Z',
+          prUrl: 'https://github.com/uat-fixtures/repo/pull/1',
+        },
+      },
+    )
+
+    expect(dbOnly['FIX-1']?.prUrl).toBe('https://github.com/uat-fixtures/repo/pull/1')
+  })
+
+  it('never overrides a tracker-derived entry for the same issueId', () => {
+    const trackerDerived = {
+      'PAN-486': {
+        issueId: 'PAN-486',
+        reviewStatus: 'passed' as const,
+        testStatus: 'passed' as const,
+        readyForMerge: true,
+        updatedAt: '2026-04-11T17:00:00.000Z',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/486',
+      },
+    }
+    const dbOnly = mergeDbOnlyReviewStatuses(trackerDerived, {
+      'PAN-486': {
+        issueId: 'PAN-486',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })
+
+    // The tracker-derived PAN-486 stays out of the DB-only map entirely — the
+    // caller spreads trackerDerived last, so a stale DB row can never win.
+    expect(dbOnly['PAN-486']).toBeUndefined()
+  })
+
+  it('returns an empty object when every DB row is already tracker-covered', () => {
+    const trackerDerived = {
+      'PAN-1': {
+        issueId: 'PAN-1',
+        reviewStatus: 'pending' as const,
+        testStatus: 'pending' as const,
+        readyForMerge: false,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    }
+    const dbOnly = mergeDbOnlyReviewStatuses(trackerDerived, {
+      'PAN-1': { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+    })
+
+    expect(dbOnly).toEqual({})
   })
 })

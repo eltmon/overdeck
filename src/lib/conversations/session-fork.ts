@@ -7,14 +7,10 @@
  * given model, NOT the session id), a byte-identical copied history resumed
  * under a new id hits the same cache entries the source session wrote.
  *
- * Extracted from the conversation-panel fork machinery (summary-fork.ts) so the
- * conversation panel AND the review convoy share ONE copy/reserve code path —
- * no copy-paste fork logic (repo "No Bandaids" rule). Two consumers:
- *
- *  - Conversation forks (summary-fork.ts): copy from the last compact boundary
- *    (the summarized tail is what the fork continues from).
- *  - Review convoy forks (review-agent.ts): copy the FULL history — the parent's
- *    discovery reads are exactly the payload the forked reviewers must inherit.
+ * Extracted from the conversation-panel fork machinery (summary-fork.ts) so
+ * summary forks share one copy/reserve code path instead of duplicating it.
+ * Conversation forks copy from the last compact boundary, where the summarized
+ * tail is the context the fork continues from.
  *
  * The source JSONL is sacred and strictly read-only here (CLAUDE.md).
  */

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import type { ReviewStatus } from './review-status.js';
+import type { ReviewStatus } from './review-status-types.js';
 
 export function normalizeReviewStatusSync(status: ReviewStatus): ReviewStatus {
   const shouldClearMergeNotes = status.mergeStatus === 'verifying' || status.mergeStatus === 'merged';
