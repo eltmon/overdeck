@@ -499,11 +499,11 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-09T12:47:32.083Z",
+  "updated": "2026-08-09T13:10:26.070Z",
   "pipeline": {
     "issueId": "PAN-3537",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -511,13 +511,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-09T12:47:29.187Z",
-    "testNotes": "Automated gates at HEAD 4e7bc62de4 (feature/pan-3537, merge of unrelated main commits — confirmed via git diff --stat origin/main...HEAD that none touch PAN-3537's declared scope). install: bun install --frozen-lockfile OK (1648/1855 packages, no changes). typecheck: npm run typecheck OK (root tsc, hooks, evals, dashboard ratchet 30 known/0 new, frontend ratchet 0 known/0 new). lint: npm run lint — first attempt hit a transient SIGTERM(143) on the effect-diagnostics lane under load (13 other agents running concurrently in this Overdeck instance); re-ran that lane in isolation (passed cleanly, 308 known findings/none new) and re-ran the full lint chain twice more, both clean exit 0 (eslint + all sub-lints incl. file-size, circular-deps, ratchet-audit, quarantine-audit). build: npm run build OK including build:dashboard:server:bundle (dist/dashboard/server.js fresh, verified buildCommit=4e7bc62de4 via the workspace container's /api/health). test: OVERDECK_VERIFICATION=1 vitest run --changed origin/main (root) + frontend, exactly per the configured gate command. Frontend: 182 files / 2044 tests all passed outright. Root: 9666 passed, 7 failed across 3 files, none in PAN-3537's declared scope (contracts/webhook/CI-fill/chip files). Re-ran the 3 failing files in isolation: tests/unit/lib/review-status-pan-1908-record.test.ts and tests/unit/dashboard/routes/resources-teardown.test.ts (both 'no such table: review_status' under concurrent-suite DB-setup contention) passed cleanly standalone — confirmed contention flake. src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts's one failing test still fails standalone, but that file and its implementation are byte-identical to origin/main (git diff --stat origin/main...HEAD -- src/lib/cloister/ is empty) — a pre-existing failure unrelated to this branch's changes, not a PAN-3537 regression.",
+    "updatedAt": "2026-08-09T13:10:25.702Z",
     "uatNotes": "UAT REQUIRED and FAILED. FR-1/FR-2 require the Command Deck project row to show a compact CI chip for the project's default branch, sourced from a boot-time REST fill so the chip is correct before the first webhook. This is UI/dashboard behavior so per self-verify-rendering I drove it live rather than trusting unit tests alone.\n\nEnvironment: never touched the host dashboard on :3011 (that is the live flywheel-managed instance with 25 running agents — roles/test.md and the PAN-2322 port guard both forbid this). Instead brought up the workspace's own isolated devcontainer 'server' stack (docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server), which is single-deacon-safe (OVERDECK_DISABLE_DEACON=1, no ~/.overdeck bind mount) and serves https://feature-pan-3537.overdeck.localhost / https://api-feature-pan-3537.overdeck.localhost. Verified /api/health reports buildCommit=43fc78c69e3, buildBranch=feature/pan-3537, buildDirty=false throughout.\n\nTwo pre-existing, PAN-3537-unrelated environment gaps blocked the stack from staying up long enough to test, both worked around without any code/config edits: (1) startCliproxyWatchdog() in main.ts crashes the Alpine-based container on an unhandled spawn 'error' event because the host's glibc cliproxy binary can't exec under musl — worked around by pre-binding a loop of `nc -l -p 8317` inside the container so the watchdog's TCP liveness check finds the port already held and never attempts the spawn. (2) `gh` was not installed in the container and no projects.yaml exists in the container's isolated ~/.overdeck (correct per the single-deacon invariant, which deliberately excludes that mount) — installed gh via apk, authenticated it with the host operator's own `gh auth token` (persisted to /home/node/.config/gh/hosts.yml, not passed via env so it survives restarts), and wrote a minimal test-only projects.yaml registering panopticon-cli -> eltmon/overdeck so fillAllProjectCi() had a real project with a real, live GitHub Actions history to pull.\n\nResult: on two independent fresh container boots, the boot-time fill correctly ran, called the real GitHub API, and durably persisted a project.ci_head_observed event with a fully correct payload (verified by direct read of the events table: projectKey/repo/branch/headSha/observedAt all correct, 3 suites all status=completed conclusion=success). The read model's live snapshot sequence advanced past each event (29 then 36). Unrelated live data on the same page (issue counts, 'Just now' sync timestamp) rendered correctly, proving the general WS/read-model pipeline is live and working. Despite this, the CI chip never appeared on the panopticon-cli project row in either boot — no element with data-testid=project-ci-chip in the DOM/accessibility tree after a fresh navigation performed well after the event was confirmed durably persisted.\n\nThis points to the boot-time fill's own emitted event being applied to the read model unreliably — plausibly a startup race between startProjectCiRefill()'s synchronous immediate run() (main.ts ~line 760, fires eagerly at module top level) and the asynchronous EventStoreServiceLive Effect layer that wires store.subscribe(...) -> readModel.applyEvent (src/dashboard/server/services/domain-services.ts:172), which is the ONLY place project.ci_head_observed ever reaches ciByProjectKey in the live in-memory projection. If the fill's REST calls resolve before that layer's subscription is registered, the event is durably written but the live projection silently misses it, and per FR-2 the chip should be correct 'before the first webhook arrives' -- exactly the case this defeats. I did not edit any code to confirm or fix this (out of scope for the test role); this is a diagnosis, not a verified root cause, and needs engineering follow-up.\n\nCommands/paths exercised: docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server; direct node:sqlite reads of /home/node/.overdeck/overdeck.db events table; Playwright navigate to https://feature-pan-3537.overdeck.localhost/ + browser_find for 'project-ci-chip' and 'panopticon-cli' (2 independent boots, both negative for the chip). No console errors other than an unrelated PostHog-token warning.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
-    "reviewedAtCommit": "4e7bc62de4317adcc7bcc301a7ddccabb050e77f",
     "lastVerifiedCommit": "d1c8fa519d4b22349eb665c6bc28e4e3182a9550",
     "reviewSpawnedAt": "2026-08-09T12:10:31.271Z",
     "scopeDrift": {
@@ -677,17 +675,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 524,
-            "output": 122426,
-            "cacheRead": 53943727,
-            "cacheWrite": 502852
+            "input": 528,
+            "output": 123144,
+            "cacheRead": 54374897,
+            "cacheWrite": 504013
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5800324,
-            "output": 283241,
-            "cacheRead": 115743744,
+            "input": 5919554,
+            "output": 296863,
+            "cacheRead": 131848192,
             "cacheWrite": 0
           }
         }
@@ -706,9 +704,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13785074,
-          "output": 568365,
-          "cacheRead": 161511424,
+          "input": 13904304,
+          "output": 581987,
+          "cacheRead": 177615872,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -718,15 +716,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 524,
-          "output": 122426,
-          "cacheRead": 53943727,
-          "cacheWrite": 502852
+          "input": 528,
+          "output": 123144,
+          "cacheRead": 54374897,
+          "cacheWrite": 504013
         }
       },
       "costAtCloseOut": {
-        "usd": 217.7010323,
-        "pricingAsOf": "2026-08-09T12:47:32.076Z"
+        "usd": 226.8543913,
+        "pricingAsOf": "2026-08-09T13:10:25.738Z"
       }
     },
     "merges": [
