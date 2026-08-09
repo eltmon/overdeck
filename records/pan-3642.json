@@ -3,18 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-09T21:59:38.150Z",
-  "updated": "2026-08-09T23:33:58.830Z",
+  "updated": "2026-08-09T23:34:01.134Z",
   "pipeline": {
     "issueId": "PAN-3642",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
-    "mergeStatus": "pending",
+    "verificationStatus": "running",
+    "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T23:33:23.452Z",
-    "mergeNotes": "Stale strike signal: recorded HEAD 7e03c4b2c4bc6dfce014bc08d5a5cf55f2307d3a differs from origin/strike/pan-3642 at 0cb9364334e394c73dece442920e90ed9d1fdf53",
+    "updatedAt": "2026-08-09T23:33:37.546Z",
     "strikeReadyHead": "49715870c179ee5eb557b644b0ef14e208667d88",
     "strikeReadyAt": "2026-08-09T23:24:23.994Z",
     "strikeLandingState": "landing",
@@ -51,7 +50,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.345535,
-        "pricingAsOf": "2026-08-09T23:33:23.459Z"
+        "pricingAsOf": "2026-08-09T23:34:01.126Z"
       }
     },
     "merges": [],
