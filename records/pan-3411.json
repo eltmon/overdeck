@@ -225,10 +225,10 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T21:24:03.330Z",
+  "updated": "2026-08-09T21:40:33.069Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -236,7 +236,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T14:08:24.272Z",
-    "updatedAt": "2026-08-09T21:23:56.753Z",
+    "updatedAt": "2026-08-09T21:40:32.985Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "649756e5df6850aaf10e0ca0d25843f71d6ed468",
@@ -333,6 +333,12 @@
           }
         },
         "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 511196,
+            "output": 41588,
+            "cacheRead": 6576640,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-terra": {
             "input": 1153093,
             "output": 47956,
@@ -341,6 +347,12 @@
           }
         },
         "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 353544,
+            "output": 25194,
+            "cacheRead": 4174848,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-terra": {
             "input": 844701,
             "output": 38476,
@@ -349,6 +361,12 @@
           }
         },
         "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 545742,
+            "output": 38684,
+            "cacheRead": 5742720,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-terra": {
             "input": 707524,
             "output": 50974,
@@ -357,6 +375,12 @@
           }
         },
         "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 320879,
+            "output": 16965,
+            "cacheRead": 4089728,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-terra": {
             "input": 251578,
             "output": 4184,
@@ -381,15 +405,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3968898,
-          "output": 326683,
-          "cacheRead": 139364224,
+          "input": 5700259,
+          "output": 449114,
+          "cacheRead": 159948160,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 118.171457,
-        "pricingAsOf": "2026-08-09T21:23:56.763Z"
+        "usd": 140.79316,
+        "pricingAsOf": "2026-08-09T21:40:33.054Z"
       }
     },
     "merges": [
