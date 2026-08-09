@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3626-review",
+  "issueId": "PAN-3626",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3626",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "7fad3422-ca41-4c60-a166-d08a96d2f0a6",
+      "startedAt": "2026-08-09T20:30:50.082Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-09T20:30:50.082Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
