@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:17:08.805Z",
+  "updated": "2026-08-09T12:17:44.762Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "parity-no-loss-audit": {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 786171,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:17:44.762Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -294,6 +302,7 @@
     "idea-cards": "completed",
     "idea-cards.ac1": "completed",
     "idea-cards.ac2": "completed",
-    "idea-cards.ac3": "completed"
+    "idea-cards.ac3": "completed",
+    "parity-no-loss-audit": "running"
   }
 }
