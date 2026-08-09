@@ -273,19 +273,20 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:34:32.619Z",
+  "updated": "2026-08-09T22:34:42.432Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "dispatch_failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T14:08:24.272Z",
-    "updatedAt": "2026-08-09T22:27:03.496Z",
+    "updatedAt": "2026-08-09T22:34:32.599Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3411.lock is held by agent-pan-3411-review pid=3925260 acquiredAt=2026-08-09T22:34:07.849Z. Retry the command after that writer finishes.",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "7b350539d1e15ad05aed9c0cf17bea427aaeaf96",
@@ -374,10 +375,16 @@
     "usage": {
       "byStage": {
         "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1442168,
+            "output": 63140,
+            "cacheRead": 21883392,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-terra": {
-            "input": 1114603,
-            "output": 28598,
-            "cacheRead": 10303488,
+            "input": 1825197,
+            "output": 33862,
+            "cacheRead": 13789184,
             "cacheWrite": 0
           }
         },
@@ -439,30 +446,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4288854,
-            "output": 386826,
-            "cacheRead": 150602752,
+            "input": 4302630,
+            "output": 388680,
+            "cacheRead": 151516160,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
-        "openai/gpt-5.6-terra": {
-          "input": 4071499,
-          "output": 170188,
-          "cacheRead": 34461696,
+        "openai/gpt-5.6-sol": {
+          "input": 7499281,
+          "output": 582609,
+          "cacheRead": 196710912,
           "cacheWrite": 0
         },
-        "openai/gpt-5.6-sol": {
-          "input": 6043337,
-          "output": 517615,
-          "cacheRead": 173914112,
+        "openai/gpt-5.6-terra": {
+          "input": 4782093,
+          "output": 175452,
+          "cacheRead": 37947392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 154.049272,
-        "pricingAsOf": "2026-08-09T22:27:03.507Z"
+        "usd": 177.404086,
+        "pricingAsOf": "2026-08-09T22:34:38.705Z"
       }
     },
     "merges": [
@@ -471,7 +478,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
