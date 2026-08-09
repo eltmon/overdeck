@@ -58,8 +58,8 @@ export function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
 }
 
-export function getCliproxyBinary(): string {
-  return join(BIN_DIR, 'cliproxy');
+export function getCliproxyBinary(platform: NodeJS.Platform = process.platform): string {
+  return join(BIN_DIR, platform === 'win32' ? 'cliproxy.exe' : 'cliproxy');
 }
 
 export function getCliproxyConfigPath(): string {
@@ -434,12 +434,19 @@ export function detectPlatformAsset(
   return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.${ext}` };
 }
 
+export function isExecutableMode(
+  mode: number,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform === 'win32' || (mode & 0o111) !== 0;
+}
+
 export function isCliproxyInstalled(): boolean {
   const bin = getCliproxyBinary();
   if (!existsSync(bin)) return false;
   try {
     const st = statSync(bin);
-    return st.isFile() && (st.mode & 0o111) !== 0;
+    return st.isFile() && isExecutableMode(st.mode);
   } catch {
     return false;
   }
