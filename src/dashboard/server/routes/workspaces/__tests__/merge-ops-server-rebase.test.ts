@@ -147,7 +147,7 @@ describe('triggerMerge server rebase escalation', () => {
       stderr: '',
     }));
     mocks.execFile.mockImplementation(async (file, args) => {
-      if (file === 'gh' && args[0] === 'pr' && args[1] === 'view') return { stdout: `${PR_URL}\n`, stderr: '' };
+      if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
       if (file === 'git' && args[0] === 'merge-base') throw new Error('branch is behind');
       return { stdout: '', stderr: '' };
     });

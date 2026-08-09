@@ -159,7 +159,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
   return lines.join('\n') || `Automated PR for ${issueId}`;
 }
 
-async function ensurePRExists(
+export async function ensurePRExists(
   issueId: string,
   options?: { cwd?: string; branchName?: string; targetBranch?: string }
 ): Promise<{ created: boolean; prUrl?: string; error?: string }> {
@@ -170,14 +170,14 @@ async function ensurePRExists(
     const execOptions: Parameters<typeof execFileAsync>[2] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
-    // Check for existing PR
-    let existingOut: string = '';
+    // Reuse an open PR for this head/base pair, or a merged PR for terminal reconciliation.
+    // A closed unmerged PR must not prevent a fresh PR for new branch commits.
     try {
-      const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions);
-      existingOut = String(stdout);
-    } catch { /* no existing PR */ }
-    const existing = existingOut.trim();
-    if (existing) return { created: false, prUrl: existing };
+      const { stdout } = await execFileAsync('gh', ['pr', 'list', '--head', branchName, '--base', targetBranch, '--state', 'all', '--json', 'url,state', '--limit', '100'], execOptions);
+      const pullRequests = JSON.parse(String(stdout)) as Array<{ url?: string; state?: string }>;
+      const existing = pullRequests.find(pr => pr.state === 'OPEN') ?? pullRequests.find(pr => pr.state === 'MERGED');
+      if (existing?.url) return { created: false, prUrl: existing.url };
+    } catch { /* no reusable PR */ }
 
     // Build rich PR body if workspace path is available
     const prBody = options?.cwd ? await buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
