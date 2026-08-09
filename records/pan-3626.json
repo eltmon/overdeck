@@ -40,21 +40,23 @@
     "recordedAt": "2026-08-09T20:28:46.594Z"
   },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:47:16.094Z",
+  "updated": "2026-08-09T20:47:18.822Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:47:15.995Z",
-    "reviewNotes": "All four reviewers approved; no blocking or advisory findings.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-09T20:47:16.010Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3626-review",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3635",
     "reviewedAtCommit": "4baa5fa27d67018b4a09909fb9964bed89eb32f8",
     "lastVerifiedCommit": "4baa5fa27d67018b4a09909fb9964bed89eb32f8",
+    "reviewRequestedAt": "2026-08-09T20:28:49.994Z",
     "reviewSpawnedAt": "2026-08-09T20:30:14.833Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -158,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.709562,
-        "pricingAsOf": "2026-08-09T20:47:16.079Z"
+        "pricingAsOf": "2026-08-09T20:47:18.815Z"
       }
     },
     "merges": [
