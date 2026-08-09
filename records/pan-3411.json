@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:17:44.762Z",
+  "updated": "2026-08-09T12:20:10.080Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "parity-no-loss-audit": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 786171,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:17:44.762Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -228,6 +220,17 @@
         "outcome": "completed",
         "reason": "Added the six static mockup idea cards with uppercase mono categories, responsive soft-card layout, hero prefill/focus behavior, and coverage proving the click path performs no network work.",
         "releasedAt": "2026-08-09T12:17:08.805Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 786171,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:17:44.762Z",
+        "itemId": "parity-no-loss-audit",
+        "outcome": "completed",
+        "reason": "Added the explicit modal-to-page affordance checklist with named failure behavior; the gate also exposed and fixed missing resolved path, branch, worktree, and unregistered-target status segments. Page, parity, and controller suites pass.",
+        "releasedAt": "2026-08-09T12:20:10.080Z"
       }
     ],
     "statusReasons": {
@@ -262,6 +265,10 @@
       "idea-cards": {
         "reason": "Added the six static mockup idea cards with uppercase mono categories, responsive soft-card layout, hero prefill/focus behavior, and coverage proving the click path performs no network work.",
         "updatedAt": "2026-08-09T12:17:08.805Z"
+      },
+      "parity-no-loss-audit": {
+        "reason": "Added the explicit modal-to-page affordance checklist with named failure behavior; the gate also exposed and fixed missing resolved path, branch, worktree, and unregistered-target status segments. Page, parity, and controller suites pass.",
+        "updatedAt": "2026-08-09T12:20:10.080Z"
       }
     }
   },
@@ -303,6 +310,8 @@
     "idea-cards.ac1": "completed",
     "idea-cards.ac2": "completed",
     "idea-cards.ac3": "completed",
-    "parity-no-loss-audit": "running"
+    "parity-no-loss-audit": "completed",
+    "parity-no-loss-audit.ac1": "completed",
+    "parity-no-loss-audit.ac2": "completed"
   }
 }
