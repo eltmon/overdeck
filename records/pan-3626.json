@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:28:32.418Z",
+  "updated": "2026-08-09T20:28:46.595Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -191,5 +191,24 @@
     "win32-sync-port-probe.ac3": "completed",
     "docs-windows-support": "completed",
     "docs-windows-support.ac1": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/harnesses.mdx",
+      "src/lib/cliproxy.ts",
+      "tests/lib/cliproxy-platform-asset.test.ts",
+      "tests/lib/cliproxy-version-probe.test.ts",
+      "tests/lib/cliproxy-windows-paths.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/harnesses.mdx",
+      "src/lib/cliproxy.ts",
+      "tests/lib/cliproxy-platform-asset.test.ts",
+      "tests/lib/cliproxy-version-probe.test.ts",
+      "tests/lib/cliproxy-windows-paths.test.ts"
+    ],
+    "recordedAt": "2026-08-09T20:28:46.594Z"
   }
 }
