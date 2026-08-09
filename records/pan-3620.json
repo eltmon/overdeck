@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T20:37:17.267Z",
+  "updated": "2026-08-09T20:54:32.132Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -20,15 +20,13 @@
     "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:36:41.494Z",
+    "updatedAt": "2026-08-09T20:54:32.107Z",
     "mergeNotes": "Stale strike signal: recorded HEAD a97dbb4bbbba0dfd57d51c780ac97d8b7005750b differs from origin/strike/pan-3620 at 41941c6a504c583f026d182ad0e6671bbc44e05d",
     "lastVerifiedCommit": "fac381247daea503a500671cb7946d329c4b7f92",
-    "strikeReadyHead": "a97dbb4bbbba0dfd57d51c780ac97d8b7005750b",
-    "strikeReadyAt": "2026-08-09T19:57:03.095Z",
-    "strikeLandingState": "landing",
+    "strikeReadyHead": "a4f42f291d12a72d36a3f91a1b6c4a3378979666",
+    "strikeReadyAt": "2026-08-09T20:54:32.106Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-08-09T20:06:30.512Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-09T20:05:30.512Z",
@@ -36,6 +34,13 @@
         "mainHead": "f1a9c5bca16f952b5dab2567d77dfa64a2957f47",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-08-09T20:36:41.504Z",
+        "strikeHead": "a97dbb4bbbba0dfd57d51c780ac97d8b7005750b",
+        "mainHead": "53de20971bbaed62ecb91743a9061f2c6959e0e7",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD a97dbb4bbbba0dfd57d51c780ac97d8b7005750b differs from origin/strike/pan-3620 at 41941c6a504c583f026d182ad0e6671bbc44e05d"
       }
     ]
   },
@@ -44,9 +49,9 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 397375,
-            "output": 35532,
-            "cacheRead": 7973888,
+            "input": 504599,
+            "output": 38049,
+            "cacheRead": 10107392,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
@@ -59,9 +64,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 397375,
-          "output": 35532,
-          "cacheRead": 7973888,
+          "input": 504599,
+          "output": 38049,
+          "cacheRead": 10107392,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -72,8 +77,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.507388,
-        "pricingAsOf": "2026-08-09T20:37:17.260Z"
+        "usd": 13.18577,
+        "pricingAsOf": "2026-08-09T20:54:32.120Z"
       }
     },
     "merges": [],
