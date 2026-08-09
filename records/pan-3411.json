@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:06:29.930Z",
+  "updated": "2026-08-09T12:11:44.279Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "cta-and-submit": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 543581,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:06:29.930Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -195,6 +187,17 @@
         "outcome": "completed",
         "reason": "Added the live dot-metadata intent summary for shared/isolated mode, git posture, parent overrides, and inline resolver findings, with focused coverage.",
         "releasedAt": "2026-08-09T12:06:16.098Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 543581,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:06:29.930Z",
+        "itemId": "cta-and-submit",
+        "outcome": "completed",
+        "reason": "Added Cancel and Start workspace actions, stale/invalid disabling, Enter form submission, and threaded the existing invalidate-activate-navigate creation callback through AppRoutes into the page; page and controller tests plus full typecheck pass.",
+        "releasedAt": "2026-08-09T12:11:44.279Z"
       }
     ],
     "statusReasons": {
@@ -217,6 +220,10 @@
       "status-strip": {
         "reason": "Added the live dot-metadata intent summary for shared/isolated mode, git posture, parent overrides, and inline resolver findings, with focused coverage.",
         "updatedAt": "2026-08-09T12:06:16.098Z"
+      },
+      "cta-and-submit": {
+        "reason": "Added Cancel and Start workspace actions, stale/invalid disabling, Enter form submission, and threaded the existing invalidate-activate-navigate creation callback through AppRoutes into the page; page and controller tests plus full typecheck pass.",
+        "updatedAt": "2026-08-09T12:11:44.279Z"
       }
     }
   },
@@ -244,6 +251,10 @@
     "status-strip.ac2": "completed",
     "status-strip.ac3": "completed",
     "status-strip.ac4": "completed",
-    "cta-and-submit": "running"
+    "cta-and-submit": "completed",
+    "cta-and-submit.ac1": "completed",
+    "cta-and-submit.ac2": "completed",
+    "cta-and-submit.ac3": "completed",
+    "cta-and-submit.ac4": "completed"
   }
 }
