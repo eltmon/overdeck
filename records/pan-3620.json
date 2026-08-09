@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-09T22:50:01.931Z",
+  "updated": "2026-08-09T22:50:07.607Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -20,7 +20,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:49:13.202Z",
+    "updatedAt": "2026-08-09T22:49:13.612Z",
     "lastVerifiedCommit": "fac381247daea503a500671cb7946d329c4b7f92",
     "strikeReadyHead": "eb99d522834a18fea63266acaf9808f3e661d7f3",
     "strikeReadyAt": "2026-08-09T22:31:42.425Z",
@@ -98,7 +98,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.636213,
-        "pricingAsOf": "2026-08-09T22:49:58.580Z"
+        "pricingAsOf": "2026-08-09T22:50:04.832Z"
       }
     },
     "merges": [],
