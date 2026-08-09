@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Plus } from 'lucide-react';
 import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
@@ -22,11 +22,21 @@ interface WorkspaceRecency {
   lastAccessedAt: number;
 }
 
+const WORKSPACE_IDEAS = [
+  ['AUTOMATE', 'Nightly dependency-audit sweep across all registered projects'],
+  ['DELEGATE', 'Triage the untriaged backlog and draft a priority proposal'],
+  ['EXPLORE', 'Map how the merge train decides dispatch order'],
+  ['BUILD', 'Prototype kanban swimlanes grouped by project'],
+  ['PLAN', 'Plan the Q3 cost-governor roadmap from open issues'],
+  ['DESIGN', 'Redesign the agent card footer around the new style guide'],
+] as const;
+
 interface NewWorkspacePageProps {
   onCreated?: (workspaceId: string) => void;
 }
 
 export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
+  const heroRef = useRef<HTMLInputElement>(null);
   const [projectPreset] = useState(() => getNewWorkspaceProjectFromSearch() ?? '');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projects, setProjects] = useState<RegisteredProject[]>([]);
@@ -216,6 +226,7 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
         </div>
 
         <input
+          ref={heroRef}
           data-testid="new-workspace-hero-title"
           data-region="hero-title"
           aria-label="Workspace name"
@@ -388,7 +399,26 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
           </div>
         </div>
         <div data-testid="new-workspace-hairline-bottom" data-region="hairline-bottom" className="mb-8 border-t border-border" />
-        <div data-testid="new-workspace-idea-grid" data-region="idea-grid" className="min-h-48 flex-1" />
+        <div data-testid="new-workspace-idea-grid" data-region="idea-grid" className="min-h-48 flex-1">
+          <h2 className="eyebrow mb-4 font-mono">Ideas for your next workspace</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {WORKSPACE_IDEAS.map(([category, title]) => (
+              <button
+                key={category}
+                type="button"
+                data-testid="new-workspace-idea-card"
+                onClick={() => {
+                  intent.setName(title);
+                  heroRef.current?.focus();
+                }}
+                className="flex min-h-28 flex-col gap-2 rounded-xl border border-transparent bg-foreground/[0.03] p-4 text-left transition-colors hover:bg-foreground/[0.055] active:scale-[0.985]"
+              >
+                <span className="eyebrow font-mono">{category}</span>
+                <span className="text-sm leading-relaxed text-foreground">{title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </form>
 
       <NewProjectModal

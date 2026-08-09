@@ -317,6 +317,28 @@ describe('NewWorkspacePage shell', () => {
     expect(await screen.findByRole('button', { name: 'New Project' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('renders all six static idea cards with uppercase mono categories', () => {
+    render(<NewWorkspacePage />);
+
+    expect(screen.getAllByTestId('new-workspace-idea-card')).toHaveLength(6);
+    for (const category of ['AUTOMATE', 'DELEGATE', 'EXPLORE', 'BUILD', 'PLAN', 'DESIGN']) {
+      expect(screen.getByText(category)).toHaveClass('eyebrow', 'font-mono');
+    }
+    expect(screen.getByText('Nightly dependency-audit sweep across all registered projects')).toBeInTheDocument();
+  });
+
+  it('prefills and focuses the hero when an idea is selected without extra network activity', async () => {
+    render(<NewWorkspacePage />);
+    await waitFor(() => expect(mockFetchWithTimeout).toHaveBeenCalled());
+    mockFetchWithTimeout.mockClear();
+
+    fireEvent.click(screen.getByText('Map how the merge train decides dispatch order'));
+
+    expect(currentIntent.setName).toHaveBeenCalledWith('Map how the merge train decides dispatch order');
+    expect(screen.getByTestId('new-workspace-hero-title')).toHaveFocus();
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled();
+  });
+
   it('renders the resolved shared-mode status line and parent override', () => {
     currentIntent = {
       ...makeIntent(),
