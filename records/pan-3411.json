@@ -269,17 +269,17 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:44:37.236Z",
+  "updated": "2026-08-09T22:44:38.002Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:43:51.522Z",
+    "updatedAt": "2026-08-09T22:44:37.999Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewSpawnedAt": "2026-08-09T22:27:03.496Z",
@@ -295,7 +295,9 @@
         "images/dashboard/pan-3411-900x700-finding-bottom.png",
         "images/dashboard/pan-3411-900x700-finding-top.png",
         "packages/contracts/src/telemetry.ts",
+        "snippets/themed-image.mdx",
         "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
         "tests/unit/dashboard/no-loss-audit.test.ts"
       ],
@@ -342,6 +344,7 @@
         "images/dashboard/pan-3411-900x700-finding-bottom.png",
         "images/dashboard/pan-3411-900x700-finding-top.png",
         "packages/contracts/src/telemetry.ts",
+        "snippets/themed-image.mdx",
         "src/dashboard/frontend/src/App.tsx",
         "src/dashboard/frontend/src/App/AppRoutes.tsx",
         "src/dashboard/frontend/src/App/routes.ts",
@@ -352,6 +355,7 @@
         "src/dashboard/frontend/src/components/CommandDeck/__tests__/useNewWorkspaceModal.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
         "src/dashboard/frontend/src/components/Header.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "src/dashboard/frontend/src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts",
         "src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts",
         "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
@@ -360,8 +364,9 @@
         "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
         "tests/unit/dashboard/no-loss-audit.test.ts"
       ],
-      "recordedAt": "2026-08-09T13:55:44.417Z"
-    }
+      "recordedAt": "2026-08-09T22:44:37.234Z"
+    },
+    "reviewRequestedAt": "2026-08-09T22:44:37.999Z"
   },
   "closeOut": {
     "usage": {
