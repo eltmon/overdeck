@@ -280,6 +280,56 @@ exit 1
       expect(result.output).toContain('chars elided');
     });
 
+    it('preserves an interior vitest failure and the final test summary', async () => {
+      const scriptPath = join(testDir, 'interior-failure-gate.sh');
+      writeFileSync(
+        scriptPath,
+        `#!/bin/bash
+for i in {1..500}; do echo "passing test output $i"; done
+echo "FAIL src/interior.test.ts > reports an interior assertion"
+echo " × reports an interior assertion"
+echo "AssertionError: expected true to be false"
+for i in {1..500}; do echo "more passing test output $i"; done
+echo "Test Files 1 failed | 99 passed"
+exit 1
+`,
+        { mode: 0o755 },
+      );
+
+      const [result] = await Effect.runPromise(runQualityGates({
+        test: { command: scriptPath },
+      }, testDir));
+
+      expect(result.passed).toBe(false);
+      expect(result.output).toContain('FAIL src/interior.test.ts > reports an interior assertion');
+      expect(result.output).toContain('AssertionError: expected true to be false');
+      expect(result.output).toContain('Test Files 1 failed | 99 passed');
+      expect(result.output).toContain('chars elided');
+    });
+
+    it('keeps the tail when a clipped failed gate has no recognized failure anchor', async () => {
+      const scriptPath = join(testDir, 'unanchored-failure-gate.sh');
+      writeFileSync(
+        scriptPath,
+        `#!/bin/bash
+echo "early diagnostic that should be clipped"
+for i in {1..500}; do echo "unstructured output $i"; done
+echo "final diagnostic survives without an anchor"
+exit 1
+`,
+        { mode: 0o755 },
+      );
+
+      const [result] = await Effect.runPromise(runQualityGates({
+        test: { command: scriptPath },
+      }, testDir));
+
+      expect(result.passed).toBe(false);
+      expect(result.output).not.toContain('early diagnostic that should be clipped');
+      expect(result.output).toContain('final diagnostic survives without an anchor');
+      expect(result.output).toContain('no failure anchor found, showing tail');
+    });
+
     it('uses the same separate stream budgets for passing gates', async () => {
       const scriptPath = join(testDir, 'passing-gate.sh');
       writeFileSync(
