@@ -11,7 +11,11 @@ interface ProjectTargets {
   targets: Array<{ path: string }>;
 }
 
-export function NewWorkspacePage() {
+interface NewWorkspacePageProps {
+  onCreated?: (workspaceId: string) => void;
+}
+
+export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
   const [projectPreset] = useState(() => getNewWorkspaceProjectFromSearch() ?? '');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [targetMenuOpen, setTargetMenuOpen] = useState(false);
@@ -19,7 +23,7 @@ export function NewWorkspacePage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [projectTargets, setProjectTargets] = useState<ProjectTargets | null>(null);
   const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
-  const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset });
+  const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset, onCreated });
 
   useEffect(() => {
     intent.setTargetPath('');
@@ -88,7 +92,13 @@ export function NewWorkspacePage() {
 
   return (
     <div data-testid="new-workspace-page" className="h-full w-full overflow-y-auto bg-background">
-      <main className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 py-12 lg:px-12 lg:py-16">
+      <form
+        className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 py-12 lg:px-12 lg:py-16"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (intent.canCreate) void intent.submitIntent();
+        }}
+      >
         <div
           data-testid="new-workspace-project-chip-row"
           data-region="project-chip-row"
@@ -222,34 +232,55 @@ export function NewWorkspacePage() {
         )}
 
         <div data-testid="new-workspace-hairline-top" data-region="hairline-top" className="mb-5 border-t border-border" />
-        <div data-testid="new-workspace-status-strip" data-region="status-strip" className="mb-5 flex min-h-12 items-center font-mono text-xs text-muted-foreground">
-          <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
-          <span>Memory enabled</span>
-          {(findings.length > 0 || intent.error) ? (
-            <>
-              <span className="mx-2 opacity-50">·</span>
-              <span data-testid="new-workspace-status-finding" className="text-destructive-foreground">
-                {findings.map((finding) => finding.message).join(' · ') || intent.error}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="mx-2 opacity-50">·</span>
-              <span>{intent.mode === 'isolated' ? 'Isolated worktree' : 'Files shared'}</span>
-              <span className="mx-2 opacity-50">·</span>
-              <span>{intent.intent?.isGitRepository ? 'git repository' : 'no git detected'}</span>
-              {intent.parentBranch && (
-                <>
-                  <span className="mx-2 opacity-50">·</span>
-                  <span>parent {intent.parentBranch}</span>
-                </>
-              )}
-            </>
-          )}
+        <div data-testid="new-workspace-status-strip" data-region="status-strip" className="mb-5 flex min-h-12 flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center font-mono text-xs text-muted-foreground">
+            <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
+            <span>Memory enabled</span>
+            {(findings.length > 0 || intent.error) ? (
+              <>
+                <span className="mx-2 opacity-50">·</span>
+                <span data-testid="new-workspace-status-finding" className="text-destructive-foreground">
+                  {findings.map((finding) => finding.message).join(' · ') || intent.error}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="mx-2 opacity-50">·</span>
+                <span>{intent.mode === 'isolated' ? 'Isolated worktree' : 'Files shared'}</span>
+                <span className="mx-2 opacity-50">·</span>
+                <span>{intent.intent?.isGitRepository ? 'git repository' : 'no git detected'}</span>
+                {intent.parentBranch && (
+                  <>
+                    <span className="mx-2 opacity-50">·</span>
+                    <span>parent {intent.parentBranch}</span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="new-workspace-cancel"
+              onClick={() => window.history.back()}
+              className="eyebrow bg-transparent px-2 py-2 text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              data-testid="new-workspace-submit"
+              disabled={!intent.canCreate}
+              className="inline-flex h-12 items-center gap-3 rounded-xl bg-primary/15 px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Start workspace
+              <span className="inline-grid h-6 min-w-6 place-items-center rounded-md bg-foreground/10 px-1.5 font-mono text-xs">↵</span>
+            </button>
+          </div>
         </div>
         <div data-testid="new-workspace-hairline-bottom" data-region="hairline-bottom" className="mb-8 border-t border-border" />
         <div data-testid="new-workspace-idea-grid" data-region="idea-grid" className="min-h-48 flex-1" />
-      </main>
+      </form>
 
       <NewProjectModal
         isOpen={newProjectOpen}

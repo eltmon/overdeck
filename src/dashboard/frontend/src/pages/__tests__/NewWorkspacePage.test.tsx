@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../components/CommandDeck/NewProjectModal.js', () => ({
@@ -73,13 +74,16 @@ function makeIntent(initialProjectKey = ''): ReturnType<typeof useWorkspaceCreat
 }
 
 let currentIntent: ReturnType<typeof useWorkspaceCreateIntent>;
+let currentOnCreated: ((workspaceId: string) => void) | undefined;
 let intentInitialized: boolean;
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/workspaces/new');
   currentIntent = makeIntent();
+  currentOnCreated = undefined;
   intentInitialized = false;
   mockUseWorkspaceCreateIntent.mockImplementation((options = {}) => {
+    currentOnCreated = options.onCreated;
     if (!intentInitialized) {
       currentIntent = makeIntent(options.initialProjectKey);
       intentInitialized = true;
@@ -279,5 +283,32 @@ describe('NewWorkspacePage shell', () => {
 
     expect(screen.getByTestId('new-workspace-status-finding')).toHaveTextContent('Choose a registered target');
     expect(screen.queryByTestId('new-workspace-error-panel')).not.toBeInTheDocument();
+  });
+
+  it('disables Start workspace while the intent is stale or invalid', () => {
+    render(<NewWorkspacePage />);
+    expect(screen.getByTestId('new-workspace-submit')).toBeDisabled();
+  });
+
+  it('submits exactly once when Enter is pressed in the hero field', async () => {
+    currentIntent = {
+      ...makeIntent(),
+      intent: makeResolvedIntent(),
+      stale: false,
+      canCreate: true,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    await userEvent.type(screen.getByTestId('new-workspace-hero-title'), '{Enter}');
+    expect(currentIntent.submitIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it('threads successful creation to the app-level workspace callback', () => {
+    const onCreated = vi.fn();
+    render(<NewWorkspacePage onCreated={onCreated} />);
+
+    currentOnCreated?.('workspace/id');
+    expect(onCreated).toHaveBeenCalledWith('workspace/id');
   });
 });

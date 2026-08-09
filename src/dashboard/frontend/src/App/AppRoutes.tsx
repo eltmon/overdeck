@@ -57,6 +57,7 @@ interface AppRoutesProps {
   /** PAN-1990: the workspace-registry id restored from /workspace/<id>. */
   workspaceRouteId: string | null;
   onWorkspaceViewBack: () => void;
+  onWorkspaceCreated: (workspaceId: string) => void;
   initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
@@ -89,6 +90,7 @@ export function AppRoutes({
   cockpitRoute,
   workspaceRouteId,
   onWorkspaceViewBack,
+  onWorkspaceCreated,
   initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
@@ -136,7 +138,7 @@ export function AppRoutes({
       )}
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
-          <NewWorkspacePage />
+          <NewWorkspacePage onCreated={onWorkspaceCreated} />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (
