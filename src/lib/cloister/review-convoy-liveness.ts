@@ -1,3 +1,5 @@
+import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
+
 export const REVIEW_AGENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 export const REVIEWING_WATCHDOG_THRESHOLD_MS = 45 * 60 * 1000;
 
@@ -7,6 +9,7 @@ type ReviewAgentRow = {
   role?: string | null;
   status?: string | null;
   lastActivity?: string | null;
+  reviewRunId?: string | null;
 };
 
 export type ReviewConvoyLiveness = {
@@ -32,7 +35,8 @@ export function evaluateReviewConvoyLiveness(
   });
 
   const coordinatorId = `agent-${issueId.toLowerCase()}-review`;
-  if (reviewAgents.some((agent) => agent.id === coordinatorId && (agent.status === 'stopped' || agent.status === 'error'))) {
+  const coordinator = reviewAgents.find((agent) => agent.id === coordinatorId);
+  if (coordinator?.status === 'stopped' || coordinator?.status === 'error') {
     return { active: false, reason: 'coordinator stopped' };
   }
 
@@ -41,10 +45,19 @@ export function evaluateReviewConvoyLiveness(
     return { active: false, reason: 'review watchdog expired' };
   }
 
-  for (const agent of reviewAgents) {
+  const currentRunId = coordinator?.reviewRunId;
+  const currentReviewAgents = currentRunId
+    ? reviewAgents.filter((agent) => agent.reviewRunId === currentRunId)
+    : reviewAgents;
+
+  for (const agent of currentReviewAgents) {
     if (agent.status === 'stopped' || agent.status === 'error') continue;
-    const lastActivity = reviewTimestampMs(agent.lastActivity ?? undefined);
-    if (!Number.isFinite(lastActivity) || now - lastActivity < REVIEW_AGENT_IDLE_THRESHOLD_MS) {
+    const persistedLastActivity = reviewTimestampMs(agent.lastActivity ?? undefined);
+    if (!Number.isFinite(persistedLastActivity) || now - persistedLastActivity < REVIEW_AGENT_IDLE_THRESHOLD_MS) {
+      return { active: true, reason: `active review agent ${agent.id}` };
+    }
+    const effectiveLastActivity = getAgentEffectiveLastActivityMs(agent.id);
+    if (effectiveLastActivity !== null && now - effectiveLastActivity < REVIEW_AGENT_IDLE_THRESHOLD_MS) {
       return { active: true, reason: `active review agent ${agent.id}` };
     }
   }
