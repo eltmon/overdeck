@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   resolveHarness: vi.fn(async () => 'kimi-code'),
   deliverInitialPromptWithRetry: vi.fn(async () => ({ ok: true, path: 'supervisor' })),
   deliverResumeMessageWithTranscriptConfirmation: vi.fn(async () => ({ delivered: true, attempts: 1 })),
+  prepareAutonomousAgentResumePane: vi.fn(async () => ({ ready: true, action: 'clear' })),
+  waitForReadySignal: vi.fn(async () => true),
   killSession: vi.fn(() => Effect.succeed(undefined)),
 }));
 
@@ -58,6 +60,18 @@ vi.mock('../delivery.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../resume-pane-choice.js', () => ({
+  prepareAutonomousAgentResumePane: mocks.prepareAutonomousAgentResumePane,
+}));
+
+vi.mock('../identity.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../identity.js')>();
+  return {
+    ...actual,
+    waitForReadySignal: mocks.waitForReadySignal,
+  };
+});
+
 vi.mock('../../tmux.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../tmux.js')>();
   return {
@@ -72,6 +86,7 @@ vi.mock('../../tmux.js', async (importOriginal) => {
 
 import { resumeAgent } from '../resume.js';
 import { saveAgentStateSync, getAgentDir } from '../agent-state.js';
+import { sessionFilePath } from '../../paths.js';
 
 let tempHome: string;
 let prevOverdeckHome: string | undefined;
@@ -85,6 +100,8 @@ beforeEach(() => {
   mocks.resolveHarness.mockResolvedValue('kimi-code');
   mocks.deliverInitialPromptWithRetry.mockResolvedValue({ ok: true, path: 'supervisor' });
   mocks.deliverResumeMessageWithTranscriptConfirmation.mockResolvedValue({ delivered: true, attempts: 1 });
+  mocks.prepareAutonomousAgentResumePane.mockResolvedValue({ ready: true, action: 'clear' });
+  mocks.waitForReadySignal.mockResolvedValue(true);
   mocks.killSession.mockReturnValue(Effect.succeed(undefined));
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-test-'));
@@ -97,7 +114,80 @@ afterEach(() => {
   if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = prevOverdeckHome;
   rmSync(tempHome, { recursive: true, force: true });
+  rmSync(dirname(sessionFilePath(workspace, 'cleanup')), { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
+});
+
+describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
+  function writeClaudeResumeState(agentId: string, sessionId: string): void {
+    const transcriptPath = sessionFilePath(workspace, sessionId);
+    mkdirSync(dirname(transcriptPath), { recursive: true });
+    writeFileSync(transcriptPath, '{"type":"summary","summary":"prior work"}\n');
+    mkdirSync(getAgentDir(agentId), { recursive: true });
+    writeFileSync(join(getAgentDir(agentId), 'session.id'), `${sessionId}\n`);
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-3411',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      kickoffDelivered: true,
+      sessionId,
+    });
+  }
+
+  beforeEach(() => {
+    mocks.resolveHarness.mockResolvedValue('claude-code');
+    mocks.prepareHarnessLaunch.mockResolvedValue({
+      binaryPath: '/opt/claude/bin/claude',
+      pathExport: "export PATH='/opt/claude/bin':\"$PATH\"",
+    });
+    mocks.prepareSupervisorForRelaunch.mockResolvedValue({
+      useSupervisor: true,
+      supervisorScriptPath: '/repo/dist/pty-supervisor.js',
+    });
+  });
+
+  it('clears the PAN-3411 modal before delivering and confirming the continuation', async () => {
+    const agentId = 'agent-pan-3411';
+    writeClaudeResumeState(agentId, 'pan-3411-session');
+    mocks.prepareAutonomousAgentResumePane.mockResolvedValue({
+      ready: true,
+      action: 'resumed-from-summary',
+    });
+
+    const result = await resumeAgent(agentId);
+
+    expect(result).toEqual({ success: true, messageDelivered: true });
+    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work');
+    expect(mocks.deliverResumeMessageWithTranscriptConfirmation).toHaveBeenCalledWith(expect.objectContaining({
+      agentId,
+      sessionId: 'pan-3411-session',
+      deliveryMethod: 'supervisor',
+    }));
+    expect(mocks.prepareAutonomousAgentResumePane.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.deliverResumeMessageWithTranscriptConfirmation.mock.invocationCallOrder[0]!);
+    expect(mocks.killSession).not.toHaveBeenCalled();
+  });
+
+  it('tears down without injecting when a non-resume choice still owns the pane', async () => {
+    const agentId = 'agent-pan-3411';
+    writeClaudeResumeState(agentId, 'pan-3411-blocked-session');
+    mocks.prepareAutonomousAgentResumePane.mockResolvedValue({
+      ready: false,
+      reason: 'pane is blocked on a choice menu other than the Claude resume-summary gate',
+    });
+
+    const result = await resumeAgent(agentId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Resume continue prompt did not become a confirmed turn');
+    expect(mocks.deliverResumeMessageWithTranscriptConfirmation).not.toHaveBeenCalled();
+    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
+  });
 });
 
 describe('resumeAgent — native Kimi Code session resume (PAN-1837 review fix)', () => {
