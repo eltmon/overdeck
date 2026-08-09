@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:28:46.595Z",
+  "updated": "2026-08-09T20:28:49.998Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -25,7 +25,28 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T19:54:46.001Z"
+    "updatedAt": "2026-08-09T20:28:49.994Z",
+    "reviewRequestedAt": "2026-08-09T20:28:49.994Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "configuration/harnesses.mdx",
+        "src/lib/cliproxy.ts",
+        "tests/lib/cliproxy-platform-asset.test.ts",
+        "tests/lib/cliproxy-version-probe.test.ts",
+        "tests/lib/cliproxy-windows-paths.test.ts"
+      ],
+      "actualChangedFiles": [
+        "configuration/harnesses.mdx",
+        "src/lib/cliproxy.ts",
+        "tests/lib/cliproxy-platform-asset.test.ts",
+        "tests/lib/cliproxy-version-probe.test.ts",
+        "tests/lib/cliproxy-windows-paths.test.ts"
+      ],
+      "recordedAt": "2026-08-09T20:28:46.594Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3635"
   },
   "closeOut": {
     "usage": {
