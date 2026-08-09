@@ -13,7 +13,8 @@ import {
   INITIAL_READ_MODEL_STATE,
   ReadModelState,
 } from '../../packages/contracts/src/event-reducers.js'
-import type { AgentSnapshot, DashboardSnapshot } from '../../packages/contracts/src/index.js'
+import { deriveProjectCi } from '../../packages/contracts/src/project-ci.js'
+import type { AgentSnapshot, DashboardSnapshot, ProjectCiSnapshot } from '../../packages/contracts/src/index.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ describe('INITIAL_READ_MODEL_STATE', () => {
     expect(INITIAL_READ_MODEL_STATE.rollupsByIssueId).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.resetMarkersByScopeId).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.healthByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.ciByProjectKey).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.resources).toBeNull()
   })
 })
@@ -164,6 +166,215 @@ describe('syncSnapshot', () => {
 
     expect(state.observationsByIssueId['PAN-1']).toEqual([])
     expect(state.healthByIssueId['PAN-1']?.status).toBe('healthy')
+  })
+
+  it('hydrates project CI state from the snapshot', () => {
+    const record: ProjectCiSnapshot = {
+      projectKey: 'overdeck',
+      repo: 'eltmon/overdeck',
+      branch: 'main',
+      headSha: 'sha-a',
+      suites: { '1': { status: 'completed', conclusion: 'success' } },
+      updatedAt: '2026-08-04T08:00:00.000Z',
+    }
+    const state = syncSnapshot(makeState(), {
+      ...snapshot,
+      ciByProjectKey: { overdeck: record },
+    })
+
+    expect(state.ciByProjectKey).toEqual({ overdeck: record })
+  })
+
+  it('preserves project CI state when the snapshot omits it', () => {
+    const record: ProjectCiSnapshot = {
+      projectKey: 'overdeck',
+      repo: 'eltmon/overdeck',
+      branch: 'main',
+      headSha: 'sha-a',
+      suites: {},
+      updatedAt: '2026-08-04T08:00:00.000Z',
+    }
+    const state = syncSnapshot(makeState({ ciByProjectKey: { overdeck: record } }), snapshot)
+
+    expect(state.ciByProjectKey).toEqual({ overdeck: record })
+  })
+})
+
+// ─── applyEvent — project CI events ──────────────────────────────────────────
+
+describe('applyEvent — project CI events', () => {
+  const existing: ProjectCiSnapshot = {
+    projectKey: 'overdeck',
+    repo: 'eltmon/overdeck',
+    branch: 'main',
+    headSha: 'sha-a',
+    suites: {
+      '1': {
+        status: 'completed',
+        conclusion: 'success',
+        observedAt: '2026-08-04T08:00:00.000Z',
+      },
+    },
+    updatedAt: '2026-08-04T08:00:00.000Z',
+  }
+
+  it('ignores a first suite observation that is not verified against the branch head', () => {
+    const next = applyEvent(makeState(), {
+      type: 'project.ci_suite_observed',
+      sequence: 1,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+        suiteId: '1', status: 'queued', conclusion: null, observedAt: '2026-08-04T08:00:00.000Z',
+      },
+    })
+
+    expect(next.ciByProjectKey).toEqual({})
+  })
+
+  it('creates a project record from an authoritative first observation', () => {
+    const next = applyEvent(makeState(), {
+      type: 'project.ci_suite_observed',
+      sequence: 1,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+        suiteId: '1', status: 'queued', conclusion: null, observedAt: '2026-08-04T08:00:00.000Z',
+        authoritativeHead: true,
+      },
+    })
+
+    expect(next.ciByProjectKey.overdeck).toEqual({
+      projectKey: 'overdeck',
+      repo: 'eltmon/overdeck',
+      branch: 'main',
+      headSha: 'sha-a',
+      suites: {
+        '1': {
+          status: 'queued', conclusion: null, htmlUrl: undefined,
+          observedAt: '2026-08-04T08:00:00.000Z',
+        },
+      },
+      updatedAt: '2026-08-04T08:00:00.000Z',
+    })
+  })
+
+  it('merges suites observed for the same head SHA', () => {
+    const next = applyEvent(makeState({ ciByProjectKey: { overdeck: existing } }), {
+      type: 'project.ci_suite_observed',
+      sequence: 2,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+        suiteId: '2', status: 'in_progress', conclusion: null, observedAt: '2026-08-04T08:05:00.000Z',
+      },
+    })
+
+    expect(next.ciByProjectKey.overdeck?.suites['2']).toEqual({
+      status: 'in_progress', conclusion: null, htmlUrl: undefined,
+      observedAt: '2026-08-04T08:05:00.000Z',
+    })
+    expect(next.ciByProjectKey.overdeck?.updatedAt).toBe('2026-08-04T08:05:00.000Z')
+  })
+
+  it('does not regress a suite from a delayed same-SHA observation', () => {
+    const state = makeState({ ciByProjectKey: { overdeck: existing } })
+    const next = applyEvent(state, {
+      type: 'project.ci_suite_observed',
+      sequence: 2,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+        suiteId: '1', status: 'queued', conclusion: null, observedAt: '2026-08-04T07:59:00.000Z',
+      },
+    })
+
+    expect(next.ciByProjectKey).toBe(state.ciByProjectKey)
+  })
+
+  it('allows cross-SHA replacement only for an authoritative observation', () => {
+    const state = makeState({ ciByProjectKey: { overdeck: existing } })
+    const unverified = applyEvent(state, {
+      type: 'project.ci_suite_observed',
+      sequence: 2,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-b',
+        suiteId: '3', status: 'queued', conclusion: null, observedAt: '2026-08-04T08:10:00.000Z',
+      },
+    })
+    const verified = applyEvent(state, {
+      type: 'project.ci_suite_observed',
+      sequence: 3,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-b',
+        suiteId: '3', status: 'queued', conclusion: null, observedAt: '2026-08-04T08:10:00.000Z',
+        authoritativeHead: true,
+      },
+    })
+
+    expect(unverified.ciByProjectKey).toBe(state.ciByProjectKey)
+    expect(verified.ciByProjectKey.overdeck?.headSha).toBe('sha-b')
+  })
+
+  it('replaces the projection with the complete authoritative head, including no-suite heads', () => {
+    const next = applyEvent(makeState({ ciByProjectKey: { overdeck: existing } }), {
+      type: 'project.ci_head_observed',
+      sequence: 2,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-b',
+        suites: {}, observedAt: '2026-08-04T08:10:00.000Z',
+      },
+    })
+
+    expect(next.ciByProjectKey.overdeck).toMatchObject({ headSha: 'sha-b', suites: {} })
+  })
+
+  it('drops an older authoritative projection', () => {
+    const state = makeState({ ciByProjectKey: { overdeck: existing } })
+    const next = applyEvent(state, {
+      type: 'project.ci_head_observed',
+      sequence: 2,
+      timestamp: ts(),
+      payload: {
+        projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-old',
+        suites: {}, observedAt: '2026-08-04T07:00:00.000Z',
+      },
+    })
+
+    expect(next.ciByProjectKey).toBe(state.ciByProjectKey)
+    expect(next.sequence).toBe(2)
+  })
+})
+
+describe('deriveProjectCi', () => {
+  it('reports failure before in-progress when any suite has failed', () => {
+    const result = deriveProjectCi({
+      projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+      suites: {
+        failed: { status: 'completed', conclusion: 'failure' },
+        running: { status: 'in_progress', conclusion: null },
+      },
+      updatedAt: '2026-08-04T08:00:00.000Z',
+    })
+
+    expect(result).toMatchObject({ state: 'failure', completed: 1, total: 2 })
+  })
+
+  it('uses a single suite htmlUrl and a commit checks URL for multiple suites', () => {
+    const base: ProjectCiSnapshot = {
+      projectKey: 'overdeck', repo: 'eltmon/overdeck', branch: 'main', headSha: 'sha-a',
+      suites: { '1': { status: 'completed', conclusion: 'success', htmlUrl: 'https://github.com/run/1' } },
+      updatedAt: '2026-08-04T08:00:00.000Z',
+    }
+
+    expect(deriveProjectCi(base).href).toBe('https://github.com/run/1')
+    expect(deriveProjectCi({
+      ...base,
+      suites: { ...base.suites, '2': { status: 'completed', conclusion: 'success' } },
+    }).href).toBe('https://github.com/eltmon/overdeck/commit/sha-a/checks')
   })
 })
 
