@@ -183,10 +183,10 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T20:02:54.520Z",
+  "updated": "2026-08-09T20:02:56.629Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -194,13 +194,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T14:08:24.272Z",
-    "updatedAt": "2026-08-09T20:02:52.579Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-09T20:02:53.543Z",
+    "reviewNotes": "newly created projects disappear from the selectable chip row",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "ed530b4752cab236c4a9bdb145f5992d4fc88db0",
-    "reviewRequestedAt": "2026-08-09T14:08:24.272Z",
     "reviewSpawnedAt": "2026-08-09T19:46:11.349Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -350,7 +349,7 @@
       },
       "costAtCloseOut": {
         "usd": 118.0087,
-        "pricingAsOf": "2026-08-09T20:02:52.598Z"
+        "pricingAsOf": "2026-08-09T20:02:56.612Z"
       }
     },
     "merges": [
