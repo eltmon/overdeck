@@ -59,15 +59,7 @@
       "timestamp": "2026-08-09T14:04:35.775Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-09T14:04:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3411\n\n# Review Synthesis — PAN-3411 — 2026-08-09T14:03:00Z\n\n## Verdict: CHANGES REQUESTED — resolved status strip omits the inferred parent branch\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/context.json`\n- Branch: `feature/pan-3411`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411`\n- HEAD reviewed: `ed530b4752cab236c4a9bdb145f5992d4fc88db0`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR diff: `395349da39d942f285257ff92e4abff8f441ef4a..ed530b4752cab236c4a9bdb145f5992d4fc88db0` (16 commits)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] The status strip hides the resolver-inferred parent branch — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:396`\n\nThe normal blank-parent input case does not render the resolved `intent.intent?.parentBranch` or indicate when `parentBranchGuessed` is true; it renders a parent only when the operator explicitly supplied one. The requirements reviewer classified this as `Scope: in_pr_scope`, and the cited page is wholly introduced by this PR (`459` added lines), so it survives the mandatory PR-scope gate. This leaves the resolved-intent preview and the modal-parity parent metadata incomplete: an operator cannot verify the inferred parent before creating an isolated workspace. Render the resolved parent whenever present, label guessed values as inferred, and add coverage for the blank-input/inferred-parent state.\n\n## Non-blocking Findings\n\n### [performance]\n\n- `~` **Reuse the workspace-registry query instead of issuing a second full-list request** — `src/dashboard/frontend/src/pages/NewWorkspacePage.tsx:56`. The page independently fetches the unpaged registry only to calculate project recency while the mounted sidebar already polls the same endpoint. Reusing the sidebar query cache would avoid an additional O(W) status-read fanout per page visit.\n\n## Clean Sub-roles\n\n- **security:** No blockers or advisories; authenticated mutation-token handling and rendering boundaries were reviewed.\n- **correctness:** No blockers or advisories; route cutover, intent lifecycle, activation/navigation, and focused test coverage were reviewed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3411/.pan/review/agent-pan-3411-review-ed530b47/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3411 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -148,10 +140,10 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T19:43:05.035Z",
+  "updated": "2026-08-09T19:46:11.397Z",
   "pipeline": {
     "issueId": "PAN-3411",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -159,14 +151,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T14:08:24.272Z",
-    "updatedAt": "2026-08-09T19:43:04.956Z",
+    "updatedAt": "2026-08-09T19:46:11.350Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "ed530b4752cab236c4a9bdb145f5992d4fc88db0",
     "reviewRequestedAt": "2026-08-09T14:08:24.272Z",
-    "reviewSpawnedAt": "2026-08-09T13:58:27.211Z",
+    "reviewSpawnedAt": "2026-08-09T19:46:11.349Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/TELEMETRY.md",
@@ -315,7 +307,7 @@
       },
       "costAtCloseOut": {
         "usd": 107.181922,
-        "pricingAsOf": "2026-08-09T19:43:05.001Z"
+        "pricingAsOf": "2026-08-09T19:46:11.366Z"
       }
     },
     "merges": [
