@@ -54,7 +54,7 @@
     }
   ],
   "created": "2026-08-02T19:48:15.485Z",
-  "updated": "2026-08-06T00:10:26.127Z",
+  "updated": "2026-08-09T11:43:18.194Z",
   "pipeline": {
     "issueId": "PAN-3497",
     "reviewStatus": "pending",
@@ -92,5 +92,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-terra"
 }
