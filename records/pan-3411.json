@@ -299,19 +299,21 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T23:10:52.601Z",
+  "updated": "2026-08-09T23:16:06.015Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "passed",
     "testStatus": "passed",
+    "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-09T22:48:29.007Z",
-    "updatedAt": "2026-08-09T23:10:50.041Z",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "updatedAt": "2026-08-09T23:16:04.673Z",
+    "testNotes": "typecheck/lint/build/server-bundle: pass. Full npm test: 2 runs each had a small non-overlapping set of setupOverdeckTestDb() beforeEach timeouts under heavy box load (unrelated modules); all 9 flaky files pass 100% in isolation across both batches. Frontend test portion (issueActions*, fr7-conversation) and PAN-3411's own suite (NewWorkspacePage*, useWorkspaceCreateIntent) pass clean. All 56 xBRIEF items completed.",
+    "uatNotes": "Browser UAT via Playwright MCP against the workspace-built dashboard (pan workspace rebuild + seed-uat-fixtures, feature-pan-3411.overdeck.localhost — not main, not the live orchestrator). Verified: 7 D-2 regions render in order; ?project= preselect survives refresh; hero autofocus; invalid/empty-name finding rendering + disabled submit; clean resolve clears finding + enables submit; idea-card hero-prefill+focus (verbatim per idea-cards.ac2); target row folder chip/shared-isolated toggle/advanced disclosure; bootstrap-main-affordance actually registers+navigates; keyboard tab order confirmed; two-width screenshots clean. See .pan/test/result.json for full detail incl. a documented pre-existing (non-PAN-3411) workspace-container session-cookie-origin quirk and its one-time workaround.",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
@@ -414,9 +416,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 2878889,
-            "output": 38211,
-            "cacheRead": 17908224,
+            "input": 2879583,
+            "output": 38304,
+            "cacheRead": 18200064,
             "cacheWrite": 0
           }
         },
@@ -478,10 +480,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 326,
-            "output": 53464,
-            "cacheRead": 28255311,
-            "cacheWrite": 254980
+            "input": 358,
+            "output": 59961,
+            "cacheRead": 32405288,
+            "cacheWrite": 269341
           }
         },
         "work": {
@@ -501,21 +503,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 5835785,
-          "output": 179801,
-          "cacheRead": 42066432,
+          "input": 5836479,
+          "output": 179894,
+          "cacheRead": 42358272,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 326,
-          "output": 53464,
-          "cacheRead": 28255311,
-          "cacheWrite": 254980
+          "input": 358,
+          "output": 59961,
+          "cacheRead": 32405288,
+          "cacheWrite": 269341
         }
       },
       "costAtCloseOut": {
-        "usd": 206.962344,
-        "pricingAsOf": "2026-08-09T23:10:52.590Z"
+        "usd": 207.969366,
+        "pricingAsOf": "2026-08-09T23:16:04.703Z"
       }
     },
     "merges": [
