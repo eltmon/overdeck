@@ -2093,3 +2093,11 @@ Only `tsconfig.evals.json` pins `"types": ["node"]`, so plain `tsc --noEmit` pas
 **PAN-3537 unchanged** — rows 1–5 and 8 pass, row 6 still blocked by the PAN-3628 defect. Close-out is chained behind that strike landing and a `pan reload`, not behind an override.
 
 **Fleet:** `strike-pan-3620` (fresh, gpt-5.6-sol), `strike-pan-3628` (fresh, gpt-5.6-terra), `agent-pan-3626` (running final gates), `planning-min-953` (Fable, operator-side), plus the PAN-3411 review convoy winding down. Four typed blind spots unchanged. Filed this tick: PAN-3633.
+
+**Tick 2 post-checks — both cleared, one anomaly filed.**
+
+Verified that closing PR #3632 could not be undone by a stale readiness record: `~/.overdeck/state/panopticon-cli/records/pan-3620.json` carries no `strikeLandingState`, `strikeReadyHead` or `strikeReadyAt`, so the landing ladder has nothing armed to retry from. `deacon-strike-landing.ts:383-396` clears those fields at the end of an attempt, which is why the hold is durable rather than a race I won.
+
+Verified that `agent-pan-3626` was not a pickup-gate bypass. Its planning parent records `startedBy: operator:cli:pan-start` at 19:43:59Z — the operator ran `pan start PAN-3626`, which is the paved road, and operator-started agents are exempt from the gate. I had folded it into my fleet count without checking who spawned it, which is the tick-45 trap again; the check took one command and the answer was benign.
+
+It did surface a real inconsistency, filed as **PAN-3634**: the auto-handoff work agent is stamped `flywheelRunId: RUN-84` while its operator-started planning parent has none. Provenance is being taken from ambient run state rather than from the chain's originator, which strips the reaping exemption from exactly the half of an operator-initiated chain that does the work, and inflates the run's own fleet count with an agent it never dispatched.
