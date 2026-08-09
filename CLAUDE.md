@@ -20,6 +20,7 @@
 - **Deep-wipe** (`POST /api/issues/:id/deep-wipe`) destroys workspace, branches, and tracker state irreversibly. Never call it — or any destructive HTTP request — speculatively.
 - **Issue tracker:** GitHub Issues (`PAN-<n>` = `eltmon/overdeck#<n>`), not Linear. Issue→project resolution reads `issue_prefix` in `projects.yaml`.
 - **`pan start <id>`** is the paved road: plans if unplanned (`--plan interactive|auto|skip`), then starts work. `pan plan` is plan-only. Verify flags with `pan <verb> --help`.
+- **Workspace creation UI:** the sidebar `+`, command-palette action, and per-project button navigate to `/workspaces/new`; project-scoped entry points preselect with `?project=<key>`.
 
 ## Project Structure
 

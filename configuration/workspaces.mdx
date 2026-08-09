@@ -3,6 +3,8 @@ title: Workspaces
 description: Managing per-project git worktrees and their memory
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Workspaces
 
 A workspace is one git worktree Overdeck knows about for a registered
@@ -32,39 +34,46 @@ Workspaces are reachable from three places in the dashboard:
 ## Creating a workspace from the dashboard
 
 Click the **+** in the sidebar's **Workspaces** header, run **New workspace…**
-from Cmd-K / Ctrl-K, or use **New workspace** on a project's overview (which
-preselects that project). All three open the same dialog.
+from Cmd-K / Ctrl-K, or use **New workspace** on a project's overview. Every
+entry point navigates to `/workspaces/new`; a project overview adds
+`?project=<key>` so that project's chip starts selected.
 
-The dialog asks for a name, a project, a mode, and a target directory:
+<ThemedImage
+  light="/images/dashboard/new-workspace-page-light.png"
+  dark="/images/dashboard/new-workspace-page-dark.png"
+  alt="New Workspace page with project chips, hero title, target controls, resolved status, and workspace ideas"
+/>
 
-- **Shared directory** (the default) points the workspace at a directory it
-  does not own — the project's primary path, another registered target from the
-  dropdown, or anything you pick with **Browse…**.
-- **Isolated worktree** creates a dedicated git worktree at
-  `workspaces/scratch-<name>` on a `scratch/<name>` branch. It derives its own
-  path, so the target-directory field is disabled in this mode.
-- **Advanced** reveals a parent-branch override; leave it alone and Overdeck
-  infers the project's current branch, shown in the field's placeholder.
+The page keeps the complete creation intent in one view:
+
+- The **project chip row** selects a registered project or opens the existing
+  project-registration flow. Recently used projects appear first.
+- The large **workspace title** is the name that will be created.
+- **Shared directory** (the default) targets the project's primary path,
+  another registered target, or a directory chosen with **Browse…**.
+- **Isolated worktree** creates `workspaces/scratch-<name>` on a
+  `scratch/<name>` branch. It derives its own path, so target selection is
+  disabled in this mode.
+- **Advanced** reveals a parent-branch override; otherwise Overdeck infers the
+  project's current branch.
 
 <Note>
-  **The preview is the point.** As you type, the panel below the fields shows
-  the resolved outcome — the final path, the branch that will be created or the
-  one already there, the parent branch (marked `inferred` when Overdeck guessed
-  it), whether the target is a git repository, and whether a worktree gets
-  made. That preview comes from the server running the *same* resolution the
-  real create runs, so confirming never produces a surprise.
+  **The resolved status is the point.** As you type, the strip above the action
+  buttons shows the final path, branch, parent branch, git posture, and whether
+  a worktree gets made. The server runs the *same* resolution for this preview
+  and the real create, so starting the workspace does not change the outcome.
 </Note>
 
-Names are validated by that same resolution, not by a separate rule in the
-browser: an invalid name, a missing directory, or an ambiguous project appears
-as a message beside the offending field, and **Create** stays disabled until
-the preview is clean. On success the new workspace appears in the rail
-immediately and opens.
+Names are validated by that same resolution, not by a separate browser rule.
+An invalid name, missing directory, or ambiguous project appears inline, and
+**Start workspace** stays disabled until the findings are clear and the status
+is current. On success the registry is invalidated immediately, the new row is
+activated, and its workspace view opens.
 
 This is the dashboard equivalent of `pan workspace new` below — both call the
 same code, so a workspace created either way is identical.
 
-### The routes behind the dialog
+### The routes behind the page
 
 The dashboard drives these; they are listed so you can reach them directly or
 recognize them in logs.
