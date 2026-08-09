@@ -2187,3 +2187,13 @@ PAN-3620's eventual landing used the previously closed PR #3632 after that PR wa
 **PAN-3411 and MIN-953 are both back in specialist flow.** PAN-3411 passed review, fixed a real test-agent failure, pushed clean head `4cbceccd96`, and re-entered review/test. MIN-953's Kimi agent completed all eleven xBRIEF items, fixed both first-cycle blockers and the advisories, passed 2,550 unit tests plus typecheck, and requested re-review. Their work agents are idle by design while specialists evaluate the new heads; productive concurrency remains exactly two through the PAN-3639 and PAN-3642 recovery gates.
 
 **Carry this: stale readiness is a successful safety check, not failed delivery.** A strike branch can move legitimately while queued because it resyncs after another merge. Rejecting the old marker forces the agent to prove the new tree, preventing verification of one commit from authorizing a different one.
+
+### RUN-85 tick 9 — 2026-08-09T23:06Z — both landed fixes closed; the state push race reproduced without blocking delivery
+
+**PAN-3620 and PAN-3641 passed every Definition-of-Done row and closed.** Main CI was fully green at `c75c24b39a`, the live dashboard ran that exact clean build, and both tracker transitions succeeded. PAN-3620 close-out again hit the PAN-3640 `overdeck-state` ref-lock race after its successful gate; the next domain writer advanced the state branch, so the race left cleanup residue without invalidating either close-out.
+
+### RUN-85 tick 10 — 2026-08-09T23:21Z — PAN-3411 cleared every gate and entered unattended merge cooldown
+
+**PAN-3411 is ready to merge.** Review, test, verification, browser UAT, and every GitHub check passed at `795eeb3347`; auto-merge id 51 is scheduled for 23:25:34Z with terminal-state coverage. Its work agent's low-activity health label is expected standby after handoff, not evidence the ready merge is stalled.
+
+**PAN-3639 has fresh readiness at `1d871df3fb` after 13,565 backend tests and 63 frontend tests.** PAN-3642 is still completing the full test gate after its final main sync before replacing its stale marker. MIN-953 fixed a second-cycle live-markdown performance blocker and its advisories, passed 2,551 tests plus typecheck, and entered review cycle three.
