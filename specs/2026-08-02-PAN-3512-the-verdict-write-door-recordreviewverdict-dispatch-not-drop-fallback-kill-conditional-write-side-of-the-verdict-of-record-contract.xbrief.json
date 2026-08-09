@@ -4,17 +4,17 @@
     "created": "2026-08-02T22:52:40.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3512: The verdict write door — recordReviewVerdict + dispatch-not-drop + fallback kill-conditional (write-side of the verdict-of-record contract)",
-    "updated": "2026-08-02T23:03:28.651Z"
+    "updated": "2026-08-09T11:31:00.670Z"
   },
   "plan": {
     "id": "pan-3512",
     "title": "The verdict write door — recordReviewVerdict + dispatch-not-drop + fallback kill-conditional (write-side of the verdict-of-record contract)",
-    "status": "running",
+    "status": "completed",
     "uid": "98ecbdb8-f79e-4a9d-afd5-1f98cef05e27",
     "author": "agent:claude-opus-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-02T22:52:40.000Z",
-    "updated": "2026-08-02T23:03:28.651Z",
+    "updated": "2026-08-09T11:31:00.670Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3512",
@@ -913,5 +913,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
