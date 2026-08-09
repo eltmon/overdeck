@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:12:01.816Z",
+  "updated": "2026-08-09T12:15:20.492Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "project-chip-row": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 689421,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:12:01.816Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -206,6 +198,17 @@
         "outcome": "completed",
         "reason": "Added Cancel and Start workspace actions, stale/invalid disabling, Enter form submission, and threaded the existing invalidate-activate-navigate creation callback through AppRoutes into the page; page and controller tests plus full typecheck pass.",
         "releasedAt": "2026-08-09T12:11:44.279Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 689421,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:12:01.816Z",
+        "itemId": "project-chip-row",
+        "outcome": "completed",
+        "reason": "Added recency-ordered project chips, sole-project and key/name preset selection, five-chip overflow, add/new project modal launch, and onCreated insertion/selection with focused coverage.",
+        "releasedAt": "2026-08-09T12:15:20.492Z"
       }
     ],
     "statusReasons": {
@@ -232,6 +235,10 @@
       "cta-and-submit": {
         "reason": "Added Cancel and Start workspace actions, stale/invalid disabling, Enter form submission, and threaded the existing invalidate-activate-navigate creation callback through AppRoutes into the page; page and controller tests plus full typecheck pass.",
         "updatedAt": "2026-08-09T12:11:44.279Z"
+      },
+      "project-chip-row": {
+        "reason": "Added recency-ordered project chips, sole-project and key/name preset selection, five-chip overflow, add/new project modal launch, and onCreated insertion/selection with focused coverage.",
+        "updatedAt": "2026-08-09T12:15:20.492Z"
       }
     }
   },
@@ -264,6 +271,10 @@
     "cta-and-submit.ac2": "completed",
     "cta-and-submit.ac3": "completed",
     "cta-and-submit.ac4": "completed",
-    "project-chip-row": "running"
+    "project-chip-row": "completed",
+    "project-chip-row.ac1": "completed",
+    "project-chip-row.ac2": "completed",
+    "project-chip-row.ac3": "completed",
+    "project-chip-row.ac4": "completed"
   }
 }
