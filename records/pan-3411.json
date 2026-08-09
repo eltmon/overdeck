@@ -299,7 +299,7 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T23:26:37.338Z",
+  "updated": "2026-08-09T23:26:39.781Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "passed",
@@ -308,11 +308,11 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "verifying",
-    "mergeStep": "reporting-statuses",
+    "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T22:48:29.007Z",
-    "updatedAt": "2026-08-09T23:26:05.861Z",
+    "updatedAt": "2026-08-09T23:26:07.604Z",
     "testNotes": "typecheck/lint/build/server-bundle: pass. Full npm test: 2 runs each had a small non-overlapping set of setupOverdeckTestDb() beforeEach timeouts under heavy box load (unrelated modules); all 9 flaky files pass 100% in isolation across both batches. Frontend test portion (issueActions*, fr7-conversation) and PAN-3411's own suite (NewWorkspacePage*, useWorkspaceCreateIntent) pass clean. All 56 xBRIEF items completed.",
     "uatNotes": "Browser UAT via Playwright MCP against the workspace-built dashboard (pan workspace rebuild + seed-uat-fixtures, feature-pan-3411.overdeck.localhost — not main, not the live orchestrator). Verified: 7 D-2 regions render in order; ?project= preselect survives refresh; hero autofocus; invalid/empty-name finding rendering + disabled submit; clean resolve clears finding + enables submit; idea-card hero-prefill+focus (verbatim per idea-cards.ac2); target row folder chip/shared-isolated toggle/advanced disclosure; bootstrap-main-affordance actually registers+navigates; keyboard tab order confirmed; two-width screenshots clean. See .pan/test/result.json for full detail incl. a documented pre-existing (non-PAN-3411) workspace-container session-cookie-origin quirk and its one-time workaround.",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -518,7 +518,7 @@
       },
       "costAtCloseOut": {
         "usd": 208.155009,
-        "pricingAsOf": "2026-08-09T23:26:37.327Z"
+        "pricingAsOf": "2026-08-09T23:26:39.775Z"
       }
     },
     "merges": [
