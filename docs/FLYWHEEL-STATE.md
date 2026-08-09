@@ -2101,3 +2101,77 @@ Verified that closing PR #3632 could not be undone by a stale readiness record: 
 Verified that `agent-pan-3626` was not a pickup-gate bypass. Its planning parent records `startedBy: operator:cli:pan-start` at 19:43:59Z — the operator ran `pan start PAN-3626`, which is the paved road, and operator-started agents are exempt from the gate. I had folded it into my fleet count without checking who spawned it, which is the tick-45 trap again; the check took one command and the answer was benign.
 
 It did surface a real inconsistency, filed as **PAN-3634**: the auto-handoff work agent is stamped `flywheelRunId: RUN-84` while its operator-started planning parent has none. Provenance is being taken from ambient run state rather than from the chain's originator, which strips the reaping exemption from exactly the half of an operator-initiated chain that does the work, and inflates the run's own fleet count with an agent it never dispatched.
+
+### RUN-85 tick 1 — 2026-08-09T20:43Z — the PTY 502 was a blocking startup menu, not supervisor overload
+
+**Main is green at `53de20971b`**; all six CI jobs completed successfully. The active cohort is above the two-agent floor: PAN-3626 is in convoy review, PAN-3628 is running final strike verification, PAN-3620 is recovering from a stale readiness signal after the rejected PR was closed, and the newly-filed PAN-3636 strike is working.
+
+**PAN-3411's rework resurrection failed six times for one deterministic reason.** The lifecycle log only said `Resume continue prompt did not become a confirmed turn`, the same outer signature previously attributed to PTY-supervisor overload. The supervisor's own `echo_confirm_failed` artifact carried the missing evidence: its observed tail was Claude Code's `Resume from summary / Resume full session as-is / Don't ask me again` startup modal. The continuation was written while that menu owned the TUI, so no composer echo could exist; every retry purged, failed, and tore the session down.
+
+Root cause is in the work-agent resume ordering: `resume.ts` waits for SessionStart and immediately delivers the continuation, but never resolves the known resume-summary gate first. The codebase already parses the exact menu, while the conversation-only helper deliberately leaves it for an operator. Autonomous pipeline agents have no attached operator, so the recommended summary path must be selected before continuation delivery. Filed and struck **PAN-3636** with the exact captured modal, a narrow fix boundary, and a regression requirement. Added a correction to PAN-3560: `input echo confirmation failed` is a transport symptom, not sufficient evidence of overload.
+
+**Carry this: an opaque transport error can be downstream of a perfectly rendered UI state.** The 502 described the failed write, not why the write could not land. The artifact added for PAN-1769 — `observedTail` on echo failure — converted six identical retry failures into one exact diagnosis. When an error has a captured boundary artifact, read that artifact before classifying the subsystem that emitted the outer error.
+
+### RUN-85 tick 2 — 2026-08-09T21:06Z — three fixes reached their landing doors; PAN-3626 entered unattended merge cooldown
+
+**Main remains green at `53de20971b`.** Planning floor is empty (`ready=0`, `released=0`, `needsPlanning=0`) and auto-pickup remains off, so no routine backlog launch is permitted or needed.
+
+**PAN-3626 passed review, test and verification on PR #3635.** All required GitHub checks are green and the branch is mergeable. Because `require_uat_before_merge=false`, scheduled it through the canonical auto-merge door with the five-minute cooldown (`scheduledMergeAt=2026-08-09T21:10:02.400Z`) and started a terminal-state watcher covering merged, failed, blocked and cancelled outcomes.
+
+**Both prior strikes completed their agent contracts.** PAN-3628 pushed `aee56f018c` and recorded readiness; the Deacon opened PR #3637 and is landing it, with every check green except the still-running CI test job at observation time. PAN-3620 pushed the corrected full-stream fix at `a4f42f291d` and replaced the stale readiness marker; its landing state is now `landing`. PAN-3636 has committed its resume-menu fix and is running the sync/full-gate phase.
+
+**Carry this: a Flywheel merge action is the schedule plus terminal coverage, not the POST alone.** The canonical scheduler accepted PAN-3626, but acceptance only proves a cooldown row exists. The same tick installed a watcher that reports every terminal disposition, so silence cannot be mistaken for a merge.
+
+### RUN-85 tick 3 — 2026-08-09T21:22Z — two merges are live; a closed PR poisoned fresh strike landing
+
+**PAN-3626 and PAN-3628 are merged and deployed.** PR #3635 merged at `6879ca3f49`; strike PR #3637 merged at `c0bde8bd9e`, and the live Node 22 dashboard is clean at `6879ca3f49`, which contains both. Their complete main CI job sets are still running, so PAN-3626, PAN-3628, and the now-unblocked PAN-3537 remain open in `verifying-on-main`; installed a whole-run watcher rather than filtering for one desired job.
+
+**PAN-3620's fresh corrected strike exposed a deterministic merge-door defect.** Its new readiness marker is `a4f42f291d`, while the prior rejected PR #3632 is closed at old head `41941c6a50`. The canonical review-status and merge-set rows carry no `prUrl` or artifact URL, but `ensurePRExists()` runs branch-only `gh pr view strike/pan-3620` and accepts whatever URL comes back without checking state. GitHub returns the closed PR, so the function skips `gh pr create`; the next guard correctly rejects that same PR as CLOSED. Filed and struck PAN-3639. PAN-3620 is queued behind the current PAN-3636 landing and must recover through the fixed door rather than a manual state reset.
+
+**PAN-3636 reached PR #3638 and full verification.** The PR is mergeable, local gates and GitHub CI are running, and its deployment remains the prerequisite for testing whether PAN-3411's blocked rework agent can cross Claude Code's resume-summary modal without intervention.
+
+**Carry this: “stale PR state” does not imply the state store is stale.** Here both canonical artifact fields were null; the stale value was recreated on demand by a lookup that treated branch identity as proof of an open review artifact. Diagnose the value's read path before resetting persisted state — a reset would have changed nothing and the same closed PR would be selected again.
+
+### RUN-85 tick 4 — 2026-08-09T21:32Z — green main drained three close-outs; PAN-3411 resumed through committed rework
+
+**Both complete main CI job sets finished green.** PAN-3628 and PAN-3537 passed every Definition-of-Done row and closed out; PAN-3626 then passed the same gate against `6879ca3f49` and closed. The live dashboard remains clean at that commit. PAN-3537's row 6 now sees the later green `c0bde8bd9e` run containing its UAT-batch merge, which is the exact production proof PAN-3628 was written to restore.
+
+**PAN-3537 close-out exposed a separate state-writer race.** Several agent tombstone writes lost concurrent `overdeck-state` ref updates, and `flushAgentPlaneWrites()` returned immediately after the first failed push instead of reaching its own `reconcileStatePlaneDrift()` step. Later writers carried the commits to the remote, but agent GC had already preserved the terminal rows. Filed PAN-3640 for the domain-aware retry gap; it is residue, not a current pipeline blocker, so it stays in the normal backlog.
+
+**PAN-3411 is no longer waiting on the resume fix.** Its workspace contained committed rework at `d1d0f0df23` — including both previously blocking corrections — and automatic main synchronization produced review head `7b350539d1`. The review convoy is actively evaluating that head, with security and performance complete and correctness still running. This keeps the productive fleet above the two-agent floor alongside PAN-3639; no routine launch is allowed because tracker `ready=0`, `released=0`, and auto-pickup is off.
+
+**PAN-3636 passed local verification and reached the final squash-merge step on PR #3638.** All required GitHub checks except the still-running test job are green. PAN-3639 committed the closed-PR recovery fix at `f30c60c756` and is running full gates; PAN-3620 remains correctly queued behind that repair rather than being reset or forced.
+
+**Carry this: close-out success and cleanup completeness are different claims.** PAN-3537 genuinely met all shipping rows and the tracker transition succeeded, while its agent-row cleanup partially failed behind it. Treat the issue as shipped and the cleanup defect as its own substrate issue; conflating them would either reopen delivered work or hide durable residue.
+
+### RUN-85 tick 5 — 2026-08-09T21:36Z — PAN-3636 merged; recovery lanes remain productive
+
+**PAN-3636 merged through the Deacon-owned strike door.** PR #3638 completed every required check and squash-merged at `812dc53a0c`. Main CI and the post-merge dashboard deployment are now the only prerequisites to close-out. Whole-job and live-build monitors cover both rather than treating the green PR checks as completion.
+
+**PAN-3411's review convoy is making real progress on the rework head.** Security, performance, and requirements reports are ready; correctness is running diagnostics against `7b350539d1`. The original work-agent row remains stopped, but this is no longer a stalled resurrection — committed rework is already in the review pipeline.
+
+**PAN-3639 remains the second productive lane.** Its root fix is committed at `f30c60c756` and the full gates are running. PAN-3620 correctly remains failed at the old closed-PR validation step with its fresh readiness head preserved; no manual reset or state mutation is appropriate before the repaired selection code is live.
+
+**Planning floor remains empty.** Tracker `ready=0`, `released=0`, auto-pickup is off, and the active correctness reviewer plus PAN-3639 satisfy the two-agent target. Starting routine backlog work would violate the run configuration rather than improve throughput.
+
+### RUN-85 tick 6 — 2026-08-09T21:44Z — PAN-3411 was falsely orphaned while its reviewer was visibly working
+
+**The orphan-review safety net reset PAN-3411 from `reviewing` to `pending` at 21:40:32Z while its correctness reviewer and coordinator remained live.** Three current-run reports were already written, the correctness pane was still running diagnostics, and its runtime activity log continued advancing. The reset stamped `reviewRetryCount=1` and `recoveryStartedAt`, so this was the infrastructure recovery path, not a review verdict.
+
+Root cause is `evaluateReviewConvoyLiveness()` in `review-convoy-liveness.ts`: it consumes `listRunningAgents()` rows and declares every reviewer stale when `state.json.lastActivity` is older than 15 minutes. For the correctness reviewer that field remained its 21:24 startup transition even though current runtime and PTY activity continued through 21:40. The same subsystem already has `getAgentEffectiveLastActivityMs()` for real activity, but the orphan evaluator reads the launch-time mirror. Filed and struck PAN-3641; the live current-run reviewer is being left alone to finish.
+
+**PAN-3636 is deployed.** The clean live dashboard now runs `812dc53a0c`; only the complete main CI job set remains before close-out. PAN-3639 continues full gates, so productive concurrency is now three lanes: PAN-3411 correctness, PAN-3639, and PAN-3641.
+
+**Carry this: a timestamp called `lastActivity` can still be launch-time state.** The field name made the liveness check look semantically correct, but positive pane and runtime evidence disproved it. For agent health, verify which writer refreshes a timestamp before using its age to kill or reset work.
+
+### RUN-85 tick 7 — 2026-08-09T22:00Z — summary resume succeeded, but the owed feedback missed its immediate delivery window
+
+**PAN-3636 passed the full Definition-of-Done gate and closed.** The complete main workflow set is green at `812dc53a0c`, the live Node 22 dashboard runs that exact clean commit, and all shipping rows passed. The strike worktree and branch remain as the already-known squash-merge cleanup residue; close-out correctly treated delivery and residue as separate claims.
+
+**PAN-3411 proved the resume-menu fix and exposed the next delivery boundary.** `resumeAgent()` selected Claude's **Resume from summary** option and restored the work session, but the review agent's immediate keyed feedback operation timed out after 30 seconds while Claude compacted. The outer CLI timeout covers target resurrection plus up to four payload-aware supervisor attempts and their retry sleeps, even though that valid worst-case path exceeds 30 seconds. Keyed delivery deliberately skips the mail backup, so the first path left a live agent at the generic completed-handoff standby prompt with no specialist-feedback turn and no durable stuck mark. Filed and struck PAN-3642.
+
+The host feedback janitor recovered the issue at 21:58:48Z with a generic rework prompt. PAN-3411 found and opened `.overdeck/feedback/001-review-agent-changes-requested.md` at 21:59:12Z and is now fixing all three current-cycle blockers. Recovery therefore works eventually, but an eleven-minute idle orbit is still a substrate defect, not a successful immediate handoff.
+
+**MIN-953 did not need planning restarted.** Its canonical xBRIEF sequence 2 was already finalized at 20:11Z, and an operator-started Kimi `k3[1m]` work agent is productively implementing the `display-rows` foundation across the nested `feature/min-953` repositories. Restarting planning would duplicate completed work, so the live Kimi work lane was left intact.
+
+**Fleet is above floor with five productive lanes:** MIN-953 implementation, PAN-3411 rework, and PAN-3639/PAN-3641/PAN-3642 strikes. PAN-3620 has fresh readiness at `09d3574ce5` but correctly remains blocked on the still-live closed-PR bug until PAN-3639 deploys. Four typed membership blind spots and eight zombie PRs remain unchanged.
