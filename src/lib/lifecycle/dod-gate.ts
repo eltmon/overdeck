@@ -159,21 +159,19 @@ export async function readContainingDefaultBranchCommits(
   mergeCommit: string,
 ): Promise<string[]> {
   const options = { cwd: ctx.projectPath, encoding: 'utf-8' as const, timeout: 10000, maxBuffer: 8 * 1024 * 1024 };
-  const { stdout } = await execFileAsync('git', ['rev-list', '--first-parent', 'origin/main'], options);
-  const firstParentCommits = stdout.split('\n').map(line => line.trim()).filter(Boolean);
-  const candidates: string[] = [];
-
-  for (const commit of firstParentCommits) {
-    try {
-      await execFileAsync('git', ['merge-base', '--is-ancestor', mergeCommit, commit], options);
-      candidates.push(commit);
-    } catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 1) break;
-      throw error;
-    }
+  try {
+    await execFileAsync('git', ['merge-base', '--is-ancestor', mergeCommit, 'origin/main'], options);
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 1) return [];
+    throw error;
   }
 
-  return candidates;
+  const { stdout } = await execFileAsync(
+    'git',
+    ['rev-list', '--first-parent', `${mergeCommit}..origin/main`],
+    options,
+  );
+  return stdout.split('\n').map(line => line.trim()).filter(Boolean);
 }
 
 const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
