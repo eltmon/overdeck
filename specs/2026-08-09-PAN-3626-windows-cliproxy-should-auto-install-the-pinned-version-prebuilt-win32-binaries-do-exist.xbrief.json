@@ -1,0 +1,457 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-09T19:57:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3626: Windows: CLIProxy should auto-install the pinned version (prebuilt win32 binaries do exist)",
+    "updated": "2026-08-09T19:53:59.714Z"
+  },
+  "plan": {
+    "id": "pan-3626",
+    "title": "Windows: CLIProxy should auto-install the pinned version (prebuilt win32 binaries do exist)",
+    "status": "proposed",
+    "uid": "1ffb9370-32e4-4f53-a124-55316a5d8fec",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-08-09T19:57:00.000Z",
+    "updated": "2026-08-09T19:53:59.714Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3626",
+        "label": "PAN-3626",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cliproxy",
+      "windows",
+      "cross-platform",
+      "installer",
+      "watchdog"
+    ],
+    "narratives": {
+      "Problem": "On win32 the CLIProxy auto-installer refuses to install (detectPlatformAsset never learned win32) and the dashboard watchdog throws CliproxyError in a loop for the life of the process. The stated reason is false: CLIProxyAPI v7.2.113 (the pinned version) publishes windows_amd64/windows_aarch64 zip assets containing cli-proxy-api.exe, verified working on Windows 11. Additionally the version probe runs '<bin> --version', a flag v7.2.113 does not define — the binary prints the version banner but exits 2, so the up-to-date check always returns false and every cold start silently redownloads the ~65MB archive on ALL platforms (verified locally on linux).",
+      "Proposal": "Add win32 to the asset map (zip extension), make install portable (tar -xf works for both tar.gz via GNU tar and zip via Windows' bundled bsdtar; replace install/rm -rf shell-outs with fs rm->copyFile->chmod), append .exe to the binary path on win32, gate the Unix exec-bit installed-check to non-win32, parse the version banner from stdout even when the probe exits non-zero (all platforms), and replace the bash /dev/tcp sync port probe with netstat parsed in JS on win32. All platform-dependent logic is parameterized (platform = process.platform) for linux-CI unit tests. Full brief: .pan/drafts/PAN-3626.md.",
+      "NonGoals": "- Skipping or disabling the CLIProxy watchdog on Windows (explicitly rejected by the issue)\n- Changing the fuser port-kill fallback in stopCliproxySync/stopCliproxyTask (stays Unix-only behind its silent catch; pid-based kill covers Windows)\n- Adding any npm dependency for zip extraction (bsdtar ships with Windows 10 1803+/11)\n- Adding a Windows CI runner or CI-run end-to-end Windows install test\n- Any upstream CLIProxyAPI changes (e.g. defining a --version flag)\n- Changing the probe flag away from --version (undefined flag = banner + fast exit is deliberate)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extract both archive types with 'tar -xf' instead of Expand-Archive or a Node unzip library",
+        "rationale": "Windows 10 1803+/11 ships bsdtar at System32\\tar.exe which extracts zip; GNU tar auto-detects gzip on linux/darwin. One command, zero new dependencies — the issue asked for the simplest portable route."
+      },
+      {
+        "summary": "Fix the --version probe for all platforms, not just win32",
+        "rationale": "Empirically verified during planning: the local linux v7.2.113 binary also prints the banner and exits 2, so isCliproxyUpToDate* is always false and every cold start redownloads the archive on linux/darwin today."
+      },
+      {
+        "summary": "Keep --version as the probe flag; parse err.stdout on non-zero exit",
+        "rationale": "The flag being undefined guarantees the binary prints the banner and exits immediately instead of starting a server; execSync errors and promisified-exec rejections both attach .stdout, so the banner is recoverable."
+      },
+      {
+        "summary": "Parameterize all new platform-dependent helpers with (platform = process.platform) defaults",
+        "rationale": "There is no Windows CI runner; following detectPlatformAsset's existing signature pattern makes every win32 branch unit-testable on linux."
+      },
+      {
+        "summary": "Replace the bash /dev/tcp fallback with netstat parsed in JS on win32 only",
+        "rationale": "bash does not exist on stock Windows so a listening proxy with a stale pidfile reads as down and the CLI spawns a doomed duplicate; parsing netstat output in an exported pure helper avoids fragile findstr quoting and false matches on foreign addresses."
+      },
+      {
+        "summary": "Install via fs.rm(target) -> copyFile -> chmod instead of the 'install' shell-out",
+        "rationale": "GNU install unlinks before writing; naive copyFile over a running binary throws ETXTBSY on linux. chmod 0o755 is harmless on win32. All force-reinstall paths already stop the proxy before installing."
+      }
+    ],
+    "items": [
+      {
+        "id": "win32-asset-mapping",
+        "title": "detectPlatformAsset: map win32 to windows zip assets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-platform-asset.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-platform-asset.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cliproxy-platform-asset.test.ts passes with win32 zip expectations",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cliproxy.ts detectPlatformAsset (line 417): add `else if (platform === 'win32') os = 'windows';` and derive the extension `const ext = os === 'windows' ? 'zip' : 'tar.gz';`, returning `CLIProxyAPI_${version}_${os}_${cpu}.${ext}`. Arch mapping (x64->amd64, arm64->aarch64) is already correct for the Windows asset names. Update tests/lib/cliproxy-platform-asset.test.ts: the line-31 assertion that win32/x64 is null FLIPS to expect /^CLIProxyAPI_[\\d.]+_windows_amd64\\.zip$/; add win32/arm64 -> /_windows_aarch64\\.zip$/; keep win32/ia32 and darwin/ia32 -> null. See PRD W1 for exact before/after."
+        },
+        "items": [
+          {
+            "id": "win32-asset-mapping.ac1",
+            "title": "Given platform win32 and arch x64, detectPlatformAsset returns archive CLIProxyAPI_<ver>_windows_amd64.zip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "win32-asset-mapping.ac2",
+            "title": "Given platform win32 and arch arm64, detectPlatformAsset returns archive CLIProxyAPI_<ver>_windows_aarch64.zip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "win32-asset-mapping.ac3",
+            "title": "Given an unsupported combo (win32/ia32, darwin/ia32), detectPlatformAsset still returns null and linux/darwin combos still return .tar.gz names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "binary-path-exe",
+        "title": "getCliproxyBinary .exe suffix and win32-safe installed check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-windows-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-windows-paths.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cliproxy-windows-paths.test.ts passes covering getCliproxyBinary and isExecutableMode",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cliproxy.ts: (1) change getCliproxyBinary (line 61) to `getCliproxyBinary(platform: NodeJS.Platform = process.platform)` returning join(BIN_DIR, platform === 'win32' ? 'cliproxy.exe' : 'cliproxy') — existing zero-arg callers keep working. (2) Add exported pure helper `isExecutableMode(mode: number, platform: NodeJS.Platform = process.platform): boolean` returning `platform === 'win32' || (mode & 0o111) !== 0`, and use `st.isFile() && isExecutableMode(st.mode)` in isCliproxyInstalled (line 440). Create tests/lib/cliproxy-windows-paths.test.ts with unit tests for both helpers. See PRD W2."
+        },
+        "items": [
+          {
+            "id": "binary-path-exe.ac1",
+            "title": "getCliproxyBinary('win32') returns a path ending in cliproxy.exe while getCliproxyBinary('linux') returns a path ending in cliproxy with no suffix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binary-path-exe.ac2",
+            "title": "isExecutableMode(0o644, 'win32') returns true; isExecutableMode(0o644, 'linux') returns false; isExecutableMode(0o755, 'linux') returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binary-path-exe.ac3",
+            "title": "isCliproxyInstalled preserves existing linux behavior: a present file without any exec bit is reported as not installed on non-win32",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "portable-install",
+        "title": "Portable install: tar -xf, .exe extracted name, fs primitives",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-windows-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-windows-paths.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "extractedBinaryName tests pass",
+            "typecheck and lint complete without errors",
+            "file-size guard passes (cliproxy.ts under 1000 lines or audited allowlist row)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Change installCliproxySync (lines 495-527) and installCliproxyTask (lines 533-563) identically, keeping execSync in the Sync variant and execAsync in the Task variant (repo rule: no execSync in server-reachable code): (1) replace `tar -xzf` with `tar -xf` (GNU tar auto-detects gzip; Windows System32 bsdtar extracts zip); (2) add exported helper `extractedBinaryName(platform = process.platform)` returning 'cli-proxy-api.exe' on win32 else 'cli-proxy-api', use it for the extracted path; (3) replace the `install -m 0755` shell-out with rm(target, {force:true}) then copyFile(extracted, target) then chmod(target, 0o755) — rm-first is required or copyFile over a running binary throws ETXTBSY on linux; (4) replace `rm -rf tmpDir` with fs.rm(tmpDir, {recursive:true, force:true}) inside the existing non-fatal catch; (5) reword the unsupported-platform error to 'GPT subscription routing requires linux, darwin, or windows on amd64/arm64.' Sync variant uses rmSync/copyFileSync/chmodSync; Task variant uses fs/promises rm/copyFile/chmod. Do NOT add retry logic for EBUSY — all force-reinstall paths stop the proxy first. See PRD W3, D1, D4, H1."
+        },
+        "items": [
+          {
+            "id": "portable-install.ac1",
+            "title": "Both install variants extract via 'tar -xf' (no -z flag) so the same command accepts .tar.gz on unix and .zip on Windows bsdtar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "portable-install.ac2",
+            "title": "extractedBinaryName('win32') returns cli-proxy-api.exe and extractedBinaryName('linux') returns cli-proxy-api; install code joins tmpDir with this helper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "portable-install.ac3",
+            "title": "When either install variant places the binary, it deletes the old target, copies the extracted file, and applies mode 0o755 via fs primitives; grep of src/lib/cliproxy.ts returns no 'install -m' or 'rm -rf' shell-outs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "portable-install.ac4",
+            "title": "When detectPlatformAsset returns null the thrown message names linux, darwin, and windows (amd64/arm64) as supported, not 'linux and darwin only'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "portable-install.ac5",
+            "title": "installCliproxyTask still contains no execSync calls (execAsync only), preserving the no-execSync-in-server rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "version-probe-nonzero-exit",
+        "title": "Version probe parses stdout when --version exits non-zero (all platforms)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-version-probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-version-probe.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cliproxy-version-probe.test.ts passes covering parseCliproxyVersion and execFailureStdout",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cliproxy.ts: (1) export the existing parseCliproxyVersion (line 452), signature unchanged; (2) add exported helper `execFailureStdout(err: unknown): string` returning (err as {stdout?: string|Buffer})?.stdout?.toString() ?? '' — both execSync errors and promisified-exec rejections attach .stdout, and the sync probe's stdio ['ignore','pipe','ignore'] keeps stdout piped so it is present on the error; (3) in the catch blocks of isCliproxyUpToDateSync (line 474) and isCliproxyUpToDateTask (line 485), replace `return false` with `return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();`; (4) update the doc comment (lines 457-465) to record that v7.2.113 does not define --version — it prints the banner to stdout and exits 2 — and that keeping the undefined flag is deliberate (banner + fast exit instead of starting a server). This fixes the silent ~65MB redownload on every cold start on linux/darwin too (verified locally: linux binary exits 2). Create tests/lib/cliproxy-version-probe.test.ts with pure tests, no child processes. See PRD W4, D2, D3."
+        },
+        "items": [
+          {
+            "id": "version-probe-nonzero-exit.ac1",
+            "title": "parseCliproxyVersion('CLIProxyAPI Version: 7.2.113, Commit: bc71c77f, ...') returns '7.2.113' and parseCliproxyVersion('garbage') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-probe-nonzero-exit.ac2",
+            "title": "execFailureStdout returns the banner string from an Error carrying stdout as a string, round-trips a Buffer stdout, and falls back to '' when stdout is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-probe-nonzero-exit.ac3",
+            "title": "Both isCliproxyUpToDate variants' catch blocks compare the version parsed from the failed exec's stdout against the pin instead of returning false unconditionally, so an installed pinned binary that exits 2 on --version no longer triggers a reinstall",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "win32-sync-port-probe",
+        "title": "isCliproxyRunningSync: netstat-based port probe on win32",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "tests/lib/cliproxy-windows-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cliproxy-windows-paths.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "netstatShowsListener tests pass (LISTENING local port true, foreign-address-only false, empty false)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cliproxy.ts isCliproxyRunningSync (lines 585-601): after the pidfile+isProcessAlive check, branch on process.platform === 'win32' to run execSync('netstat -ano -p TCP', {encoding:'utf8', stdio:'pipe', timeout:5000}) and return the result of a new exported pure helper `netstatShowsListener(output: string, port: number): boolean` — true only when a line contains LISTENING (case-insensitive word) AND a local address ending [:.]<port> followed by whitespace (a bare ':8317' substring would also match foreign addresses of ESTABLISHED rows). Non-win32 keeps the existing bash /dev/tcp probe byte-for-byte. Everything stays inside the existing try/catch that returns false on failure. This function is CLI-only, so execSync is permitted; the server-side isCliproxyRunningTask already uses portable net.connect and is untouched. Add fixture-based tests to tests/lib/cliproxy-windows-paths.test.ts. See PRD W5, D5."
+        },
+        "items": [
+          {
+            "id": "win32-sync-port-probe.ac1",
+            "title": "netstatShowsListener returns true for a fixture line 'TCP 127.0.0.1:8317 0.0.0.0:0 LISTENING 1234' with port 8317",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "win32-sync-port-probe.ac2",
+            "title": "netstatShowsListener returns false when :8317 appears only as a foreign address on an ESTABLISHED row, and false for empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "win32-sync-port-probe.ac3",
+            "title": "The non-win32 branch of isCliproxyRunningSync preserves the existing bash /dev/tcp probe unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-windows-support",
+        "title": "Document Windows CLIProxy support in configuration/harnesses.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-09T19:57:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3626",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -i 'windows' configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "harnesses.mdx CLIProxy section names linux, macOS, and Windows (amd64/arm64) with the cliproxy.exe install location"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ],
+          "acJustification": "Single-sentence documentation note; one criterion fully specifies the observable content."
+        },
+        "narrative": {
+          "Action": "In configuration/harnesses.mdx, in the CLIProxy discussion (the 'Multi-provider via ohmypi vs CLIProxy' section around line 496), add a short platform-support note stating: CLIProxy is auto-installed at the pinned version on linux, macOS, and Windows (amd64/arm64); on Windows the sidecar installs as cliproxy.exe under ~/.overdeck/bin using the OS-bundled curl and tar. This is the only user-facing page discussing CLIProxy routing (docs/USAGE.md's 'prebuilt binary' line is about node-gyp, not CLIProxy — leave it untouched). See PRD W6."
+        },
+        "items": [
+          {
+            "id": "docs-windows-support.ac1",
+            "title": "configuration/harnesses.mdx CLIProxy section contains a note that auto-install covers linux, macOS, and Windows (amd64/arm64) and shows the cliproxy.exe install location under ~/.overdeck/bin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "win32-asset-mapping",
+        "to": "portable-install",
+        "type": "blocks"
+      },
+      {
+        "from": "binary-path-exe",
+        "to": "portable-install",
+        "type": "blocks"
+      },
+      {
+        "from": "portable-install",
+        "to": "docs-windows-support",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-09-PAN-3626-windows-cliproxy-should-auto-install-the-pinned-version-prebuilt-win32-binaries-do-exist.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
