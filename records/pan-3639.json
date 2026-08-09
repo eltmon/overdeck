@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-09T21:19:29.687Z",
-  "updated": "2026-08-09T22:57:16.897Z",
+  "updated": "2026-08-09T23:18:36.485Z",
   "pipeline": {
     "issueId": "PAN-3639",
     "reviewStatus": "pending",
@@ -13,37 +13,45 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:56:41.114Z",
+    "updatedAt": "2026-08-09T23:18:36.464Z",
     "mergeNotes": "Stale strike signal: recorded HEAD b48d2f99263a9f5b4ed46177b7bf06adcc46f060 differs from origin/strike/pan-3639 at 1d871df3fb2c24295602883af7d8158c2823084e",
-    "strikeReadyHead": "b48d2f99263a9f5b4ed46177b7bf06adcc46f060",
-    "strikeReadyAt": "2026-08-09T22:38:29.224Z",
-    "strikeLandingState": "landing",
+    "strikeReadyHead": "1d871df3fb2c24295602883af7d8158c2823084e",
+    "strikeReadyAt": "2026-08-09T23:18:36.463Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-09T22:56:41.119Z",
+        "strikeHead": "b48d2f99263a9f5b4ed46177b7bf06adcc46f060",
+        "mainHead": "c75c24b39a8343b15b9062b606dda5d680a1d823",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD b48d2f99263a9f5b4ed46177b7bf06adcc46f060 differs from origin/strike/pan-3639 at 1d871df3fb2c24295602883af7d8158c2823084e"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 701843,
-            "output": 37216,
-            "cacheRead": 17906688,
+            "input": 766311,
+            "output": 40807,
+            "cacheRead": 22618112,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 701843,
-          "output": 37216,
-          "cacheRead": 17906688,
+          "input": 766311,
+          "output": 40807,
+          "cacheRead": 22618112,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.579039,
-        "pricingAsOf": "2026-08-09T22:57:16.888Z"
+        "usd": 16.364821,
+        "pricingAsOf": "2026-08-09T23:18:36.476Z"
       }
     },
     "merges": [],
