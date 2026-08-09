@@ -571,7 +571,7 @@
     "recordedAt": "2026-08-09T13:12:19.089Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-09T20:49:15.681Z",
+  "updated": "2026-08-09T21:23:55.834Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
@@ -583,7 +583,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:49:15.660Z",
+    "updatedAt": "2026-08-09T21:23:55.798Z",
     "reviewNotes": "All four reports are readable; no current-cycle blockers remain after convergence gating.",
     "testNotes": "HEAD 79e4b7da79 (reviewed cycle 5 SHA bb70382c12 + a no-op merge of origin/main, verified via git merge-base --is-ancestor and diffstat: only release/version-bump files changed). npm run typecheck: clean (root tsc, hooks, evals, dashboard-types ratchet 30/30 known, frontend-types ratchet 0/0, acp all clean) — an initial run showed a transient 40-error dashboard-types spike caused by a concurrent durable-review verification-worker (pid 1904596) rebuilding packages/contracts/dist in the same shared workspace at the same time; isolated reruns of the dashboard-types check alone and then the full typecheck both came back clean, confirming the spike was a build race, not a code regression. npm run lint: clean, all ratchets/guards passed (circular-deps 56 baselined/no new, effect-diagnostics 308/none new, file-size, permissions, state-writes/paths, workspace-doors, quarantine-audit, etc). npm test (full suite): 1436 test files passed / 3 skipped (pre-existing quarantined), 13537 tests passed / 51 skipped, 0 failed; plus the frontend issueActions/parity suite 4 files / 63 tests passed. Targeted feature suites also verified in isolation: tests/dashboard/event-reducers.test.ts + src/lib/__tests__/activity-logger.test.ts + tests/unit/lib/ci/project-ci-observation.test.ts + tests/unit/lib/webhook-handlers.test.ts + src/lib/overdeck/__tests__/project-ci-fill.test.ts + src/dashboard/server/services/__tests__/project-ci-refill-startup.test.ts = 169/169 passed; frontend ProjectCiChip + ProjectNode = 20/20 passed. Minor non-blocking observation: the docs xBRIEF item's own verify_command (grep 'project.ci_suite_observed' across EXTERNAL-EVENT-STREAM.md, CLAUDE.md, events.ts) finds the string in the first and third files but CLAUDE.md documents the same behavior only as a compressed one-liner in 'Key Invariants' (line 38) without the literal event name — consistent with CLAUDE.md's established trim-and-link-out convention and already accepted by the review convoy's requirements pass; not treated as a gate failure.",
     "uatNotes": "UAT REQUIRED and FAILED. FR-1/FR-2 require the Command Deck project row to show a compact CI chip for the project's default branch, sourced from a boot-time REST fill so the chip is correct before the first webhook. This is UI/dashboard behavior so per self-verify-rendering I drove it live rather than trusting unit tests alone.\n\nEnvironment: never touched the host dashboard on :3011 (that is the live flywheel-managed instance with 25 running agents — roles/test.md and the PAN-2322 port guard both forbid this). Instead brought up the workspace's own isolated devcontainer 'server' stack (docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server), which is single-deacon-safe (OVERDECK_DISABLE_DEACON=1, no ~/.overdeck bind mount) and serves https://feature-pan-3537.overdeck.localhost / https://api-feature-pan-3537.overdeck.localhost. Verified /api/health reports buildCommit=43fc78c69e3, buildBranch=feature/pan-3537, buildDirty=false throughout.\n\nTwo pre-existing, PAN-3537-unrelated environment gaps blocked the stack from staying up long enough to test, both worked around without any code/config edits: (1) startCliproxyWatchdog() in main.ts crashes the Alpine-based container on an unhandled spawn 'error' event because the host's glibc cliproxy binary can't exec under musl — worked around by pre-binding a loop of `nc -l -p 8317` inside the container so the watchdog's TCP liveness check finds the port already held and never attempts the spawn. (2) `gh` was not installed in the container and no projects.yaml exists in the container's isolated ~/.overdeck (correct per the single-deacon invariant, which deliberately excludes that mount) — installed gh via apk, authenticated it with the host operator's own `gh auth token` (persisted to /home/node/.config/gh/hosts.yml, not passed via env so it survives restarts), and wrote a minimal test-only projects.yaml registering panopticon-cli -> eltmon/overdeck so fillAllProjectCi() had a real project with a real, live GitHub Actions history to pull.\n\nResult: on two independent fresh container boots, the boot-time fill correctly ran, called the real GitHub API, and durably persisted a project.ci_head_observed event with a fully correct payload (verified by direct read of the events table: projectKey/repo/branch/headSha/observedAt all correct, 3 suites all status=completed conclusion=success). The read model's live snapshot sequence advanced past each event (29 then 36). Unrelated live data on the same page (issue counts, 'Just now' sync timestamp) rendered correctly, proving the general WS/read-model pipeline is live and working. Despite this, the CI chip never appeared on the panopticon-cli project row in either boot — no element with data-testid=project-ci-chip in the DOM/accessibility tree after a fresh navigation performed well after the event was confirmed durably persisted.\n\nThis points to the boot-time fill's own emitted event being applied to the read model unreliably — plausibly a startup race between startProjectCiRefill()'s synchronous immediate run() (main.ts ~line 760, fires eagerly at module top level) and the asynchronous EventStoreServiceLive Effect layer that wires store.subscribe(...) -> readModel.applyEvent (src/dashboard/server/services/domain-services.ts:172), which is the ONLY place project.ci_head_observed ever reaches ciByProjectKey in the live in-memory projection. If the fill's REST calls resolve before that layer's subscription is registered, the event is durably written but the live projection silently misses it, and per FR-2 the chip should be correct 'before the first webhook arrives' -- exactly the case this defeats. I did not edit any code to confirm or fix this (out of scope for the test role); this is a diagnosis, not a verified root cause, and needs engineering follow-up.\n\nCommands/paths exercised: docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server; direct node:sqlite reads of /home/node/.overdeck/overdeck.db events table; Playwright navigate to https://feature-pan-3537.overdeck.localhost/ + browser_find for 'project-ci-chip' and 'panopticon-cli' (2 independent boots, both negative for the chip). No console errors other than an unrelated PostHog-token warning.",
@@ -667,7 +667,9 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-09T13:12:19.089Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-09T21:23:55.798Z"
   },
   "closeOut": {
     "usage": {
@@ -823,7 +825,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3542"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-09T21:23:55.829Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 79e4b7da79b9111319e641e94f7838b0f9e368ce",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3542 MERGED at 2026-08-09T13:51:11Z",
+          "status": "pass",
+          "mergedAt": "2026-08-09T13:51:11Z",
+          "mergeCommit": "c42c117d67077e7bd997f83924611081dc351ddd"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on c42c117d67077e7bd997f83924611081dc351ddd: test, lint, build (22), guard; verified on main by later green CI run c0bde8bd9e3ba1a5369494fa353efe610fe21ffb containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 6879ca3f contains merge c42c117d",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 10 agent state directories (11 transcript files preserved); No strike branch strike/pan-3537 found; Pruned 356 checkpoint ref(s) for agent-pan-3537, planning-pan-3537, strike-pan-3537; No specialist registry entries for PAN-3537"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
