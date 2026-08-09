@@ -170,17 +170,12 @@ export async function ensurePRExists(
     const execOptions: Parameters<typeof execFileAsync>[2] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
-    // Reuse an open PR for this exact head/base pair. A merged PR remains usable
-    // for the later terminal-state reconciliation, but a closed unmerged PR must
-    // not prevent a fresh PR from being created for new commits on the branch.
+    // Reuse an open PR for this head/base pair, or a merged PR for terminal reconciliation.
+    // A closed unmerged PR must not prevent a fresh PR for new branch commits.
     try {
-      const { stdout } = await execFileAsync('gh', [
-        'pr', 'list', '--head', branchName, '--base', targetBranch, '--state', 'all',
-        '--json', 'url,state', '--limit', '100',
-      ], execOptions);
+      const { stdout } = await execFileAsync('gh', ['pr', 'list', '--head', branchName, '--base', targetBranch, '--state', 'all', '--json', 'url,state', '--limit', '100'], execOptions);
       const pullRequests = JSON.parse(String(stdout)) as Array<{ url?: string; state?: string }>;
-      const existing = pullRequests.find(pr => pr.state === 'OPEN')
-        ?? pullRequests.find(pr => pr.state === 'MERGED');
+      const existing = pullRequests.find(pr => pr.state === 'OPEN') ?? pullRequests.find(pr => pr.state === 'MERGED');
       if (existing?.url) return { created: false, prUrl: existing.url };
     } catch { /* no reusable PR */ }
 
