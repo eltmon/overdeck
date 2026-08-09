@@ -40,17 +40,18 @@
     "recordedAt": "2026-08-09T20:28:46.594Z"
   },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:30:50.084Z",
+  "updated": "2026-08-09T20:45:15.558Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T20:30:14.834Z",
+    "updatedAt": "2026-08-09T20:44:44.762Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3635",
+    "lastVerifiedCommit": "4baa5fa27d67018b4a09909fb9964bed89eb32f8",
     "reviewRequestedAt": "2026-08-09T20:28:49.994Z",
     "reviewSpawnedAt": "2026-08-09T20:30:14.833Z",
     "scopeDrift": {
@@ -84,6 +85,38 @@
             "cacheWrite": 156689
           }
         },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 279716,
+            "output": 16652,
+            "cacheRead": 2676224,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 252499,
+            "output": 12570,
+            "cacheRead": 2573824,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 191456,
+            "output": 8892,
+            "cacheRead": 1952256,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 235024,
+            "output": 10279,
+            "cacheRead": 2337280,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-terra": {
             "input": 303329,
@@ -100,6 +133,12 @@
           "cacheRead": 4631890,
           "cacheWrite": 156689
         },
+        "openai/gpt-5.6-sol": {
+          "input": 958695,
+          "output": 48393,
+          "cacheRead": 9539584,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.6-terra": {
           "input": 303329,
           "output": 26517,
@@ -108,8 +147,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 13.078202,
-        "pricingAsOf": "2026-08-09T20:30:14.877Z"
+        "usd": 24.093259,
+        "pricingAsOf": "2026-08-09T20:44:44.805Z"
       }
     },
     "merges": [
@@ -118,7 +157,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3626",
