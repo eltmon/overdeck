@@ -274,7 +274,7 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:48:29.502Z",
+  "updated": "2026-08-09T22:48:32.419Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -284,7 +284,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T22:48:20.596Z",
+    "panDoneRecoveredAt": "2026-08-09T22:48:29.007Z",
+    "updatedAt": "2026-08-09T22:48:29.490Z",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewRequestedAt": "2026-08-09T22:48:29.007Z",
@@ -371,8 +372,7 @@
         "tests/unit/dashboard/no-loss-audit.test.ts"
       ],
       "recordedAt": "2026-08-09T22:44:37.234Z"
-    },
-    "panDoneRecoveredAt": "2026-08-09T22:48:29.007Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -486,7 +486,7 @@
       },
       "costAtCloseOut": {
         "usd": 181.591923,
-        "pricingAsOf": "2026-08-09T22:48:21.046Z"
+        "pricingAsOf": "2026-08-09T22:48:32.412Z"
       }
     },
     "merges": [
