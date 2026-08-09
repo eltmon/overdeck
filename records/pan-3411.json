@@ -299,7 +299,7 @@
     "recordedAt": "2026-08-09T22:44:37.234Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T23:26:34.875Z",
+  "updated": "2026-08-09T23:26:37.338Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "passed",
@@ -308,14 +308,14 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "verifying",
-    "mergeStep": "verifying",
+    "mergeStep": "reporting-statuses",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-09T22:48:29.007Z",
-    "updatedAt": "2026-08-09T23:26:05.860Z",
+    "updatedAt": "2026-08-09T23:26:05.861Z",
     "testNotes": "typecheck/lint/build/server-bundle: pass. Full npm test: 2 runs each had a small non-overlapping set of setupOverdeckTestDb() beforeEach timeouts under heavy box load (unrelated modules); all 9 flaky files pass 100% in isolation across both batches. Frontend test portion (issueActions*, fr7-conversation) and PAN-3411's own suite (NewWorkspacePage*, useWorkspaceCreateIntent) pass clean. All 56 xBRIEF items completed.",
     "uatNotes": "Browser UAT via Playwright MCP against the workspace-built dashboard (pan workspace rebuild + seed-uat-fixtures, feature-pan-3411.overdeck.localhost — not main, not the live orchestrator). Verified: 7 D-2 regions render in order; ?project= preselect survives refresh; hero autofocus; invalid/empty-name finding rendering + disabled submit; clean resolve clears finding + enables submit; idea-card hero-prefill+focus (verbatim per idea-cards.ac2); target row folder chip/shared-isolated toggle/advanced disclosure; bootstrap-main-affordance actually registers+navigates; keyboard tab order confirmed; two-width screenshots clean. See .pan/test/result.json for full detail incl. a documented pre-existing (non-PAN-3411) workspace-container session-cookie-origin quirk and its one-time workaround.",
-    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3625",
     "reviewedAtCommit": "795eeb3347c528992c952fd0e99408b9c9eb8f30",
@@ -518,7 +518,7 @@
       },
       "costAtCloseOut": {
         "usd": 208.155009,
-        "pricingAsOf": "2026-08-09T23:26:34.869Z"
+        "pricingAsOf": "2026-08-09T23:26:37.327Z"
       }
     },
     "merges": [
