@@ -9,6 +9,7 @@ const {
   mockSetReviewStatus,
   mockRunQualityGates,
   mockWriteFeedbackFile,
+  mockVerificationArtifactPath,
   mockWriteVerificationArtifact,
   mockRebuildWorkspaceStack,
 } = vi.hoisted(() => ({
@@ -17,6 +18,7 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockRunQualityGates: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
+  mockVerificationArtifactPath: vi.fn((workspacePath: string) => `${workspacePath}/.overdeck/verification-latest.json`),
   mockWriteVerificationArtifact: vi.fn(),
   mockRebuildWorkspaceStack: vi.fn(),
 }));
@@ -34,6 +36,7 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
   readVerificationArtifact: vi.fn(() => null),
+  verificationArtifactPath: mockVerificationArtifactPath,
   writeVerificationArtifact: mockWriteVerificationArtifact,
 }));
 
@@ -156,6 +159,45 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       cycleCount: 0,
       maxCycles: 3,
     });
+  });
+
+  it('points failed-gate feedback at the complete verification artifact', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      issueId: 'PAN-2901',
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      verificationCycleCount: 0,
+    });
+    mockRunQualityGates.mockReturnValue([{
+      name: 'test',
+      passed: false,
+      required: true,
+      output: `${'passing output\n'.repeat(20_000)}FAIL src/example.test.ts\nAssertionError: expected true to be false`,
+      durationMs: 10,
+    }]);
+
+    await Effect.runPromise(runVerificationForIssueInProcess(
+      'PAN-2901',
+      workspacePath,
+      workspaceInfo,
+      'test',
+      { syncTargetBranch: false },
+    ));
+
+    const fullOutputPath = `${workspacePath}/.overdeck/verification-latest.json`;
+    expect(mockWriteVerificationArtifact).toHaveBeenCalledWith(
+      workspacePath,
+      'PAN-2901',
+      expect.arrayContaining([expect.objectContaining({ name: 'test', passed: false })]),
+    );
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2901', expect.objectContaining({
+      verificationNotes: expect.stringContaining(fullOutputPath),
+    }));
+    expect(mockWriteFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
+      markdownBody: expect.stringContaining(`Read the complete gate output at \`${fullOutputPath}\``),
+    }));
   });
 
   it('discards a failing gate verdict when the issue merges during verification', async () => {

@@ -43,16 +43,20 @@ describe('verification artifact', () => {
     expect(read?.gates.every((g) => g.output === undefined)).toBe(true);
   });
 
-  it('records the failed check and keeps its output', () => {
+  it('records the failed check and keeps its complete output', () => {
+    const output = `${'passing test output\n'.repeat(20_000)}FAIL src/example.test.ts\nAssertionError: expected true to be false`;
     writeVerificationArtifact(workspace, 'PAN-2', [
       gate({ name: 'typecheck' }),
-      gate({ name: 'lint', passed: false, output: 'prompt lint failed:\n  item-loop-order', error: 'exit 1' }),
+      gate({ name: 'lint', passed: false, output, error: 'exit 1' }),
     ]);
 
     const read = readVerificationArtifact(workspace);
     expect(read).toMatchObject({ outcome: 'failed', failedCheck: 'lint' });
     const lint = read?.gates.find((g) => g.name === 'lint');
-    expect(lint?.output).toContain('item-loop-order');
+    expect(lint?.output).toBe(output);
+    expect(lint?.output).toContain('FAIL src/example.test.ts');
+    expect(lint?.output).toContain('AssertionError: expected true to be false');
+    expect(lint?.output).not.toContain('chars elided');
     expect(lint?.error).toBe('exit 1');
   });
 

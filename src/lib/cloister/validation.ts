@@ -36,9 +36,14 @@ function clipGateStream(stream: string, limit: number): string {
   return `${signal.slice(0, headLength)}\n…(${signal.length - limit} chars elided)…\n${signal.slice(-tailLength)}`;
 }
 
+function formatGatePreview(stdout: string, stderr: string): string {
+  return [clipGateStream(stdout, 4000), clipGateStream(stderr, 2000)]
+    .filter(Boolean)
+    .join('\n--- stderr ---\n');
+}
+
 function formatGateOutput(stdout: string, stderr: string): string {
-  const streams = [clipGateStream(stdout, 4000), clipGateStream(stderr, 2000)].filter(Boolean);
-  return streams.join('\n--- stderr ---\n');
+  return [stdout, stderr].filter(Boolean).join('\n--- stderr ---\n');
 }
 
 function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
@@ -615,7 +620,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         }
         const { stdout, stderr } = await execPromise;
         passedGate = true;
-        passOutput = formatGateOutput(stdout, stderr);
+        passOutput = formatGatePreview(stdout, stderr);
       } catch (error: any) {
         lastError = error;
         if (attempt < maxAttempts) {
