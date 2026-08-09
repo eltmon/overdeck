@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T19:59:40.555Z",
+  "updated": "2026-08-09T19:59:49.653Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "portable-install": {
+        "writerId": "agent-pan-3626",
+        "agentId": "agent-pan-3626",
+        "pid": 413125,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T19:59:49.653Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3626",
@@ -114,6 +122,7 @@
     "binary-path-exe": "completed",
     "binary-path-exe.ac1": "completed",
     "binary-path-exe.ac2": "completed",
-    "binary-path-exe.ac3": "completed"
+    "binary-path-exe.ac3": "completed",
+    "portable-install": "running"
   }
 }
