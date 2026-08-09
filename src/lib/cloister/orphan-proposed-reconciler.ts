@@ -117,6 +117,7 @@ export interface HandleOrphanProposedSpecOptions {
   /** Liveness overrides for deterministic scans that already captured a snapshot. */
   tmuxSessionNames?: readonly string[];
   getAgentStateForIssue?: (agentId: string) => Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null>;
+  closedIssueIds?: Set<string>;
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
@@ -474,7 +475,7 @@ export async function handleOrphanProposedSpec(
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'terminal-closed' });
     return [];
   }
-  if (await isIssueClosed(upperIssueId)) {
+  if (await isIssueClosed(upperIssueId, options.closedIssueIds)) {
     terminalClosedIssueIds.add(upperIssueId);
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'closed' });
     return [];
@@ -592,6 +593,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
         spec: { path: candidate.specPath, doc: planDoc },
         tmuxSessionNames: options.tmuxSessionNames,
         getAgentStateForIssue: options.getAgentStateForIssue,
+        closedIssueIds: options.closedIssueIds,
       });
       actions.push(...result);
     }

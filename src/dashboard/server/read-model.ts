@@ -500,6 +500,7 @@ export const ReadModelServiceLive = Layer.effect(
         enrichStats: state.enrichStats,
         enrichProgressBySessionId: state.enrichProgressBySessionId,
         embedProgressBySessionId: state.embedProgressBySessionId,
+        ciByProjectKey: state.ciByProjectKey,
         timestamp: new Date().toISOString(),
       };
     }

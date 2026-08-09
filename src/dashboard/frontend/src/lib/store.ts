@@ -15,6 +15,7 @@ import type {
   MemoryHealthSnapshot,
   MemoryObservation,
   MemoryStatus,
+  ProjectCiSnapshot,
   ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
@@ -622,6 +623,9 @@ export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapC
 export const selectDashboardLifecycle = (s: DashboardState) => s.dashboardLifecycle
 
 export const selectScanProgress = (s: DashboardState) => s.scanProgress
+
+export const selectProjectCi = (projectKey: string) =>
+  (s: DashboardState): ProjectCiSnapshot | undefined => s.ciByProjectKey[projectKey]
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 
