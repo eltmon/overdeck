@@ -2,7 +2,7 @@
   "issueId": "PAN-3626",
   "schemaVersion": 2,
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T19:54:06.701Z",
+  "updated": "2026-08-09T19:54:42.150Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -37,5 +37,6 @@
       "open": true,
       "needsYouEmittedAt": "2026-08-09T19:54:06.697Z"
     }
-  ]
+  ],
+  "workModel": "gpt-5.6-terra"
 }
