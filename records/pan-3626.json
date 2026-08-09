@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:11:09.659Z",
+  "updated": "2026-08-09T20:12:24.509Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-windows-support": {
-        "writerId": "agent-pan-3626",
-        "agentId": "agent-pan-3626",
-        "pid": 716791,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T20:11:09.659Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3626",
@@ -134,6 +126,17 @@
         "outcome": "completed",
         "reason": "Added netstat listener detection for Windows while preserving the Unix port probe.",
         "releasedAt": "2026-08-09T20:11:00.836Z"
+      },
+      {
+        "writerId": "agent-pan-3626",
+        "agentId": "agent-pan-3626",
+        "pid": 716791,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T20:11:09.659Z",
+        "itemId": "docs-windows-support",
+        "outcome": "completed",
+        "reason": "Documented pinned CLIProxy auto-install support and Windows executable location.",
+        "releasedAt": "2026-08-09T20:12:24.509Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "win32-sync-port-probe": {
         "reason": "Added netstat listener detection for Windows while preserving the Unix port probe.",
         "updatedAt": "2026-08-09T20:11:00.836Z"
+      },
+      "docs-windows-support": {
+        "reason": "Documented pinned CLIProxy auto-install support and Windows executable location.",
+        "updatedAt": "2026-08-09T20:12:24.509Z"
       }
     }
   },
@@ -182,6 +189,7 @@
     "win32-sync-port-probe.ac1": "completed",
     "win32-sync-port-probe.ac2": "completed",
     "win32-sync-port-probe.ac3": "completed",
-    "docs-windows-support": "running"
+    "docs-windows-support": "completed",
+    "docs-windows-support.ac1": "completed"
   }
 }
