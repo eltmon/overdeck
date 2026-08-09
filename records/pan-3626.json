@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T20:06:27.115Z",
+  "updated": "2026-08-09T20:08:38.553Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "version-probe-nonzero-exit": {
-        "writerId": "agent-pan-3626",
-        "agentId": "agent-pan-3626",
-        "pid": 592892,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T20:06:27.115Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3626",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Made both installers archive-agnostic and filesystem-based, with platform-specific extracted names.",
         "releasedAt": "2026-08-09T20:06:19.005Z"
+      },
+      {
+        "writerId": "agent-pan-3626",
+        "agentId": "agent-pan-3626",
+        "pid": 592892,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T20:06:27.115Z",
+        "itemId": "version-probe-nonzero-exit",
+        "outcome": "completed",
+        "reason": "Parse CLIProxy version banner from failed --version executions to avoid unnecessary reinstalls.",
+        "releasedAt": "2026-08-09T20:08:38.553Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "portable-install": {
         "reason": "Made both installers archive-agnostic and filesystem-based, with platform-specific extracted names.",
         "updatedAt": "2026-08-09T20:06:19.005Z"
+      },
+      "version-probe-nonzero-exit": {
+        "reason": "Parse CLIProxy version banner from failed --version executions to avoid unnecessary reinstalls.",
+        "updatedAt": "2026-08-09T20:08:38.553Z"
       }
     }
   },
@@ -144,6 +151,9 @@
     "portable-install.ac3": "completed",
     "portable-install.ac4": "completed",
     "portable-install.ac5": "completed",
-    "version-probe-nonzero-exit": "running"
+    "version-probe-nonzero-exit": "completed",
+    "version-probe-nonzero-exit.ac1": "completed",
+    "version-probe-nonzero-exit.ac2": "completed",
+    "version-probe-nonzero-exit.ac3": "completed"
   }
 }
