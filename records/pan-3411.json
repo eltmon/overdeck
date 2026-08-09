@@ -51,42 +51,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T11:55:28.240Z",
+  "updated": "2026-08-09T11:56:42.041Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T11:55:28.227Z",
-    "inspectNotes": "Inspecting item route-and-page-shell"
+    "updatedAt": "2026-08-09T11:56:39.757Z",
+    "inspectNotes": "AC1-3 met at tree of 473cc8a1. NewWorkspacePage.tsx renders all seven D-2 regions in order (chip-row, hero-title, target-row, hairline-top, status-strip, hairline-bottom, idea-grid). Route resolves exactly: TAB_PATHS['workspace-new']='/workspaces/new' hits PATH_TO_TAB exact match and is NOT swallowed by the startsWith('/workspace/') branch; getNewWorkspaceProjectFromSearch parses ?project= and seeds useWorkspaceCreateIntent initialProjectKey. Hero input uses the .display-xl primitive from index.css (no ad-hoc font-size), autoFocus, muted 'Untitled workspace' placeholder. NOTE: the reviewed SHA is a main->branch merge carrying only unrelated main-side files; the bead implementation is in first parent 35577a5de6 ('chore: auto-commit before sync with main'), so per-commit diff review would have shown an empty bead diff."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2136739,
-            "output": 144859,
-            "cacheRead": 44057088,
+            "input": 2141035,
+            "output": 144965,
+            "cacheRead": 44291584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2136739,
-          "output": 144859,
-          "cacheRead": 44057088,
+          "input": 2141035,
+          "output": 144965,
+          "cacheRead": 44291584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.058009,
-        "pricingAsOf": "2026-08-09T11:55:28.231Z"
+        "usd": 37.199917,
+        "pricingAsOf": "2026-08-09T11:56:39.805Z"
       }
     },
     "merges": [],
