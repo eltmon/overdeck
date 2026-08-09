@@ -177,9 +177,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-09T22:27:10.277Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-09T22:34Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-08-09T22:34:32.619Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-09T22:34:32Z",
+      "markdownBody": "# Test failure\n\nDispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3411.lock is held by agent-pan-3411-review pid=3925260 acquiredAt=2026-08-09T22:34:07.849Z. Retry the command after that writer finishes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3411`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -260,7 +273,7 @@
     "recordedAt": "2026-08-09T13:55:44.417Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:34:08.596Z",
+  "updated": "2026-08-09T22:34:32.619Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "reviewing",
