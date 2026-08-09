@@ -24,4 +24,5 @@ export type Tab =
   | 'deacon'
   | 'sessions'
   | 'awaiting-merge'
+  | 'workspace-new'
   | 'workspace';

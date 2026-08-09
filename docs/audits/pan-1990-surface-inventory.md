@@ -264,12 +264,24 @@ capture `project-targets` as an id — asserted by a test.
   single row, so All shows no duplicate.
 - `project-overview-new-workspace` — per-project button that preselects the
   project.
-- `new-workspace-modal` — the dialog itself, with its resolve-before-create
-  preview panel.
+- `new-workspace-page` — `/workspaces/new`, with project chips, hero title,
+  target controls, resolve-before-create status strip, submit action, and idea
+  cards. Project-scoped entry points pass `?project=<key>`.
 - `workspace-view-actions` — Favorite / Relocate / Archive in the
   `WorkspaceView` header, rendered for `main` and `scratch` only.
 
-### 10.3 Refactor with no behavior change
+### 10.3 PAN-3411 modal-to-page no-loss audit
+
+`src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx`
+accounts for every affordance removed with `NewWorkspaceModal`: project preset
+and registration, registered targets and folder browsing, shared/isolated mode,
+advanced parent branch, resolved findings and stale-submit blocking, main
+workspace bootstrap, registry invalidation, activation, and navigation. The
+audit fails with the missing affordance's name if any checklist row loses its
+page test, while `tests/unit/dashboard/no-loss-audit.test.ts` keeps every older
+tab route and asserts the additive `/workspaces/new` route.
+
+### 10.4 Refactor with no behavior change
 
 Creation intent moved out of `src/cli/commands/workspace-scratch.ts` into
 `src/lib/workspaces/create.ts`. CLI behavior is byte-identical — same flags,
