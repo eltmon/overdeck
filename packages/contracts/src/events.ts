@@ -10,6 +10,7 @@ import {
   ChannelPermissionRequestSnapshot,
   ClaudeChannelPermissionBehavior,
   IssueId,
+  ProjectCiSuite,
   ResourceStats,
   ReviewStatusSnapshot,
   Role,
@@ -46,6 +47,61 @@ export const BeadsFreshnessChangedEvent = Schema.Struct({
   }),
 })
 export type BeadsFreshnessChangedEvent = typeof BeadsFreshnessChangedEvent.Type
+
+/**
+ * One GitHub Actions check suite observed on a project's default branch
+ * (PAN-3537).
+ *
+ * Emitted by the `check_suite` webhook handler for live updates, only after an
+ * independent branch-head lookup verifies the payload SHA is still current.
+ * `suiteId` is the check suite id — for GitHub Actions that is one suite per
+ * workflow run. The webhook payload does not carry `htmlUrl`.
+ *
+ * Boot and periodic repair use `project.ci_head_observed`, which replaces the
+ * complete projection after pagination. Both events feed
+ * `ReadModelState.ciByProjectKey`, a disposable cache rebuilt from REST on every
+ * boot — there is no durable CI store.
+ */
+export const ProjectCiSuiteObservedEvent = Schema.Struct({
+  type: Schema.Literal("project.ci_suite_observed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectKey: Schema.String,
+    repo: Schema.String,
+    branch: Schema.String,
+    headSha: Schema.String,
+    suiteId: Schema.String,
+    status: Schema.String,
+    conclusion: Schema.NullOr(Schema.String),
+    htmlUrl: Schema.optional(Schema.String),
+    observedAt: Schema.String,
+    /** True only after the emitter verified headSha against the branch head. */
+    authoritativeHead: Schema.optional(Schema.Boolean),
+  }),
+})
+export type ProjectCiSuiteObservedEvent = typeof ProjectCiSuiteObservedEvent.Type
+
+/**
+ * Complete GitHub Actions projection for the verified default-branch head.
+ * The REST seed/repair emits one event after paginating every run and verifying
+ * the branch head a second time. An empty suites record explicitly clears stale
+ * CI when the current commit has no Actions runs.
+ */
+export const ProjectCiHeadObservedEvent = Schema.Struct({
+  type: Schema.Literal("project.ci_head_observed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectKey: Schema.String,
+    repo: Schema.String,
+    branch: Schema.String,
+    headSha: Schema.String,
+    suites: Schema.Record(Schema.String, ProjectCiSuite),
+    observedAt: Schema.String,
+  }),
+})
+export type ProjectCiHeadObservedEvent = typeof ProjectCiHeadObservedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -1372,6 +1428,8 @@ export type SweepRecommendationEvent = typeof SweepRecommendationEvent.Type
 export const DomainEvent = Schema.Union([
   SystemHeartbeatEvent,
   BeadsFreshnessChangedEvent,
+  ProjectCiSuiteObservedEvent,
+  ProjectCiHeadObservedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,

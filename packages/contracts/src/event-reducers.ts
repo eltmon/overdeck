@@ -17,6 +17,7 @@ import type {
   EmbedProgressSnapshot,
   EnrichProgressSnapshot,
   EnrichStatsSnapshot,
+  ProjectCiSnapshot,
   ResourceStats,
   ReviewStatusSnapshot,
   ScanProgressSnapshot,
@@ -112,6 +113,8 @@ export interface ReadModelState {
   enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
   /** PAN-457 — latest per-session embedding progress */
   embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
+  /** PAN-3537 — per-project default-branch CI record, keyed by project key. */
+  ciByProjectKey: Record<string, ProjectCiSnapshot>
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
 }
@@ -156,6 +159,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   enrichStats: null,
   enrichProgressBySessionId: {},
   embedProgressBySessionId: {},
+  ciByProjectKey: {},
   agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
@@ -323,6 +327,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     enrichStats: snapshot.enrichStats ?? null,
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
+    ciByProjectKey: snapshot.ciByProjectKey ?? state.ciByProjectKey,
     agentIdBySessionId,
   }
 }
@@ -655,6 +660,76 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'specialist.completed':
     case 'specialist.failed':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'project.ci_suite_observed': {
+      const p = event.payload
+      const existing = state.ciByProjectKey[p.projectKey]
+      const suite = {
+        status: p.status,
+        conclusion: p.conclusion,
+        htmlUrl: p.htmlUrl,
+        observedAt: p.observedAt,
+      }
+
+      let next: ProjectCiSnapshot
+      if (!existing) {
+        if (p.authoritativeHead !== true) {
+          return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+        }
+        next = {
+          projectKey: p.projectKey, repo: p.repo, branch: p.branch, headSha: p.headSha,
+          suites: { [p.suiteId]: suite }, updatedAt: p.observedAt,
+        }
+      } else if (existing.headSha === p.headSha) {
+        const existingSuite = existing.suites[p.suiteId]
+        const existingSuiteObservedAt = existingSuite?.observedAt ?? existing.updatedAt
+        if (existingSuite && p.observedAt < existingSuiteObservedAt) {
+          return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+        }
+        next = {
+          ...existing,
+          suites: { ...existing.suites, [p.suiteId]: suite },
+          updatedAt: p.observedAt > existing.updatedAt ? p.observedAt : existing.updatedAt,
+        }
+      } else if (p.authoritativeHead === true && p.observedAt >= existing.updatedAt) {
+        next = {
+          projectKey: p.projectKey, repo: p.repo, branch: p.branch, headSha: p.headSha,
+          suites: { [p.suiteId]: suite }, updatedAt: p.observedAt,
+        }
+      } else {
+        return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      }
+
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        ciByProjectKey: { ...state.ciByProjectKey, [p.projectKey]: next },
+      }
+    }
+
+    case 'project.ci_head_observed': {
+      const p = event.payload
+      const existing = state.ciByProjectKey[p.projectKey]
+      if (existing && p.observedAt < existing.updatedAt) {
+        return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      }
+
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        ciByProjectKey: {
+          ...state.ciByProjectKey,
+          [p.projectKey]: {
+            projectKey: p.projectKey,
+            repo: p.repo,
+            branch: p.branch,
+            headSha: p.headSha,
+            suites: p.suites,
+            updatedAt: p.observedAt,
+          },
+        },
+      }
+    }
 
     case 'resources.updated':
       return {

@@ -283,6 +283,20 @@
   font-weight: 400;
 }
 
+.projectCiChip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.projectCiChip:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .projectAddConvBtn {
   display: flex;
   align-items: center;
