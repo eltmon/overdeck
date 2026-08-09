@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T12:02:37.414Z",
+  "updated": "2026-08-09T12:04:10.596Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "bootstrap-main-affordance": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 498424,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T12:02:37.413Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -173,6 +165,17 @@
         "outcome": "completed",
         "reason": "Added registered-target fetching, token-styled target picker with Browse/FolderPicker, shared/isolated mode controls, advanced parent-branch disclosure, project-change target reset, and seven focused page tests.",
         "releasedAt": "2026-08-09T12:02:12.540Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 498424,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T12:02:37.413Z",
+        "itemId": "bootstrap-main-affordance",
+        "outcome": "completed",
+        "reason": "Added includeArchived main-workspace probing, the Register main workspace action, bootstrap submit body, safe hidden default, and focused coverage for missing and archived-main cases.",
+        "releasedAt": "2026-08-09T12:04:10.596Z"
       }
     ],
     "statusReasons": {
@@ -187,6 +190,10 @@
       "target-row-controls": {
         "reason": "Added registered-target fetching, token-styled target picker with Browse/FolderPicker, shared/isolated mode controls, advanced parent-branch disclosure, project-change target reset, and seven focused page tests.",
         "updatedAt": "2026-08-09T12:02:12.540Z"
+      },
+      "bootstrap-main-affordance": {
+        "reason": "Added includeArchived main-workspace probing, the Register main workspace action, bootstrap submit body, safe hidden default, and focused coverage for missing and archived-main cases.",
+        "updatedAt": "2026-08-09T12:04:10.596Z"
       }
     }
   },
@@ -205,6 +212,9 @@
     "target-row-controls.ac2": "completed",
     "target-row-controls.ac3": "completed",
     "target-row-controls.ac4": "completed",
-    "bootstrap-main-affordance": "running"
+    "bootstrap-main-affordance": "completed",
+    "bootstrap-main-affordance.ac1": "completed",
+    "bootstrap-main-affordance.ac2": "completed",
+    "bootstrap-main-affordance.ac3": "completed"
   }
 }
