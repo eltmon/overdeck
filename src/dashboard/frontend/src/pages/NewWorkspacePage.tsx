@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Plus } from 'lucide-react';
 import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
@@ -23,6 +23,9 @@ interface WorkspaceRecency {
   lastAccessedAt: number;
 }
 
+const EMPTY_REGISTERED_PROJECTS: RegisteredProject[] = [];
+const EMPTY_WORKSPACE_RECENCY: WorkspaceRecency[] = [];
+
 const WORKSPACE_IDEAS = [
   ['AUTOMATE', 'Nightly dependency-audit sweep across all registered projects'],
   ['DELEGATE', 'Triage the untriaged backlog and draft a priority proposal'],
@@ -33,14 +36,16 @@ const WORKSPACE_IDEAS = [
 ] as const;
 
 interface NewWorkspacePageProps {
+  onCancel?: () => void;
   onCreated?: (workspaceId: string) => void;
 }
 
-export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
+export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps) {
   const heroRef = useRef<HTMLInputElement>(null);
+  const presetAppliedRef = useRef(false);
+  const queryClient = useQueryClient();
   const [projectPreset] = useState(() => getNewWorkspaceProjectFromSearch() ?? '');
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [projects, setProjects] = useState<RegisteredProject[]>([]);
   const [projectOverflowOpen, setProjectOverflowOpen] = useState(false);
   const [targetMenuOpen, setTargetMenuOpen] = useState(false);
   const [browsing, setBrowsing] = useState(false);
@@ -48,7 +53,7 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
   const [projectTargets, setProjectTargets] = useState<ProjectTargets | null>(null);
   const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
   const intent = useWorkspaceCreateIntent({ initialProjectKey: projectPreset, onCreated });
-  const { data: registeredProjects = [] } = useQuery({
+  const registeredProjectsQuery = useQuery({
     queryKey: ['registered-projects'],
     queryFn: async (): Promise<RegisteredProject[]> => {
       const response = await fetchWithTimeout('/api/registered-projects', { credentials: 'include' });
@@ -58,7 +63,7 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
     },
     staleTime: 60_000,
   });
-  const { data: workspaceRecency = [] } = useQuery({
+  const workspaceRecencyQuery = useQuery({
     queryKey: ['workspace-registry'],
     queryFn: async (): Promise<WorkspaceRecency[]> => {
       const response = await fetchWithTimeout('/api/workspace-registry', { credentials: 'include' });
@@ -69,8 +74,9 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
     staleTime: 10_000,
     refetchInterval: 10_000,
   });
-
-  useEffect(() => {
+  const registeredProjects = registeredProjectsQuery.data ?? EMPTY_REGISTERED_PROJECTS;
+  const workspaceRecency = workspaceRecencyQuery.data ?? EMPTY_WORKSPACE_RECENCY;
+  const projects = useMemo(() => {
     const lastAccessedByProject = new Map<string, number>();
     for (const workspace of workspaceRecency) {
       lastAccessedByProject.set(
@@ -78,15 +84,19 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
         Math.max(lastAccessedByProject.get(workspace.projectId) ?? 0, workspace.lastAccessedAt),
       );
     }
-    const ordered = [...registeredProjects].sort((a, b) =>
+    return [...registeredProjects].sort((a, b) =>
       (lastAccessedByProject.get(b.key) ?? 0) - (lastAccessedByProject.get(a.key) ?? 0));
-    setProjects(ordered);
+  }, [registeredProjects, workspaceRecency]);
+
+  useEffect(() => {
+    if (!registeredProjectsQuery.isSuccess || presetAppliedRef.current) return;
+    presetAppliedRef.current = true;
     const presetKey = projectPreset
-      ? ordered.find((project) => project.key === projectPreset || project.name === projectPreset)?.key
+      ? projects.find((project) => project.key === projectPreset || project.name === projectPreset)?.key
       : undefined;
-    if (presetKey) intent.setProjectKey(presetKey);
-    else if (!intent.projectKey && ordered.length === 1) intent.setProjectKey(ordered[0]?.key ?? '');
-  }, [intent.projectKey, intent.setProjectKey, projectPreset, registeredProjects, workspaceRecency]);
+    if (presetKey && intent.projectKey !== presetKey) intent.setProjectKey(presetKey);
+    else if (!intent.projectKey && projects.length === 1) intent.setProjectKey(projects[0]?.key ?? '');
+  }, [intent.projectKey, intent.setProjectKey, projectPreset, projects, registeredProjectsQuery.isSuccess]);
 
   useEffect(() => {
     intent.setTargetPath('');
@@ -414,7 +424,16 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
             <button
               type="button"
               data-testid="new-workspace-cancel"
-              onClick={() => window.history.back()}
+              onClick={() => {
+                if (window.history.state?.tab === 'workspace-new' && window.history.length > 1) {
+                  window.history.back();
+                } else if (onCancel) {
+                  onCancel();
+                } else {
+                  window.history.replaceState({ tab: 'home' }, '', '/');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+              }}
               className="eyebrow bg-transparent px-2 py-2 text-muted-foreground hover:text-foreground"
             >
               Cancel
@@ -457,7 +476,14 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
         isOpen={newProjectOpen}
         onClose={() => setNewProjectOpen(false)}
         onCreated={(project) => {
-          setProjects((current) => [project, ...current.filter((candidate) => candidate.key !== project.key)]);
+          queryClient.setQueryData<RegisteredProject[]>(['registered-projects'], (current = []) => [
+            project,
+            ...current.filter((candidate) => candidate.key !== project.key),
+          ]);
+          void queryClient.invalidateQueries({
+            queryKey: ['registered-projects'],
+            refetchType: 'none',
+          });
           intent.setProjectKey(project.key);
           setNewProjectOpen(false);
         }}

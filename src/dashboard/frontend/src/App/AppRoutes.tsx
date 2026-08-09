@@ -138,7 +138,7 @@ export function AppRoutes({
       )}
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
-          <NewWorkspacePage onCreated={onWorkspaceCreated} />
+          <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (

@@ -156,6 +156,16 @@ describe('NewWorkspacePage shell', () => {
     expect(screen.getByTestId('new-project-modal-mount')).toHaveAttribute('data-open', 'false');
   });
 
+  it('stays stable while the project queries cold-load', async () => {
+    mockFetchWithTimeout.mockImplementation(() => new Promise<Response>(() => {}));
+
+    render(<NewWorkspacePage />);
+    await Promise.resolve();
+
+    expect(screen.getByTestId('new-workspace-page')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('new-workspace-project-chip')).toHaveLength(0);
+  });
+
   it('renders an autofocused display-scale hero title with the empty-state placeholder', () => {
     render(<NewWorkspacePage />);
 
@@ -180,6 +190,24 @@ describe('NewWorkspacePage shell', () => {
       'data-selected-project',
       'Overdeck CLI',
     );
+  });
+
+  it('applies a project preset once and keeps a later chip selection', async () => {
+    window.history.replaceState(null, '', '/workspaces/new?project=Overdeck%20CLI');
+    mockProjectData([
+      { key: 'overdeck', name: 'Overdeck CLI', path: '/overdeck' },
+      { key: 'other', name: 'Other Project', path: '/other' },
+    ]);
+    const { rerender } = render(<NewWorkspacePage />);
+
+    await waitFor(() => expect(currentIntent.setProjectKey).toHaveBeenCalledWith('overdeck'));
+    vi.mocked(currentIntent.setProjectKey).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Other Project' }));
+    currentIntent.projectKey = 'other';
+    rerender(<NewWorkspacePage />);
+
+    expect(currentIntent.setProjectKey).toHaveBeenCalledTimes(1);
+    expect(currentIntent.setProjectKey).toHaveBeenCalledWith('other');
   });
 
   it('renders registered targets and mounts FolderPicker from Browse', async () => {
@@ -344,12 +372,15 @@ describe('NewWorkspacePage shell', () => {
   it('opens NewProjectModal and selects the project returned by onCreated', async () => {
     currentIntent.setProjectKey = vi.fn((key) => { currentIntent.projectKey = key; });
     intentInitialized = true;
-    render(<NewWorkspacePage />);
+    const { queryClient } = render(<NewWorkspacePage />);
 
     fireEvent.click(screen.getByRole('button', { name: /new project/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Create mocked project' }));
 
     expect(currentIntent.setProjectKey).toHaveBeenCalledWith('new-project');
+    expect(queryClient.getQueryData(['registered-projects'])).toEqual([
+      { key: 'new-project', name: 'New Project', path: '/new' },
+    ]);
     expect(await screen.findByRole('button', { name: 'New Project' })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -453,6 +484,16 @@ describe('NewWorkspacePage shell', () => {
 
     expect(screen.getByTestId('new-workspace-status-finding')).toHaveTextContent('Choose a registered target');
     expect(screen.queryByTestId('new-workspace-error-panel')).not.toBeInTheDocument();
+  });
+
+  it('uses app navigation when Cancel is opened from a direct route', () => {
+    const onCancel = vi.fn();
+    window.history.replaceState(null, '', '/workspaces/new');
+    render(<NewWorkspacePage onCancel={onCancel} />);
+
+    fireEvent.click(screen.getByTestId('new-workspace-cancel'));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('disables Start workspace while the intent is stale or invalid', () => {

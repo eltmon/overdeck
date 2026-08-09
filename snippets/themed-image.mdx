@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
+
 {/*
-  ThemedImage — renders the light or dark variant of a docs screenshot to
-  match the reader's docs theme. Mintlify toggles a `dark` class on <html>,
-  so Tailwind's `dark:` variant picks the right image.
+  ThemedImage — renders only the active light or dark docs screenshot to match
+  the reader's docs theme. Mintlify toggles a `dark` class on <html>, and a
+  MutationObserver swaps the image without downloading the hidden variant.
 
   Every screenshot in the docs ships two variants, captured together with
   scripts/capture-doc-shot.mjs (see docs/SCREENSHOTS.md).
@@ -19,9 +21,19 @@
   screenshot can be added before its dark variant exists without breaking.
 */}
 
-export const ThemedImage = ({ light, dark, alt = "" }) => (
-  <>
-    <img src={light} alt={alt} className="block dark:hidden" />
-    <img src={dark ?? light} alt={alt} className="hidden dark:block" />
-  </>
-);
+export const ThemedImage = ({ light, dark, alt = "" }) => {
+  const [darkMode, setDarkMode] = useState(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncTheme = () => setDarkMode(root.classList.contains("dark"));
+    const observer = new MutationObserver(syncTheme);
+
+    syncTheme();
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  if (darkMode === null) return null;
+  return <img src={darkMode ? dark ?? light : light} alt={alt} loading="lazy" />;
+};
