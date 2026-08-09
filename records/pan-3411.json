@@ -197,7 +197,9 @@
       "images/dashboard/pan-3411-900x700-finding-bottom.png",
       "images/dashboard/pan-3411-900x700-finding-top.png",
       "packages/contracts/src/telemetry.ts",
+      "snippets/themed-image.mdx",
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
       "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
       "tests/unit/dashboard/no-loss-audit.test.ts"
     ],
@@ -244,6 +246,7 @@
       "images/dashboard/pan-3411-900x700-finding-bottom.png",
       "images/dashboard/pan-3411-900x700-finding-top.png",
       "packages/contracts/src/telemetry.ts",
+      "snippets/themed-image.mdx",
       "src/dashboard/frontend/src/App.tsx",
       "src/dashboard/frontend/src/App/AppRoutes.tsx",
       "src/dashboard/frontend/src/App/routes.ts",
@@ -254,6 +257,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/useNewWorkspaceModal.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
       "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
       "src/dashboard/frontend/src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts",
       "src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts",
       "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
@@ -262,10 +266,10 @@
       "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
       "tests/unit/dashboard/no-loss-audit.test.ts"
     ],
-    "recordedAt": "2026-08-09T13:55:44.417Z"
+    "recordedAt": "2026-08-09T22:44:07.143Z"
   },
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T22:43:51.626Z",
+  "updated": "2026-08-09T22:44:07.145Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "passed",
