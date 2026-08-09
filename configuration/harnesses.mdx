@@ -501,6 +501,10 @@ an extra middleware process; CLIProxy gives you Claude Code's tooling/UX with
 non-Anthropic providers. Pick by which UX you want — there is no correctness
 difference today.
 
+CLIProxy auto-installs its pinned release on Linux, macOS, and Windows for amd64 and
+arm64 systems. On Windows, the sidecar is installed as `~/.overdeck/bin/cliproxy.exe`
+using the OS-bundled `curl` and `tar` tools.
+
 ### When to pick which
 
 - **Default to `claude-code`** for Anthropic-subscription users and for roles
