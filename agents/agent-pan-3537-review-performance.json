@@ -10,7 +10,7 @@
   },
   "launch": {
     "harness": "claude-code",
-    "model": "gpt-5.6-sol",
+    "model": "gpt-5.6-terra",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3537",
     "branch": null
   },
@@ -24,6 +24,11 @@
       "id": "a9e26c07-d701-4776-9a25-92c07974970e",
       "startedAt": "2026-08-04T17:51:11.846Z",
       "reason": "spawn"
+    },
+    {
+      "id": "c55e4f96-6213-494e-a2fb-bb1af6ea1930",
+      "startedAt": "2026-08-09T12:10:42.922Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
@@ -33,6 +38,10 @@
     },
     {
       "at": "2026-08-04T17:51:11.846Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-09T12:10:42.922Z",
       "event": "spawned"
     }
   ],
