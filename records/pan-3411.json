@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T11:58:09.969Z",
+  "updated": "2026-08-09T12:02:12.540Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "target-row-controls": {
-        "writerId": "agent-pan-3411",
-        "agentId": "agent-pan-3411",
-        "pid": 409239,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-09T11:58:09.969Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3411",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Added the routed /workspaces/new page shell, project-query preset state, PAN-3410 display-xl hero input, ordered layout regions, modal mount state, and focused frontend coverage; typecheck, lint, and the frontend test passed.",
         "releasedAt": "2026-08-09T11:55:02.270Z"
+      },
+      {
+        "writerId": "agent-pan-3411",
+        "agentId": "agent-pan-3411",
+        "pid": 409239,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-09T11:58:09.969Z",
+        "itemId": "target-row-controls",
+        "outcome": "completed",
+        "reason": "Added registered-target fetching, token-styled target picker with Browse/FolderPicker, shared/isolated mode controls, advanced parent-branch disclosure, project-change target reset, and seven focused page tests.",
+        "releasedAt": "2026-08-09T12:02:12.540Z"
       }
     ],
     "statusReasons": {
@@ -174,8 +177,8 @@
         "updatedAt": "2026-08-01T16:15:41.141Z"
       },
       "target-row-controls": {
-        "reason": "Both prerequisite foundation items are complete and the required route-and-page-shell inspection passed.",
-        "updatedAt": "2026-08-09T11:57:55.322Z"
+        "reason": "Added registered-target fetching, token-styled target picker with Browse/FolderPicker, shared/isolated mode controls, advanced parent-branch disclosure, project-change target reset, and seven focused page tests.",
+        "updatedAt": "2026-08-09T12:02:12.540Z"
       }
     }
   },
@@ -186,9 +189,13 @@
     "resolve-intent-hook.resolve-intent-hook.ac2": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac3": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac4": "completed",
-    "target-row-controls": "running",
+    "target-row-controls": "completed",
     "route-and-page-shell.ac1": "completed",
     "route-and-page-shell.ac2": "completed",
-    "route-and-page-shell.ac3": "completed"
+    "route-and-page-shell.ac3": "completed",
+    "target-row-controls.ac1": "completed",
+    "target-row-controls.ac2": "completed",
+    "target-row-controls.ac3": "completed",
+    "target-row-controls.ac4": "completed"
   }
 }
