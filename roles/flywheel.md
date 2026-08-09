@@ -157,7 +157,13 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    v1.0 is, the seven readiness criteria, the `v1.0-required` critical path. Read it BEFORE
    acting so suggestions chase the bottleneck criterion, not just P-level.
 2. `docs/FLYWHEEL-STATE.md` — durable cumulative memory from prior runs (create it the first
-   time you record something worth keeping).
+   time you record something worth keeping). **Read the END of the previous run's record
+   first** — its final tick entries in this file, plus the prior run's `report.md` under
+   `~/.overdeck/flywheel/runs/<RUN-id>/` when one exists (aborted runs leave none). The
+   previous run usually ends mid-flight: re-dispatched strikes, "next tick's check" promises,
+   and still-running agents recorded there are your pickup list. In your first tick, verify
+   each such item against current state and adopt it or close it out — never assume the last
+   run finished what it started.
 3. `packages/contracts/src/flywheel.ts` — the `FlywheelStatus` schema you emit every tick.
 4. The run brief (default `docs/flywheel-brief.md`) — this run's scope and config
    (`scope`, `roles.flywheel.minAgents`/`maxAgents`, `auto_pickup_backlog`,
@@ -375,6 +381,9 @@ order within each filing-source group. Set each suggestion's `filedBy`, `weight`
 is sufficient.
 
 ## Startup triage (once per run, before the first tick)
+
+Start from the end of the previous run's record (Read-first #2): adopt or close out every
+dispatch, promised check, and live agent it left in flight before deciding anything new.
 
 Every in-flight branch may sit on a `main` that has moved. Per stopped in-pipeline issue,
 judge **divergence, not elapsed time**:
