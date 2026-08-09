@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-09T11:56:42.041Z",
+  "updated": "2026-08-09T11:57:55.322Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -97,7 +97,7 @@
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
+    "sequence": 12,
     "claims": {},
     "claimHistory": [
       {
@@ -166,8 +166,8 @@
         "updatedAt": "2026-08-01T16:15:41.141Z"
       },
       "target-row-controls": {
-        "reason": "Cannot implement: route-and-page-shell is blocked and NewWorkspacePage.tsx does not exist; this item is explicitly sequential and depends on that page shell.",
-        "updatedAt": "2026-08-07T10:07:25.197Z"
+        "reason": "Both prerequisite foundation items are complete and the required route-and-page-shell inspection passed.",
+        "updatedAt": "2026-08-09T11:57:55.322Z"
       }
     }
   },
@@ -178,7 +178,7 @@
     "resolve-intent-hook.resolve-intent-hook.ac2": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac3": "completed",
     "resolve-intent-hook.resolve-intent-hook.ac4": "completed",
-    "target-row-controls": "blocked",
+    "target-row-controls": "pending",
     "route-and-page-shell.ac1": "completed",
     "route-and-page-shell.ac2": "completed",
     "route-and-page-shell.ac3": "completed"
