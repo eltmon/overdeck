@@ -83,6 +83,8 @@ export function NewWorkspacePage() {
   const targetLabel = intent.mode === 'isolated'
     ? intent.intent?.path ?? 'Resolved isolated path'
     : intent.targetPath || intent.intent?.path || 'Choose target directory';
+  const findings = (['name', 'project', 'targetPath', 'parentBranch'] as const)
+    .flatMap((field) => intent.findingsFor(field));
 
   return (
     <div data-testid="new-workspace-page" className="h-full w-full overflow-y-auto bg-background">
@@ -220,7 +222,31 @@ export function NewWorkspacePage() {
         )}
 
         <div data-testid="new-workspace-hairline-top" data-region="hairline-top" className="mb-5 border-t border-border" />
-        <div data-testid="new-workspace-status-strip" data-region="status-strip" className="mb-5 min-h-12" />
+        <div data-testid="new-workspace-status-strip" data-region="status-strip" className="mb-5 flex min-h-12 items-center font-mono text-xs text-muted-foreground">
+          <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
+          <span>Memory enabled</span>
+          {(findings.length > 0 || intent.error) ? (
+            <>
+              <span className="mx-2 opacity-50">·</span>
+              <span data-testid="new-workspace-status-finding" className="text-destructive-foreground">
+                {findings.map((finding) => finding.message).join(' · ') || intent.error}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="mx-2 opacity-50">·</span>
+              <span>{intent.mode === 'isolated' ? 'Isolated worktree' : 'Files shared'}</span>
+              <span className="mx-2 opacity-50">·</span>
+              <span>{intent.intent?.isGitRepository ? 'git repository' : 'no git detected'}</span>
+              {intent.parentBranch && (
+                <>
+                  <span className="mx-2 opacity-50">·</span>
+                  <span>parent {intent.parentBranch}</span>
+                </>
+              )}
+            </>
+          )}
+        </div>
         <div data-testid="new-workspace-hairline-bottom" data-region="hairline-bottom" className="mb-8 border-t border-border" />
         <div data-testid="new-workspace-idea-grid" data-region="idea-grid" className="min-h-48 flex-1" />
       </main>

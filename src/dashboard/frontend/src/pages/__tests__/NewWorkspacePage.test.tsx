@@ -32,6 +32,22 @@ import { NewWorkspacePage } from '../NewWorkspacePage.js';
 const mockUseWorkspaceCreateIntent = vi.mocked(useWorkspaceCreateIntent);
 const mockFetchWithTimeout = vi.mocked(fetchWithTimeout);
 
+function makeResolvedIntent(isGitRepository = true) {
+  return {
+    projectId: 'project',
+    kind: 'user',
+    name: 'workspace',
+    path: '/repo/workspace',
+    branchName: null,
+    parentBranch: 'main',
+    parentBranchGuessed: true,
+    isGitRepository,
+    wouldCreateWorktree: false,
+    unregisteredTargetPath: false,
+    findings: [],
+  };
+}
+
 function makeIntent(initialProjectKey = ''): ReturnType<typeof useWorkspaceCreateIntent> {
   return {
     name: '',
@@ -217,5 +233,51 @@ describe('NewWorkspacePage shell', () => {
       { credentials: 'include' },
     ));
     expect(screen.queryByTestId('new-workspace-bootstrap-main')).not.toBeInTheDocument();
+  });
+
+  it('renders the resolved shared-mode status line and parent override', () => {
+    currentIntent = {
+      ...makeIntent(),
+      parentBranch: 'release',
+      intent: makeResolvedIntent(true),
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent(
+      /Memory enabled\s*·\s*Files shared\s*·\s*git repository\s*·\s*parent release/,
+    );
+  });
+
+  it('renders isolated mode and non-git posture', () => {
+    currentIntent = {
+      ...makeIntent(),
+      mode: 'isolated',
+      intent: makeResolvedIntent(false),
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent(
+      /Memory enabled\s*·\s*Isolated worktree\s*·\s*no git detected/,
+    );
+  });
+
+  it('renders resolver findings in the status strip without a separate error panel', () => {
+    const finding = { field: 'targetPath' as const, code: 'outside-project', message: 'Choose a registered target' };
+    currentIntent = {
+      ...makeIntent(),
+      intent: { ...makeResolvedIntent(), findings: [finding] },
+      findingsFor: vi.fn((field) => field === 'targetPath' ? [finding] : []),
+      hasFindings: true,
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-status-finding')).toHaveTextContent('Choose a registered target');
+    expect(screen.queryByTestId('new-workspace-error-panel')).not.toBeInTheDocument();
   });
 });
