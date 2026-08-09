@@ -369,6 +369,30 @@ export function NewWorkspacePage({ onCreated }: NewWorkspacePageProps) {
                 <span>{intent.mode === 'isolated' ? 'Isolated worktree' : 'Files shared'}</span>
                 <span className="mx-2 opacity-50">·</span>
                 <span>{intent.intent?.isGitRepository ? 'git repository' : 'no git detected'}</span>
+                {intent.intent?.path && (
+                  <>
+                    <span className="mx-2 opacity-50">·</span>
+                    <span>{intent.intent.path}</span>
+                  </>
+                )}
+                {intent.intent?.branchName && (
+                  <>
+                    <span className="mx-2 opacity-50">·</span>
+                    <span>creates {intent.intent.branchName}</span>
+                  </>
+                )}
+                {intent.intent?.wouldCreateWorktree && (
+                  <>
+                    <span className="mx-2 opacity-50">·</span>
+                    <span>worktree</span>
+                  </>
+                )}
+                {intent.intent?.unregisteredTargetPath && (
+                  <>
+                    <span className="mx-2 opacity-50">·</span>
+                    <span className="text-destructive-foreground">unregistered target</span>
+                  </>
+                )}
                 {intent.parentBranch && (
                   <>
                     <span className="mx-2 opacity-50">·</span>

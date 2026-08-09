@@ -350,8 +350,29 @@ describe('NewWorkspacePage shell', () => {
     render(<NewWorkspacePage />);
 
     expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent(
-      /Memory enabled\s*·\s*Files shared\s*·\s*git repository\s*·\s*parent release/,
+      /Memory enabled\s*·\s*Files shared\s*·\s*git repository.*parent release/,
     );
+  });
+
+  it('renders resolved path, branch, worktree, and unregistered-target posture in place', () => {
+    currentIntent = {
+      ...makeIntent(),
+      intent: {
+        ...makeResolvedIntent(),
+        path: '/repo/workspace',
+        branchName: 'workspace/feature',
+        wouldCreateWorktree: true,
+        unregisteredTargetPath: true,
+      },
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent('/repo/workspace');
+    expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent('creates workspace/feature');
+    expect(screen.getByTestId('new-workspace-status-strip')).toHaveTextContent('worktree');
+    expect(screen.getByText('unregistered target')).toHaveClass('text-destructive-foreground');
   });
 
   it('renders isolated mode and non-git posture', () => {
