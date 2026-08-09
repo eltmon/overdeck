@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-09T21:19:29.687Z",
-  "updated": "2026-08-09T23:20:42.474Z",
+  "updated": "2026-08-09T23:20:45.354Z",
   "pipeline": {
     "issueId": "PAN-3639",
     "reviewStatus": "pending",
@@ -49,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.68614,
-        "pricingAsOf": "2026-08-09T23:20:42.464Z"
+        "pricingAsOf": "2026-08-09T23:20:45.333Z"
       }
     },
     "merges": [],
