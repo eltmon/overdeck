@@ -38,6 +38,7 @@ import {
   sessionResumeDriftReasons,
 } from './runtime-state.js';
 import { decideResumeSpawnPlan } from './resume-spawn-plan.js';
+import { prepareAutonomousAgentResumePane } from './resume-pane-choice.js';
 import {
   hasAgentRuntimeInSubtree,
   writeLauncherScriptAtomic,
@@ -547,34 +548,46 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        try {
-          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
-            agentId: normalizedId,
-            workspace: agentState.workspace,
-            sessionId,
-            message: effectiveMessage,
-            caller: 'resumeAgent:auto-continue',
-            // A relaunched Claude work/strike agent owns a fresh supervisor socket;
-            // require that verified PTY path instead of silently falling back to a
-            // tmux paste whose compaction summary can masquerade as prompt landing.
-            deliveryMethod: supervisorLaunch.useSupervisor
-              ? 'supervisor'
-              : resilientDeliveryMethod(agentState.deliveryMethod),
-          });
-          messageDelivered = delivery.delivered;
-          if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
-          if (!delivery.delivered) {
-            console.error(`[resumeAgent] Auto-continue prompt did not land after ${delivery.attempts} delivery attempts`);
+        // PAN-3636: long-lived Claude sessions may open on the harness's
+        // resume-summary gate instead of a composer. Autonomous pipeline agents
+        // have no operator attached to answer it, so cross only that exact menu
+        // through the typed pane-choice door before injecting the continuation.
+        const panePreparation = await prepareAutonomousAgentResumePane(normalizedId, agentState.role);
+        if (!panePreparation.ready) {
+          console.error(`[resumeAgent] Auto-continue prompt not sent: ${panePreparation.reason}`);
+        } else {
+          if (panePreparation.action === 'resumed-from-summary') {
+            logAgentLifecycleSync(normalizedId, 'resumeAgent: selected Claude Resume from summary before continuation delivery');
           }
-        } catch (deliveryError) {
-          // A thrown delivery abort (e.g. the pane is blocked on a choice menu —
-          // the PAN-3212 guard) must reach the kill-on-failure path below, not
-          // escape to the caller with the wedged session still alive: a live
-          // wedge blocks every fresh-spawn fallback with "already running"
-          // (observed as an unbreakable review-restart loop after the
-          // 2026-08-04 OOM killed a reviewer mid-cycle).
-          messageDelivered = false;
-          console.error(`[resumeAgent] Auto-continue delivery threw: ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}`);
+          try {
+            const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+              agentId: normalizedId,
+              workspace: agentState.workspace,
+              sessionId,
+              message: effectiveMessage,
+              caller: 'resumeAgent:auto-continue',
+              // A relaunched Claude work/strike agent owns a fresh supervisor socket;
+              // require that verified PTY path instead of silently falling back to a
+              // tmux paste whose compaction summary can masquerade as prompt landing.
+              deliveryMethod: supervisorLaunch.useSupervisor
+                ? 'supervisor'
+                : resilientDeliveryMethod(agentState.deliveryMethod),
+            });
+            messageDelivered = delivery.delivered;
+            if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+            if (!delivery.delivered) {
+              console.error(`[resumeAgent] Auto-continue prompt did not land after ${delivery.attempts} delivery attempts`);
+            }
+          } catch (deliveryError) {
+            // A thrown delivery abort (e.g. the pane is blocked on a choice menu —
+            // the PAN-3212 guard) must reach the kill-on-failure path below, not
+            // escape to the caller with the wedged session still alive: a live
+            // wedge blocks every fresh-spawn fallback with "already running"
+            // (observed as an unbreakable review-restart loop after the
+            // 2026-08-04 OOM killed a reviewer mid-cycle).
+            messageDelivered = false;
+            console.error(`[resumeAgent] Auto-continue delivery threw: ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}`);
+          }
         }
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
