@@ -2175,3 +2175,15 @@ The host feedback janitor recovered the issue at 21:58:48Z with a generic rework
 **MIN-953 did not need planning restarted.** Its canonical xBRIEF sequence 2 was already finalized at 20:11Z, and an operator-started Kimi `k3[1m]` work agent is productively implementing the `display-rows` foundation across the nested `feature/min-953` repositories. Restarting planning would duplicate completed work, so the live Kimi work lane was left intact.
 
 **Fleet is above floor with five productive lanes:** MIN-953 implementation, PAN-3411 rework, and PAN-3639/PAN-3641/PAN-3642 strikes. PAN-3620 has fresh readiness at `09d3574ce5` but correctly remains blocked on the still-live closed-PR bug until PAN-3639 deploys. Four typed membership blind spots and eight zombie PRs remain unchanged.
+
+### RUN-85 tick 8 — 2026-08-09T23:02Z — two fixes landed; stale readiness recovery kept the next two honest
+
+**PAN-3641 and PAN-3620 landed through the Deacon-owned strike door.** PR #3643 merged the effective-activity review-liveness fix at `6a69d70bae`; PR #3632 then merged the corrected full-stream verification feedback at `c75c24b39a`. The live Node 22 dashboard is clean at `c75c24b39a`, which contains both. Their complete main CI job set is still running, so both remain in `post_merge_limbo` until the Definition-of-Done gate can verify main and close them.
+
+PAN-3620's eventual landing used the previously closed PR #3632 after that PR was reopened with the current strike head. The corrected work is now merged, but PAN-3639 still matters: the selection door must stop treating a closed unmerged PR as reusable state rather than depending on a separate actor to reopen it.
+
+**PAN-3639 and PAN-3642 both rejected stale readiness after main moved under them.** Their agents had already pushed resync commits, so the recorded readiness heads no longer matched the remote strike branches when Deacon validated the requests. Both recovery sessions are rerunning full gates and will emit fresh readiness rather than asking the merge door to trust an obsolete marker. PR #3644 is fully green; PR #3645 is green except its still-running test job.
+
+**PAN-3411 and MIN-953 are both back in specialist flow.** PAN-3411 passed review, fixed a real test-agent failure, pushed clean head `4cbceccd96`, and re-entered review/test. MIN-953's Kimi agent completed all eleven xBRIEF items, fixed both first-cycle blockers and the advisories, passed 2,550 unit tests plus typecheck, and requested re-review. Their work agents are idle by design while specialists evaluate the new heads; productive concurrency remains exactly two through the PAN-3639 and PAN-3642 recovery gates.
+
+**Carry this: stale readiness is a successful safety check, not failed delivery.** A strike branch can move legitimately while queued because it resyncs after another merge. Rejecting the old marker forces the agent to prove the new tree, preventing verification of one commit from authorizing a different one.
