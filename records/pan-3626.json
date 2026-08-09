@@ -40,7 +40,7 @@
     "recordedAt": "2026-08-09T20:28:46.594Z"
   },
   "created": "2026-08-09T19:44:16.050Z",
-  "updated": "2026-08-09T21:11:11.752Z",
+  "updated": "2026-08-09T21:11:14.470Z",
   "pipeline": {
     "issueId": "PAN-3626",
     "reviewStatus": "passed",
@@ -50,7 +50,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-09T21:11:06.985Z",
+    "updatedAt": "2026-08-09T21:11:07.386Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3626-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -161,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.814172,
-        "pricingAsOf": "2026-08-09T21:11:11.747Z"
+        "pricingAsOf": "2026-08-09T21:11:14.463Z"
       }
     },
     "merges": [
