@@ -61,17 +61,17 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:17:49.892Z",
+  "updated": "2026-08-10T21:17:54.854Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T21:17:49.890Z",
+    "updatedAt": "2026-08-10T21:17:54.185Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3656",
@@ -123,9 +123,9 @@
       "byStage": {
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 593276,
-            "output": 21490,
-            "cacheRead": 3405312,
+            "input": 616628,
+            "output": 27108,
+            "cacheRead": 5975040,
             "cacheWrite": 0
           }
         },
@@ -139,9 +139,9 @@
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 600202,
-            "output": 12012,
-            "cacheRead": 3377664,
+            "input": 601594,
+            "output": 15770,
+            "cacheRead": 3817472,
             "cacheWrite": 0
           }
         },
@@ -155,24 +155,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 504221,
-            "output": 65625,
-            "cacheRead": 31706112,
+            "input": 544202,
+            "output": 68525,
+            "cacheRead": 36431360,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2418301,
-          "output": 120862,
-          "cacheRead": 42810880,
+          "input": 2483026,
+          "output": 133138,
+          "cacheRead": 50545664,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.122805,
-        "pricingAsOf": "2026-08-10T21:15:14.343Z"
+        "usd": 41.682102,
+        "pricingAsOf": "2026-08-10T21:17:54.203Z"
       }
     },
     "merges": [
