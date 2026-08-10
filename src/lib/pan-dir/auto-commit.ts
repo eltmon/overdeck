@@ -721,7 +721,6 @@ function maybePushStateCommit(
 function pushStateBranch(
   gitRoot: string,
   branch: string,
-  retry = false,
 ): Effect.Effect<PushResult, never> {
   if (branch === 'main') return pushOriginMain(gitRoot, branch, false);
   const timeoutMs = parsePositiveInteger(
@@ -734,59 +733,14 @@ function pushStateBranch(
       onSuccess: () => Effect.succeed({ pushed: true }),
       onFailure: (err) => {
         const message = err.stderr || err._tag;
-        // A non-fast-forward rejection means another writer (a second machine,
-        // a workspace peer) landed state commits between our last fetch and
-        // this push. Replaying our state-only commits on top and retrying once
-        // converges the branch instead of failing the domain write outright.
-        if (!retry && branch === STATE_BRANCH && isNonFastForwardPushError(message)) {
-          return rebaseStateBranchAndRetry(gitRoot, branch);
-        }
+        // The paths-only queue has no mutation intent and must never replay or
+        // rebase. Domain writers resolve non-fast-forward conflicts before
+        // enqueuing a new concrete file version (PAN-2541 D10).
         warnAutoPush(branch, `push failed: ${message}`);
         return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
       },
     }),
   );
-}
-
-/**
- * Non-fast-forward recovery for the state branch: fetch, then rebase local
- * commits onto origin/<branch> and retry the push once. Every commit on
- * overdeck-state is state-plane by branch policy (guards keep code off it), so
- * the legacy-main state-only-diff guard is unnecessary; the preconditions that
- * matter here are a clean working tree (another writer's unflushed files must
- * not be dragged into the rebase) and no rebase already in progress. A
- * conflicting rebase is aborted and reported — the queue never decides
- * content; domain writers own conflict resolution (PAN-2541 D10).
- */
-function rebaseStateBranchAndRetry(gitRoot: string, branch: string): Effect.Effect<PushResult, never> {
-  const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
-  return Effect.gen(function* () {
-    const fetched = yield* runGitWithTimeout(['fetch', 'origin', branch], gitRoot, timeoutMs).pipe(
-      Effect.match({ onSuccess: () => true, onFailure: () => false }),
-    );
-    if (!fetched) {
-      return { pushed: false, reason: 'push rejected and reconciliation fetch failed' };
-    }
-    if (!(yield* isWorkingTreeClean(gitRoot, branch))) {
-      return { pushed: false, reason: 'push rejected and working tree is dirty' };
-    }
-    const rebaseMergePath = yield* runGit(['rev-parse', '--git-path', 'rebase-merge'], gitRoot).pipe(
-      Effect.match({ onSuccess: (r) => r.stdout.trim(), onFailure: () => '' }),
-    );
-    if (rebaseMergePath && existsSync(rebaseMergePath)) {
-      return { pushed: false, reason: 'push rejected and a rebase is already in progress' };
-    }
-    const rebased = yield* runGitWithTimeout(['rebase', `origin/${branch}`], gitRoot, timeoutMs).pipe(
-      Effect.match({ onSuccess: () => true, onFailure: () => false }),
-    );
-    if (!rebased) {
-      yield* runGit(['rebase', '--abort'], gitRoot).pipe(
-        Effect.match({ onSuccess: () => true, onFailure: () => false }),
-      );
-      return { pushed: false, reason: 'push rejected and state-branch rebase conflicted (aborted)' };
-    }
-    return yield* pushStateBranch(gitRoot, branch, true);
-  });
 }
 
 function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<PushResult, never> {
@@ -860,7 +814,7 @@ function isWorkingTreeClean(gitRoot: string, branch: string): Effect.Effect<bool
     Effect.match({
       onSuccess: (result) => {
         const clean = result.stdout.trim().length === 0;
-        if (!clean) warnAutoPush(branch, `non-fast-forward push rejected and working tree is dirty; leaving local ${branch} ahead of origin/${branch}`);
+        if (!clean) warnAutoPush(branch, 'non-fast-forward push rejected and working tree is dirty; leaving local main ahead of origin/main');
         return clean;
       },
       onFailure: (err) => {
