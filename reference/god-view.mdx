@@ -1,0 +1,82 @@
+---
+title: God View
+description: Read the Confluence river, hook telemetry, issue states, and controls at /god-view
+---
+
+# God View
+
+God View's **Confluence** canvas turns the live pipeline into one ambient
+operational map. Open `/god-view` to see where issues are moving, which harness
+hooks are firing, what agents are waiting on, and where work has become stale.
+
+## Read the river
+
+The center river runs from `PLAN` through `WORK`, `REVIEW`, `TEST`, `VERIFY`,
+and `MERGE`. Each orb is one issue. Its lane shows the current stage, its color
+shows the primary role, its inner glyph identifies the model family, and its
+motion and glow reflect real activity.
+
+| Visual | Meaning |
+| --- | --- |
+| Orbiting satellites | A review convoy working on one issue |
+| Shelf | Paused or scheduler-yielded work |
+| Frost and Doldrums | Increasing idle time and stale work |
+| Bright portal | The merge path into `main` |
+| Pink wreck | A failed merge that still needs attention |
+| Flywheel sun and sequencer | Orchestration and dispatch activity |
+| Conversation constellation | Live conversations connected to the system |
+
+The canvas uses a reactive WebGL aurora when available and falls back to the
+same operational view in canvas-only mode when WebGL is unavailable.
+
+## Read live telemetry
+
+The left hook bus lists the complete harness-hook inventory. Wired rows flash
+and count real events. Dim dotted rows are **dark fiber**: the hook exists in the
+contract, but no producer is wired, so God View shows `—` instead of pretending
+that it fired.
+
+The bottom strip is a 60-second logic-analyzer trace. Each wired hook gets one
+channel in the same order and color as the bus. Closely timed events stack into
+brighter ticks, while the aggregate band shows current and peak events per
+second. The box beside it shows the live agent-role mix.
+
+The top bar combines event rate, event ECG, host health, queue and work counts,
+cost, merges, tokens, stale work, and active agents. A `—` means the source is
+unavailable; it does not mean zero.
+
+## Inspect and open work
+
+- **Hover an orb** to see issue, stage, role, project, state, model, harness,
+  hook rate, frost, event count, stale age, yield reason, warnings, and convoy
+  members.
+- **Click an orb** to open that issue in the real issue drawer.
+- **Hover an issue-linked activity row** to see its source, full message, and
+  timestamp while the matching orb flashes.
+- **Click an issue-linked activity row** to open the same issue drawer. Rows
+  without an issue do nothing.
+
+## Keyboard controls
+
+| Key | Action |
+| --- | --- |
+| `h` or `?` | Toggle the Confluence field guide |
+| `Escape` | Close the field guide |
+| `f` | Toggle God View fullscreen |
+
+God View leaves these shortcuts alone while a text field or another modal has
+focus.
+
+## Where the data comes from
+
+Confluence uses the shared dashboard snapshot and the domain-event stream over
+`/ws/rpc`. Agent heartbeats and harness activity become domain events, then the
+same live state drives the river, micro-states, hook bus, and telemetry trace.
+Confluence does not poll to manufacture river motion or hook activity. Existing
+host-health polling and the activity feed's REST fallback remain as supporting
+sources and never create fake events.
+
+The honesty rule is simple: **the cast is real and the motion is real**. Missing
+data stays missing, hook marks require hook events, frost requires idle time,
+yield motion requires a scheduler state, and merge motion requires a merge
+transition.

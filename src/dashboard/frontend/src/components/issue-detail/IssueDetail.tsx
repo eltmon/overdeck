@@ -119,6 +119,11 @@ function WorkspaceSection({ issueId }: { issueId: string }) {
           <PanOpenInPicker openInCwd={workspace.path} />
         </div>
       </div>
+      {workspace.git?.branch && (
+        <div data-testid="drawer-workspace-branch" className="mt-[6px] truncate font-mono text-[11px] leading-[16px] text-muted-foreground" title={workspace.git.branch}>
+          ⎇ {workspace.git.branch}
+        </div>
+      )}
     </section>
   );
 }

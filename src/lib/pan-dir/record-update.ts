@@ -127,14 +127,34 @@ export type IssueRecordMutator = (record: PanIssueRecord) => PanIssueRecord | vo
 export function clearRecordPipelineClosedOutSync(
   project: ProjectConfig,
   issueId: string,
+  reopenedAt = new Date().toISOString(),
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
   record.pipeline.closedOut = undefined;
   record.pipeline.closedOutAt = undefined;
-  record.pipeline.updatedAt = new Date().toISOString();
+  record.pipeline.reopenedAt = reopenedAt;
+  record.pipeline.updatedAt = reopenedAt;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+export async function clearRecordPipelineClosedOut(
+  project: ProjectConfig,
+  issueId: string,
+  options: { reopenedAt?: string; autoCommit?: boolean } = {},
+): Promise<boolean> {
+  let changed = false;
+  const reopenedAt = options.reopenedAt ?? new Date().toISOString();
+  await updateIssueRecord(project, issueId, (record) => {
+    if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
+    record.pipeline.closedOut = undefined;
+    record.pipeline.closedOutAt = undefined;
+    record.pipeline.reopenedAt = reopenedAt;
+    record.pipeline.updatedAt = reopenedAt;
+    changed = true;
+  }, { autoCommit: options.autoCommit });
+  return changed;
 }
 
 interface GitFailure extends Error {

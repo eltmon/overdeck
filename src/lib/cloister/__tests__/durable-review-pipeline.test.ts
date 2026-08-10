@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   hasDurableReviewPipelineHandler,
+  registerDurableReviewDispatcher,
   registerDurableReviewPipelineHandler,
+  startRegisteredDurableReviewPipelineHostSide,
 } from '../durable-review-pipeline.js';
 import { dispatchReviewHostSide } from '../../review-status.js';
 
@@ -29,5 +31,28 @@ describe.sequential('durable review pipeline handler registration', () => {
     registerDurableReviewPipelineHandler(async () => true);
 
     expect(hasDurableReviewPipelineHandler()).toBe(true);
+  });
+
+  it('injects the registered dispatcher into host-side pipeline input', async () => {
+    const dispatchReview = vi.fn(async () => ({ success: true }));
+    registerDurableReviewDispatcher(dispatchReview);
+    registerDurableReviewPipelineHandler(async (input) => {
+      const result = await input.dispatchReview({
+        issueId: input.issueId,
+        workspace: '/workspace',
+        branch: 'feature/pan-3187',
+      });
+      return result.success;
+    });
+
+    await expect(startRegisteredDurableReviewPipelineHostSide({
+      issueId: 'PAN-3187',
+      setReviewPending: vi.fn(),
+    })).resolves.toBe(true);
+    expect(dispatchReview).toHaveBeenCalledWith({
+      issueId: 'PAN-3187',
+      workspace: '/workspace',
+      branch: 'feature/pan-3187',
+    });
   });
 });

@@ -69,20 +69,29 @@ function logBuiltInDefaultNotice(provider: string, harness: RuntimeName): void {
 export async function resolveHarness(input: ResolveHarnessInput): Promise<RuntimeName> {
   const provider = getProviderForModelSync(input.model).name;
   const { config } = loadYamlConfig();
-  // Harness is PROVIDER-DEFAULT-ONLY (PAN-1984). It is derived solely from the model's
-  // provider — the per-provider default (Settings → Providers) else the built-in default.
-  // We no longer honor a per-spawn explicit override or a per-role harness:
-  // `input.explicit` / `input.role` are accepted for signature compatibility but
-  // INTENTIONALLY IGNORED. This removes the entire class of harness↔model mismatch bugs
-  // (e.g. Pi+GPT-5.5 selected when Codex is GPT-5.5's real provider default) and the
-  // stale-harness-on-resume bug — a provider/config change now always flows through
-  // instead of a frozen state.json harness winning forever.
+  // Harness is provider-default UNLESS an explicit pick arrives (PAN-1984 plus
+  // the 2026-08-02 explicit-pick refinement). Without `input.explicit`, the
+  // harness derives solely from the model's provider — the per-provider default
+  // (Settings → Providers) else the built-in default — which kills the class of
+  // harness↔model mismatch bugs (e.g. Pi+GPT-5.5 selected when Codex is
+  // GPT-5.5's real provider default) and the stale-harness-on-resume bug.
+  // `input.role` is accepted for signature compatibility but INTENTIONALLY
+  // IGNORED.
+  //
+  // `input.explicit` IS honored: surfaces that let the operator choose the
+  // harness directly (the model picker's harness-labeled rows — "Kimi K3 (1M)
+  // — Kimi Code CLI" vs "… — Claude Code" vs "… — ACP") pass it through, and
+  // silently discarding it would launch a harness the operator did not pick.
+  // The pick is still policy-gated (canUseHarnessSync) and fail-loud: a denied
+  // combo or a missing binary throws instead of rerouting to the provider
+  // default.
   const providerHarness = config.providerHarnesses?.[provider];
   const builtInHarness = getBuiltInDefaultHarness(provider);
+  const explicit = input.explicit;
 
-  const winner = providerHarness ?? builtInHarness ?? 'claude-code';
+  const winner = explicit ?? providerHarness ?? builtInHarness ?? 'claude-code';
 
-  if (!providerHarness) {
+  if (!providerHarness && !explicit) {
     logBuiltInDefaultNotice(provider, winner);
   }
 
@@ -94,6 +103,11 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
 
   const decision = canUseHarnessSync(winner, input.model, authMode);
   if (!decision.allowed) {
+    if (explicit) {
+      throw new HarnessResolutionError(
+        `Harness ${explicit} denied for ${input.model} (${decision.reason ?? 'policy denied'}) — refusing to silently reroute an explicit harness pick to the provider default.`,
+      );
+    }
     // PAN-1871 — only fall back to claude-code when it is the model's NATIVE
     // harness (Anthropic). For CLIProxy-routed models (kimi, gpt-5.5, …) the
     // provider default is pi/codex; claude-code would route them through
@@ -120,9 +134,10 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
     const binary = configuredHarnessBinaryPath(winner) ?? harnessBinaryName(winner);
     // PAN-1871 — never silently fall back to claude-code from a non-native
     // (CLIProxy) model whose own binary is missing at spawn. An explicitly
-    // configured ACP harness has the same fail-loud contract: falling back
-    // would silently ignore the operator's transport choice.
-    if (winner === 'acp' || (builtInHarness && builtInHarness !== 'claude-code')) {
+    // configured ACP harness — or any explicit operator pick — has the same
+    // fail-loud contract: falling back would silently ignore the operator's
+    // transport choice.
+    if (explicit || winner === 'acp' || (builtInHarness && builtInHarness !== 'claude-code')) {
       const remediation = configuredHarnessBinaryPath(winner)
         ? `Fix the configured executable path ${binary} and retry.`
         : `Install ${binary} (check its PATH) and retry.`;

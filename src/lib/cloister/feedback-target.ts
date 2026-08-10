@@ -264,6 +264,24 @@ export async function surfaceIssueFeedbackNeedsYou(
 ): Promise<void> {
   try {
     const { markWorkspaceStuck, FEEDBACK_DELIVERY_STUCK_REASON } = await import('../review-status.js');
+    // PAN-3511: consult evidence from the host-recorded active review run
+    // before mutating the row. A workspace artifact never authorizes a terminal
+    // verdict; the canonical review done signal owns that transition, so a
+    // delivery failure still receives its protective stuck mark.
+    try {
+      const [{ getAgentStateSync }, { readLatestSynthesisVerdictAsync }] = await Promise.all([
+        import('../agents/agent-state.js'),
+        import('./synthesis-verdict.js'),
+      ]);
+      const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+      const artifact = await readLatestSynthesisVerdictAsync(issueId, {
+        runId: state?.reviewRunId,
+        workspacePath: state?.workspace,
+      });
+      if (artifact) console.warn(`[feedback-target] ${issueId}: found fresh ${artifact.verdict} artifact for the active run; awaiting canonical review signal. ${reason}`);
+    } catch (err) {
+      console.warn(`[feedback-target] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}; proceeding with the stuck mark`);
+    }
     markWorkspaceStuck(issueId, FEEDBACK_DELIVERY_STUCK_REASON, {
       reason,
       ...details,

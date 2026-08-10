@@ -28,12 +28,19 @@ export type FilePathExistsState =
 
 const inflight = new Map<string, Promise<{ exists: boolean; kind: FilePathExistsKind }>>();
 
-function inflightKey(cwd: string, path: string): string {
-  return `${cwd}\0${path}`;
+function inflightKey(cwd: string | undefined, path: string): string {
+  return `${cwd ?? ''}\0${path}`;
+}
+
+// Absolute paths resolve without a cwd (the server stats them directly);
+// relative paths have no resolution base without one, so they stay missing.
+function canResolve(cwd: string | undefined, path: string | undefined): path is string {
+  if (!path) return false;
+  return Boolean(cwd) || path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) || path.startsWith('\\\\');
 }
 
 function readCacheState(cwd: string | undefined, path: string | undefined): FilePathExistsState {
-  if (!cwd || !path) return { state: 'missing' };
+  if (!canResolve(cwd, path)) return { state: 'missing' };
   const cached = getCachedExists(cwd, path);
   if (!cached) return { state: 'loading' };
   return cached.exists
@@ -48,7 +55,7 @@ export function useFilePathExists(
   const [state, setState] = useState<FilePathExistsState>(() => readCacheState(cwd, path));
 
   useEffect(() => {
-    if (!cwd || !path) {
+    if (!canResolve(cwd, path)) {
       setState({ state: 'missing' });
       return;
     }

@@ -184,7 +184,7 @@ describe('restoreReviewStatusFromRecords', () => {
       deaconIgnored: true,
       deaconIgnoredAt: '2026-06-15T01:00:00.000Z',
       deaconIgnoredReason: 'operator request',
-      conflictsSince: {
+      legacyConflictMarker: {
         sha: '6ac4a3dc11',
         detectedAt: '2026-07-26T18:58:00.000Z',
         paths: ['scripts/file-size-baseline.txt'],
@@ -220,11 +220,7 @@ describe('restoreReviewStatusFromRecords', () => {
     expect(status!.deaconIgnored).toBe(true);
     expect(status!.deaconIgnoredAt).toBe('2026-06-15T01:00:00.000Z');
     expect(status!.deaconIgnoredReason).toBe('operator request');
-    expect(status!.conflictsSince).toEqual({
-      sha: '6ac4a3dc11',
-      detectedAt: '2026-07-26T18:58:00.000Z',
-      paths: ['scripts/file-size-baseline.txt'],
-    });
+    expect(status).not.toHaveProperty('legacyConflictMarker');
   });
 
   it('does not overwrite a fresh live review cycle with a stale durable verdict', async () => {
@@ -398,8 +394,10 @@ describe('restoreReviewStatusFromRecords', () => {
       'release_status',
       'release_notes',
       'review_cycle_history',
-      'conflicts_since',
     ]);
+
+    // Compatibility storage retained for older database files; restoration deliberately ignores it.
+    const compatibilityOnly = new Set(['conflicts_since']);
 
     // Columns re-derived live or computed by the write path after restore
     const derived = new Set([
@@ -427,7 +425,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'inspect_bead_id',
     ]);
 
-    const accountedFor = new Set([...primaryKey, ...durable, ...derived, ...ephemeralDefaults]);
+    const accountedFor = new Set([...primaryKey, ...durable, ...compatibilityOnly, ...derived, ...ephemeralDefaults]);
 
     const missingFromAudit = [...actual].filter((col) => !accountedFor.has(col));
     const unknownColumns = [...accountedFor].filter((col) => !actual.has(col));

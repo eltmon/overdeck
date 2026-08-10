@@ -75,6 +75,7 @@ function startDeps(stateRoot: string, overrides: Partial<StartFlywheelRunDeps> =
     writeStatus: vi.fn(async () => 'latest.json'),
     cleanupSpawnedRun: vi.fn(async () => {}),
     orderStateRoot: () => stateRoot,
+    prepareIssueStore: vi.fn(async () => {}),
     validateOrderBook: () => ({ blocks: [], warns: [] }),
     ...overrides,
   };
@@ -103,6 +104,28 @@ describe('pan flywheel start --orders', () => {
     expect(launch).toMatchObject({ runId: 'RUN-1', orders: { bookId } });
     expect(getBook(stateRoot, bookId)).toMatchObject({ status: 'running', runId: 'RUN-1' });
     expect(deps.spawn).toHaveBeenCalledOnce();
+  });
+
+  it('awaits issue-store preparation before order validation', async () => {
+    const stateRoot = gitFixture();
+    overdeckHome();
+    const bookId = '2026-07-18-prepare-order';
+    await readyBook(stateRoot, bookId);
+    const calls: string[] = [];
+    const deps = startDeps(stateRoot, {
+      prepareIssueStore: async () => {
+        await Promise.resolve();
+        calls.push('prepared');
+      },
+      validateOrderBook: () => {
+        calls.push('validated');
+        return { blocks: [], warns: [] };
+      },
+    });
+
+    await startFlywheelRun({ cwd: process.cwd(), orders: bookId }, deps);
+
+    expect(calls).toEqual(['prepared', 'validated']);
   });
 
   it('resolves and appends the configured brief overlay for the spawned orchestrator', async () => {

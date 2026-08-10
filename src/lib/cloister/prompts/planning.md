@@ -172,15 +172,17 @@ If the issue will require browser-based verification, encode that expectation cl
 {{#TLDR_AVAILABLE}}
 ### TLDR: Token-Efficient Code Discovery
 
-You have access to TLDR MCP tools for broad codebase discovery without reading full files first. Prefer these summaries during exploration, then use full Reads only when you need exact implementation details for the xBRIEF:
-- `tldr_context <file>` — summarize a candidate file's structure, imports, exports, and key functions
-- `tldr_structure <directory>` — understand a subsystem layout before choosing files to inspect
-- `tldr_semantic <query>` — find code by behavior or concept when the affected files are unknown
-- `tldr_calls <function> <file>` — identify callers that may constrain the plan
-- `tldr_impact <function> <file>` — see what a function touches before defining task boundaries or hazards
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-Use TLDR first for discovery breadth, and reserve full Reads for authoritative details you will encode into decisions, hazards, acceptance criteria, or task descriptions.
-
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
 ### Task Granularity — Decompose Aggressively
 
@@ -220,7 +222,7 @@ Every item MUST declare these metadata fields:
 - `kind: "docs" | "api" | "backend" | "frontend" | "infra" | "test" | "refactor" | "design" | "spike"` — subject-matter routing category. Emit it on every item; when the category is unclear or mixed, use `"backend"` as the default.
 - `files_scope: string[]` — concrete files or narrow globs the item is expected to touch. Do not use broad repo-wide globs such as `**/*`, `src/**/*`, or `*.ts`.
 - `files_scope_confidence: "high" | "medium" | "low"` — confidence that `files_scope` is accurate.
-- `readiness: "ready" | "sequential" | "needs_refinement"` — `ready` means independently dispatchable, `sequential` means deliberately serialized despite clear scope, and `needs_refinement` means the item is not dispatch-ready and must be split or clarified before work starts.
+- `readiness: "ready" | "sequential" | "needs_refinement"` — this is a static parallel-safety classification, not whether the item can dispatch before its blockers finish. `ready` means the item may run in its own slot once DAG predecessors complete; incoming `blocks` edges do not make it `sequential`. `sequential` means it must remain intentionally serialized even after prerequisites complete, and `needs_refinement` means the item must be split or clarified before work starts.
 
 For every slot-eligible item, also declare:
 - `verify_commands: string[]` — commands a slot can run before merging, scoped as tightly as the item allows.
@@ -382,7 +384,7 @@ It MUST have exactly two top-level keys: `xBRIEFInfo` and `plan`.
 - Use `metadata.traces` to preserve FR-N/NFR-N requirement IDs from the PRD draft on the plan items that satisfy them.
 - `metadata.kind` is REQUIRED on every plan item for subject-matter routing. Use one of: `"docs"`, `"api"`, `"backend"`, `"frontend"`, `"infra"`, `"test"`, `"refactor"`, `"design"`, `"spike"`. Default to `"backend"` when no category is specified by the issue or discovery.
 - **Documentation is required work, and finalize enforces it.** The plan MUST carry the PRD's documentation work item: at least one active item either sets `metadata.kind: "docs"` or names a documentation file — `.md`/`.mdx`, or a path under `docs/` — in its `metadata.files_scope`. Either shape satisfies the gate, so a vertical slice that updates its own docs counts; you do not need a separate docs-only item. Name the exact doc files the change touches (user-facing Mintlify pages, `docs/…`, the relevant `CLAUDE.md`/rule sections). If the change genuinely alters no documented surface, set `plan.metadata.docsJustification` to a sentence saying why. Otherwise finalize fails with `docs-item-missing`. Note that "docs updated"-style phrasings are still banned as acceptance criteria — state what the docs now say or show, observably.
-- `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness` are REQUIRED on every plan item. Use `readiness: "ready"` only for independently dispatchable tracer-bullet slices, `readiness: "sequential"` for deliberate serialization, and `readiness: "needs_refinement"` when the item must be split or clarified before work.
+- `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness` are REQUIRED on every plan item. Classify readiness independently of DAG position: never derive it from zero in-degree or the initial frontier. An item with incoming `blocks` edges should still be `ready` when it can run in its own slot after those blockers complete; the DAG controls when it dispatches. Use `sequential` only when it must stay serialized even after prerequisites complete, and `needs_refinement` when it must be split or clarified before work.
 - `metadata.verify_commands` and `metadata.expected_outputs` are REQUIRED on every slot-eligible item. Commands must be concrete and expected outputs must name the evidence the worker should see.
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the task lays a foundation other xBRIEF tasks depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
 - `metadata.inspectionDepth` defaults to `"fast"` when omitted. Set it to `"deep"` only when `requiresInspection` is true and the task needs a stronger architecture/safety review.

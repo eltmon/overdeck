@@ -25,11 +25,18 @@ import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../.
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import { clearFeedbackDeliveryStuck, getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
+import {
+  clearFeedbackDeliveryStuck,
+  getReviewStatusSync,
+  registerReviewVerdictFeedbackDelivery,
+  type ReviewStatus,
+} from '../../../../lib/review-status.js';
 import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
+import { deliverReviewVerdictFeedbackFromStatus } from '../../../../lib/cloister/review-verdict-feedback.js';
+import { spawnReviewRoleForIssue } from '../../../../lib/cloister/review-agent.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
 import { requestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -58,9 +65,11 @@ const pushRemoteReviewBranch = async (vmName: string, workspacePath: string, bra
   const command = `cd ${workspacePath} && GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true SSH_ASKPASS=true git push origin ${branchName}`;
   await execAsync(flyExecCmd(vmName, command), { encoding: 'utf-8', timeout: 30_000 });
 };
+registerReviewVerdictFeedbackDelivery(deliverReviewVerdictFeedbackFromStatus);
 registerDashboardDurableReviewPipeline({
   getWorkspaceInfo: getWorkspaceInfoForIssue,
   pushRemote: pushRemoteReviewBranch,
+  dispatchReview: (context) => Effect.runPromise(spawnReviewRoleForIssue(context)),
 });
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;

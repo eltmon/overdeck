@@ -12,6 +12,7 @@ import { costAction } from './cost.js';
 import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
+import { moveAction } from './move.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -97,6 +98,12 @@ export function registerConversationsCommands(program: Command): void {
     .description('Print the Claude JSONL transcript path for a conversation id (the /conv/<N> number)')
     .option('--json', 'Output status/path as JSON; read the status field')
     .action((id: string, opts: { json?: boolean }) => jsonlAction(id, opts));
+
+  // ── move ────────────────────────────────────────────────────────────────────
+  conversations
+    .command('move <query> <projectKey>')
+    .description('Reassign a conversation to a different project (exact name, then fuzzy title match)')
+    .action((query: string, projectKey: string) => moveAction(query, projectKey));
 
   // ── current ───────────────────────────────────────────────────────────────────
   conversations

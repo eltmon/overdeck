@@ -1,0 +1,1217 @@
+[
+  {
+    "issueId": "PAN-1525",
+    "isMandatory": true,
+    "negAt": null,
+    "passAt": null,
+    "minutes": null,
+    "negState": null,
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
+    "commitMethod": "compacted-no-events",
+    "commitCount": null,
+    "branchExists": null,
+    "error": "events compacted; negAt/passAt unavailable from event log",
+    "resetAt": null
+  },
+  {
+    "issueId": "PAN-2467",
+    "isMandatory": true,
+    "negAt": "2026-07-25T22:34:35.893Z",
+    "passAt": "2026-07-25T23:22:15.348Z",
+    "minutes": 48,
+    "negState": "blocked/pending",
+    "negNotes": "Review dispatch skipped \u2014 already running: agent-pan-2467-review",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3080",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 13,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-25T22:47:28Z",
+        "committedDate": "2026-07-25T22:47:28Z",
+        "headline": "fix(review): reject unverifiable merge artifacts"
+      }
+    ],
+    "branchExists": false,
+    "resetAt": "2026-07-25T22:47:49.624Z"
+  },
+  {
+    "issueId": "PAN-2876",
+    "isMandatory": true,
+    "negAt": "2026-07-27T07:07:11.808Z",
+    "passAt": "2026-07-27T07:42:31.368Z",
+    "minutes": 35,
+    "negState": "blocked/pending",
+    "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T06:44:15.236Z by flywheel-orchestrator). It re-runs automatically after the deploy.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3204",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 14,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T07:14:16Z",
+        "committedDate": "2026-07-27T07:14:16Z",
+        "headline": "fix(dashboard): address subagent review findings"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:14:35.226Z"
+  },
+  {
+    "issueId": "PAN-3037",
+    "isMandatory": true,
+    "negAt": "2026-07-25T22:38:57.993Z",
+    "passAt": "2026-07-25T23:31:49.741Z",
+    "minutes": 53,
+    "negState": "failed/passed",
+    "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3037-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3037-review -e OVERDECK_ISSUE_ID=PAN-3037 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3037-review/launcher.sh\nduplicate session: agent-pan-3037-review\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
+    "commitMethod": "pr-commits",
+    "commitCount": 3,
+    "prTotalCommits": 20,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-25T23:03:26Z",
+        "committedDate": "2026-07-25T23:03:26Z",
+        "headline": "fix(cloister): resolve conflicts from target branch"
+      },
+      {
+        "authoredDate": "2026-07-25T23:03:51Z",
+        "committedDate": "2026-07-25T23:03:51Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3037"
+      },
+      {
+        "authoredDate": "2026-07-25T23:25:32Z",
+        "committedDate": "2026-07-25T23:25:32Z",
+        "headline": "test(specialists): expect inspect feedback notes"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-25T23:03:49.515Z"
+  },
+  {
+    "issueId": "PAN-3052",
+    "isMandatory": true,
+    "negAt": "2026-07-25T12:51:48.999Z",
+    "passAt": "2026-07-25T13:15:05.225Z",
+    "minutes": 23,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3052-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3052 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3052-review -e OVERDECK_ISSUE_ID=PAN-3052 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3052-review/launcher.sh\nduplicate session: agent-pan-3052-review\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3065",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 4,
+    "inRangeDetail": [],
+    "branchExists": false,
+    "resetAt": "2026-07-25T12:55:14.605Z"
+  },
+  {
+    "issueId": "PAN-3083",
+    "isMandatory": true,
+    "negAt": "2026-07-25T23:55:09.301Z",
+    "passAt": "2026-07-26T00:17:07.793Z",
+    "minutes": 22,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3083-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3083-review -e OVERDECK_ISSUE_ID=PAN-3083 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3083-review/launcher.sh\nduplicate session: agent-pan-3083-review\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3089",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 9,
+    "inRangeDetail": [],
+    "branchExists": false,
+    "resetAt": "2026-07-25T23:58:02.288Z"
+  },
+  {
+    "issueId": "PAN-3097",
+    "isMandatory": true,
+    "negAt": "2026-07-26T03:30:18.325Z",
+    "passAt": "2026-07-26T03:50:03.364Z",
+    "minutes": 20,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
+    "commitMethod": "pr-commits",
+    "commitCount": 10,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T02:41:57Z",
+        "committedDate": "2026-07-26T03:36:40Z",
+        "headline": "feat(frontend): add issue reference formatter"
+      },
+      {
+        "authoredDate": "2026-07-26T02:44:26Z",
+        "committedDate": "2026-07-26T03:36:40Z",
+        "headline": "feat(dashboard): show issue titles in question dialog"
+      },
+      {
+        "authoredDate": "2026-07-26T02:46:52Z",
+        "committedDate": "2026-07-26T03:36:40Z",
+        "headline": "feat(dashboard): populate issue titles for prompts"
+      },
+      {
+        "authoredDate": "2026-07-26T02:51:30Z",
+        "committedDate": "2026-07-26T03:36:40Z",
+        "headline": "feat(dashboard): show issue titles in decisions"
+      },
+      {
+        "authoredDate": "2026-07-26T02:54:32Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "feat(dashboard): show issue titles in activity feed"
+      },
+      {
+        "authoredDate": "2026-07-26T02:55:27Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "docs: require self-contained agent questions"
+      },
+      {
+        "authoredDate": "2026-07-26T02:56:32Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "docs: reinforce standalone planning questions"
+      },
+      {
+        "authoredDate": "2026-07-26T02:57:27Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "docs: explain question context rendering"
+      },
+      {
+        "authoredDate": "2026-07-26T03:17:15Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "chore: record planning prompt change"
+      },
+      {
+        "authoredDate": "2026-07-26T03:36:25Z",
+        "committedDate": "2026-07-26T03:36:41Z",
+        "headline": "fix(cli): refresh composer command manifest"
+      }
+    ],
+    "branchExists": false,
+    "resetAt": "2026-07-26T03:30:55.924Z"
+  },
+  {
+    "issueId": "PAN-3109",
+    "isMandatory": true,
+    "negAt": "2026-07-26T06:27:58.716Z",
+    "passAt": "2026-07-26T06:50:05.157Z",
+    "minutes": 22,
+    "negState": "failed/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3112",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 4,
+    "inRangeDetail": [],
+    "branchExists": false,
+    "resetAt": "2026-07-26T06:30:31.344Z"
+  },
+  {
+    "issueId": "PAN-3110",
+    "isMandatory": true,
+    "negAt": "2026-07-26T12:02:21.024Z",
+    "passAt": "2026-07-26T12:43:15.248Z",
+    "minutes": 41,
+    "negState": "failed/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3136",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T12:36:03Z",
+        "committedDate": "2026-07-26T12:36:03Z",
+        "headline": "fix: close merge recovery review gaps (PAN-3110)"
+      },
+      {
+        "authoredDate": "2026-07-26T12:36:23Z",
+        "committedDate": "2026-07-26T12:36:23Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3110"
+      }
+    ],
+    "branchExists": false,
+    "resetAt": "2026-07-26T12:02:45.956Z"
+  },
+  {
+    "issueId": "PAN-3114",
+    "isMandatory": true,
+    "negAt": "2026-07-26T10:38:07.947Z",
+    "passAt": "2026-07-26T11:09:56.090Z",
+    "minutes": 32,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: write failed for agents-db:agent-pan-3114-review: database is locked",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 5,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-26T10:39:12.236Z"
+  },
+  {
+    "issueId": "PAN-3115",
+    "isMandatory": true,
+    "negAt": "2026-07-26T11:22:23.081Z",
+    "passAt": "2026-07-26T12:00:33.370Z",
+    "minutes": 38,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3115-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3115 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3115-review -e OVERDECK_ISSUE_ID=PAN-3115 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-71 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3115-review/launcher.sh\nduplicate session: agent-pan-3115-review\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3134",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 12,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T11:49:52Z",
+        "committedDate": "2026-07-26T11:49:52Z",
+        "headline": "fix(cloister): verify symbolic default branches"
+      },
+      {
+        "authoredDate": "2026-07-26T11:50:07Z",
+        "committedDate": "2026-07-26T11:50:07Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3115"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:26:17.938Z"
+  },
+  {
+    "issueId": "PAN-3147",
+    "isMandatory": true,
+    "negAt": "2026-07-26T17:50:20.814Z",
+    "passAt": "2026-07-26T18:18:47.373Z",
+    "minutes": 28,
+    "negState": "failed/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3149",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 1,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-26T17:52:55.279Z"
+  },
+  {
+    "issueId": "PAN-3155",
+    "isMandatory": true,
+    "negAt": "2026-07-26T20:40:40.607Z",
+    "passAt": "2026-07-26T21:22:35.349Z",
+    "minutes": 42,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 8,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T21:01:49Z",
+        "committedDate": "2026-07-26T21:01:49Z",
+        "headline": "fix: short-circuit deploy dependency checks (PAN-3155)"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T20:40:54.244Z"
+  },
+  {
+    "issueId": "PAN-3158",
+    "isMandatory": true,
+    "negAt": "2026-07-26T20:49:03.785Z",
+    "passAt": "2026-07-26T21:10:09.850Z",
+    "minutes": 21,
+    "negState": "failed/pending",
+    "negNotes": "Verification failed at test",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 7,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T20:50:34Z",
+        "committedDate": "2026-07-26T20:50:34Z",
+        "headline": "test(dashboard): align awaiting merge host coverage"
+      },
+      {
+        "authoredDate": "2026-07-26T21:00:47Z",
+        "committedDate": "2026-07-26T21:00:47Z",
+        "headline": "fix(dashboard): scope filtered merge train empty state"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T20:51:00.705Z"
+  },
+  {
+    "issueId": "PAN-3183",
+    "isMandatory": true,
+    "negAt": "2026-07-27T06:31:02.917Z",
+    "passAt": "2026-07-27T07:24:10.918Z",
+    "minutes": 53,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3201",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 10,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T07:04:17Z",
+        "committedDate": "2026-07-27T07:04:17Z",
+        "headline": "fix(db): make boot reconciliation commit-aware"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:06:08.383Z"
+  },
+  {
+    "issueId": "PAN-3184",
+    "isMandatory": true,
+    "negAt": "2026-07-27T06:05:17.116Z",
+    "passAt": "2026-07-27T06:56:52.947Z",
+    "minutes": 52,
+    "negState": "blocked/pending",
+    "negNotes": "FR-3 measures clean-shutdown freshness at grace expiry instead of bootStartedAt; the required marker round-trip test is also missing",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
+    "commitMethod": "pr-commits",
+    "commitCount": 11,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T05:03:03Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(cloister): widen boot resume candidacy (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:08:28Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(cloister): auto-release vacuous boot holds (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:14:45Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(dashboard): persist clean shutdown marker (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:17:38Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(cloister): classify boot expiry default (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:24:00Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(cloister): make boot resume origin-aware (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:24:18Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(cloister): preserve deacon file-size ratchet (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:27:53Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(dashboard): expose live boot hold state (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:33:16Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "fix(dashboard): render live boot hold banner (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:35:30Z",
+        "committedDate": "2026-07-27T06:36:27Z",
+        "headline": "docs(cloister): document classified boot expiry (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T06:35:40Z",
+        "committedDate": "2026-07-27T06:36:28Z",
+        "headline": "fix(cloister): anchor clean boot freshness (PAN-3184)"
+      },
+      {
+        "authoredDate": "2026-07-27T06:35:59Z",
+        "committedDate": "2026-07-27T06:36:28Z",
+        "headline": "test(codex): await request log before cleanup (PAN-3184)"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T06:35:01.334Z"
+  },
+  {
+    "issueId": "PAN-3192",
+    "isMandatory": true,
+    "negAt": "2026-07-27T05:35:48.544Z",
+    "passAt": "2026-07-27T06:10:50.739Z",
+    "minutes": 35,
+    "negState": "blocked/pending",
+    "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3198",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 6,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T05:49:55Z",
+        "committedDate": "2026-07-27T05:49:55Z",
+        "headline": "fix: fail frontend guard on compiler crash (PAN-3192)"
+      },
+      {
+        "authoredDate": "2026-07-27T05:50:14Z",
+        "committedDate": "2026-07-27T05:50:14Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3192"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T05:50:13.044Z"
+  },
+  {
+    "issueId": "PAN-3206",
+    "isMandatory": true,
+    "negAt": "2026-07-27T18:37:07.982Z",
+    "passAt": "2026-07-27T19:29:51.362Z",
+    "minutes": 53,
+    "negState": "failed/pending",
+    "negNotes": "Verification error: Verification worker 2045091 exited before writing a result",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 16,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T18:45:25Z",
+        "committedDate": "2026-07-27T18:45:25Z",
+        "headline": "chore(cli): refresh close command manifest PAN-3206"
+      },
+      {
+        "authoredDate": "2026-07-27T19:14:39Z",
+        "committedDate": "2026-07-27T19:14:39Z",
+        "headline": "fix(review): harden verdict reconciliation PAN-3206"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T18:45:43.531Z"
+  },
+  {
+    "issueId": "PAN-3216",
+    "isMandatory": true,
+    "negAt": "2026-07-28T06:40:30.326Z",
+    "passAt": "2026-07-28T07:25:42.825Z",
+    "minutes": 45,
+    "negState": "failed/pending",
+    "negNotes": "Verification error: Verification worker 1874133 exited before writing a result",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3219",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 1,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-28T07:07:50.045Z"
+  },
+  {
+    "issueId": "PAN-3230",
+    "isMandatory": true,
+    "negAt": "2026-07-28T19:07:34.616Z",
+    "passAt": "2026-07-28T20:05:45.836Z",
+    "minutes": 58,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 24,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T19:17:32Z",
+        "committedDate": "2026-07-28T19:17:32Z",
+        "headline": "fix(infra): enforce durable state path writes"
+      },
+      {
+        "authoredDate": "2026-07-28T19:38:28Z",
+        "committedDate": "2026-07-28T19:38:28Z",
+        "headline": "fix(infra): close state path review gaps"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T19:11:38.189Z"
+  },
+  {
+    "issueId": "PAN-3356",
+    "isMandatory": true,
+    "negAt": "2026-07-31T20:45:43.264Z",
+    "passAt": "2026-07-31T21:31:46.047Z",
+    "minutes": 46,
+    "negState": "blocked/pending",
+    "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition \u2014 `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 19,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-31T21:14:42Z",
+        "committedDate": "2026-07-31T21:14:42Z",
+        "headline": "fix(dashboard): clear cockpit stuck state"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-31T21:15:00.405Z"
+  },
+  {
+    "issueId": "MIN-858",
+    "isMandatory": true,
+    "negAt": "2026-07-25T12:51:37.111Z",
+    "passAt": "2026-07-25T13:07:47.534Z",
+    "minutes": 16,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 1,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:57:45.130Z"
+  },
+  {
+    "issueId": "MIN-879",
+    "isMandatory": true,
+    "negAt": "2026-07-26T05:58:18.535Z",
+    "passAt": "2026-07-26T06:41:35.735Z",
+    "minutes": 43,
+    "negState": "passed/failed",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 11,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-26T06:20:38.473Z"
+  },
+  {
+    "issueId": "MIN-896",
+    "isMandatory": true,
+    "negAt": "2026-07-26T01:54:56.569Z",
+    "passAt": "2026-07-26T02:38:31.158Z",
+    "minutes": 44,
+    "negState": "failed/pending",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 15,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-26T01:55:12.065Z"
+  },
+  {
+    "issueId": "MIN-901",
+    "isMandatory": true,
+    "negAt": "2026-07-25T12:52:13.226Z",
+    "passAt": "2026-07-25T13:08:06.763Z",
+    "minutes": 16,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 9,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:54:03.350Z"
+  },
+  {
+    "issueId": "MIN-902",
+    "isMandatory": false,
+    "negAt": "2026-07-25T12:47:26.766Z",
+    "passAt": "2026-07-25T13:30:24.102Z",
+    "minutes": 43,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 3,
+    "prTotalCommits": 14,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:50:55.030Z"
+  },
+  {
+    "issueId": "PAN-3055",
+    "isMandatory": false,
+    "negAt": "2026-07-25T12:52:37.684Z",
+    "passAt": "2026-07-25T13:18:48.056Z",
+    "minutes": 26,
+    "negState": "failed/pending",
+    "negNotes": "Verification failed at typecheck",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 5,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-25T12:55:32Z",
+        "committedDate": "2026-07-25T12:55:32Z",
+        "headline": "fix(dashboard): type pending reap resolution (PAN-3055)"
+      }
+    ],
+    "branchExists": false,
+    "resetAt": "2026-07-25T12:56:31.811Z"
+  },
+  {
+    "issueId": "MIN-891",
+    "isMandatory": false,
+    "negAt": "2026-07-25T12:53:58.068Z",
+    "passAt": "2026-07-25T13:44:34.987Z",
+    "minutes": 51,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": null,
+    "commitMethod": "mr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 9,
+    "inRangeDetail": [],
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T13:04:47.715Z"
+  },
+  {
+    "issueId": "PAN-3076",
+    "isMandatory": false,
+    "negAt": "2026-07-25T23:00:51.154Z",
+    "passAt": "2026-07-26T00:00:33.233Z",
+    "minutes": 60,
+    "negState": "blocked/pending",
+    "negNotes": "Unchanged HEAD still preserves passed review on failed Git inspection; write-site guard still misses raw writes in allowlisted files",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 18,
+    "inRangeDetail": [],
+    "branchExists": false,
+    "resetAt": "2026-07-25T23:09:28.933Z"
+  },
+  {
+    "issueId": "PAN-2997",
+    "isMandatory": false,
+    "negAt": "2026-07-26T10:59:28.994Z",
+    "passAt": "2026-07-26T11:43:52.744Z",
+    "minutes": 44,
+    "negState": "blocked/pending",
+    "negNotes": "Poison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
+    "commitMethod": "pr-commits",
+    "commitCount": 3,
+    "prTotalCommits": 27,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T11:19:18Z",
+        "committedDate": "2026-07-26T11:19:18Z",
+        "headline": "fix: recoverable classification for poison-clear failures (PAN-2997)"
+      },
+      {
+        "authoredDate": "2026-07-26T11:19:50Z",
+        "committedDate": "2026-07-26T11:19:50Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-2997"
+      },
+      {
+        "authoredDate": "2026-07-26T11:30:36Z",
+        "committedDate": "2026-07-26T11:30:36Z",
+        "headline": "fix: initial poison read rejects as recoverable marker error (PAN-2997)"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:19:49.380Z"
+  },
+  {
+    "issueId": "PAN-1696",
+    "isMandatory": false,
+    "negAt": "2026-07-26T11:21:55.248Z",
+    "passAt": "2026-07-26T11:55:30.928Z",
+    "minutes": 34,
+    "negState": "passed/failed",
+    "negNotes": "Approved at f8bb608b: invalid project fields now fail closed, the collapsed cockpit summary includes generation status and Awaiting Merge navigation, and focused verification plus CI are green. Report: .pan/review/agent-pan-1696-review-f8bb608b/review.md",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 47,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T11:49:25Z",
+        "committedDate": "2026-07-26T11:49:25Z",
+        "headline": "Merge origin/main into feature/pan-1696 (6)"
+      },
+      {
+        "authoredDate": "2026-07-26T11:50:34Z",
+        "committedDate": "2026-07-26T11:50:34Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-1696"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:49:57.471Z"
+  },
+  {
+    "issueId": "PAN-3128",
+    "isMandatory": false,
+    "negAt": "2026-07-26T14:45:23.661Z",
+    "passAt": "2026-07-26T15:38:54.181Z",
+    "minutes": 54,
+    "negState": "blocked/pending",
+    "negNotes": "Agent re-review request (2/25): Fixed review issues",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 10,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-26T14:58:02.407Z"
+  },
+  {
+    "issueId": "PAN-3135",
+    "isMandatory": false,
+    "negAt": "2026-07-26T15:13:46.880Z",
+    "passAt": "2026-07-26T16:04:50.648Z",
+    "minutes": 51,
+    "negState": "blocked/pending",
+    "negNotes": "Agent re-review request (1/25): Fixed review issues",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
+    "commitMethod": "pr-commits",
+    "commitCount": 4,
+    "prTotalCommits": 22,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T15:30:50Z",
+        "committedDate": "2026-07-26T15:30:50Z",
+        "headline": "fix: preserve durable review workspace semantics (PAN-3135)"
+      },
+      {
+        "authoredDate": "2026-07-26T15:31:19Z",
+        "committedDate": "2026-07-26T15:31:19Z",
+        "headline": "fix: target deploy escalation at current verifier (PAN-3135)"
+      },
+      {
+        "authoredDate": "2026-07-26T15:31:47Z",
+        "committedDate": "2026-07-26T15:31:47Z",
+        "headline": "fix: defer auto-merge before preparation (PAN-3135)"
+      },
+      {
+        "authoredDate": "2026-07-26T15:34:24Z",
+        "committedDate": "2026-07-26T15:34:24Z",
+        "headline": "fix: publish deploy queue locks atomically (PAN-3135)"
+      }
+    ],
+    "branchExists": false,
+    "resetAt": "2026-07-26T15:25:12.800Z"
+  },
+  {
+    "issueId": "PAN-3093",
+    "isMandatory": false,
+    "negAt": "2026-07-26T18:36:03.067Z",
+    "passAt": "2026-07-26T19:09:28.090Z",
+    "minutes": 33,
+    "negState": "blocked/pending",
+    "negNotes": "The configured branch-prefix fix reaches assembly but not reconciler anchors, so valid custom-prefix generations are invalidated",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 17,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-26T18:46:48.193Z"
+  },
+  {
+    "issueId": "PAN-3138",
+    "isMandatory": false,
+    "negAt": "2026-07-26T18:46:12.921Z",
+    "passAt": "2026-07-26T19:40:34.905Z",
+    "minutes": 54,
+    "negState": "blocked/pending",
+    "negNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
+    "commitMethod": "pr-commits",
+    "commitCount": 3,
+    "prTotalCommits": 17,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T19:07:42Z",
+        "committedDate": "2026-07-26T19:07:42Z",
+        "headline": "fix: queue every post-merge lifecycle generation"
+      },
+      {
+        "authoredDate": "2026-07-26T19:09:10Z",
+        "committedDate": "2026-07-26T19:09:10Z",
+        "headline": "chore: remove retired file-size baseline"
+      },
+      {
+        "authoredDate": "2026-07-26T19:09:16Z",
+        "committedDate": "2026-07-26T19:09:16Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3138"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T19:11:46.473Z"
+  },
+  {
+    "issueId": "PAN-3162",
+    "isMandatory": false,
+    "negAt": "2026-07-26T22:58:21.722Z",
+    "passAt": "2026-07-26T23:49:19.571Z",
+    "minutes": 51,
+    "negState": "blocked/pending",
+    "negNotes": "PR HEAD is unchanged and still contains both prior correctness blockers; the uncommitted rework also leaves a reverse merge-set lost-update race",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
+    "commitMethod": "pr-commits",
+    "commitCount": 3,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-26T23:10:57Z",
+        "committedDate": "2026-07-26T23:10:57Z",
+        "headline": "fix: bind merge evidence to current artifacts (PAN-3162)"
+      },
+      {
+        "authoredDate": "2026-07-26T23:11:09Z",
+        "committedDate": "2026-07-26T23:11:09Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3162"
+      },
+      {
+        "authoredDate": "2026-07-26T23:37:03Z",
+        "committedDate": "2026-07-26T23:37:03Z",
+        "headline": "fix: make merge reconciliation atomic (PAN-3162)"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-26T23:06:55.746Z"
+  },
+  {
+    "issueId": "PAN-3187",
+    "isMandatory": false,
+    "negAt": "2026-07-27T07:08:50.061Z",
+    "passAt": "2026-07-27T07:53:24.734Z",
+    "minutes": 45,
+    "negState": "blocked/pending",
+    "negNotes": "The recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3203",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T07:31:20Z",
+        "committedDate": "2026-07-27T07:31:20Z",
+        "headline": "fix(cloister): bound closed review sweeps (PAN-3187)"
+      },
+      {
+        "authoredDate": "2026-07-27T07:31:37Z",
+        "committedDate": "2026-07-27T07:31:37Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3187"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:31:36.718Z"
+  },
+  {
+    "issueId": "PAN-3111",
+    "isMandatory": false,
+    "negAt": "2026-07-27T11:13:06.782Z",
+    "passAt": "2026-07-27T11:53:55.192Z",
+    "minutes": 41,
+    "negState": "blocked/pending",
+    "negNotes": "Agent re-review request (2/25): Fixed cycle-4 findings",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 36,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T11:37:29Z",
+        "committedDate": "2026-07-27T11:37:29Z",
+        "headline": "fix: preserve autonomous release-source authority (PAN-3111)"
+      },
+      {
+        "authoredDate": "2026-07-27T11:39:23Z",
+        "committedDate": "2026-07-27T11:39:23Z",
+        "headline": "fix: reject contended auto-start consent (PAN-3111)"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:40:50.144Z"
+  },
+  {
+    "issueId": "PAN-3154",
+    "isMandatory": false,
+    "negAt": "2026-07-27T11:52:17.030Z",
+    "passAt": "2026-07-27T12:47:17.566Z",
+    "minutes": 55,
+    "negState": "blocked/pending",
+    "negNotes": "Verification failed at test",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3208",
+    "commitMethod": "pr-commits",
+    "commitCount": 5,
+    "prTotalCommits": 13,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T11:58:53Z",
+        "committedDate": "2026-07-27T11:58:53Z",
+        "headline": "fix(cloister): stop dropping non-GitHub projects and unrecorded confl\u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:18:40Z",
+        "committedDate": "2026-07-27T12:18:40Z",
+        "headline": "Merge origin/main into feature/pan-3154"
+      },
+      {
+        "authoredDate": "2026-07-27T12:26:29Z",
+        "committedDate": "2026-07-27T12:26:29Z",
+        "headline": "fix(db): repeat the v61 top-ups in the v61->v62 migration path (PAN-3\u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:26:39Z",
+        "committedDate": "2026-07-27T12:26:39Z",
+        "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3154"
+      },
+      {
+        "authoredDate": "2026-07-27T12:28:55Z",
+        "committedDate": "2026-07-27T12:28:55Z",
+        "headline": "chore: correct schema.ts file-size allowlist entry to 1740 lines"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:55:34.230Z"
+  },
+  {
+    "issueId": "PAN-3151",
+    "isMandatory": false,
+    "negAt": "2026-07-27T11:56:33.800Z",
+    "passAt": "2026-07-27T12:52:41.940Z",
+    "minutes": 56,
+    "negState": "failed/pending",
+    "negNotes": "Verification failed at typecheck",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "commitMethod": "pr-commits",
+    "commitCount": 5,
+    "prTotalCommits": 42,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-27T12:01:32Z",
+        "committedDate": "2026-07-27T12:01:32Z",
+        "headline": "test: add regression test for review_cycle_history clear on unstick (\u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:07:38Z",
+        "committedDate": "2026-07-27T12:08:06Z",
+        "headline": "test: seed cycle history in review_cycle_history clear regression tes\u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:22:16Z",
+        "committedDate": "2026-07-27T12:22:16Z",
+        "headline": "fix: validate JSON storage format in review_cycle_history regression \u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:27:57Z",
+        "committedDate": "2026-07-27T12:27:57Z",
+        "headline": "fix: remove double-serialization from reviewCycleHistory regression t\u2026"
+      },
+      {
+        "authoredDate": "2026-07-27T12:30:00Z",
+        "committedDate": "2026-07-27T12:30:00Z",
+        "headline": "fix: pass array directly to setReviewStatusSync in regression test (P\u2026"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:56:33.827Z"
+  },
+  {
+    "issueId": "PAN-3025",
+    "isMandatory": false,
+    "negAt": "2026-07-28T08:48:46.946Z",
+    "passAt": "2026-07-28T09:44:14.524Z",
+    "minutes": 55,
+    "negState": "blocked/pending",
+    "negNotes": null,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
+    "commitMethod": "pr-commits",
+    "commitCount": 11,
+    "prTotalCommits": 11,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T06:42:03Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "feat: preserve verificationStatus in close-out journal write (PAN-302\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T06:45:04Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "feat: reset verificationStatus on reopen (PAN-3025 WI-2)"
+      },
+      {
+        "authoredDate": "2026-07-28T06:47:05Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "feat: add journal fallback to row 5 (post-merge) mergeStatus read (PA\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T06:56:55Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "feat: add idempotent short-circuit for re-close workflows (PAN-3025 W\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T06:59:30Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "docs: record verdict durability and idempotent re-close in DEFINITION\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T07:12:07Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "fix: update records test to expect preserved verificationStatus (PAN-\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T07:42:04Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "fix: update close-out-terminal test to expect preserved verificationS\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T08:49:51Z",
+        "committedDate": "2026-07-28T08:50:10Z",
+        "headline": "fix: address all review blocking findings (PAN-3025)"
+      },
+      {
+        "authoredDate": "2026-07-28T09:08:52Z",
+        "committedDate": "2026-07-28T09:08:52Z",
+        "headline": "fix: replace vacuous test mocks with production-path verifications (P\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T09:14:50Z",
+        "committedDate": "2026-07-28T09:14:50Z",
+        "headline": "fix: correct Effect return types and dependency mocking in row-5 and \u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T09:22:57Z",
+        "committedDate": "2026-07-28T09:22:57Z",
+        "headline": "fix: add missing canonical-state mock and strengthen workflow asserti\u2026"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T08:50:18.055Z"
+  },
+  {
+    "issueId": "PAN-3215",
+    "isMandatory": false,
+    "negAt": "2026-07-28T10:04:35.691Z",
+    "passAt": "2026-07-28T10:52:18.014Z",
+    "minutes": 48,
+    "negState": "blocked/pending",
+    "negNotes": "Verification infrastructure error: Verification worker 466058 exited before writing a result",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 7,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T10:38:21Z",
+        "committedDate": "2026-07-28T10:38:21Z",
+        "headline": "fix: address merge verification review findings"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T10:38:47.150Z"
+  },
+  {
+    "issueId": "PAN-3092",
+    "isMandatory": false,
+    "negAt": "2026-07-28T11:36:08.704Z",
+    "passAt": "2026-07-28T12:23:04.769Z",
+    "minutes": 47,
+    "negState": "blocked/pending",
+    "negNotes": "Verification infrastructure error: Verification worker 1786496 exited before writing a result",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
+    "commitMethod": "pr-commits",
+    "commitCount": 2,
+    "prTotalCommits": 16,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T11:46:38Z",
+        "committedDate": "2026-07-28T11:46:38Z",
+        "headline": "fix(db): create event_idempotency in overdeck.db, and bound the sweep\u2026"
+      },
+      {
+        "authoredDate": "2026-07-28T12:02:37Z",
+        "committedDate": "2026-07-28T12:02:37Z",
+        "headline": "fix(cloister): fan warnings out concurrently so no episode is starved"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T11:46:50.036Z"
+  },
+  {
+    "issueId": "PAN-3049",
+    "isMandatory": false,
+    "negAt": "2026-07-28T16:42:28.831Z",
+    "passAt": "2026-07-28T17:12:06.549Z",
+    "minutes": 30,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 19,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-28T16:42:28.850Z"
+  },
+  {
+    "issueId": "PAN-2882",
+    "isMandatory": false,
+    "negAt": "2026-07-28T18:12:53.685Z",
+    "passAt": "2026-07-28T18:52:00.654Z",
+    "minutes": 39,
+    "negState": "blocked/pending",
+    "negNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 10,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T18:34:25Z",
+        "committedDate": "2026-07-28T18:34:25Z",
+        "headline": "fix: satisfy GitLab membership review requirements"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T18:21:38.436Z"
+  },
+  {
+    "issueId": "PAN-3233",
+    "isMandatory": false,
+    "negAt": "2026-07-28T21:10:01.262Z",
+    "passAt": "2026-07-28T21:42:09.459Z",
+    "minutes": 32,
+    "negState": "blocked/pending",
+    "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
+    "commitMethod": "pr-commits",
+    "commitCount": 1,
+    "prTotalCommits": 27,
+    "inRangeDetail": [
+      {
+        "authoredDate": "2026-07-28T21:21:28Z",
+        "committedDate": "2026-07-28T21:21:28Z",
+        "headline": "fix: address review blocking findings for PAN-3233"
+      }
+    ],
+    "branchExists": true,
+    "resetAt": "2026-07-28T21:21:48.850Z"
+  },
+  {
+    "issueId": "PAN-3229",
+    "isMandatory": false,
+    "negAt": "2026-07-28T22:29:59.530Z",
+    "passAt": "2026-07-28T22:47:12.090Z",
+    "minutes": 17,
+    "negState": "failed/pending",
+    "negNotes": "Review role spawn failed: Role run agent-pan-3229-review already running. Use 'pan tell' to message it.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
+    "commitMethod": "pr-commits",
+    "commitCount": 0,
+    "prTotalCommits": 14,
+    "inRangeDetail": [],
+    "branchExists": true,
+    "resetAt": "2026-07-28T22:37:00.723Z"
+  }
+]

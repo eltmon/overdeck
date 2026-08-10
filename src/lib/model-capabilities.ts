@@ -840,8 +840,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'gemini-2.5-flash': { model: 'gemini-2.5-flash', provider: 'google', displayName: 'Gemini 2.5 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 78, 'code-review': 74, debugging: 70, planning: 66, documentation: 74, testing: 70, security: 58, performance: 68, synthesis: 74, speed: 94, 'context-length': 100 } },
 
   // KIMI MODELS
-  'k3': { model: 'k3', provider: 'kimi', displayName: 'Kimi K3', costPer1MTokens: 9, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Kimi K3 coding endpoint alias. 2.8T MoE, always-thinking, 256K context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
-  'k3[1m]': { model: 'k3[1m]', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Kimi K3 coding endpoint 1M alias. 2.8T MoE, always-thinking, 1,048,576-token context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
+  'k3': { model: 'k3', provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Kimi K3 coding endpoint alias. 2.8T MoE, always-thinking, 256K context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
+  'k3[1m]': { model: 'k3[1m]', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Kimi K3 coding endpoint 1M alias. 2.8T MoE, always-thinking, 1,048,576-token context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
 
   'kimi-k2.7-code': {
     model: 'kimi-k2.7-code',
@@ -849,6 +849,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'Kimi K2.7 Code',
     costPer1MTokens: 2.5, // $0.95 in (cache-miss) / $4.00 out; $0.19 in (cache-hit)
     contextWindow: 262144,
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 95, // Coding-first flagship, surpasses K2.6
       'code-review': 93,
@@ -935,10 +936,10 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
 
   // KIMI-CODE NATIVE ALIASES (PAN-1837) — the CLI's own config.toml catalog,
   // namespaced `kimi-code/<alias>`, verified via `kimi provider list --json`.
-  'kimi-code/k3': { model: 'kimi-code/k3', provider: 'kimi', displayName: 'Kimi K3 (native)', costPer1MTokens: 9, contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias for K3 at its full 1M context (maxContextSize=1048576 per `kimi provider list --json`). Launched via `kimi -m kimi-code/k3 --yolo`.' },
-  'kimi-code/k3-256k': { model: 'kimi-code/k3-256k', provider: 'kimi', displayName: 'Kimi K3 (native, 256K)', costPer1MTokens: 9, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Native kimi-code harness alias for K3 at the smaller 256K context tier (maxContextSize=262144 per `kimi provider list --json`). Same per-token pricing as kimi-code/k3.' },
-  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'K2.7 Coding (native)', costPer1MTokens: 2.5, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
-  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'K2.7 Coding Highspeed (native)', costPer1MTokens: 2.5, contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
+  'kimi-code/k3': { model: 'kimi-code/k3', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias for K3 at its full 1M context (maxContextSize=1048576 per `kimi provider list --json`). Launched via `kimi -m kimi-code/k3 --yolo`.' },
+  'kimi-code/k3-256k': { model: 'kimi-code/k3-256k', provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Native kimi-code harness alias for K3 at the smaller 256K context tier (maxContextSize=262144 per `kimi provider list --json`). Same per-token pricing as kimi-code/k3.' },
+  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
+  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'Kimi K2.7 Coding Highspeed', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
@@ -1289,6 +1290,28 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 98,
     },
     notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+  },
+
+  'qwen3.8-max': {
+    model: 'qwen3.8-max',
+    provider: 'dashscope',
+    displayName: 'Qwen3.8 Max (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 1048576,
+    skills: {
+      'code-generation': 97,
+      'code-review': 95,
+      debugging: 95,
+      planning: 96,
+      documentation: 93,
+      testing: 93,
+      security: 91,
+      performance: 91,
+      synthesis: 96,
+      speed: 68,
+      'context-length': 99,
+    },
+    notes: 'Canonical DashScope ID verified from Alibaba Cloud Model Studio docs on 2026-08-03. Preview release (2.4T MoE, always-on thinking, 1M-class context); free 1M-token Model Studio quota (90 days) on the Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Reported pay-as-you-go pricing $2/M in, $6/M out — cost placeholder until intl pricing is confirmed.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@overdeck/contracts';
 
 import {
@@ -11,9 +11,22 @@ import {
 } from '../../../src/cli/commands/flywheel-complete.js';
 import { startFlywheelRun, type StartFlywheelRunDeps } from '../../../src/cli/commands/flywheel.js';
 import { getFlywheelRunDir } from '../../../src/dashboard/server/services/flywheel-run-state.js';
-import { getBook } from '../../../src/lib/orders/resolver.js';
+import { firstReadyBookInQueue, getBook } from '../../../src/lib/orders/resolver.js';
 import type { OrderBookProgress } from '../../../src/lib/orders/types.js';
 import { createBook, setStatus } from '../../../src/lib/orders/writer.js';
+import type { ProjectConfig } from '../../../src/lib/projects.js';
+
+const { mockResolveStateReadHomeSync } = vi.hoisted(() => ({
+  mockResolveStateReadHomeSync: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/state-read-home.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/state-read-home.js')>();
+  return {
+    ...actual,
+    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
+  };
+});
 
 const roots: string[] = [];
 const at = '2026-07-18T12:00:00.000Z';
@@ -117,9 +130,16 @@ function completeDeps(stateRoot: string, overrides: Partial<CompleteFlywheelDeps
     stateRoot: () => stateRoot,
     computeProgress: () => progress(true),
     autoPickupBacklog: () => false,
+    // No other tracked project by default, so a test that does not opt in never
+    // scans the machine's real registry.
+    listProjects: () => [],
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  mockResolveStateReadHomeSync.mockImplementation((config: ProjectConfig) => ({ root: config.path, migrated: true }));
+});
 
 afterEach(() => {
   delete process.env['OVERDECK_HOME'];
@@ -179,6 +199,106 @@ describe('pan flywheel complete', () => {
     await expect(completeFlywheelRun({}, deps)).resolves.toMatchObject({ continuation: 'backlog', nextRunId: 'RUN-2' });
     expect(start).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }));
     expect(start.mock.calls[0]?.[0]).not.toHaveProperty('orders');
+  });
+
+  it('continues into another project when the completing project has no ready book', async () => {
+    const stateRoot = gitFixture();
+    const otherRoot = gitFixture();
+    overdeckHome();
+    await runningBook(stateRoot);
+    await createBook(otherRoot, { id: '2026-07-18-other', name: 'Other', createdAt: at });
+    await setStatus(otherRoot, '2026-07-18-other', 'ready', { at });
+
+    const start = vi.fn(async () => ({ runId: 'RUN-2' }));
+    const scanned: string[] = [];
+    const deps = completeDeps(stateRoot, {
+      start,
+      listProjects: () => [
+        { key: 'completing-project', config: { path: stateRoot } as ProjectConfig },
+        { key: 'other-project', config: { path: otherRoot } as ProjectConfig },
+      ],
+      firstReady: (root) => {
+        scanned.push(root);
+        return firstReadyBookInQueue(root);
+      },
+    });
+
+    const result = await completeFlywheelRun({}, deps);
+
+    expect(result).toMatchObject({
+      continuation: 'next-book',
+      nextRunId: 'RUN-2',
+      nextBookId: '2026-07-18-other',
+      nextProjectKey: 'other-project',
+    });
+    expect(start).toHaveBeenCalledWith({ cwd: otherRoot, orders: '2026-07-18-other' });
+    expect(start.mock.calls[0]?.[0]).not.toHaveProperty('brief');
+    // The completing project's own root was already drained by advanceQueue, so
+    // the scan skips it rather than re-reading it.
+    expect(scanned).toEqual([otherRoot]);
+    expect(getBook(stateRoot, '2026-07-18-current')?.status).toBe('complete');
+  });
+
+  it('prefers the completing project own ready book and never scans other projects', async () => {
+    const stateRoot = gitFixture();
+    overdeckHome();
+    await runningBook(stateRoot);
+    await createBook(stateRoot, { id: '2026-07-18-next', name: 'Next', createdAt: at });
+    await setStatus(stateRoot, '2026-07-18-next', 'ready', { at });
+
+    const start = vi.fn(async () => ({ runId: 'RUN-2' }));
+    const listProjects = vi.fn(() => []);
+    const firstReady = vi.fn(() => null);
+    const deps = completeDeps(stateRoot, { start, listProjects, firstReady });
+
+    const result = await completeFlywheelRun({}, deps);
+
+    expect(result).toMatchObject({ continuation: 'next-book', nextBookId: '2026-07-18-next' });
+    expect(result.nextProjectKey).toBeUndefined();
+    expect(start).toHaveBeenCalledWith({
+      cwd: process.cwd(),
+      brief: join(process.cwd(), 'docs', 'flywheel-brief.md'),
+      orders: '2026-07-18-next',
+    });
+    expect(listProjects).not.toHaveBeenCalled();
+    expect(firstReady).not.toHaveBeenCalled();
+  });
+
+  it('falls through to backlog mode when no project has a ready book', async () => {
+    const stateRoot = gitFixture();
+    const otherRoot = gitFixture();
+    overdeckHome();
+    await runningBook(stateRoot);
+    const start = vi.fn(async () => ({ runId: 'RUN-2' }));
+    const deps = completeDeps(stateRoot, {
+      start,
+      autoPickupBacklog: () => true,
+      listProjects: () => [{ key: 'other-project', config: { path: otherRoot } as ProjectConfig }],
+      firstReady: firstReadyBookInQueue,
+    });
+
+    await expect(completeFlywheelRun({}, deps)).resolves.toMatchObject({ continuation: 'backlog', nextRunId: 'RUN-2' });
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }));
+    expect(start.mock.calls[0]?.[0]).not.toHaveProperty('orders');
+  });
+
+  it('names the project in the console line only when continuation crossed projects', async () => {
+    const stateRoot = gitFixture();
+    const otherRoot = gitFixture();
+    overdeckHome();
+    await runningBook(stateRoot);
+    await createBook(otherRoot, { id: '2026-07-18-other', name: 'Other', createdAt: at });
+    await setStatus(otherRoot, '2026-07-18-other', 'ready', { at });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await createFlywheelCompleteCommand(completeDeps(stateRoot, {
+      listProjects: () => [{ key: 'other-project', config: { path: otherRoot } as ProjectConfig }],
+      firstReady: firstReadyBookInQueue,
+    }))({});
+
+    expect(log).toHaveBeenCalledWith(
+      'Completed RUN-1; started RUN-2 with order book 2026-07-18-other (project: other-project).',
+    );
   });
 
   it('writes the exact no-findings line and emits needs-you when continuation is disabled', async () => {

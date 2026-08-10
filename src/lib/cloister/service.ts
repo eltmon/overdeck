@@ -2,7 +2,7 @@
 import type { HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth } from './health.js';
-import type { DomainEvent } from '@overdeck/contracts';
+import { getCloisterEventStore, type CloisterEventStore } from './event-store-provider.js';
 import { loadCloisterConfigSync } from './config.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
@@ -53,7 +53,6 @@ import {
 import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
 import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
-import type { CloisterDomainEventLike } from './service-reactive.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 export {
   handleCloisterDomainEvent,
@@ -75,16 +74,7 @@ async function cleanupLegacySpecialistsDirectory(): Promise<void> {
   await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
 }
 
-interface CloisterEventStore {
-  append(event: Omit<DomainEvent, 'sequence'>): number;
-  subscribe?: (fn: (event: CloisterDomainEventLike) => void) => () => void;
-}
-
-let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
-
-export function setCloisterEventStoreProvider(provider: (() => CloisterEventStore) | null): void {
-  cloisterEventStoreProvider = provider;
-}
+export { getCloisterEventStore, setCloisterEventStoreProvider } from './event-store-provider.js';
 
 /**
  * Write Cloister running state to file for cross-process visibility
@@ -520,7 +510,7 @@ export class CloisterService {
     if (this.domainEventUnsubscribe) return;
 
     try {
-      const injected = cloisterEventStoreProvider?.();
+      const injected = getCloisterEventStore();
       if (injected) {
         this.eventStore = injected;
         if (injected.subscribe) {

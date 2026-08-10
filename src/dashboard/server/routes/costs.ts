@@ -44,7 +44,7 @@ import { httpHandler } from './http-handler.js';
 // CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
 import { CostDoorLive, CostResolver, CostWriter } from '../../../lib/overdeck/cost.js';
 import type { CostReconcileSummary } from '../../../lib/overdeck/cost.js';
-import type { IssueId } from '../../../lib/overdeck/cost.js';
+import type { IssueId } from '../../../lib/overdeck/issues.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
 
@@ -326,7 +326,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
   '/api/costs/sync-wal',
   httpHandler(Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
-      try: () => syncWalFromAllProjects(),
+      try: () => Effect.runPromise(syncWalFromAllProjects()),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse({ success: true, ...result });

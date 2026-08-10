@@ -3,7 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
 import type { PipelineBucket, SessionNode } from '@overdeck/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
+import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import type { Harness } from '../../shared/ModelPicker';
+import { ProjectCiChip } from '../ProjectCiChip';
 import styles from '../styles/command-deck.module.css';
 
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'prd' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
@@ -235,7 +237,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
     mutationFn: async (newName: string) => {
       const response = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/rename`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ name: newName }),
       });
       const data = await response.json().catch(() => null) as { error?: string } | null;
@@ -350,6 +352,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
           <span data-testid="command-deck-tree-title" className={`${styles.projectName} font-display`}>{name}</span>
         )}
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
+        <ProjectCiChip projectKey={projectKey} />
         {onNewConversation && (
           <span
             role="button"

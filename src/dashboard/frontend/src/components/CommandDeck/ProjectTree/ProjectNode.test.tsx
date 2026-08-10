@@ -1,8 +1,9 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProjectNode, type ProjectFeature } from './ProjectNode';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
+import { useDashboardStore } from '../../../lib/store';
 
 vi.mock('lucide-react', () => ({
   ChevronRight: (props: Record<string, unknown>) => <svg data-testid="project-chevron" {...props} />,
@@ -23,6 +24,13 @@ vi.mock('lucide-react', () => ({
   Zap: () => <svg data-testid="zap-icon" />,
   GitBranchPlus: () => <svg data-testid="gitbranchplus-icon" />,
   AlertCircle: () => <svg data-testid="alertcircle-icon" />,
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
 }));
 
 vi.mock('./FeatureItem', () => ({
@@ -93,6 +101,10 @@ function makeFeature(issueId: string, sessions?: SessionNodeType[]): ProjectFeat
 }
 
 describe('ProjectNode', () => {
+  beforeEach(() => {
+    useDashboardStore.setState({ ciByProjectKey: {} });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -176,6 +188,63 @@ describe('ProjectNode', () => {
 
     expect(onSelectProject).toHaveBeenCalledWith('overdeck');
     expect(screen.getByText('(no active features)')).toBeInTheDocument();
+  });
+
+  it('omits the CI chip when the project has no CI record', () => {
+    render(
+      <ProjectNode
+        projectKey="overdeck"
+        name="overdeck"
+        features={[]}
+        selectedFeature={null}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId('project-ci-chip')).not.toBeInTheDocument();
+  });
+
+  it('renders the CI chip and opens it without selecting the project', () => {
+    useDashboardStore.setState({
+      ciByProjectKey: {
+        overdeck: {
+          projectKey: 'overdeck',
+          repo: 'eltmon/overdeck',
+          branch: 'main',
+          headSha: '0123456789abcdef',
+          suites: {
+            '101': {
+              status: 'completed',
+              conclusion: 'success',
+              htmlUrl: 'https://github.com/eltmon/overdeck/actions/runs/101',
+            },
+          },
+          updatedAt: '2026-08-04T08:10:00.000Z',
+        },
+      },
+    });
+    const open = vi.fn();
+    vi.stubGlobal('open', open);
+    const onSelectProject = vi.fn();
+
+    render(
+      <ProjectNode
+        projectKey="overdeck"
+        name="overdeck"
+        features={[]}
+        selectedFeature={null}
+        onSelectFeature={() => {}}
+        onSelectProject={onSelectProject}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('project-ci-chip'));
+
+    expect(open).toHaveBeenCalledWith(
+      'https://github.com/eltmon/overdeck/actions/runs/101',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(onSelectProject).not.toHaveBeenCalled();
   });
 
   it('applies selected project background and preserves MessageSquarePlus stopPropagation', () => {
@@ -276,7 +345,10 @@ describe('ProjectNode', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledWith('/api/projects/overdeck/rename', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
         body: JSON.stringify({ name: 'Overdeck App' }),
       });
     });

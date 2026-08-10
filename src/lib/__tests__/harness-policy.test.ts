@@ -119,6 +119,29 @@ describe('canUseHarness', () => {
     })
   })
 
+  it.each(['claude-code', 'codex', 'ohmypi', 'pi'] as const)(
+    'blocks %s + a kimi-code/* native-catalog id (2026-08-02 id-space correctness)',
+    (harness) => {
+      const decision = canUseHarnessSync(harness, 'kimi-code/k3', 'api-key')
+      expect(decision.allowed).toBe(false)
+      expect(decision.reason).toContain('kimi-code/*')
+      expect(decision.reason).toContain('native Kimi Code CLI catalog')
+    },
+  )
+
+  it('allows kimi-code and acp + a kimi-code/* native-catalog id', () => {
+    expect(canUseHarnessSync('kimi-code', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('acp', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('kimi-code', 'kimi-code/kimi-for-coding', undefined)).toEqual({ allowed: true })
+  })
+
+  it('still allows claude-code + bare Kimi ids (they translate into the native catalog, never back)', () => {
+    expect(canUseHarnessSync('claude-code', 'k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('claude-code', 'k3[1m]', undefined)).toEqual({ allowed: true })
+    expect(canUseHarnessSync('kimi-code', 'k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('acp', 'k3', 'api-key')).toEqual({ allowed: true })
+  })
+
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
       const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')

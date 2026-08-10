@@ -176,10 +176,23 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
   }
 
   if (phase === 'review') {
-    if (reviewStatus?.testStatus === 'testing' || reviewStatus?.verificationStatus === 'running') {
+    if (reviewStatus?.testStatus === 'testing') {
       return {
         key: 'testing',
         label: 'testing',
+        textClass: 'text-teal-600',
+        bgClass: 'bg-teal-500/12',
+        dotClass: 'bg-teal-500',
+        ringClass: 'border-teal-500',
+        animate: true,
+      };
+    }
+    // The verification gate (quality checks) is not the test specialist —
+    // labelling it "testing" made rows claim a test agent that never spawned.
+    if (reviewStatus?.verificationStatus === 'running') {
+      return {
+        key: 'verification',
+        label: 'running checks',
         textClass: 'text-teal-600',
         bgClass: 'bg-teal-500/12',
         dotClass: 'bg-teal-500',

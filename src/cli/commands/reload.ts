@@ -18,6 +18,7 @@ import {
   readActiveDashboardBundleSync,
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
+import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
@@ -36,6 +37,33 @@ import {
   resolveBundledServerPath,
   spawnDashboardDetached,
 } from './restart.js';
+
+/**
+ * Repoint the global `pan` link at the just-activated generation and narrate
+ * the outcome. Returns an error string when the repoint (or its verification)
+ * failed — the caller decides whether that fails the reload. `absent` and
+ * `foreign` are healthy no-ops: no global link, or an operator-managed
+ * install we must not clobber.
+ */
+async function reportCliRepoint(deployRoot: string): Promise<string | null> {
+  const result = await repointGlobalCliToDeployment(deployRoot);
+  switch (result.status) {
+    case 'repointed':
+      console.log(chalk.dim(`  global pan CLI → ${result.target}`));
+      return null;
+    case 'already-current':
+    case 'absent':
+      return null;
+    case 'foreign':
+      console.log(chalk.dim(`  global pan CLI left untouched (${result.target ?? 'real install'})`));
+      return null;
+    case 'error': {
+      const message = `global pan CLI repoint failed — CLI still runs the previous generation (PAN-3538): ${result.message}`;
+      console.error(chalk.red(`✗ ${message}`));
+      return message;
+    }
+  }
+}
 
 export interface ReloadOptions {
   skipBuild?: boolean;
@@ -253,6 +281,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       if (deployment) {
         if (leavesDashboardRunning(error)) {
           await activation?.commit();
+          await reportCliRepoint(deployment.deployRoot);
           await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
         } else {
           await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
@@ -269,6 +298,15 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await activation?.commit();
     if (deployment) {
+      // PAN-3538: the deploy contract includes the CLI — a healthy new server
+      // with a stale global `pan` means every spawn still runs the previous
+      // build, so a failed repoint fails the reload loudly.
+      const repointError = await reportCliRepoint(deployment.deployRoot);
+      if (repointError) {
+        await recordReloadStatus(startedAt, false, repointError);
+        process.exitCode = 1;
+        return;
+      }
       await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
     }
     await recordReloadStatus(startedAt, true);

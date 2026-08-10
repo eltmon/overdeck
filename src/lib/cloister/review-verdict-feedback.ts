@@ -17,7 +17,8 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { messageAgent } from '../agents.js';
+import { messageAgent } from '../agents/messaging.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedbackDeliveryStuck, getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
@@ -50,6 +51,12 @@ export interface DeliverReviewVerdictFeedbackResult {
   synthesisPath?: string;
   prCommentPosted: boolean;
   agentMessageSent: boolean;
+}
+
+export interface ReviewVerdictFeedbackStatus {
+  reviewStatus: string;
+  reviewNotes?: string;
+  prUrl?: string;
 }
 
 async function findLatestSynthesis(workspacePath: string): Promise<{ path: string; body: string } | null> {
@@ -320,3 +327,21 @@ export const deliverReviewVerdictFeedback = (
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Effect.Effect<DeliverReviewVerdictFeedbackResult> =>
   Effect.promise(() => deliverReviewVerdictFeedbackPromise(opts));
+
+/** Adapter for the review-status write door, registered by the dashboard composition root. */
+export async function deliverReviewVerdictFeedbackFromStatus(
+  issueId: string,
+  status: ReviewVerdictFeedbackStatus,
+): Promise<void> {
+  const runId = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
+  const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    issueId,
+    verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
+    notes: status.reviewNotes,
+    prUrl: status.prUrl,
+    ...(runId ? { runId } : {}),
+  }));
+  if (result.agentMessageSent) {
+    console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
+  }
+}

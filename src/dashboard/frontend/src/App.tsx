@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
+import { fetchWithTimeout } from './lib/apiFetch';
+import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
@@ -16,8 +18,6 @@ import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
-import { NewWorkspaceModal } from './components/CommandDeck/NewWorkspaceModal';
-import { useNewWorkspaceModal } from './components/CommandDeck/useNewWorkspaceModal';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -492,16 +492,23 @@ export default function App() {
     const path = `/workspace/${encodeURIComponent(workspaceId)}`;
     if (window.location.pathname !== path) window.history.pushState({ tab: 'workspace' }, '', path);
   }, []);
-
+  const onNewWorkspace = useCallback((projectKey?: string) => { const path = projectKey ? `/workspaces/new?project=${encodeURIComponent(projectKey)}` : '/workspaces/new'; setActiveTabState('workspace-new'); window.history.pushState({ tab: 'workspace-new' }, '', path); }, []);
   const onWorkspaceViewBack = useCallback(() => {
     setWorkspaceRouteId(null);
     setActiveTab('home');
   }, [setActiveTab]);
 
-  // PAN-3330: New Workspace dialog. The entry points that call `.open()` (rail
-  // "+", command palette, project overview) arrive with WI-4.
-  const newWorkspace = useNewWorkspaceModal(onSelectWorkspace);
-
+  const onWorkspaceCreated = useCallback((workspaceId: string) => {
+    void queryClient.invalidateQueries({ queryKey: ['workspace-registry'] });
+    void (async () => {
+      try {
+        await fetchWithTimeout(`/api/workspace-registry/${encodeURIComponent(workspaceId)}/activate`, {
+          method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
+        });
+      } catch { /* activation only touches recency; the created row remains valid */ }
+    })();
+    onSelectWorkspace(workspaceId);
+  }, [onSelectWorkspace, queryClient]);
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
     // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
@@ -831,14 +838,6 @@ export default function App() {
         onCreated={handleProjectCreated}
       />
 
-      {/* PAN-3330: New Workspace modal */}
-      <NewWorkspaceModal
-        isOpen={newWorkspace.isOpen}
-        onClose={newWorkspace.close}
-        onCreated={newWorkspace.onCreated}
-        presetProjectKey={newWorkspace.presetProjectKey}
-      />
-
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
@@ -850,7 +849,7 @@ export default function App() {
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
-        onNewWorkspace={() => newWorkspace.open(selectedProjectKey ?? undefined)}
+        onNewWorkspace={() => onNewWorkspace(selectedProjectKey ?? undefined)}
         onOpenUpdater={() => setIsUpdateDialogOpen(true)}
         onSelectWorkspace={onSelectWorkspace}
       />
@@ -893,7 +892,7 @@ export default function App() {
             pendingConversationTarget={pendingConversationTarget}
             cockpitRoute={cockpitRoute}
             workspaceRouteId={workspaceRouteId}
-            onWorkspaceViewBack={onWorkspaceViewBack}
+            onWorkspaceViewBack={onWorkspaceViewBack} onWorkspaceCreated={onWorkspaceCreated}
             initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}
@@ -915,7 +914,7 @@ export default function App() {
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
             this global feed, so don't double it up there. */}
-        {isSessionFeedSidebarOpen && !['command-deck', 'backlog'].includes(activeTab) && (
+        {isSessionFeedSidebarOpen && !['command-deck', 'backlog', 'god-view'].includes(activeTab) && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
         </div>
@@ -997,7 +996,7 @@ export default function App() {
         }}
         onOpenConversationHit={handleOpenConversationHit}
         onSelectWorkspace={onSelectWorkspace}
-        onNewWorkspace={() => newWorkspace.open()}
+        onNewWorkspace={() => onNewWorkspace()}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}

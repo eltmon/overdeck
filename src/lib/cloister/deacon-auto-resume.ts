@@ -14,7 +14,7 @@ import {
 } from './boot-reconciliation.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
-import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
+import { listAllAgentsSync as listAllAgents, RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -31,6 +31,7 @@ import {
   recordAgentFailure,
   resetAgentFailureCount,
   resumeAgent,
+  stopAgent,
   saveAgentState,
   saveAgentStateSync,
   deliverInitialPromptWithRetry,
@@ -48,6 +49,7 @@ import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
 import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
+import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -131,12 +133,14 @@ export async function handleAgentHeartbeatDeadEvent(
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — status=${state.status} (not running/starting)`);
     return [];
   }
-  if (isVerifyPausedAgentState(state)) {
-    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — verify-paused (mergeStatus=merged, tmux session intentionally absent)`);
-    return [];
+  const verifyPaused = isVerifyPausedAgentState(state);
+  let [sessionQuery, retainReason] = queryConfirmedSession(agentId);
+  // A reconcile pass must settle stale registry rows without waiting for the
+  // next stretched patrol, while preserving the two independent tmux misses
+  // required to reject a transient session lookup failure.
+  if (context === 'reconcile' && retainReason?.startsWith('retained after first confirmed tmux miss')) {
+    [sessionQuery, retainReason] = queryConfirmedSession(agentId);
   }
-
-  const [sessionQuery, retainReason] = queryConfirmedSession(agentId);
   if (retainReason) { logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} ${retainReason}`); return []; }
 
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
@@ -199,7 +203,7 @@ export async function handleAgentHeartbeatDeadEvent(
   // will actually retry. Planning agents are one-shot by design.
   const isResumableRole = !agentId.startsWith('planning-');
   const completedReviewArtifact = hasCompletedReviewArtifact(state);
-  if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact) {
+  if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact && !verifyPaused) {
     const rapidPostResumeDeath = isRapidPostResumeDeath(state);
     const preKickoffLaunchDeath = isPreKickoffLaunchDeath(state);
     // PAN-1718: preserve (accumulate) the failure counter for deaths that prove
@@ -224,6 +228,8 @@ export async function handleAgentHeartbeatDeadEvent(
     }
   } else if (completedReviewArtifact) {
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after completed review artifact; not recording orphan failure`);
+  } else if (verifyPaused) {
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after verify pause; not recording orphan failure`);
   }
   const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);
@@ -643,6 +649,26 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
+  // PAN-3479: tombstoned rows keep their session_id for transcript linkage —
+  // the phase, not a nulled session, is what makes them non-resumable.
+  if (state.phase === RETAINED_TRANSCRIPTS_PHASE) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — retired (transcripts retained)`);
+    return null;
+  }
+
+  if (isTerminalSwarmSlotAgent(state)) {
+    if (await Effect.runPromise(sessionExists(agentId))) {
+      try {
+        await Effect.runPromise(stopAgent(agentId));
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reaped — assigned swarm item is terminal`);
+      } catch (err) {
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reap failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — assigned swarm item is terminal`);
+    }
+    return null;
+  }
 
   if (getBootReconciliationHeldResumeSet().has(agentId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — held by boot reconciliation decision`);
@@ -870,6 +896,8 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();
   const candidates = listAllAgents()
     .filter((agent) => agent.status === 'stopped' && agent.role === 'work')
+    // PAN-3479: retired rows exist only for transcript linkage — never resume.
+    .filter((agent) => agent.phase !== RETAINED_TRANSCRIPTS_PHASE)
     .filter((agent) => !bootReconciliationHoldSet.has(agent.id))
     .map((agent) => agent.id);
 

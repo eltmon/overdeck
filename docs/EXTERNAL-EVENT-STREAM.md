@@ -100,6 +100,8 @@ External subscribers may only depend on events in the **public catalog**. Events
 | `workspace.created`              | Workspace provisioned                        | `issueId`, `path` |
 | `workspace.destroyed`            | Workspace torn down                          | `issueId` |
 | `issue.status_changed`           | Tracker status transition                    | `issueId`, `from`, `to` |
+| `project.ci_suite_observed`      | Verified GitHub Actions suite update for the current default-branch head | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt`, `authoritativeHead?` |
+| `project.ci_head_observed`       | Complete REST projection for the verified default-branch head | yes | `projectKey`, `repo`, `branch`, `headSha`, `suites`, `observedAt` |
 | `dashboard.lifecycle_started`    | Dashboard restarting                         | `reason`, `trigger` |
 | `dashboard.lifecycle_completed`  | Dashboard restart finished                   | `reason`, `durationMs` |
 | `dashboard.lifecycle_failed`     | Dashboard restart failed                     | `reason`, `error` |
@@ -180,4 +182,4 @@ When this contract is implemented, the route should live at `src/dashboard/serve
 4. Add a `GET /events/version` route returning `{ version: 1, catalog: [...] }` for capability discovery.
 5. Unit-test the filter logic; integration-test with a fake event store that appends a handful of events and asserts the consumer receives the expected subset.
 
-No blocking FS or exec calls in the handler — standard dashboard-server rules apply (`CLAUDE.md`, `.claude/rules/no-execsync-server.md`).
+No blocking FS or exec calls in the handler — standard dashboard-server rules apply (`CLAUDE.md`, `sync-sources/rules/no-execsync-server.md`).

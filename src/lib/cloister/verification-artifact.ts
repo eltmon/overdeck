@@ -18,7 +18,7 @@ export interface VerificationGateRecord {
   passed: boolean;
   required: boolean;
   durationMs: number;
-  /** Gate stdout+stderr (already tail-truncated by runQualityGates). */
+  /** Complete gate stdout+stderr for failed gates. */
   output?: string;
   error?: string;
 }

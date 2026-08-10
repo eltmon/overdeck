@@ -92,6 +92,7 @@ describe('TitleSource schema', () => {
       name: 'schema-test',
       cwd: '/tmp',
       issueId: null,
+      projectKey: null,
       harness: null,
       model: null,
       effort: null,
@@ -102,6 +103,7 @@ describe('TitleSource schema', () => {
       handoffDocPath: null,
       handoffTargetConvId: null,
       clearedToConvId: null,
+      projectKey: null,
       files: [],
     }).titleSource).toBe(titleSource);
   });

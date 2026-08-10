@@ -77,7 +77,6 @@ function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): ReviewStatus
     deaconIgnored: pipeline.deaconIgnored,
     deaconIgnoredAt: pipeline.deaconIgnoredAt,
     deaconIgnoredReason: pipeline.deaconIgnoredReason,
-    conflictsSince: pipeline.conflictsSince,
   };
 }
 

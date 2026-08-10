@@ -55,14 +55,31 @@ async function commandAvailable(cmd: string, args: string[]): Promise<boolean> {
 export async function provisionClaudeHooks(
   options: { settingsPath?: string; binDir?: string } = {},
 ): Promise<ProvisionClaudeHooksResult> {
-  const settingsPath = options.settingsPath ?? join(homedir(), '.claude', 'settings.json');
-  const binDir = options.binDir ?? BIN_DIR;
   const none: Omit<ProvisionClaudeHooksResult, 'ok' | 'reason'> = {
     changed: false,
     binariesSynced: 0,
     registered: [],
     pruned: [],
   };
+
+  // Under a test runner the default settingsPath still resolves to the
+  // developer's REAL ~/.claude/settings.json while binDir follows the test's
+  // temp OVERDECK_HOME — provisioning would register hook commands under a
+  // per-run mkdtemp dir into the live settings file, where they outlive the
+  // temp dir and fire "not found" hook errors on every matching tool call
+  // (observed: dozens of /tmp/pan-agent-role-* linear-mcp-auth-hook entries
+  // accumulated by agent-state-role.test.ts runs reaching the spawn path).
+  // Tests that exercise provisioning pass explicit settingsPath/binDir.
+  if (!options.settingsPath && process.env.VITEST) {
+    return {
+      ok: true,
+      reason: 'test runner detected with default settingsPath — skipping real ~/.claude/settings.json provisioning',
+      ...none,
+    };
+  }
+
+  const settingsPath = options.settingsPath ?? join(homedir(), '.claude', 'settings.json');
+  const binDir = options.binDir ?? BIN_DIR;
 
   try {
     if (!existsSync(SYNC_SOURCES.hooks)) {

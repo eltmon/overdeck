@@ -7,29 +7,37 @@ import { Effect } from 'effect';
 
 import { ProcessSpawnError } from '../errors.js';
 import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
-import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { subItemsOf } from '../xbrief/types.js';
+import { readWorkspacePlan, readWorkspacePlanSync } from '../xbrief/io.js';
+import { subItemsOf, type XBriefDocument } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
 const execAsync = promisify(exec);
 const terminal = new Set(['completed', 'cancelled']);
 
-export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
-  const doc = readWorkspacePlanSync(workspacePath);
+function displaySubItemId(itemId: string, subItemId: string): string {
+  return subItemId.startsWith(`${itemId}.`) ? subItemId : `${itemId}.${subItemId}`;
+}
+
+export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[] {
   if (!doc) return ['  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
   const incomplete = doc.plan.items.flatMap((item) => {
+    if (item.status === 'cancelled') return [];
     const lines: string[] = [];
     if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);
     for (const child of subItemsOf(item)) {
-      if (!terminal.has(child.status)) lines.push(`    - ${item.id}.${child.id} ${child.title} (${child.status})`);
+      if (!terminal.has(child.status)) lines.push(`    - ${displaySubItemId(item.id, child.id)} ${child.title} (${child.status})`);
     }
     return lines;
   });
   return incomplete.length === 0 ? [] : [`  Incomplete plan items (${incomplete.length}):`, ...incomplete];
 }
 
+export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
+  return evaluateIncompletePlanItems(readWorkspacePlanSync(workspacePath));
+}
+
 export async function checkIncompletePlanItemsPromise(workspacePath: string, _issueId?: string): Promise<string[]> {
-  return checkIncompletePlanItemsSync(workspacePath);
+  return evaluateIncompletePlanItems(await Effect.runPromise(readWorkspacePlan(workspacePath)));
 }
 
 /**

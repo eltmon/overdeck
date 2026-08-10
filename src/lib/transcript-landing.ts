@@ -143,6 +143,8 @@ export function hasNewTranscriptUserRecord(
 export interface TranscriptWatchProbe {
   /** A landed user record whose content contains the watched message text. */
   matchedUserRecord: boolean;
+  /** Real model turns observed at/after the probe's start offset. */
+  realAssistantTurnCount?: number;
   /** compact_boundary records observed at/after the probe's start offset. */
   compactBoundaryCount: number;
 }
@@ -188,6 +190,14 @@ function isCompactBoundaryRecord(entry: unknown): boolean {
   return record.type === 'system' && record.subtype === 'compact_boundary';
 }
 
+function isRealAssistantTurn(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  const record = entry as { type?: unknown; message?: { role?: unknown; model?: unknown } };
+  return record.type === 'assistant'
+    && record.message?.role === 'assistant'
+    && record.message.model !== '<synthetic>';
+}
+
 /**
  * Scan the transcript from `fromByteOffset` for (a) a user record carrying
  * `messageText` and (b) compact boundaries. Backs the eaten-by-compaction
@@ -203,7 +213,7 @@ export async function probeTranscriptSince(
   const needle = normalizeForContentMatch(messageText).slice(0, MATCH_PREFIX_CHARS);
   const sessionFile = sessionFilePath(workspace, sessionId);
   if (!needle || !existsSync(sessionFile)) {
-    return { matchedUserRecord: false, compactBoundaryCount: 0 };
+    return { matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 };
   }
 
   try {
@@ -211,6 +221,7 @@ export async function probeTranscriptSince(
     const start = Math.min(Math.max(0, fromByteOffset), fileStat.size);
     const content = await readFileRange(sessionFile, start, fileStat.size);
     let matchedUserRecord = false;
+    let realAssistantTurnCount = 0;
     let compactBoundaryCount = 0;
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
@@ -218,6 +229,10 @@ export async function probeTranscriptSince(
         const entry = JSON.parse(line) as unknown;
         if (isCompactBoundaryRecord(entry)) {
           compactBoundaryCount += 1;
+          continue;
+        }
+        if (isRealAssistantTurn(entry)) {
+          realAssistantTurnCount += 1;
           continue;
         }
         const text = userRecordText(entry);
@@ -228,8 +243,8 @@ export async function probeTranscriptSince(
         // Partial trailing line mid-append; the next probe sees it complete.
       }
     }
-    return { matchedUserRecord, compactBoundaryCount };
+    return { matchedUserRecord, realAssistantTurnCount, compactBoundaryCount };
   } catch {
-    return { matchedUserRecord: false, compactBoundaryCount: 0 };
+    return { matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 };
   }
 }

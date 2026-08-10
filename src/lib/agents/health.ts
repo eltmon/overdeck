@@ -7,7 +7,7 @@ import type {
 
 const STARTUP_GRACE_MS = 5 * 60 * 1000;
 const ACTIVITY_WARNING_MS = 15 * 60 * 1000;
-const ACTIVITY_STALLED_MS = 30 * 60 * 1000;
+export const ACTIVITY_STALLED_MS = 30 * 60 * 1000;
 
 export interface PersistedAgentHealthState {
   id?: string;
@@ -89,6 +89,19 @@ function agentKind(role: string | undefined): AgentHealthKind {
   if (role === 'plan') return 'planning';
   if (role === 'review' || role === 'test' || role === 'ship') return 'specialist';
   return 'other';
+}
+
+function humanizeInactivity(ms: number): string {
+  const minutes = ms / 60_000;
+  if (minutes < 60) {
+    return `${Math.round(minutes)} min`;
+  }
+  const hours = minutes / 60;
+  if (hours < 72) {
+    return `${Math.round(hours)} h`;
+  }
+  const days = hours / 24;
+  return `${Math.round(days)} d`;
 }
 
 function intentionalInactive(state: PersistedAgentHealthState): boolean {
@@ -224,14 +237,14 @@ export function classifyAgentHealth(
         return buildSnapshot(input, state, 'stalled', [reason(
           'agent.runtime.inactive.stalled',
           'warning',
-          `The active agent has produced no activity for ${Math.round(inactivityMs / 60_000)} minutes.`,
+          `${input.agentId} has produced no activity for ${humanizeInactivity(inactivityMs)}.`,
         )]);
       }
       if (inactivityMs >= ACTIVITY_WARNING_MS) {
         return buildSnapshot(input, state, 'warning', [reason(
           'agent.runtime.inactive.warning',
           'warning',
-          `The active agent has produced no activity for ${Math.round(inactivityMs / 60_000)} minutes.`,
+          `${input.agentId} has produced no activity for ${humanizeInactivity(inactivityMs)}.`,
         )]);
       }
     }

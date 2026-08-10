@@ -71,7 +71,7 @@
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
   /* Use the SF Mono stack so digits inside the tiny ring stay aligned. */
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .tone_low .ringProgress {
@@ -225,7 +225,7 @@
 }
 
 .popoverNote code {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 9.5px;
   padding: 1px 4px;
   border-radius: 3px;

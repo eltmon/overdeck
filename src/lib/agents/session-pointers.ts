@@ -1,12 +1,17 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { emitAgentEvent } from '../agent-runtime.js';
+import { SESSION_RESET_MARKER } from '../session-history.js';
 import { getAgentDir, getAgentStateSync, saveAgentStateSync } from './agent-state.js';
 
 export interface ClearedAgentSessionPointers {
   cleared: string[];
+}
+
+export function isAgentSessionReset(agentId: string): boolean {
+  return existsSync(join(getAgentDir(agentId), SESSION_RESET_MARKER));
 }
 
 /**
@@ -26,6 +31,13 @@ export async function clearAgentSessionPointers(
     unlinkSync(path);
     cleared.push(name);
   }
+
+  // The agents plane retains session history for crash recovery. Keep an
+  // explicit local intent marker so that recovery cannot recreate the pointer
+  // the operator just cleared from that history or from a retained JSONL.
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(join(agentDir, SESSION_RESET_MARKER), '');
+  cleared.push(SESSION_RESET_MARKER);
 
   const runtimeFile = join(agentDir, 'runtime.json');
   if (existsSync(runtimeFile)) {

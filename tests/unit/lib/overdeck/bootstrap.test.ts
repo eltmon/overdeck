@@ -105,7 +105,9 @@ function makeBootstrapTestLayer(dbPath: string) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('overdeck bootstrap layer', () => {
-  it('AC1: BootstrapObservabilityLive seeds getSnapshot from resolvers on boot', async () => {
+  // AC1/AC2 boot real Effect layers (SQLite, resolvers, EventBus) — over the 5s
+  // default under verification-gate load (nice -19, parallel forks), so opt in.
+  it('AC1: BootstrapObservabilityLive seeds getSnapshot from resolvers on boot', { timeout: 20_000 }, async () => {
     const dbPath = makeDbPath();
 
     const snapshot = await Effect.runPromise(
@@ -123,7 +125,7 @@ describe('overdeck bootstrap layer', () => {
     expect(Array.isArray(snapshot.agents)).toBe(true);
   });
 
-  it('AC2: snapshot sequence advances when EventBus emits — no direct store polling', async () => {
+  it('AC2: snapshot sequence advances when EventBus emits — no direct store polling', { timeout: 20_000 }, async () => {
     const dbPath = makeDbPath();
 
     const { before, after } = await Effect.runPromise(

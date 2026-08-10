@@ -26,6 +26,12 @@ Focus on correctness bugs:
 
 Do not review security vulnerabilities, performance regressions, style, architecture, or requirements coverage. Requirements and acceptance criteria belong to the requirements reviewer.
 
+## Effect diagnostics ratchet
+
+Run `npm run lint:effect-diagnostics` for the branch under review.
+Any `NEW:` finding is a blocking correctness finding and must prevent approval.
+`known:` findings are baselined, pre-existing debt and are not the author's to fix.
+
 ## Method
 
 1. Review the inline shared context summary in your spawn prompt.
@@ -38,13 +44,18 @@ Do not run broad `git diff`, rediscover all changed files, or perform an unbound
 
 ## TLDR: prefer code summaries over full reads
 
-If `<workspace>/.venv` exists, you have these MCP tools — use them in place of full `Read` when exploring code:
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
-- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — caller/callee analysis
-- `tldr_semantic <query>` — natural-language code search
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-Read full files only when you need exact lines. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for details.
 
 ## Severity and evidence
 

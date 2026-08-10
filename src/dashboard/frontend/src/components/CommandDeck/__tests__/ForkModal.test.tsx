@@ -9,6 +9,15 @@ vi.mock('posthog-js', () => ({
   default: { capture: vi.fn() },
 }));
 
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({
+    data: [
+      { key: 'source-key', name: 'Source Project', path: '/tmp/acp-source' },
+      { key: 'target-key', name: 'Target Project', path: '/tmp/target' },
+    ],
+  }),
+}));
+
 vi.mock('../../chat/defaultConversationModel', () => ({
   getDefaultConversationModel: () => 'claude-sonnet-5',
   FALLBACK_DEFAULT_CONVERSATION_MODEL: 'claude-sonnet-5',
@@ -55,6 +64,8 @@ describe('ForkModal ACP source capabilities', () => {
 
     expect(screen.queryByText('Exact copy')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Fresh summary/ })).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Project' })).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'Same as source (Source Project)' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
@@ -72,6 +83,28 @@ describe('ForkModal ACP source capabilities', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     );
+  });
+
+  it('sends the selected registered project yaml key', () => {
+    const onConfirm = vi.fn();
+
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), {
+      target: { value: 'target-key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm.mock.calls[0][13]).toBe('target-key');
   });
 });

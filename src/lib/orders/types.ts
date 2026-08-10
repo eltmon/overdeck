@@ -71,7 +71,8 @@ export type OrderBookFindingCode =
   | 'duplicate-membership'
   | 'unresolved-prerequisite'
   | 'prerequisite-cycle'
-  | 'missing-prd';
+  | 'missing-prd'
+  | 'issue-store-unavailable';
 
 export interface OrderBookFinding {
   code: OrderBookFindingCode;

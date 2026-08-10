@@ -40,6 +40,12 @@ describe('task mutation door', () => {
           { id: 'wi-1', title: 'First', status: 'pending', items: [{ id: 'ac-1', title: 'AC', status: 'pending' }] },
           { id: 'wi-2', title: 'Second', status: 'pending' },
           { id: 'wi-done', title: 'Terminal', status: 'completed' },
+          {
+            id: 'wi-cancelled',
+            title: 'Cancelled with stale criterion',
+            status: 'cancelled',
+            items: [{ id: 'wi-cancelled.ac-1', title: 'Deferred AC', status: 'pending' }],
+          },
         ],
         edges: [],
       },
@@ -80,6 +86,32 @@ describe('task mutation door', () => {
       tasks: { claims: {}, claimHistory: [{ itemId: 'wi-1', outcome: 'completed' }] },
     });
   });
+
+  it('cancels an item and its acceptance-criteria children in one sequence increment', async () => {
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'cancel', itemId: 'wi-1', writerId: 'agent-a', reason: 'deliberately deferred',
+    })).resolves.toMatchObject({ status: 'cancelled', sequence: 1 });
+    expect(readIssueRecordSync(project, ISSUE_ID)).toMatchObject({
+      statusOverrides: { 'wi-1': 'cancelled', 'wi-1.ac-1': 'cancelled' },
+      tasks: { sequence: 1 },
+    });
+  });
+
+  it('repairs stale criteria under an already-cancelled item without duplicating qualified IDs', async () => {
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'cancel', itemId: 'wi-cancelled', writerId: 'agent-a', reason: 'repair child state',
+    })).resolves.toMatchObject({ status: 'cancelled', sequence: 1 });
+    expect(readIssueRecordSync(project, ISSUE_ID)).toMatchObject({
+      statusOverrides: {
+        'wi-cancelled': 'cancelled',
+        'wi-cancelled.ac-1': 'cancelled',
+      },
+    });
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'cancel', itemId: 'wi-cancelled', writerId: 'agent-a', reason: 'repair child state',
+    })).resolves.toMatchObject({ status: 'cancelled', sequence: 1, idempotent: true });
+  });
+
 
   it.each([
     ['block', undefined, /requires --reason/i],

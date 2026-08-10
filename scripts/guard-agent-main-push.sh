@@ -5,7 +5,7 @@
 # opt in with OVERDECK_OPERATOR_PUSH=1.
 #
 # Operator-supervised conversations (OVERDECK_AGENT_ID prefixed `conv-`) are
-# exempt without the manual opt-in — see .claude/rules/operator-authorized-merges.md.
+# exempt without the manual opt-in — see sync-sources/rules/operator-authorized-merges.md.
 # The incident this guard exists for (PAN-2194) was the unsupervised flywheel
 # orchestrator, not a conversation; `conv-` is already the codebase's standing
 # marker for the human-supervised category (src/lib/agents/identity.ts

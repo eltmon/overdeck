@@ -1,10 +1,24 @@
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
+
+export const SESSION_RESET_MARKER = 'session-reset';
+
+export function isSessionResetMarker(agentId: string): boolean {
+  return existsSync(join(getOverdeckHome(), 'agents', agentId, SESSION_RESET_MARKER));
+}
+
+export function clearSessionResetMarker(agentId: string): void {
+  try {
+    unlinkSync(join(getOverdeckHome(), 'agents', agentId, SESSION_RESET_MARKER));
+  } catch {
+    // The marker is absent for normal launches.
+  }
+}
 
 /**
  * PAN-1989: durably record a Claude session id in the agent's append-only
@@ -28,6 +42,19 @@ import { logAgentLifecycleSync } from './persistent-logger.js';
  * Lives in its own module (not agents.ts) so the dashboard event sink can import
  * it without pulling the whole agents.ts graph — avoids an ESM import cycle.
  */
+export function readSessionIdHistorySync(agentId: string): string[] {
+  try {
+    const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
+    if (!existsSync(file)) return [];
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export function appendSessionIdToHistory(agentId: string, sessionId: string): void {
   if (!sessionId || !sessionId.trim()) return;
   try {
@@ -37,7 +64,7 @@ export function appendSessionIdToHistory(agentId: string, sessionId: string): vo
     let list: string[] = [];
     if (existsSync(file)) {
       const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-      if (Array.isArray(parsed)) list = parsed.filter((v): v is string => typeof v === 'string');
+      if (Array.isArray(parsed)) list = parsed.filter((value): value is string => typeof value === 'string');
     }
     if (list.includes(sessionId)) return;
     list.push(sessionId);

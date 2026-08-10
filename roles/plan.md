@@ -42,7 +42,7 @@ If a Linear MCP tool call fails with an authentication error: call `mcp__linear_
 
 ## Outputs
 
-1. **PRD draft** at `.pan/drafts/<ISSUE-ID>.md` in your workspace — **created FIRST, before the xBRIEF, whenever a canonical one does not already exist.** `pan plan finalize` enforces this (PRD-first gate, minimum 20 lines) and promotes your workspace draft to `drafts/<issue>.md` on `overdeck-state` through the draft write door; you never write to the state worktree directly. The xBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `.claude/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, **a documentation work item naming the exact doc files the change touches**, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.
+1. **PRD draft** at `.pan/drafts/<ISSUE-ID>.md` in your workspace — **created FIRST, before the xBRIEF, whenever a canonical one does not already exist.** `pan plan finalize` enforces this (PRD-first gate, minimum 20 lines) and promotes your workspace draft to `drafts/<issue>.md` on `overdeck-state` through the draft write door; you never write to the state worktree directly. The xBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `sync-sources/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, **a documentation work item naming the exact doc files the change touches**, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.
 2. **xBRIEF plan** in `.overdeck/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy). The PRD's documentation work item must survive the lowering: at least one item carries `metadata.kind: "docs"` or names a doc file (`.md`/`.mdx`, or a `docs/` path) in `metadata.files_scope`, or `pan plan finalize` fails the `docs-item-missing` quality gate. If the change genuinely alters no documented surface, say so in `plan.metadata.docsJustification` rather than dropping the item. Phrase that item's acceptance criteria as concrete observable behavior — "docs updated" and its variants are banned AC phrases.
 3. **Continue context** in `.overdeck/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Codebase map** under `<projectRoot>/.overdeck/context/codebase/` — bootstrapped if missing, corrected if stale.
@@ -70,7 +70,7 @@ If two items are independent, leave them unconnected. The work agent reads the D
 ## Process
 
 1. Read the issue and the PRD draft at `drafts/<ISSUE-ID>.md` on `overdeck-state` through the read door if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `specs/` directly.
-2. Explore the codebase. **Prefer TLDR MCP tools over full `Read` whenever possible** — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
+2. Explore the codebase. Large-file `Read`s return TLDR summaries automatically — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach; write each question self-contained (situation, decision, option consequences) — the operator answers from a dialog without the transcript
 5. **Write the PRD draft** to `.pan/drafts/<ISSUE-ID>.md` in your workspace if no canonical PRD exists (see Outputs #1 for the standard). Do not proceed to the xBRIEF until the PRD is on disk — `pan plan finalize` refuses to run without it and promotes it to `overdeck-state`.
@@ -80,14 +80,18 @@ If two items are independent, leave them unconnected. The work agent reads the D
 
 ## TLDR: prefer code summaries over full reads
 
-Planning means broad exploration — exactly where TLDR pays off most. If `<workspace>/.venv` exists, you have these MCP tools:
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
-- `tldr_structure <directory>` — directory layout, useful when orienting in unfamiliar code
-- `tldr_semantic <query>` — natural-language search; great for "where is X handled?"
-- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — dependency analysis when scoping a refactor
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-Read full files only when you need exact line numbers for a citation in the plan. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for the full workflow.
 
 ## State model
 

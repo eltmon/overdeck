@@ -7,6 +7,18 @@
 
 set -e
 
+# Every guard below audits the overdeck repository's own branches. Pushes to
+# a foreign repository — e.g. scripts/mirror-okf-skill.sh pushing the subtree
+# split to eltmon/okf — carry a tree that is not overdeck, so the ratchet /
+# state-plane / file-size checks would misfire on files that legitimately
+# don't exist there (2026-08-06: mirror push failed on the file-size
+# allowlist). $2 is the remote URL when known; skip everything when the
+# destination isn't this repo.
+case "${2:-}" in
+  *overdeck*) ;;  # eltmon/overdeck by URL or local worktree path — audit
+  *) exit 0 ;;    # foreign repo (okf mirror, etc.) — nothing here applies
+esac
+
 # The overdeck-state worktree shares this repo's core.hooksPath, but the
 # orphan state branch carries none of the guard scripts — running them there
 # dies with 127 and blocks the state write door's pushes (PAN-2677). Skip the
@@ -15,12 +27,10 @@ set -e
 HAS_TOOLING=0
 [ -f scripts/lint-file-size.sh ] && HAS_TOOLING=1
 
-# PAN-2227: ratchets enforce at the write point — catch god-file growth
-# before origin does. Checks the WORKING TREE (what a direct-to-main
-# writer is about to make main), not each pushed commit.
-if [ "$HAS_TOOLING" = 1 ]; then
-  bash scripts/lint-file-size.sh </dev/null
-fi
+# PAN-2227: ratchets enforce at the write point. The file-size check runs
+# per pushed branch ref against the tip being pushed (inside the loop below)
+# — a dirty working tree must not block pushing already-committed, legal
+# state, and an over-cap tip must not hide behind a clean working tree.
 
 read_version() {
   git show "$1:$2" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))"
@@ -58,6 +68,7 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         fi
         bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
         bash scripts/guard-hook-bundle-freshness.sh "$base..$local_sha" </dev/null
+        bash scripts/lint-file-size.sh --at "$local_sha" </dev/null
       else
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "" </dev/null

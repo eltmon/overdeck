@@ -8,6 +8,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
 import {
+  DEFAULT_CONFIG,
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
   PARENT_MODEL_REF,
@@ -26,6 +27,7 @@ import {
   type ConversationSearchConfig,
   type RoleEffort,
   type ProviderConfig,
+  type DesignLanguage,
   ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
@@ -212,6 +214,10 @@ export interface ApiSettingsConfig {
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };
+  /** Overdeck Theme design language (PAN-3410). open_in_editor_command is config.yaml-only, not surfaced here. */
+  ui?: {
+    theme?: 'ledger' | 'broadsheet';
+  };
   tracker_keys?: {
     linear?: string;
     github?: string;
@@ -287,7 +293,23 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
-type AvailableModel = { id: ModelId; name: string; costPer1MTokens: number };
+type AvailableModel = {
+  id: ModelId;
+  name: string;
+  costPer1MTokens: number;
+  /**
+   * Kimi-only: which harness family this id launches under. `claude-code` ids
+   * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
+   * CLI's catalog (also used by the ACP transport). Conversation pickers use
+   * this to render harness-labeled rows and to send the row's harness at
+   * spawn; config panels can ignore it.
+   */
+  harness?: RuntimeName;
+  /** Effort levels the row's harness actually offers (Kimi rows only today). */
+  effortLevels?: readonly string[];
+  /** Display name without any harness suffix — pickers compose row labels from it. */
+  baseName?: string;
+};
 type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
@@ -510,10 +532,6 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (mode !== undefined && mode !== 'quick' && mode !== 'full' && mode !== 'none') {
     errors.push(`${fieldPath}.mode must be quick, full, or none`);
   }
-  const reReviewScope = roleConfig.reReviewScope;
-  if (reReviewScope !== undefined && reReviewScope !== 'all' && reReviewScope !== 'changed' && reReviewScope !== 'blockers') {
-    errors.push(`${fieldPath}.reReviewScope must be all, changed, or blockers`);
-  }
 }
 
 /** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */
@@ -722,6 +740,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    ui: {
+      theme: config.ui.theme,
+    },
     conversationSearch: config.conversationSearch,
     conversations: conversationSettings,
     memory: {
@@ -807,6 +828,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['api_keys', config.api_keys],
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
+    ['ui', config.ui],
     ['conversationSearch', config.conversationSearch],
     ['conversations', config.conversations],
     ['memory', config.memory],
@@ -864,7 +886,51 @@ function providerConfigForSave(
   return pruneUndefined({ enabled, auth, plan, harness });
 }
 
+/**
+ * Serializes every config.yaml write behind one in-process queue (PAN-3410
+ * review finding — FR-7 no-loss guarantee, cycle 6). Removing the client's
+ * GET-then-PUT round trip (cycle 5) only closed the network-latency-sized
+ * race window; two settings writes issued back-to-back in the same process
+ * (a theme change alongside the top-level Settings form's save, or two rapid
+ * theme changes) could still interleave their own read-modify-write, since
+ * both read the pre-write config before either finished writing it. Callers
+ * must do their OWN `loadConfigSync()`/`loadSettingsApi()` read *inside* the
+ * queued callback (see `saveDesignLanguagePromise` below) — reading before
+ * enqueueing bakes in the same staleness a queue further down cannot undo.
+ */
+let settingsWriteQueue: Promise<unknown> = Promise.resolve();
+
+function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
+  const turn = settingsWriteQueue.then(fn, fn);
+  // Swallow rejections in the queue's own chain — a failed write must not
+  // permanently wedge every subsequent write behind a forever-rejected turn.
+  settingsWriteQueue = turn.then(
+    () => undefined,
+    () => undefined,
+  );
+  return turn;
+}
+
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+  return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
+}
+
+/**
+ * `honorThemeFromSettings` gates whether `settings.ui?.theme` is allowed to
+ * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguagePromise`
+ * passes `true`, immediately after its own fresh `loadSettingsApi()` read
+ * inside the write queue. Every other caller — chiefly the general
+ * `PUT /api/settings` route, whose `settings` argument is a whole-document
+ * payload a client materialized from a GET that can predate a since-completed
+ * theme save — defaults to `false` and always carries forward the freshly
+ * re-read `currentConfig.ui.theme` below instead. Without this gate, that
+ * caller's queued turn would silently revert whichever theme was live when
+ * its GET ran, no matter how much later its own turn actually executes.
+ */
+async function saveSettingsApiPromiseUnlocked(
+  settings: ApiSettingsConfig,
+  { honorThemeFromSettings = false }: { honorThemeFromSettings?: boolean } = {},
+): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
@@ -913,6 +979,22 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    // No-loss (PAN-3410): the API surface only carries `theme`, never
+    // open_in_editor_command, so a theme-only save must not blank an
+    // editor command the operator set outside this API. Symmetrically, a
+    // caller that omits `ui` entirely (or omits `theme` within it) must not
+    // blank a non-default theme the operator set outside this save. Beyond
+    // omission, `honorThemeFromSettings` (see the doc comment above) governs
+    // whether an EXPLICITLY-present `settings.ui.theme` is trusted at all —
+    // only saveDesignLanguagePromise's fresh-inside-the-queue read may set it.
+    ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
+      || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
+      || currentConfig.ui.openInEditorCommand !== null)
+      ? {
+          ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
+          theme: honorThemeFromSettings ? (settings.ui?.theme ?? currentConfig.ui.theme) : currentConfig.ui.theme,
+        }
+      : undefined,
     conversationSearch: settings.conversationSearch,
     conversations: settings.conversations,
     memory: settings.memory
@@ -1022,6 +1104,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    ui: {
+      ...current.ui,
+      ...updates.ui,
     },
     conversationSearch: {
       ...current.conversationSearch,
@@ -1262,6 +1348,26 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (tieredExecutionError) errors.push(tieredExecutionError);
   }
 
+  if (
+    settings.ui?.theme !== undefined &&
+    settings.ui.theme !== 'ledger' &&
+    settings.ui.theme !== 'broadsheet'
+  ) {
+    errors.push('ui.theme must be ledger or broadsheet');
+  } else if (
+    // PAN-3410 review finding (cycle 9): PUT /api/settings validated an
+    // explicit theme change, then silently discarded it and reported success
+    // — saveSettingsApiPromiseUnlocked's honorThemeFromSettings gate (cycle 8)
+    // never lets the general save path write it. Rejecting an actual change
+    // here at validation time makes that impossible, while a caller that
+    // echoes back the theme it already read (the common whole-document
+    // round trip) is unaffected — only a genuine attempted change is rejected.
+    settings.ui?.theme !== undefined &&
+    settings.ui.theme !== loadConfigSync().config.ui.theme
+  ) {
+    errors.push('ui.theme cannot be changed through PUT /api/settings — use PUT /api/settings/design-language instead');
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -1272,6 +1378,37 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 /**
  * Get available models by provider (for model selection UI)
  */
+/**
+ * Annotate Kimi entries with the harness their id space belongs to and the
+ * effort levels that route actually offers (ground truth:
+ * MODEL_CAPABILITIES.effortLevels — the native `kimi` binary's /effort offers
+ * low/high/max for kimi-code/* ids; claude-code's /effort offers all five for
+ * the bare Anthropic-route ids). `kimi-code/*` ids only launch via the native
+ * CLI (kimi-code harness or ACP transport), so the picker-facing `name`
+ * carries the "— Kimi Code CLI" marker wherever the row is shown without
+ * harness context; bare ids are the claude-code route. Keeps flat config
+ * panels honest (two "Kimi K3 (1M)" rows with different validity would be a
+ * trap) while conversation pickers compose their own per-row labels from
+ * baseName.
+ */
+function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
+  if (modelId.startsWith('kimi-code/')) {
+    return {
+      ...entry,
+      name: `${entry.name} — Kimi Code CLI`,
+      baseName: entry.name,
+      harness: 'kimi-code',
+      effortLevels,
+    };
+  }
+  return {
+    ...entry,
+    baseName: entry.name,
+    harness: 'claude-code',
+    effortLevels,
+  };
+}
+
 export function getAvailableModelsApi(): AvailableModelsApi {
   const result: AvailableModelsApi = {
     anthropic: [],
@@ -1295,36 +1432,37 @@ export function getAvailableModelsApi(): AvailableModelsApi {
     if (capability.displayName.includes('(deprecated)')) continue;
     if (modelId in MODEL_DEPRECATIONS) continue;
     const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
       case 'anthropic':
-        result.anthropic.push(entry);
+        result.anthropic.push(annotated);
         break;
       case 'openai':
-        result.openai.push(entry);
+        result.openai.push(annotated);
         break;
       case 'google':
-        result.google.push(entry);
+        result.google.push(annotated);
         break;
       case 'kimi':
-        result.kimi.push(entry);
+        result.kimi.push(annotated);
         break;
       case 'minimax':
-        result.minimax.push(entry);
+        result.minimax.push(annotated);
         break;
       case 'zai':
-        result.zai.push(entry);
+        result.zai.push(annotated);
         break;
       case 'mimo':
-        result.mimo.push(entry);
+        result.mimo.push(annotated);
         break;
       case 'openrouter':
-        result.openrouter.push(entry);
+        result.openrouter.push(annotated);
         break;
       case 'nous':
-        result.nous.push(entry);
+        result.nous.push(annotated);
         break;
       case 'dashscope':
-        result.dashscope.push(entry);
+        result.dashscope.push(annotated);
         break;
     }
   }
@@ -1408,6 +1546,34 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
     ...current,
     openrouter: { ...current.openrouter, favorites },
   }));
+}
+
+/**
+ * Single-field `ui.theme` (Overdeck Theme — Ledger/Broadsheet) write.
+ *
+ * The frontend's `useDesignLanguage` hook calls this directly instead of
+ * fetching the whole settings document and PUTting it back with only the
+ * theme changed: that GET-then-PUT round trip leaves a client-round-trip-sized
+ * window in which a concurrent settings save (another tab, or the top-level
+ * Settings form) commits, then gets silently overwritten by this save's now-stale
+ * snapshot of every other field (PAN-3410 review finding — no-loss guarantee,
+ * FR-7, cycle 5). That alone still left an in-process race: the read below
+ * and `saveSettingsApiPromiseUnlocked`'s own write must both run as one turn
+ * of `runSettingsWriteSerialized` — its own module comment above explains
+ * why the read cannot happen before entering the queue (cycle 6). Passing
+ * `honorThemeFromSettings: true` is what actually lets this call's `theme`
+ * reach disk at all — every other caller of `saveSettingsApiPromiseUnlocked`
+ * defaults to `false` and can never write a client-materialized theme snapshot,
+ * however fresh it looked when constructed (cycle 8).
+ */
+async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
+  await runSettingsWriteSerialized(async () => {
+    const current = loadSettingsApi();
+    await saveSettingsApiPromiseUnlocked({
+      ...current,
+      ui: { ...current.ui, theme },
+    }, { honorThemeFromSettings: true });
+  });
 }
 
 /**
@@ -1498,6 +1664,20 @@ export const saveOpenRouterFavorites = (
     catch: (cause) =>
       new SettingsApiError({
         operation: 'saveOpenRouterFavorites',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `saveDesignLanguage` — single-field `ui.theme` write. */
+export const saveDesignLanguage = (
+  theme: DesignLanguage,
+): Effect.Effect<void, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => saveDesignLanguagePromise(theme),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'saveDesignLanguage',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

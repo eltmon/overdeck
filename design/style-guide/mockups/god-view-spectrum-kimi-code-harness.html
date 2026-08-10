@@ -10,6 +10,7 @@
 <style>
 /* ════════════════════════════════════════════════════════════════════
    SPECTRUM DECK — a Winamp-grade god-view visualizer (kimi-code-harness)
+   Confluence (PAN-3447) supersedes this parent concept for production.
    God-view tokens (PAN-341) + deliberate style-guide breakage.
    ════════════════════════════════════════════════════════════════════ */
 :root {
@@ -181,6 +182,58 @@ body { font-family:var(--f-disp); color:var(--gv-text); }
   font-family:var(--f-mono); font-size:9px; color:var(--gv-dim); display:flex; gap:18px; flex-wrap:wrap; }
 #help .foot b { color:var(--gv-text2); font-weight:400; }
 @media (max-width:900px){ .hgrid { grid-template-columns:1fr; } }
+
+/* ── interactivity: tooltip + issue rail ─────────────────────────── */
+#tip { position:fixed; z-index:44; pointer-events:none; min-width:190px; max-width:280px;
+  padding:8px 10px; border-radius:9px; background:rgba(9,13,25,.95); border:1px solid rgba(0,212,255,.35);
+  box-shadow:0 0 20px rgba(0,212,255,.15); display:none; }
+#tip .t-head { display:flex; align-items:center; gap:7px; }
+#tip .t-issue { font-family:var(--f-mono); font-weight:600; font-size:11.5px; color:var(--gv-text); }
+#tip .t-badge { font-family:var(--f-mono); font-size:7.5px; letter-spacing:.1em; padding:1.5px 7px; border-radius:99px; }
+#tip .t-sub { font-family:var(--f-mono); font-size:8px; color:var(--gv-dim); margin-top:2px; }
+#tip .t-rows { margin-top:6px; display:flex; flex-direction:column; gap:2.5px; }
+#tip .t-row { display:flex; justify-content:space-between; gap:12px; font-family:var(--f-mono); font-size:8.5px; color:var(--gv-text2); }
+#tip .t-row b { color:var(--gv-text); font-weight:400; text-align:right; }
+#tip .t-msg { margin-top:5px; font-size:9.5px; color:var(--gv-text); line-height:1.45; white-space:normal; }
+#tip .t-cta { margin-top:7px; font-family:var(--f-mono); font-size:8px; letter-spacing:.1em; color:var(--gv-green); }
+.ev { cursor:pointer; padding:1px 4px; border-radius:5px; }
+.ev:hover { background:rgba(0,212,255,.08); }
+#rail { position:absolute; top:8px; right:8px; bottom:30px; width:298px; z-index:25;
+  background:rgba(9,13,25,.93); border:1px solid rgba(0,212,255,.3); border-radius:12px;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  transform:translateX(115%); transition:transform .28s cubic-bezier(.2,.9,.25,1);
+  display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 34px rgba(0,0,0,.55); }
+#rail.open { transform:none; }
+#rail .r-head { padding:10px 12px 9px; border-bottom:1px solid var(--gv-border); display:flex; align-items:center; gap:8px; }
+#rail .r-issue { font-family:var(--f-mono); font-size:14px; font-weight:600; color:var(--gv-text); }
+#rail .r-stage { font-family:var(--f-mono); font-size:7.5px; letter-spacing:.14em; padding:2px 8px; border-radius:99px; }
+#rail .r-x { margin-left:auto; cursor:pointer; color:var(--gv-text2); border:1px solid var(--gv-border);
+  background:none; border-radius:6px; font-family:var(--f-mono); font-size:10px; padding:2px 8px; }
+#rail .r-x:hover { color:var(--gv-pink); border-color:var(--gv-pink); }
+#rail .r-body { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:11px; scrollbar-width:thin; }
+#rail h4 { font-size:8.5px; letter-spacing:.2em; color:var(--gv-dim); font-weight:700; margin-bottom:5px; }
+.r-steps { display:flex; gap:3px; }
+.r-step { flex:1; text-align:center; font-family:var(--f-mono); font-size:7px; letter-spacing:.06em;
+  color:var(--gv-dim); padding:3px 0 4px; border-bottom:2px solid var(--gv-border); }
+.r-step.done { color:var(--gv-green); border-color:rgba(57,255,20,.45); }
+.r-step.cur { color:var(--gv-blue); border-color:var(--gv-blue); text-shadow:0 0 8px rgba(0,212,255,.7); }
+.r-agents { display:flex; flex-direction:column; gap:6px; }
+.r-agent { border:1px solid var(--gv-border); border-radius:8px; padding:7px 9px; background:rgba(255,255,255,.02);
+  display:flex; flex-direction:column; gap:4px; }
+.r-agent .ra-top { display:flex; align-items:center; gap:7px; }
+.r-agent .ra-role { font-family:var(--f-mono); font-size:7.5px; letter-spacing:.1em; padding:1px 7px; border-radius:99px; }
+.r-agent .ra-id { font-family:var(--f-mono); font-size:8.5px; color:var(--gv-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.r-agent .ra-rows { display:flex; flex-wrap:wrap; gap:2px 12px; }
+.r-agent .ra-row { font-family:var(--f-mono); font-size:8px; color:var(--gv-text2); }
+.r-agent .ra-row b { color:var(--gv-text); font-weight:400; }
+.r-evs { display:flex; flex-direction:column; gap:4px; }
+.r-ev { display:flex; gap:6px; align-items:baseline; font-size:9px; line-height:1.35; }
+.r-ev .src { font-family:var(--f-mono); font-size:8px; font-weight:600; min-width:58px; flex:0 0 auto; }
+.r-ev .msg { color:var(--gv-text2); flex:1; }
+.r-ev .age { font-family:var(--f-mono); font-size:7.5px; color:var(--gv-dim); flex:0 0 auto; }
+.r-empty { font-size:9.5px; color:var(--gv-dim); font-style:italic; }
+.r-foot { padding:8px 12px; border-top:1px solid var(--gv-border); font-family:var(--f-mono); font-size:8px; color:var(--gv-dim); }
+.r-foot b { color:var(--gv-green); font-weight:400; }
 </style>
 </head>
 <body>
@@ -224,6 +277,7 @@ body { font-family:var(--f-disp); color:var(--gv-text); }
 
     <section id="stagewrap" class="glass">
       <canvas id="stage"></canvas>
+      <div id="rail"></div>
       <div class="tag">PIPELINE FLOW · <b>PLAN → WORK → REVIEW → TEST → MERGE</b> · frost = stale · parked shelf = paused to free resources</div>
     </section>
 
@@ -331,6 +385,7 @@ body { font-family:var(--f-disp); color:var(--gv-text); }
       <span><b>?</b> or <b>h</b> — this screen</span>
       <span><b>f</b> — fullscreen</span>
       <span><b>Esc</b> — close</span>
+      <span><b>hover</b> orbs &amp; feed rows — critical info · <b>click</b> — issue rail</span>
       <span>data: snapshot 2026-08-01 15:52 UTC · motion: simulator · god-view tokens PAN-341 · mockup: god-view-spectrum-kimi-code-harness</span>
     </div>
   </div>
@@ -479,15 +534,26 @@ ORDER.filter(r=>roleCounts[r]).forEach(r => {
 /* ── activity feed ── */
 const feedEl = $('#feed');
 const FEED_MAX = 13;
+const issueLog = {};
+const stripTags = s => { const d = document.createElement('div'); d.innerHTML = s; return d.textContent; };
+function logIssue(issue, src, msg, color, t){
+  if (!issue) return;
+  const arr = issueLog[issue] = issueLog[issue] || [];
+  arr.unshift({t, src, msg: stripTags(msg), c: color || C.text2});
+  if (arr.length > 10) arr.pop();
+}
 function feedAdd(src, msg, issue, color, agoSec){
   const t = Date.now() - (agoSec||0)*1000;
   const d = document.createElement('div');
   d.className = 'ev'; d.dataset.t = t;
+  d.dataset.issue = issue || ''; d.dataset.src = src;
+  d.dataset.c = color || C.text2; d.dataset.fullmsg = stripTags(msg);
   d.innerHTML = `<span class="src" style="color:${color||C.text2}">${src}</span>` +
                 `<span class="msg">${issue?`<b>${issue}</b> `:''}${msg}</span>` +
                 `<span class="age" data-t="${t}">${fmtAge(t)}</span>`;
   feedEl.prepend(d);
   while (feedEl.children.length > FEED_MAX) feedEl.lastChild.remove();
+  logIssue(issue, src, msg, color, t);
 }
 setInterval(() => { feedEl.querySelectorAll('.age').forEach(a => a.textContent = fmtAge(+a.dataset.t)); }, 1000);
 /* real seed events (dashboard restart storm, 15:48–15:52 UTC) */
@@ -895,6 +961,17 @@ function drawStage(t){
         sctx.stroke();
       }
     }
+    /* selection + flash rings */
+    if (o.selected){
+      sctx.strokeStyle = rgba('#ffffff',.85); sctx.lineWidth = 1.4; sctx.setLineDash([6,5]);
+      sctx.lineDashOffset = -t*18;
+      sctx.beginPath(); sctx.arc(o.x,o.y,R+9,0,Math.PI*2); sctx.stroke(); sctx.setLineDash([]);
+    }
+    if (o.flash && o.flash > t){
+      const fk = clamp((o.flash-t)/1.2, 0, 1);
+      sctx.strokeStyle = rgba('#ffffff', fk*.9); sctx.lineWidth = 2;
+      sctx.beginPath(); sctx.arc(o.x,o.y, R+5+(1-fk)*12, 0, Math.PI*2); sctx.stroke();
+    }
     /* thinking shimmer */
     if (o.state==='thinking'){
       sctx.strokeStyle = rgba('#ffffff',.75); sctx.lineWidth = 1.6;
@@ -974,7 +1051,7 @@ const nowS = () => (performance.now()-S.t0)/1000;
 
 function agentEvent(o){
   o.idleMin = 0; o.activity = clamp(o.activity + rand(.35,.7), 0, 1.4);
-  S.evCount++;
+  S.evCount++; o.ev = (o.ev||0)+1;
   const roll = Math.random(), rc = ROLE[o.a.role].c;
   const src = {plan:'planning-agent', work:'work-agent', review:'review-specialist', test:'test-specialist',
                strike:'strike', flywheel:'flywheel', sequencer:'sequencer'}[o.a.role] || 'agent';
@@ -1151,6 +1228,143 @@ window.addEventListener('keydown', e => {
   else if (e.key === '?' || e.key === 'h') toggleHelp();
   else if (e.key === 'Escape') toggleHelp(false);
 });
+/* ══════════════════════════════════════════════════════════════════
+   INTERACTIVITY — hover tooltips + click-through issue rail
+   ══════════════════════════════════════════════════════════════════ */
+orbs.forEach(o => { o.flash = 0; o.selected = false; o.ev = o.ev||0; });
+window.__orbs = orbs; // debug/test handle
+const MODEL_NAME = {sonnet:'claude-sonnet-5', gpt:'gpt-5.6-sol', opus:'claude-opus-5',
+                    fable:'claude-fable-5', k3:'k3[1m] · kimi-code'};
+const STAGE_C = [C.blue, C.green, C.pink, C.amber, C.purple];
+const tip = document.createElement('div'); tip.id = 'tip'; document.body.appendChild(tip);
+function showTip(html, x, y){
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let tx = x+16, ty = y+14;
+  if (tx + r.width > innerWidth-10) tx = x - r.width - 12;
+  if (ty + r.height > innerHeight-10) ty = y - r.height - 10;
+  tip.style.left = tx+'px'; tip.style.top = ty+'px';
+}
+function hideTip(){ tip.style.display = 'none'; }
+function trow(k, v){ return `<div class="t-row"><span>${k}</span><b>${v}</b></div>`; }
+function fmtMins(m){
+  if (m < 60) return `${Math.floor(m)}m`;
+  if (m < 1440) return `${Math.floor(m/60)}h${Math.floor(m%60)}m`;
+  return `${(m/1440).toFixed(1)}d`;
+}
+function stateStr(o){
+  if (o.merge) return 'MERGING — comet away';
+  if (o.a.frozen) return 'FROZEN — stale 1.8d';
+  if (o.state === 'paused') return 'PAUSED — yielded by scheduler';
+  if (o.state === 'waiting') return 'WAITING — permission/question';
+  if (o.state === 'thinking') return 'THINKING';
+  if (o.frost > .5) return `STALE — idle ${Math.floor(o.idleMin)}m`;
+  return 'WORKING';
+}
+function orbTipHTML(o){
+  const role = ROLE[o.a.role];
+  return `<div class="t-head"><span class="t-issue">${o.a.issue}</span>` +
+    `<span class="t-badge" style="color:${role.c};border:1px solid ${rgba(role.c,.5)};background:${rgba(role.c,.12)}">${role.label}</span></div>` +
+    `<div class="t-sub">${o.a.id}</div>` +
+    `<div class="t-rows">` +
+    trow('model', MODEL_NAME[o.a.model] || o.a.model) +
+    trow('lane', o.a.orch ? 'ORCHESTRATOR' : STAGES[Math.min(o.stageIdx,4)]) +
+    trow('runtime', fmtMins(o.a.mins)) +
+    trow('state', stateStr(o)) +
+    trow('idle', Math.floor(o.idleMin) + ' min' + (o.frost > .05 ? ` · frost ${Math.round(o.frost*100)}%` : '')) +
+    trow('events fired', o.ev || 0) +
+    trow('convoy', o.satellites.length ? o.satellites.map(s => s.label).join(' · ') : '—') +
+    `</div><div class="t-cta">CLICK FOR ISSUE RAIL →</div>`;
+}
+/* orb hover + click */
+let hoverOrb = null;
+stageC.addEventListener('mousemove', e => {
+  const r = stageC.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  hoverOrb = null;
+  for (const o of orbs){
+    const big = o.a.orch ? 20 : (o.satellites.length ? 13 : 11);
+    if ((mx-o.x)*(mx-o.x) + (my-o.y)*(my-o.y) < (big+9)*(big+9)) { hoverOrb = o; break; }
+  }
+  stageC.style.cursor = hoverOrb ? 'pointer' : 'default';
+  if (hoverOrb) showTip(orbTipHTML(hoverOrb), e.clientX, e.clientY); else hideTip();
+});
+stageC.addEventListener('mouseleave', () => { hoverOrb = null; hideTip(); });
+stageC.addEventListener('click', () => { if (hoverOrb) selectIssue(hoverOrb.a.issue); });
+/* feed row hover + click */
+feedEl.addEventListener('mousemove', e => {
+  const row = e.target.closest('.ev');
+  if (!row) { hideTip(); return; }
+  const iss = row.dataset.issue, src = row.dataset.src, col = row.dataset.c;
+  const time = new Date(+row.dataset.t).toLocaleTimeString('en-GB', {hour12:false});
+  showTip(
+    `<div class="t-head"><span class="t-issue">${iss || 'system'}</span>` +
+    `<span class="t-badge" style="color:${col};border:1px solid ${rgba(col,.5)};background:${rgba(col,.12)}">${src}</span></div>` +
+    `<div class="t-msg">${row.dataset.fullmsg}</div>` +
+    `<div class="t-rows">${trow('logged', time)}</div>` +
+    (iss ? `<div class="t-cta">CLICK FOR ISSUE RAIL →</div>` : ''), e.clientX, e.clientY);
+  if (iss) orbs.forEach(o => { if (o.a.issue === iss) o.flash = nowS()+.8; });
+});
+feedEl.addEventListener('mouseleave', hideTip);
+feedEl.addEventListener('click', e => {
+  const row = e.target.closest('.ev');
+  if (row && row.dataset.issue) selectIssue(row.dataset.issue);
+});
+/* issue rail */
+const railEl = $('#rail');
+let railIssue = null;
+function selectIssue(issue){
+  railIssue = issue;
+  renderRail(issue);
+  railEl.classList.add('open');
+  orbs.forEach(o => o.selected = (o.a.issue === issue));
+  hideTip();
+}
+function closeRail(){
+  railIssue = null;
+  railEl.classList.remove('open');
+  orbs.forEach(o => o.selected = false);
+}
+function renderRail(issue){
+  const mine = orbs.filter(o => o.a.issue === issue);
+  const maxStage = mine.length ? Math.max(...mine.map(o => Math.min(o.stageIdx, 4))) : -1;
+  const steps = STAGES.map((s, i) =>
+    `<div class="r-step ${i === maxStage ? 'cur' : i < maxStage ? 'done' : ''}">${s}</div>`).join('');
+  const agents = mine.length
+    ? mine.slice().sort((a,b) => a.stageIdx - b.stageIdx).map(o => {
+        const role = ROLE[o.a.role];
+        return `<div class="r-agent"><div class="ra-top">` +
+          `<span class="ra-role" style="color:${role.c};border:1px solid ${rgba(role.c,.5)};background:${rgba(role.c,.12)}">${role.label}</span>` +
+          `<span class="ra-id">${o.a.id}</span></div>` +
+          `<div class="ra-rows">` +
+          `<span class="ra-row">model <b>${MODEL_NAME[o.a.model] || o.a.model}</b></span>` +
+          `<span class="ra-row">lane <b>${o.a.orch ? 'ORCHESTRATOR' : STAGES[Math.min(o.stageIdx,4)]}</b></span>` +
+          `<span class="ra-row">runtime <b>${fmtMins(o.a.mins)}</b></span>` +
+          `<span class="ra-row">state <b>${stateStr(o)}</b></span>` +
+          `<span class="ra-row">idle <b>${Math.floor(o.idleMin)}m</b></span>` +
+          `<span class="ra-row">events <b>${o.ev || 0}</b></span>` +
+          (o.satellites.length ? `<span class="ra-row">convoy <b>${o.satellites.map(s => s.label).join(' · ')}</b></span>` : '') +
+          `</div></div>`;
+      }).join('')
+    : `<div class="r-empty">no live agents on this issue at snapshot — events below</div>`;
+  const evs = (issueLog[issue] || []).slice(0, 8).map(e =>
+    `<div class="r-ev"><span class="src" style="color:${e.c}">${e.src}</span>` +
+    `<span class="msg">${e.msg}</span><span class="age">${fmtAge(e.t)}</span></div>`).join('')
+    || `<div class="r-empty">no events logged for this issue yet</div>`;
+  railEl.innerHTML =
+    `<div class="r-head"><span class="r-issue">${issue}</span>` +
+    (maxStage >= 0 ? `<span class="r-stage" style="color:${STAGE_C[maxStage]};border:1px solid ${rgba(STAGE_C[maxStage],.5)};background:${rgba(STAGE_C[maxStage],.12)}">${STAGES[maxStage]}</span>` : '') +
+    `<button class="r-x" id="railX">✕</button></div>` +
+    `<div class="r-body">` +
+    (maxStage >= 0 ? `<div><h4>PIPELINE STAGE</h4><div class="r-steps">${steps}</div></div>` : '') +
+    `<div><h4>AGENTS · ${mine.length}</h4><div class="r-agents">${agents}</div></div>` +
+    `<div><h4>RECENT EVENTS</h4><div class="r-evs">${evs}</div></div>` +
+    `</div><div class="r-foot">inspect live: <b>pan show ${issue.toLowerCase().replace(/[^a-z0-9-]/g, '')}</b></div>`;
+  $('#railX').onclick = closeRail;
+}
+setInterval(() => { if (railIssue) renderRail(railIssue); }, 1000);
+window.addEventListener('keydown', e => { if (e.key === 'Escape') closeRail(); });
+
 layout();
 requestAnimationFrame(frame);
 </script>

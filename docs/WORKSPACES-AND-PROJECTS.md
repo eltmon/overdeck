@@ -105,22 +105,24 @@ project-scoped pins for the same project).
 
 PAN-3286 made creation-by-intent a CLI affordance and taught the dashboard to
 *present* workspaces; PAN-3330 lets an operator express that intent where they
-already work. The rule it is built around: **the dialog never surprises you.**
+already work. PAN-3411 moves that flow to the dedicated `/workspaces/new` page,
+where the project chip row, hero title, target controls, resolved status, and
+workspace ideas stay visible together.
 
 **Resolve-before-create.** Every settled field change POSTs the intent to
 `/api/workspace-registry/resolve`, which runs
 `resolveWorkspaceCreateIntent()` — literally the same resolution the real
-create runs — and the preview panel renders its answer: the final path, the
+create runs — and the status strip renders its answer: the final path, the
 branch that will be created or the one observed, the parent branch (tagged
 `inferred` when guessed), whether the target is a git repository, and whether a
 worktree gets made. Because both paths execute one function, the preview cannot
 drift from the outcome.
 
 **Validation lives in one place.** There is no client-side name regex. The
-resolver returns `findings` — `{field, code, message, detail}` — and the dialog
-renders each one against the field that produced it. `Create` stays disabled
-while any finding is present or the preview is stale. A 422 from the create
-call folds back into those same inline findings.
+resolver returns `findings` — `{field, code, message, detail}` — and the page
+renders each one against the field that produced it. `Start workspace` stays
+disabled while any finding is present or the resolved intent is stale. A 422
+from the create call folds back into those same inline findings.
 
 **The shared core.** `src/lib/workspaces/create.ts` holds both halves:
 
@@ -154,12 +156,12 @@ intent — it resolves from the raw fields, so a doctored body cannot name an
 arbitrary path on the host. `project-targets` is registered ahead of the
 `/:id` detail route, which would otherwise capture the literal as an id.
 
-**Entry points.** A `+` in the sidebar WORKSPACES header (mirroring the
-Projects header's new-project button, and shown even when the project has no
-workspaces yet), a `New workspace…` command-palette action, and a
-`New workspace` button on the project overview that preselects that project.
-The palette action answers to both the Actions and Workspaces scope chips
-through `PaletteAction.alsoScopes`, so it is not listed twice under All.
+**Entry points.** The `+` in the sidebar WORKSPACES header, the
+`New workspace…` command-palette action, and the `New workspace` button on a
+project overview all navigate to `/workspaces/new`; project-scoped entry points
+add `?project=<key>` so the matching chip starts selected. The palette action
+answers to both the Actions and Workspaces scope chips through
+`PaletteAction.alsoScopes`, so it is not listed twice under All.
 
 **Management actions.** `WorkspaceView`'s header carries Favorite, Relocate and
 Archive for `main` and `scratch` only — `issue` workspaces are pipeline-owned
@@ -173,7 +175,7 @@ click that appears to do nothing. Successful mutations invalidate both
 `['workspace-registry']` and `['workspace-registry', workspaceId]` rather than
 waiting out the rail's 10s poll.
 
-**Out of scope.** The dialog creates `scratch` (and bootstraps `main`); `issue`
+**Out of scope.** The page creates `scratch` (and bootstraps `main`); `issue`
 workspaces stay pipeline-owned. Deleting a workspace and purging memory remain
 CLI-only, behind their typed confirmations.
 

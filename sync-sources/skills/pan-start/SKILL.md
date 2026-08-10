@@ -27,7 +27,8 @@ pan start PAN-123          # Spawn agent for issue PAN-123
 pan start MIN-456          # Works with any tracker prefix
 pan start PAN-123 --force  # Clear a paused agent gate and start anyway
 pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
-pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. switch model)
+pan reset-session PAN-123  # Clear mutable saved-session pointers before a fresh start
+pan start PAN-123 --fresh  # Start fresh only when no resumable session remains
 pan start PAN-123 --harness codex  # Explicitly use the Codex harness
 pan start PAN-123 --model gpt-5.6-sol --swarm off --review-mode full
 pan start PAN-123 --review-model gpt-5.6-sol  # Pin the convoy review model
@@ -76,11 +77,11 @@ spawning. Use `--host` only as an explicit break-glass override; interactive she
 prompt, while non-interactive callers must pass `--yes` to confirm.
 
 If a stopped agent has a saved Claude session, `pan start` refuses and points you to
-`pan resume <id>` (continue that session). Use `--fresh` to deliberately discard the
-saved session and start a brand-new one — for example, to relaunch a stopped agent on a
-different model, where the existing session can't resume under different provider routing.
-`--fresh` is non-destructive: it clears only the resume pointer, never the JSONL transcript,
-and refuses while the agent is still running (stop it first with `pan kill <id>`).
+`pan resume <id>` (continue that session) or `pan reset-session <id>` (clear mutable
+session pointers before a new start). `--fresh` runs the lifecycle guard before it wipes
+local agent state, so a refused command leaves the state directory intact. Append-only
+durable session records are not abandoned by either command; if one still makes the
+session resumable, resume it rather than deleting or inventing durable-plane markers.
 
 ## Slow or hanging workspace prep
 

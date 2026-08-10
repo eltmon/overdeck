@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmdirSync, unlinkSync, writeFileSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
-import { join, relative } from 'path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
 
@@ -101,6 +101,153 @@ export function setManifestEntry(
  */
 export function removeManifestEntry(manifest: Manifest, relativePath: string): void {
   delete manifest.installed[relativePath];
+}
+
+export interface PruneResult {
+  pruned: string[];
+  keptModified: string[];
+}
+
+/**
+ * Remove stale Overdeck-managed files while preserving user modifications.
+ *
+ * Entries are stale when their manifest path is absent from the current bundled
+ * source set. Modified files lose Overdeck ownership in the manifest but remain
+ * on disk, so later syncs treat them as user-owned.
+ */
+export function pruneStaleManifestEntriesSync(
+  targetBase: string,
+  manifest: Manifest,
+  currentSourceRelPaths: ReadonlySet<string>,
+  opts?: { prefixes?: string[] },
+): PruneResult {
+  const result: PruneResult = { pruned: [], keptModified: [] };
+  const absoluteBase = resolve(targetBase);
+  let canonicalBase = absoluteBase;
+  let baseIsDirectory = false;
+  let baseMissing = false;
+
+  try {
+    canonicalBase = realpathSync(absoluteBase);
+    baseIsDirectory = lstatSync(canonicalBase).isDirectory();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      baseIsDirectory = lstatSync(absoluteBase).isDirectory();
+    } catch (baseError) {
+      if ((baseError as NodeJS.ErrnoException).code !== 'ENOENT') throw baseError;
+      baseMissing = true;
+    }
+  }
+
+  const releaseOwnership = (relativePath: string): void => {
+    removeManifestEntry(manifest, relativePath);
+    result.keptModified.push(relativePath);
+  };
+
+  const isWithinBase = (candidate: string, allowBase: boolean): boolean => {
+    const fromBase = relative(canonicalBase, candidate);
+    if (fromBase === '') return allowBase;
+    return fromBase !== '..' && !fromBase.startsWith(`..${sep}`) && !isAbsolute(fromBase);
+  };
+
+  for (const [relativePath, entry] of Object.entries(manifest.installed)) {
+    if (entry.source !== 'overdeck') continue;
+    if (currentSourceRelPaths.has(relativePath)) continue;
+
+    const pathSegments = relativePath.split(/[\\/]/);
+    if (
+      relativePath.length === 0
+      || relativePath.includes('\0')
+      || isAbsolute(relativePath)
+      || pathSegments.includes('..')
+    ) {
+      releaseOwnership(relativePath);
+      continue;
+    }
+    if (
+      opts?.prefixes
+      && !opts.prefixes.some((prefix) => relativePath.startsWith(prefix))
+    ) continue;
+    if (baseMissing) {
+      removeManifestEntry(manifest, relativePath);
+      result.pruned.push(relativePath);
+      continue;
+    }
+
+    const targetFile = resolve(canonicalBase, relativePath);
+    if (!isWithinBase(targetFile, false) || !baseIsDirectory) {
+      releaseOwnership(relativePath);
+      continue;
+    }
+
+    const targetParent = dirname(targetFile);
+    const parentSegments = relative(canonicalBase, targetParent).split(sep).filter(Boolean);
+    let currentParent = canonicalBase;
+    let parentMissing = false;
+    let unsafeParent = false;
+
+    for (const segment of parentSegments) {
+      currentParent = join(currentParent, segment);
+      try {
+        const status = lstatSync(currentParent);
+        if (status.isSymbolicLink() || !status.isDirectory()) {
+          unsafeParent = true;
+          break;
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        parentMissing = true;
+        break;
+      }
+    }
+
+    if (unsafeParent) {
+      releaseOwnership(relativePath);
+      continue;
+    }
+    if (parentMissing) {
+      removeManifestEntry(manifest, relativePath);
+      result.pruned.push(relativePath);
+      continue;
+    }
+
+    const canonicalParent = realpathSync(targetParent);
+    if (!isWithinBase(canonicalParent, true)) {
+      releaseOwnership(relativePath);
+      continue;
+    }
+    const canonicalTarget = join(canonicalParent, basename(targetFile));
+
+    let targetStatus: ReturnType<typeof lstatSync>;
+    try {
+      targetStatus = lstatSync(canonicalTarget);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      removeManifestEntry(manifest, relativePath);
+      result.pruned.push(relativePath);
+      continue;
+    }
+
+    if (!targetStatus.isFile() || hashFileSync(canonicalTarget) !== entry.hash) {
+      releaseOwnership(relativePath);
+      continue;
+    }
+
+    unlinkSync(canonicalTarget);
+    removeManifestEntry(manifest, relativePath);
+    result.pruned.push(relativePath);
+
+    let currentDir = canonicalParent;
+    while (currentDir !== canonicalBase && isWithinBase(currentDir, false)) {
+      const status = lstatSync(currentDir);
+      if (status.isSymbolicLink() || !status.isDirectory() || readdirSync(currentDir).length > 0) break;
+      rmdirSync(currentDir);
+      currentDir = dirname(currentDir);
+    }
+  }
+
+  return result;
 }
 
 /**

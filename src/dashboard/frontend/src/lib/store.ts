@@ -15,6 +15,7 @@ import type {
   MemoryHealthSnapshot,
   MemoryObservation,
   MemoryStatus,
+  ProjectCiSnapshot,
   ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
@@ -70,6 +71,26 @@ export interface DashboardStore extends DashboardState {
   closeXbriefViewer(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
+}
+
+export type DashboardDomainEventListener = (events: readonly DomainEvent[]) => void
+
+const dashboardDomainEventListeners = new Set<DashboardDomainEventListener>()
+
+export function subscribeDashboardDomainEvents(listener: DashboardDomainEventListener): () => void {
+  dashboardDomainEventListeners.add(listener)
+  return () => dashboardDomainEventListeners.delete(listener)
+}
+
+function publishDashboardDomainEvents(events: readonly DomainEvent[]): void {
+  if (events.length === 0) return
+  for (const listener of dashboardDomainEventListeners) {
+    try {
+      listener(events)
+    } catch (error) {
+      console.error('[DashboardStore] domain event listener failed:', error)
+    }
+  }
 }
 
 // ─── Initial state ────────────────────────────────────────────────────────────
@@ -158,11 +179,15 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     set((state) => syncSnapshot(state, snapshot))
   },
 
-  applyEvent: (event) =>
-    set((state) => applyEvent(state, event)),
+  applyEvent: (event) => {
+    set((state) => applyEvent(state, event))
+    publishDashboardDomainEvents([event])
+  },
 
-  applyEvents: (events) =>
-    set((state) => applyEvents(state, events)),
+  applyEvents: (events) => {
+    set((state) => applyEvents(state, events))
+    publishDashboardDomainEvents(events)
+  },
 
   seedRecentActivity: (entries) =>
     set((state) => {
@@ -598,6 +623,9 @@ export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapC
 export const selectDashboardLifecycle = (s: DashboardState) => s.dashboardLifecycle
 
 export const selectScanProgress = (s: DashboardState) => s.scanProgress
+
+export const selectProjectCi = (projectKey: string) =>
+  (s: DashboardState): ProjectCiSnapshot | undefined => s.ciByProjectKey[projectKey]
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 

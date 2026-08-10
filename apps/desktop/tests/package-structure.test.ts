@@ -6,8 +6,10 @@
  */
 
 import * as FS from "node:fs";
+import * as OS from "node:os";
 import * as Path from "node:path";
 import { describe, expect, it } from "vitest";
+import { scanImportClosure } from "../scripts/import-closure.mjs";
 
 const desktopDir = Path.resolve(__dirname, "..");
 
@@ -161,6 +163,20 @@ describe("scripts/prepare-server-resources.mjs", () => {
 
     expect(script).toContain('cpSync(join(repoRoot, "sync-sources"), hooksStageDir, { recursive: true })');
     expect(script).not.toContain('cpSync(join(repoRoot, "sync-sources", "hooks")');
+  });
+
+  it("includes chunks reachable only through bare side-effect imports", () => {
+    const rootDir = FS.mkdtempSync(Path.join(OS.tmpdir(), "overdeck-import-closure-"));
+    try {
+      FS.writeFileSync(Path.join(rootDir, "merge-agent.js"), 'import "./validation.js";\n');
+      FS.writeFileSync(Path.join(rootDir, "validation.js"), "export {};\n");
+
+      const { seen } = scanImportClosure(rootDir, ["merge-agent.js"]);
+
+      expect(seen).toEqual(new Set(["merge-agent.js", "validation.js"]));
+    } finally {
+      FS.rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });
 

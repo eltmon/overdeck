@@ -175,7 +175,7 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
                 style={{
                   color: '#6366f1',
                   textDecoration: 'none',
-                  fontFamily: "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+                  fontFamily: "var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
                   fontSize: 11,
                   flexShrink: 0,
                 }}

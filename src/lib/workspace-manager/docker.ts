@@ -12,25 +12,21 @@ const execFileAsync = promisify(execFile);
 export async function getContainersReferencingWorkspacePathPromise(
   workspacePath: string,
 ): Promise<string[]> {
-  try {
-    const { stdout } = await execAsync(
-      `docker ps -a --format '{{.ID}}|{{.Label "com.docker.compose.project.config_files"}}'`,
-      { encoding: 'utf-8' },
-    );
-    const containers: string[] = [];
-    const devcontainerPath = join(workspacePath, DEVCONTAINER_DIRNAME);
-    for (const line of stdout.trim().split('\n').filter(Boolean)) {
-      const sep = line.indexOf('|');
-      if (sep === -1) continue;
-      const configFiles = line.slice(sep + 1);
-      if (configFiles.includes(devcontainerPath)) {
-        containers.push(line.slice(0, sep));
-      }
+  const { stdout } = await execAsync(
+    `docker ps -a --format '{{.ID}}|{{.Label "com.docker.compose.project.config_files"}}'`,
+    { encoding: 'utf-8' },
+  );
+  const containers: string[] = [];
+  const devcontainerPath = join(workspacePath, DEVCONTAINER_DIRNAME);
+  for (const line of stdout.trim().split('\n').filter(Boolean)) {
+    const sep = line.indexOf('|');
+    if (sep === -1) continue;
+    const configFiles = line.slice(sep + 1);
+    if (configFiles.includes(devcontainerPath)) {
+      containers.push(line.slice(0, sep));
     }
-    return containers;
-  } catch {
-    return [];
   }
+  return containers;
 }
 
 export async function stopWorkspaceDockerPromise(

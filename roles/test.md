@@ -63,6 +63,8 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Test only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`). If that isolated stack cannot support verification, report `TESTS FAILED`; do not substitute the primary host dashboard.
 
+Before declaring a UI UAT environment-blocked because the workspace container has no tracker-backed issue to open, run `pan admin seed-uat-fixtures <issue-id>` against the workspace stack, then perform the UAT against the seeded `FIX-1` issue's detail page instead of a real issue. Only a failure of the seeding command itself is a genuine environment block — a container with no issue data is not.
+
 1. Read the issue, xBRIEF acceptance criteria, test notes, and project instructions.
 2. Run the configured project verification gates, including typecheck, lint, unit tests, integration tests, or any project-specific test command.
 3. Capture failing command output verbatim. Treat test runner crashes, setup failures, and missing dependencies as failures.
@@ -84,13 +86,18 @@ Emit the sentinel and stop; repeated signals add lock pressure and burn tokens f
 
 ## TLDR: prefer code summaries over full reads
 
-When reading test fixtures, helpers, or app source to diagnose a failure, use TLDR MCP tools instead of full `Read` if `<workspace>/.venv` exists:
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
-- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — trace what a failing function touches
-- `tldr_semantic <query>` — find where a behavior is implemented when an acceptance criterion fails
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 
-Test logs, error output, and stack traces are still read directly. The PreToolUse hook will auto-substitute summaries for large source-file `Read`s. See the `pan-tldr` skill for details.
 
 ## Browser UAT Contract
 

@@ -123,7 +123,7 @@ import {
   orchestratedCompactionContinuations,
   scheduleOrchestratedCompactionContinuation,
 } from '../orchestrated-compaction.js';
-import { listRunningAgentsSync, getAgentRuntimeStateSync, resumeAgent } from '../../../lib/agents.js';
+import { listRunningAgentsSync, getAgentRuntimeStateSync, getAgentStateSync, resumeAgent, saveAgentStateSync } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { capturePane, listSessionNames, sendKeys } from '../../../lib/tmux.js';
 
@@ -131,6 +131,8 @@ const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeStateSync);
 const mockGetReviewStatus = vi.mocked(getReviewStatusSync);
 const mockResumeAgent = vi.mocked(resumeAgent);
+const mockGetAgentStateSync = vi.mocked(getAgentStateSync);
+const mockSaveAgentStateSync = vi.mocked(saveAgentStateSync);
 const mockCapturePane = vi.mocked(capturePane);
 const mockListSessionNames = vi.mocked(listSessionNames);
 const mockSendKeysAsync = vi.mocked(sendKeys);
@@ -460,5 +462,76 @@ describe('checkApiErrorAgents context overflow recovery', () => {
     expect(mockCapturePane).toHaveBeenCalledWith('agent-pan-1815', 100);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1815', undefined, { compact: true });
     expect(actions).toContain('Context overflow recovery: compact-respawned agent-pan-1815 (attempt 1)');
+  });
+});
+
+/**
+ * PAN-3528: the burn-pane check used to sit inside the `harness === 'codex'`
+ * branch, so a gpt-5.x agent routed through CLIProxy under claude-code — the
+ * standing GPT routing when `openai.harness: claude-code` is set — was never
+ * scanned, even though it dies on the very same credential.
+ */
+describe('checkApiErrorAgents codex-auth burn detection (PAN-3528)', () => {
+  // Verbatim from the burned 2026-08-03 pane: CLIProxy's generic 503 wrapper,
+  // carrying none of the native codex CLI's revoked-token phrases.
+  const CLIPROXY_BURN_PANE = [
+    'API Error: 503 auth_unavailable: no auth available (providers=codex, model=gpt-5.6-sol).',
+    'This is a server-side issue, usually temporary — try again in a moment.',
+    '❯',
+  ].join('\n');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    contextOverflowRecoveryState.clear();
+    orchestratedCompactionContinuations.clear();
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    } as ReturnType<typeof getAgentRuntimeStateSync>);
+    mockGetReviewStatus.mockReturnValue(undefined);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3528']));
+    mockCapturePane.mockReturnValue(Effect.succeed(CLIPROXY_BURN_PANE));
+  });
+
+  afterEach(() => {
+    contextOverflowRecoveryState.clear();
+    orchestratedCompactionContinuations.clear();
+  });
+
+  it('flags a gpt-5.x agent on the claude-code harness as codex-auth-burned', async () => {
+    mockGetAgentStateSync.mockReturnValue({
+      id: 'agent-pan-3528',
+      issueId: 'PAN-3528',
+      harness: 'claude-code',
+      model: 'gpt-5.6-sol',
+    } as ReturnType<typeof getAgentStateSync>);
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSaveAgentStateSync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        troubled: true,
+        lastFailureReason: expect.stringContaining('codex-auth-burned'),
+      }),
+    );
+    expect(actions).toContain(
+      'Codex-auth-burned halt: agent-pan-3528 marked troubled — needs re-authentication',
+    );
+  });
+
+  it('leaves an Anthropic-model agent alone — its pane text is not codex-auth evidence', async () => {
+    mockGetAgentStateSync.mockReturnValue({
+      id: 'agent-pan-3528',
+      issueId: 'PAN-3528',
+      harness: 'claude-code',
+      model: 'claude-opus-5',
+    } as ReturnType<typeof getAgentStateSync>);
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSaveAgentStateSync).not.toHaveBeenCalled();
+    expect(actions).not.toContain(
+      'Codex-auth-burned halt: agent-pan-3528 marked troubled — needs re-authentication',
+    );
   });
 });

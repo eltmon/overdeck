@@ -253,16 +253,17 @@ exit 0
   });
 
   describe('runQualityGates', () => {
-    it('preserves stdout failure details when trailing stderr noise exceeds its budget', async () => {
+    it('preserves the complete failed gate output', async () => {
       const scriptPath = join(testDir, 'failing-gate.sh');
       writeFileSync(
         scriptPath,
         `#!/bin/bash
+for i in {1..500}; do echo "leading stdout $i"; done
 echo "FAIL src/example.test.ts > reports the actual assertion"
 echo "AssertionError: expected true to be false"
-for i in {1..500}; do echo "stdout filler $i"; done
+for i in {1..500}; do echo "trailing stdout $i"; done
 for i in {1..500}; do echo "hint: noisy git advice $i" >&2; done
-echo "stderr diagnostic survives too" >&2
+echo "final stderr diagnostic" >&2
 exit 1
 `,
         { mode: 0o755 },
@@ -273,14 +274,16 @@ exit 1
       }, testDir));
 
       expect(result.passed).toBe(false);
-      expect(result.output).toContain('FAIL src/example.test.ts');
+      expect(result.output).toContain('leading stdout 1');
+      expect(result.output).toContain('FAIL src/example.test.ts > reports the actual assertion');
       expect(result.output).toContain('AssertionError: expected true to be false');
-      expect(result.output).toContain('stderr diagnostic survives too');
-      expect(result.output).not.toContain('hint: noisy git advice');
-      expect(result.output).toContain('chars elided');
+      expect(result.output).toContain('trailing stdout 500');
+      expect(result.output).toContain('hint: noisy git advice 1');
+      expect(result.output).toContain('final stderr diagnostic');
+      expect(result.output).not.toContain('chars elided');
     });
 
-    it('uses the same separate stream budgets for passing gates', async () => {
+    it('keeps passing gate output clipped to the existing preview budgets', async () => {
       const scriptPath = join(testDir, 'passing-gate.sh');
       writeFileSync(
         scriptPath,
@@ -301,6 +304,7 @@ echo "pass stderr diagnostic" >&2
       expect(result.output).toContain('pass output starts here');
       expect(result.output).toContain('pass stderr diagnostic');
       expect(result.output).not.toContain('warning: noisy tooling chatter');
+      expect(result.output).toContain('chars elided');
     });
   });
 

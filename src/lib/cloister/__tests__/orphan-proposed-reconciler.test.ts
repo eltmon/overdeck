@@ -14,6 +14,7 @@ const reviewStatusStore = vi.hoisted(() => ({
 
 const githubAppMocks = vi.hoisted(() => ({
   isGitHubAppConfigured: vi.fn(() => false),
+  getIssueState: vi.fn(() => Effect.succeed({ state: 'open' as const })),
   listPullRequestsForHead: vi.fn(() => Effect.succeed([])),
 }));
 
@@ -61,6 +62,7 @@ vi.mock('../../review-status.js', () => ({
 vi.mock('../../github-app.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../github-app.js')>(),
   isGitHubAppConfigured: githubAppMocks.isGitHubAppConfigured,
+  getIssueState: githubAppMocks.getIssueState,
   listPullRequestsForHead: githubAppMocks.listPullRequestsForHead,
 }));
 
@@ -198,6 +200,8 @@ describe('orphan proposed spec reconciler', () => {
     reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
     githubAppMocks.isGitHubAppConfigured.mockReset();
     githubAppMocks.isGitHubAppConfigured.mockReturnValue(false);
+    githubAppMocks.getIssueState.mockReset();
+    githubAppMocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'open' }));
     githubAppMocks.listPullRequestsForHead.mockReset();
     githubAppMocks.listPullRequestsForHead.mockReturnValue(Effect.succeed([]));
     trackerUtilsMocks.resolveGitHubIssueSync.mockReset();

@@ -72,7 +72,7 @@ governor mode:
 |---|---|---|
 | `ok` | `admitting` | Behavior unchanged from before PAN-2500 — count and load gates still apply. |
 | `soft` | `holding` | Stop admitting new resumes and new advancing dispatches. Nothing is killed. |
-| `hard` | `shedding` | Actively reclaim memory (see the eviction ladder below). |
+| `hard` | `shedding` | Admission is blocked. Automatic eviction is not wired; the kernel may start killing processes if memory stays exhausted. |
 
 The governor never re-admits the moment it clears SOFT. It holds until `MemAvailable` exceeds
 RECOVERY — a threshold strictly above SOFT. Without that gap, a system oscillating around SOFT would
@@ -100,6 +100,20 @@ otherwise                                                -> hold the current mod
 
 The governor's mode is module-level state, persisted across calls within the process — it is not
 recomputed from scratch each time, which is what makes the hold behavior possible.
+
+## Activity-Feed Signals (PAN-3550)
+
+The memory governor's level transitions and kernel OOM kills appear in the dashboard activity feed via a dedicated 15-second deacon timer, independent of the 60-second patrol. The timer emits **transition-only** — one row per level change, never duplicates while the level persists.
+
+Four feed levels:
+- **`ok`** — MemAvailable above the watch reserve; Overdeck is admitting work normally.
+- **`watch`** — MemAvailable below the watch reserve but still admitting (band is `ok`). Warning that the soft reserve may soon be crossed.
+- **`holding`** (band `soft`) — Overdeck has stopped admitting new agents and dispatches. Work queues until memory recovers above the recovery reserve.
+- **`shedding`** (band `hard`) — MemAvailable is below the hard reserve. Overdeck admits nothing; the kernel may OOM-kill. Automatic eviction is not wired.
+
+Top RSS consumers are attributed to Overdeck tmux sessions via `getRuntimeCensus()` (the in-repo runtime census, not the machine-local `.overdeck/logs/memory-census.log`).
+
+**OOM Canary** watches the kernel journal for `oom-kill:` lines, parses the victim's pid, command, RSS, and cgroup, and emits one activity entry per kill. The cursor-file pattern ensures no duplicate reporting across patrol ticks or dashboard restarts. On permission error (user not in `adm` group), the canary disables itself gracefully and logs once, never blocking the rest of the patrol.
 
 ### Swap runway and PSI
 
@@ -302,9 +316,10 @@ preserving only `lastYieldResumeAt` as the cooldown tracker. Every yield and res
 `Yielded agent-pan-1234 (idle 22m) to run review for PAN-5678`.
 
 This is opt-in and **disabled by default** — an unset install keeps the static defer-until-attrition
-behavior at every dispatch site (see the config table below). It complements, and does not replace,
-the eviction ladder: `shed()` still owns docker-stack reclaim under HARD memory pressure; preemption
-only pauses idle work agents at slot granularity for throughput.
+behavior at every dispatch site (see the config table below). Preemption pauses idle work agents at
+slot granularity for throughput; it is the only automatic reclaim path that runs. `shed()` remains in
+the module but is wired to no caller (PAN-3550) — nothing evicts docker stacks or pauses agents under
+HARD pressure on its own.
 
 Recovery reconcilers do not bypass the governor. `decideAutonomousRedrive()`
 first applies the unified resume policy and then reads the cached memory verdict;
@@ -382,6 +397,22 @@ The **preemptive scheduler** (PAN-2507) is also configured under `[concurrency]`
 | `preemption` | `false` | Opt-in. When true, a blocked advancing (review/test/merge) dispatch may yield an idle work agent to free capacity. Unset ⇒ zero behavior change — every dispatch site defers until attrition as before. |
 | `max_yielded` | `3` | Anti-thrash: the most work agents that may be in the yielded (scheduler-paused) state at once. |
 | `yield_cooldown_secs` | `600` | Anti-thrash: an agent resumed from a yield may not be re-yielded until this many seconds elapse. |
+
+## SystemHealthPill (PAN-3423)
+
+The dashboard System Health Pill popover displays live resource metrics and governor state through a hierarchical interface. Its one-line summary always includes stalled and idle agent counts, memory utilization, spawn headroom, and context-note count; healthy state also names relay status. Degraded states surface a prioritized **attention section** that groups identical failure patterns across multiple agents into count-badged rows such as "4× agents: agent-A, agent-B +2 more".
+
+**Sections:**
+
+1. **Summary line** — a one-sentence answer to "do I need to act now?" Healthy, warning, and critical variants preserve the same operational context: stalled and idle counts, memory utilization, admission headroom, and context-note count.
+2. **Chip row** — three status chips show admitted work agents, running containers, and webhook-relay health. The relay is green when running, red when configured but stopped or unavailable, and neutral gray when it is not configured.
+3. **Vitals tiles** — a 2×2 grid displays CPU and load/core, total/used/available memory, Overdeck RSS, swap percentage, and virtual commitment. Each tile has a proportional meter bar with threshold colors (green <60%, amber 60–85%, red >85% for host percentages; Overdeck accent blue otherwise).
+4. **Attention section** — visible severity-color-coded rows (red dot for critical, amber for warning) grouped by reason code. Identical codes across agents fold into one informational row with agent count and an abbreviated list (first two named, "+N more" if >2); grouped rows have no Open or Kill controls. Singleton agent rows show `<agentId> · <issueId>`, retain the humanized inactivity duration, and may expose Open and Kill actions. Only severity:info context notes are hidden initially inside the collapsed context-note disclosure.
+5. **Top consumers** — a memory-ranked list of agents, specialists, and containers sorted by RSS, each with a kind badge and proportional memory bar. Leaked specialists carry an amber "LEAKED" tag, while the section header reports "⚠ N leaked" or "No leaks".
+
+The popover header shows a visible labeled state pill with a red, amber, or green dot and an "Updated Ns ago" timestamp relative to the snapshot's `updatedAt`. A state transition into critical emits one toast notification with an action that opens the popover in leaked-first mode. A "Show all" button switches the top-consumer list from leaked-only to the full list.
+
+**Data flow:** `buildAttentionItems()` in `system-health-attention.ts` groups reasons by code, excludes severity:info from active rows, and sorts critical-first and stalled-before-idle. `summaryLine()` combines issue and affected-agent counts with memory, headroom, relay, and context-note state. `contextNotes()` returns only info reasons for the collapsed disclosure. Each singleton attention target carries its canonical `issueId`; the component passes that value directly to `useDashboardStore().openIssue()` when the operator chooses `Open`.
 
 ## Related documents
 

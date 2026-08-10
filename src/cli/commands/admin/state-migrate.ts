@@ -13,6 +13,7 @@ import { STATE_BRANCH, MIGRATION_COMPLETE_MARKER, clearStateMigrationCache, stat
 import { STATE_BRANCH_PATHS } from '../../../lib/state-plane.js';
 import { acquireStateMigrationLock } from '../../../lib/state-migration-lock.js';
 import { manifestEntry, verifyStateMigrationManifest, type StateMigrationManifestEntry } from '../../../lib/state-migration-manifest.js';
+import { backfillAgentRuntimePlane } from './agent-state-backfill.js';
 import { migrateProjectXBriefState } from './xbrief-state-migrate.js';
 
 const GIT_COMMAND_TIMEOUT_MS = 30_000;
@@ -545,5 +546,12 @@ export function registerStateMigrationCommand(admin: Command): void {
     .option('--dry-run', 'Print the exact xBRIEF migration plan without mutating anything')
     .action(async (project: string, options: { dryRun?: boolean }) => {
       await migrateProjectXBriefState(project, options);
+    });
+
+  state.command('backfill-agents [project]')
+    .description('Reconstruct durable agent runtime records from local and retained state')
+    .option('--dry-run', 'Report the records and sessions that would be written')
+    .action(async (project: string | undefined, options: { dryRun?: boolean }) => {
+      await backfillAgentRuntimePlane({ projectKey: project, dryRun: options.dryRun });
     });
 }

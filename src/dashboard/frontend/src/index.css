@@ -2,6 +2,139 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Self-hosted fonts (PAN-3410) — zero external font requests ─── */
+@font-face {
+  font-family: 'Geist Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/Geist-Variable.woff2') format('woff2-variations'), url('/fonts/Geist-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2-variations'), url('/fonts/GeistMono-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 1000;
+  src: url('/fonts/DMSans-Variable.woff2') format('woff2-variations'), url('/fonts/DMSans-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2-variations'), url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2');
+}
+
+/* ─── Theme font tokens (PAN-3410 D-13) — :root carries Ledger's exact values;
+     [data-theme="broadsheet"] overrides them. Components never branch on
+     theme directly, only on these variables. [data-theme="ledger"] restates
+     the :root values explicitly (not just relying on :root) so a Ledger
+     scope NESTED inside a Broadsheet document — e.g. the Settings ->
+     Appearance theme-comparison specimens — resets these variables at that
+     DOM level instead of inheriting Broadsheet's from the ancestor. ─── */
+:root,
+[data-theme="ledger"] {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+[data-theme="broadsheet"] {
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-display: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+/* ─── Display-scale utilities (Broadsheet vocabulary; Ledger-safe fallback
+     per D-13 — values ported from design/style-guide/mockups/style-guide-v2.html).
+     Broadsheet values live in per-utility CSS custom properties rather than
+     `[data-theme="broadsheet"] .display-xl` descendant-selector overrides:
+     a descendant selector matches through ANY ancestor carrying that
+     attribute, so a nested [data-theme="ledger"] scope (the Appearance
+     picker's specimens) would still inherit Broadsheet's rules from the
+     outer html[data-theme="broadsheet"]. Custom properties instead cascade
+     by DOM proximity — [data-theme="ledger"] invalidates the property at
+     that scope (falling back to the literal Ledger/Tailwind value below)
+     regardless of how deep the nesting goes, in both directions. ─── */
+@layer components {
+  [data-theme="broadsheet"] {
+    --display-xl-family: var(--font-display);
+    --display-xl-size: clamp(3rem, 7vw, 4.5rem);
+    --display-xl-weight: 750;
+    --display-xl-tracking: -0.03em;
+    --display-xl-leading: 1.02;
+
+    --display-lg-family: var(--font-display);
+    --display-lg-size: 2.5rem;
+    --display-lg-weight: 680;
+    --display-lg-tracking: -0.025em;
+    --display-lg-leading: 1.05;
+
+    --eyebrow-family: var(--font-mono);
+    --eyebrow-size: 11px;
+    --eyebrow-weight: 500;
+    --eyebrow-tracking: 0.12em;
+  }
+
+  /* Explicitly invalidate the Broadsheet display-scale properties inside a
+     nested Ledger scope so var()'s fallback (the Tailwind text-xl/text-lg/
+     text-xs + font-medium values applied below) takes over again. */
+  [data-theme="ledger"] {
+    --display-xl-family: initial;
+    --display-xl-size: initial;
+    --display-xl-weight: initial;
+    --display-xl-tracking: initial;
+    --display-xl-leading: initial;
+
+    --display-lg-family: initial;
+    --display-lg-size: initial;
+    --display-lg-weight: initial;
+    --display-lg-tracking: initial;
+    --display-lg-leading: initial;
+
+    --eyebrow-family: initial;
+    --eyebrow-size: initial;
+    --eyebrow-weight: initial;
+    --eyebrow-tracking: initial;
+  }
+
+  .display-xl {
+    @apply text-xl font-medium;
+    font-family: var(--display-xl-family, var(--font-sans));
+    font-size: var(--display-xl-size, 1.25rem);
+    font-weight: var(--display-xl-weight, 500);
+    letter-spacing: var(--display-xl-tracking, normal);
+    line-height: var(--display-xl-leading, 1.75rem);
+  }
+
+  .display-lg {
+    @apply text-lg font-medium;
+    font-family: var(--display-lg-family, var(--font-sans));
+    font-size: var(--display-lg-size, 1.125rem);
+    font-weight: var(--display-lg-weight, 500);
+    letter-spacing: var(--display-lg-tracking, normal);
+    line-height: var(--display-lg-leading, 1.75rem);
+  }
+
+  .eyebrow {
+    @apply text-xs uppercase tracking-wider font-medium text-muted-foreground;
+    font-family: var(--eyebrow-family, var(--font-sans));
+    font-size: var(--eyebrow-size, 0.75rem);
+    font-weight: var(--eyebrow-weight, 500);
+    letter-spacing: var(--eyebrow-tracking, 0.05em);
+  }
+}
+
 /* Suppress all transitions during theme changes */
 .no-transitions,
 .no-transitions *,
@@ -135,7 +268,7 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: "DM Sans", system-ui, sans-serif;
+    font-family: var(--font-sans), system-ui, sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -194,7 +327,7 @@ body::after {
 }
 
 .terminal-output {
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -257,6 +390,25 @@ body::after {
   }
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
+  }
+
+  /* Broadsheet badge radius (PAN-3410 D-11) — the one deliberate radius
+     change in the whole revision. Targets any element carrying a
+     badge-bg-* class (the sanctioned badge formula) so existing call
+     sites don't need to be touched individually. Consumed through a
+     custom property (same pattern as the display-scale utilities above)
+     rather than a bare `[data-theme="broadsheet"] [class*="badge-bg-"]`
+     descendant-selector override, so a nested [data-theme="ledger"] scope
+     (e.g. inside the Broadsheet document) correctly falls back to
+     rounded-sm instead of inheriting the outer document's radius. */
+  [data-theme="broadsheet"] {
+    --badge-radius: var(--radius-md);
+  }
+  [data-theme="ledger"] {
+    --badge-radius: initial;
+  }
+  [class*="badge-bg-"] {
+    border-radius: var(--badge-radius, var(--radius-sm));
   }
   .drawer-gate-border-pass {
     border-color: color-mix(in srgb, var(--success) 32%, transparent);

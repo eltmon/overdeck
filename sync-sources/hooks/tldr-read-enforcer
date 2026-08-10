@@ -106,9 +106,22 @@ case "$EXT_LOWER" in
     ;;
 esac
 
-# Find the .venv/bin/tldr binary
-# Check workspace first, then project root
+# Metrics helper (PAN-3534): bypasses.log feeds getTldrMetricsSync(); these
+# writes were dropped in a refactor and the metrics were dead from Feb 2026.
+# Format matches the reader: "timestamp reason rel_path".
+log_bypass() {
+  mkdir -p "$1/.tldr" 2>/dev/null
+  printf '%s %s %s\n' "$(date +%s)" "$2" "$3" >> "$1/.tldr/bypasses.log" 2>/dev/null
+}
+
+# Find the .venv/bin/tldr binary.
+# Walk up from the file, stopping at the file's own repo boundary (.git entry —
+# worktrees have a .git *file*): an enclosing checkout's index cannot resolve
+# this file's relative paths, so crossing the boundary guarantees a doomed
+# lookup (PAN-3534 — 89% of live workspaces had no local venv and burned two
+# guaranteed-fail subprocess spawns on every large Read).
 TLDR_BIN=""
+BOUNDARY_DIR=""
 DIR="$(dirname "$FILE_PATH")"
 while [ "$DIR" != "/" ]; do
   if [ -x "$DIR/.venv/bin/tldr" ]; then
@@ -116,11 +129,19 @@ while [ "$DIR" != "/" ]; do
     PROJECT_DIR="$DIR"
     break
   fi
+  if [ -e "$DIR/.git" ]; then
+    BOUNDARY_DIR="$DIR"
+    break
+  fi
   DIR=$(dirname "$DIR")
 done
 
-# Bypass: no TLDR binary found
+# Bypass: no TLDR venv inside this file's own checkout. Count it only where a
+# .tldr dir already exists — never sprout .tldr in arbitrary repos.
 if [ -z "$TLDR_BIN" ]; then
+  if [ -n "$BOUNDARY_DIR" ] && [ -d "$BOUNDARY_DIR/.tldr" ]; then
+    printf '%s no-venv %s\n' "$(date +%s)" "${FILE_PATH#$BOUNDARY_DIR/}" >> "$BOUNDARY_DIR/.tldr/bypasses.log" 2>/dev/null
+  fi
   exit 0
 fi
 
@@ -131,6 +152,7 @@ REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
 # The post-edit hook tracks edits in .tldr/dirty-files
 DIRTY_FILE="$PROJECT_DIR/.tldr/dirty-files"
 if [ -f "$DIRTY_FILE" ] && grep -qxF "$REL_PATH" "$DIRTY_FILE" 2>/dev/null; then
+  log_bypass "$PROJECT_DIR" "recently-edited" "$REL_PATH"
   exit 0
 fi
 
@@ -188,6 +210,7 @@ except:
     # If extract also found nothing useful, bypass entirely
     if [ "${EXTRACT_FUNCS:-0}" -eq 0 ] && [ "${EXTRACT_CLASSES:-0}" -eq 0 ]; then
       # Neither context nor extract found useful content — let the agent read the file
+      log_bypass "$PROJECT_DIR" "sparse-content" "$REL_PATH"
       exit 0
     fi
 
@@ -260,10 +283,12 @@ if [ "${TLDR_EXIT:-0}" -ne 0 ] && [ "${EXTRACT_EXIT:-0}" -ne 0 ]; then
   mkdir -p "$(dirname "$FAIL_LOG")" 2>/dev/null
   printf '%s binary_fail context_exit=%s extract_exit=%s %s\n' \
     "$(date +%s)" "$TLDR_EXIT" "$EXTRACT_EXIT" "$REL_PATH" >> "$FAIL_LOG" 2>/dev/null
+  log_bypass "$PROJECT_DIR" "binary-fail" "$REL_PATH"
 fi
 
 # Bypass: both context and extract failed or produced nothing useful
 if [ -z "$TLDR_OUTPUT" ]; then
+  log_bypass "$PROJECT_DIR" "no-content" "$REL_PATH"
   exit 0
 fi
 
@@ -319,6 +344,11 @@ SUMMARY="${SUMMARY}
 
 ---
 To read the full file, use Read with offset/limit parameters for the specific section you need to edit."
+
+# Metrics (PAN-3534): interceptions.log feeds getTldrMetricsSync().
+# Format matches the reader: "timestamp file_size rel_path".
+mkdir -p "$PROJECT_DIR/.tldr" 2>/dev/null
+printf '%s %s %s\n' "$(date +%s)" "$FILE_SIZE" "$REL_PATH" >> "$PROJECT_DIR/.tldr/interceptions.log" 2>/dev/null
 
 # Deny the read and provide TLDR context instead
 # Use a temp file for the JSON to handle multiline safely

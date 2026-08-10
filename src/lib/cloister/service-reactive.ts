@@ -4,7 +4,7 @@ import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { sessionExists, killSession } from '../tmux.js';
+import { capturePane, sessionExists, killSession } from '../tmux.js';
 import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
@@ -413,6 +413,38 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
 }
 
 async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
+  if (event.type === 'agent.activity_changed') {
+    const payload = payloadRecord(event);
+    const agentId = typeof payload['agentId'] === 'string' ? payload['agentId'] : undefined;
+    if (agentId && payload['hookName'] === 'PostCompact' && !agentId.startsWith('conv-')) {
+      try {
+        const { continueCompactedAgentAfterHook } = await import('./compaction-continuation.js');
+        const { findLastCompactBoundary } = await import(
+          '../../dashboard/server/services/conversation-service.js'
+        );
+        const { deliverAgentMessage, getAgentStateSync } = await import('../agents.js');
+        const continued = await continueCompactedAgentAfterHook({
+          agentId,
+          capturePane: (target) => Effect.runPromise(capturePane(target, 80)),
+          send: (target, message) => deliverAgentMessage(target, message, 'hook:post-compact-continuation'),
+          findBoundary: findLastCompactBoundary,
+        });
+        if (continued) {
+          console.log(`[cloister] ${continued}`);
+          emitActivityEntrySync({
+            source: 'cloister',
+            level: 'warn',
+            message: `${agentId} stopped after a context compaction — continued from PostCompact`,
+            issueId: getAgentStateSync(agentId)?.issueId,
+          });
+        }
+      } catch (error) {
+        console.error(`[cloister] PostCompact continuation failed for ${agentId}:`, error);
+      }
+    }
+    return;
+  }
+
   if (event.type === 'linear_mcp_auth.healthy') {
     const { processLinearMcpAuthWake } = await import('../linear-mcp-auth.js');
     await processLinearMcpAuthWake();

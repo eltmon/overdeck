@@ -15,9 +15,11 @@ const mockMirrorProjectSkills = vi.fn().mockReturnValue({ added: [], updated: []
 const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
 const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], adopted: [], skipped: [], conflicts: [], diffs: [] });
+const emptySyncResult = { created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [] };
+const mockExecuteSync = vi.fn().mockReturnValue(emptySyncResult);
+const mockExecuteAgentSkillsSync = vi.fn().mockReturnValue(emptySyncResult);
 const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
-const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0 }, agents: { copied: 0 }, rules: { copied: 0 } });
+const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0, total: 0 }, agents: { copied: 0, total: 0 }, rules: { copied: 0, total: 0 }, pruned: [], keptModified: [] });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
 const mockPlanHooksSync = vi.fn().mockReturnValue([]);
@@ -42,6 +44,8 @@ const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
   pruned: [],
 });
 const mockExecSync = vi.fn();
+const mockSpinnerSucceed = vi.fn();
+const mockSpinnerWarn = vi.fn();
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
@@ -68,6 +72,10 @@ vi.mock('../../../src/lib/sync.js', () => ({
   syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
   isStartupSyncNeededSync: mockStartupSyncNeeded,
   writeSyncManifestSync: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/harness-skill-sync.js', () => ({
+  executeAgentSkillsSync: mockExecuteAgentSkillsSync,
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
@@ -138,7 +146,9 @@ vi.mock('../../../src/lib/paths.js', () => ({
 
 vi.mock('ora', () => ({
   default: () => ({
-    start: () => ({ text: '', succeed: vi.fn(), fail: vi.fn(), warn: vi.fn(), stop: vi.fn(), info: vi.fn() }),
+    start: () => ({
+      text: '', succeed: mockSpinnerSucceed, fail: vi.fn(), warn: mockSpinnerWarn, stop: vi.fn(), info: vi.fn(),
+    }),
   }),
 }));
 
@@ -158,6 +168,15 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockLoadConfig.mockReturnValue({ sync: {} });
     mockListProjects.mockReturnValue([]);
     mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
+    mockExecuteSync.mockReturnValue(emptySyncResult);
+    mockExecuteAgentSkillsSync.mockReturnValue(emptySyncResult);
+    mockRefreshCache.mockReturnValue({
+      skills: { copied: 0, total: 0 },
+      agents: { copied: 0, total: 0 },
+      rules: { copied: 0, total: 0 },
+      pruned: [],
+      keptModified: [],
+    });
     mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
@@ -231,6 +250,56 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       ([msg]) => typeof msg === 'string' && msg.includes('Skills mirror'),
     );
     expect(mirrorLog).toBeUndefined();
+    consoleSpy.mockRestore();
+  });
+
+  it('reports stale pruning counts in cache and distribution summaries', async () => {
+    mockRefreshCache.mockReturnValue({
+      skills: { copied: 0, total: 0 },
+      agents: { copied: 0, total: 0 },
+      rules: { copied: 0, total: 0 },
+      pruned: ['skills/old/SKILL.md'],
+      keptModified: [],
+    });
+    mockExecuteSync.mockReturnValue({ ...emptySyncResult, pruned: ['skills/old/SKILL.md'] });
+    mockExecuteAgentSkillsSync.mockReturnValue({
+      ...emptySyncResult,
+      pruned: ['skills/old-agent/SKILL.md'],
+    });
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(mockSpinnerSucceed.mock.calls.some(
+      ([message]) => typeof message === 'string'
+        && message.includes('Cache refreshed')
+        && message.includes('pruned 1 stale'),
+    )).toBe(true);
+    expect(mockSpinnerSucceed.mock.calls.some(
+      ([message]) => typeof message === 'string'
+        && message.includes('Synced 0 Claude items')
+        && message.includes('pruned 2 stale'),
+    )).toBe(true);
+  });
+
+  it('lists user-modified stale files kept during distribution', async () => {
+    mockExecuteSync.mockReturnValue({
+      ...emptySyncResult,
+      keptModified: ['skills/custom/SKILL.md'],
+    });
+    mockExecuteAgentSkillsSync.mockReturnValue({
+      ...emptySyncResult,
+      keptModified: ['skills/agent-custom/SKILL.md'],
+    });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    const output = consoleSpy.mock.calls.flatMap((args) => args).join('\n');
+    expect(output).toContain('Kept user-modified stale file(s):');
+    expect(output).toContain('skills/custom/SKILL.md');
+    expect(output).toContain('~/.agents/skills/agent-custom/SKILL.md');
     consoleSpy.mockRestore();
   });
 

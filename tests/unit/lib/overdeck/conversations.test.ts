@@ -28,6 +28,7 @@ type ConvRow = {
   name: string;
   cwd: string;
   issueId: string | null;
+  projectKey: string | null;
   harness: string | null;
   model: string | null;
   effort: string | null;
@@ -185,6 +186,7 @@ function makeConvRow(name: string, overrides?: Partial<ConvRow>): ConvRow {
     name,
     cwd:                 '/home/user/projects',
     issueId:             null,
+    projectKey:          null,
     harness:             'claude-code',
     model:               'claude-sonnet-4-6',
     effort:              null,
@@ -347,7 +349,7 @@ describe('AC2 — TranscriptsResolver has no write methods; writes live on Trans
 describe('AC3 — reads and writes route through their designated doors', () => {
   it('ConversationsResolver.get returns a Conversation entity', async () => {
     const { fdb, dbLayer } = makeFakeDb();
-    fdb.convRows.push(makeConvRow('alice'));
+    fdb.convRows.push(makeConvRow('alice', { projectKey: 'mind-your-now' }));
 
     const layer = ConversationsResolverLive.pipe(Layer.provide(dbLayer));
 
@@ -357,6 +359,7 @@ describe('AC3 — reads and writes route through their designated doors', () => 
 
     expect(result.name).toBe('alice');
     expect(result.cwd).toBe('/home/user/projects');
+    expect(result.projectKey).toBe('mind-your-now');
     expect(result.harness).toBe('claude-code');
     expect(Array.isArray(result.files)).toBe(true);
   });
@@ -399,6 +402,31 @@ describe('AC3 — reads and writes route through their designated doors', () => 
     );
 
     expect(result).toHaveLength(2);
+  });
+
+  it('ConversationWriter.create persists and returns an explicit project key', async () => {
+    const { fdb, dbLayer } = makeFakeDb();
+    const { busLayer } = makeBusLayer();
+
+    const resolverLayer = ConversationsResolverLive.pipe(Layer.provide(dbLayer));
+    const layer = ConversationWriterLive.pipe(
+      Layer.provide(dbLayer),
+      Layer.provide(busLayer),
+      Layer.provide(resolverLayer),
+    );
+
+    const result = await Effect.runPromise(
+      ConversationWriter.use((w) => w.create({
+        name: 'project-conversation' as ConversationName,
+        cwd: '/tmp/isolated-worktree',
+        projectKey: 'mind-your-now',
+      })).pipe(Effect.provide(layer)),
+    );
+
+    expect(result.projectKey).toBe('mind-your-now');
+    expect(fdb.insertedConvs).toContainEqual(
+      expect.objectContaining({ projectKey: 'mind-your-now' }),
+    );
   });
 
   it('ConversationWriter.archive sets archivedAt and emits event', async () => {

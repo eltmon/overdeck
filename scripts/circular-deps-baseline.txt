@@ -6,15 +6,6 @@ src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx > 
 src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx > src/dashboard/frontend/src/components/Stage/HomePane/launcherOrdering.ts
 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts
 src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/conflict-gate.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/review-context.ts > src/lib/cloister/coderabbit-ingestion.ts > src/lib/cloister/review-verdict-feedback.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/review-convoy.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/dashboard/server/services/issue-service-singleton.ts > src/dashboard/server/services/issue-data-service.ts > src/lib/review-status.ts > src/lib/overdeck/review-status-record-sync.ts > src/lib/pan-dir/records.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/lib/backlog/backlog-auto-trigger.ts > src/lib/backlog/sequencer-agent.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
-src/dashboard/server/read-model.ts > src/lib/reconstruct/reconstruct-cache.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/dashboard/server/services/issue-lifecycle.ts > src/dashboard/server/services/domain-services.ts
 src/dashboard/server/routes/conversations.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/container-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/merge-ops.ts
@@ -30,7 +21,6 @@ src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations
 src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/agents.ts > src/lib/agents/resume.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/ohmypi-conversation-parser.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/pi-conversation-parser.ts
-src/lib/activity-logger.ts > src/lib/agents.ts > src/lib/agents/agent-state.ts
 src/lib/agents.ts > src/lib/agents/activity.ts
 src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/ohmypi.ts > src/lib/launcher-generator.ts
 src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/agents/identity.ts > src/lib/agents/runtime-state.ts
@@ -45,19 +35,12 @@ src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/termination.ts
 src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/harness-resolve.ts
 src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts
 src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts > src/lib/overdeck/agents.ts
-src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts
-src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/lib/memory/cli.ts
 src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts
 src/lib/cloister/auto-resume-config.ts > src/lib/projects.ts
-src/lib/cloister/coderabbit-ingestion.ts > src/lib/cloister/review-verdict-feedback.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/review-context.ts
-src/lib/cloister/conflict-gate.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/deacon-swarm-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/deacon-swarm-orphan-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
-src/lib/cloister/review-agent.ts > src/lib/cloister/review-convoy.ts > src/lib/pipeline-notifier.ts > src/lib/review-status.ts
-src/lib/cloister/review-agent.ts > src/lib/cloister/review-convoy.ts > src/lib/review-status.ts
-src/lib/cloister/review-agent.ts > src/lib/review-status.ts
 src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts
 src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts
@@ -69,9 +52,5 @@ src/lib/merge-set.ts > src/lib/overdeck/merge-sync.ts
 src/lib/overdeck/conversation-delivery.ts > src/lib/overdeck/conversation-runtime.ts
 src/lib/overdeck/conversation-forks.ts
 src/lib/overdeck/issue-transitions.ts > src/lib/overdeck/workspace-hygiene.ts
-src/lib/overdeck/review-status-record-sync.ts > src/lib/pan-dir/records.ts > src/lib/review-status.ts
-src/lib/overdeck/review-status-record-sync.ts > src/lib/review-status.ts
-src/lib/overdeck/review-status-sync.ts > src/lib/review-status-normalize.ts > src/lib/review-status.ts
-src/lib/overdeck/review-status-sync.ts > src/lib/review-status.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts

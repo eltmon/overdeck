@@ -115,6 +115,7 @@ describe('handoffCommand', () => {
     expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith('source-conv', {
       model: 'glm-5.2',
       cwd: undefined,
+      projectKey: undefined,
       forkMode: 'handoff',
       focus: 'ship it',
       handoffAuthor: 'external',
@@ -144,6 +145,33 @@ describe('handoffCommand', () => {
       'source-conv',
       expect.objectContaining({ issueId: 'PAN-9004', focus: 'continue' }),
     );
+  });
+
+  it('forwards --project to the fork server and prints the canonical project key', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      projectKey: 'mind-your-now',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { project: 'Mind Your Now' });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ projectKey: 'Mind Your Now', focus: 'continue' }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Project: mind-your-now');
   });
 
   it('rejects an invalid --issue and does not fork', async () => {

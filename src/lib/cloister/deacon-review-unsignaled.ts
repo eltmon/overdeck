@@ -11,6 +11,8 @@ import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialis
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy-liveness.js';
+import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
+import { recordReviewVerdict } from './review-verdict-writer.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
 
@@ -211,7 +213,7 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'pending' || !status.reviewSpawnedAt) continue;
+      if ((status.reviewStatus !== 'pending' && status.reviewStatus !== 'reviewing') || !status.reviewSpawnedAt) continue;
 
       try {
         const resolved = resolveProjectFromIssueSync(issueId);
@@ -313,13 +315,13 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
         const reviewNotes = parsed.topBlocker
           ? `${parsed.topBlocker} — ${attribution}`
           : `Review ${parsed.verdict} ${attribution}`;
-        setReviewStatusSync(issueId, {
-          reviewStatus: parsed.verdict,
-          reviewNotes,
-          ...((parsed.verdict === 'passed' || parsed.verdict === 'blocked') && currentHead
-            ? { reviewedAtCommit: currentHead }
-            : {}),
+        const convergence = await convergeRowFromVerdictOfRecord(issueId, {
+          runId: basename(latestDir),
+          workspacePath: wsPath,
+          writer: 'unsignaled-recovery',
+          notes: reviewNotes,
         });
+        if (!convergence.converged) continue;
 
         if (parsed.verdict === 'blocked') {
           try {
@@ -420,10 +422,9 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         // If we already nudged once and 30+ min have passed with no signal,
         // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
         if (lastNudged) {
-          setReviewStatusSync(issueId, {
-            reviewStatus: verdict,
-            reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`,
-          });
+          const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`;
+          const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+          if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
           actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
           console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
           continue;
@@ -448,10 +449,9 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         }
       } else {
         // Session is dead — auto-complete so the pipeline isn't blocked
-        setReviewStatusSync(issueId, {
-          reviewStatus: verdict,
-          reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`,
-        });
+        const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`;
+        const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+        if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
         actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
         console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (dead agent)`);
       }

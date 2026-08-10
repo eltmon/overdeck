@@ -25,7 +25,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
-import type { ReviewStatus } from '../review-status.js';
+import type { ReviewStatus } from '../review-status-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type {
   ContinueDecision,
@@ -108,6 +108,7 @@ export function projectPipeline(
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,
+    reopenedAt: existing?.reopenedAt,
     // PAN-2587: the tombstone lives only in the record — a rebuild that projects
     // from ReviewStatus (which has no such field) must not erase it, or the
     // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).
@@ -126,7 +127,6 @@ export function projectPipeline(
     inspectNotes: status.inspectNotes,
     mergeNotes: status.mergeNotes,
     blockerReasons: status.blockerReasons,
-    conflictsSince: status.conflictsSince,
     prUrl: status.prUrl,
     prNumber: status.prNumber,
     prHeadSha: status.prHeadSha,
@@ -141,7 +141,6 @@ export function projectPipeline(
     deaconIgnored: status.deaconIgnored,
     deaconIgnoredAt: status.deaconIgnoredAt,
     deaconIgnoredReason: status.deaconIgnoredReason,
-    reviewerVerdicts: (status as { reviewerVerdicts?: unknown }).reviewerVerdicts,
     reviewCycleHistory: (status as { reviewCycleHistory?: unknown }).reviewCycleHistory,
     strikeReadyHead: status.strikeReadyHead,
     strikeReadyAt: status.strikeReadyAt,

@@ -44,7 +44,7 @@ beforeEach(async () => {
     agentRole: 'work',
     agentHarness: 'claude-code',
   };
-});
+}, 20_000);
 
 afterEach(async () => {
   closeMemoryFtsDatabases();
@@ -57,7 +57,9 @@ afterEach(async () => {
 });
 
 describe('PAN-1052 memory extraction end-to-end flow', () => {
-  it('persists six turns, rolls up once, searches, resets, excludes subagents, records cost, and dedupes concurrent claims', async () => {
+  // Real extraction/claim/commit/write pipeline — 3s unloaded, over the 5s
+  // default under verification-gate load. Opt in like the other memory e2e tests.
+  it('persists six turns, rolls up once, searches, resets, excludes subagents, records cost, and dedupes concurrent claims', { timeout: 20_000 }, async () => {
     const transcriptPath = join(tempDir!, 'session-1.jsonl');
     const rollupJobs: PendingTurn[][] = [];
 

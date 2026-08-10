@@ -22,7 +22,8 @@ import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
-  handleReviewDiscoveryReady,
+  buildReviewRolePrompt,
+  recoverMissingConvoyReviewers,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -54,6 +55,8 @@ const {
   mockResumeAgent,
   mockStopAgent,
   mockWipeAgentStateDirs,
+  mockMarkAgentStoppedState,
+  mockConvergeRowFromVerdictOfRecord,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
@@ -76,6 +79,8 @@ const {
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
   mockStopAgent: vi.fn().mockResolvedValue(undefined),
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
+  mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
+  mockConvergeRowFromVerdictOfRecord: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -106,6 +111,12 @@ vi.mock('../../../src/lib/agents.js', () => ({
   stopAgent: (...args: Parameters<typeof mockStopAgent>) => Effect.promise(() => mockStopAgent(...args)),
   wipeAgentStateDirs: mockWipeAgentStateDirs,
   getProviderAuthMode: vi.fn(async () => 'apikey'),
+}));
+
+vi.mock('../../../src/lib/agents/agent-state.js', () => ({
+  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+  saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+  markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -148,6 +159,10 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
   archiveFeedbackFiles: mockArchiveFeedbackFiles,
 }));
 
+vi.mock('../../../src/lib/cloister/verdict-restore.js', () => ({
+  convergeRowFromVerdictOfRecord: mockConvergeRowFromVerdictOfRecord,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
@@ -168,6 +183,7 @@ beforeEach(() => {
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+  mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
 });
 
 const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
@@ -484,6 +500,54 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
   });
 });
 
+describe('spawnReviewRoleForIssue verdict-of-record convergence', () => {
+  beforeEach(() => {
+    prepareWorkspace(REVIEW_MODE_WORKSPACE);
+  });
+
+  it('lands the active verdict and does not re-enter reviewing or spawn a parent', async () => {
+    mockGetAgentState.mockReturnValue({ reviewRunId: 'agent-pan-1982-review-abcdef12' });
+    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({
+      converged: true,
+      artifact: { runId: 'agent-pan-1982-review-abcdef12', verdict: 'passed' },
+      outcome: { landed: true, classification: 'dispatched' },
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1982',
+      workspace: REVIEW_MODE_WORKSPACE,
+      branch: 'feature/pan-1982',
+      force: true,
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Review dispatch converged from the verdict of record: PAN-1982',
+    });
+    expect(mockConvergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1982', {
+      runId: 'agent-pan-1982-review-abcdef12',
+      workspacePath: REVIEW_MODE_WORKSPACE,
+      writer: 'dispatch-converge',
+    });
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
+  it('continues the normal dispatch when no fresh verdict can converge', async () => {
+    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+
+    await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1982',
+      workspace: REVIEW_MODE_WORKSPACE,
+      branch: 'feature/pan-1982',
+      force: true,
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1982', expect.objectContaining({ reviewStatus: 'reviewing' }));
+    expect(mockSpawnRun).toHaveBeenCalled();
+  });
+});
+
 // ── review mode fan-out dispatch ─────────────────────────────────────────────
 
 describe('spawnReviewRoleForIssue review mode fan-out', () => {
@@ -538,12 +602,14 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('buildReviewRolePrompt');
     expect(block).toContain('buildSelfReviewPrompt');
-    // PAN-1862: the fan-out itself lives in review-convoy.ts — the dispatch block
-    // delegates to launchConvoyReviewersPromise over the selective in-scope set
-    // (all four on a first cycle; a subset when carried verdicts prove skips safe).
+    // The fan-out itself lives in review-convoy.ts and always launches the four
+    // independent convoy lanes for a new review run.
     expect(block).toContain('launchConvoyReviewersPromise');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
+    expect(block).not.toContain('discoveryForkMode');
+    expect(block).not.toContain('markDiscoveryPending');
+    expect(block).not.toContain('return []');
     expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
     // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
     // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
@@ -567,7 +633,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
     expect(block).toContain('if (fullReview)');
     expect(block).toContain('savedReview?.reviewRunId === runId');
-    expect(block).toContain('handleReviewDiscoveryReady(opts.issueId');
+    expect(block).toContain('recoverMissingConvoyReviewers(opts.issueId');
     expect(block).toContain("source: 'same-run parent resume'");
     expect(block).toContain('missing reviewer recovery failed');
     expect(block).toContain('await spawnConvoyReviewers(reviewAgentId)');
@@ -1084,6 +1150,65 @@ describe('convoy orchestration', () => {
     }));
   });
 
+  it('repairs and persists missing parent run metadata before recovering reviewers', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    const reviewDir = dirname(manifestPath);
+    for (const role of ['security', 'performance', 'requirements']) {
+      writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+    }
+    const parent = {
+      id: 'agent-pan-1059-review',
+      issueId: 'PAN-1059',
+      workspace,
+      role: 'review',
+      model: 'review-model',
+      status: 'starting',
+      startedAt: '2000-01-01T00:00:00.000Z',
+    };
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === parent.id ? parent : null,
+    );
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+    }));
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toMatchObject({ success: true, launched: 1 });
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      reviewContextManifestPath: manifestPath,
+    }));
+  });
+
+  it('fails reviewer recovery before launch when repaired parent state cannot be persisted', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    writeReviewManifest(workspace);
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            issueId: 'PAN-1059',
+            workspace,
+            role: 'review',
+            model: 'review-model',
+            status: 'starting',
+            startedAt: '2000-01-01T00:00:00.000Z',
+          }
+        : null,
+    );
+    mockSaveAgentStateAsync.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Could not persist active review run state for PAN-1059: database unavailable',
+    });
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
   it('re-dispatches only the missing reviewer when sibling reports already exist', async () => {
     const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
     const manifestPath = writeReviewManifest(workspace);
@@ -1103,7 +1228,7 @@ describe('convoy orchestration', () => {
       id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
     }));
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     expect(result).toMatchObject({ success: true, launched: 1 });
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
@@ -1114,6 +1239,86 @@ describe('convoy orchestration', () => {
     expect(readTestFileSync(`${reviewDir}/security.md`, 'utf-8')).toBe('security complete');
     expect(readTestFileSync(`${reviewDir}/performance.md`, 'utf-8')).toBe('performance complete');
     expect(readTestFileSync(`${reviewDir}/requirements.md`, 'utf-8')).toBe('requirements complete');
+  });
+
+  // PAN-3545: the per-lane filter must treat tmux as the liveness oracle. A
+  // state.json row still claiming 'running' after its session died (deacon
+  // freeze, boot --no-resume, missed stopped event) must not block the launch —
+  // trusting it no-oped the convoy and stranded the synthesis parent (PAN-3511
+  // cycle 3, 2026-08-04). The stale row is healed to stopped at the signal.
+  it('launches every lane despite stale running rows when the tmux probe says no sessions', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    const staleReviewer = (id: string) => ({
+      id,
+      issueId: 'PAN-1059',
+      role: 'review',
+      status: 'running',
+      startedAt: '2000-01-01T00:00:00.000Z',
+    });
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            workspace,
+            reviewRunId: REVIEW_AGENT_RUN_ID,
+            reviewContextManifestPath: manifestPath,
+          }
+        : staleReviewer(agentId),
+    );
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+    }));
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    // The filter's output is the message denominator: 4 lanes selected despite
+    // four stale 'running' rows. (The per-lane spawn outcomes themselves are
+    // not asserted — four parallel dynamic imports of the mocked agents.js
+    // barrel resolve nondeterministically under vitest; the deterministic
+    // regression signal is the filter decision plus the heal calls below.)
+    expect(result.message).toMatch(/launched \d+\/4 missing reviewer/);
+    expect(result.message).not.toContain('already launched');
+    expect(mockMarkAgentStoppedState).toHaveBeenCalledTimes(4);
+    expect(mockMarkAgentStoppedState).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-pan-1059-review-security', status: 'running' }),
+      'system',
+    );
+    expect(mockMarkAgentStoppedState.mock.calls.every(([, cause]) => cause === 'system')).toBe(true);
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-pan-1059-review-correctness', status: 'stopped' }),
+    );
+  });
+
+  // PAN-3545: when the tmux probe itself fails, the state row keeps its
+  // conservative vote — a skipped launch beats a duplicate reviewer.
+  it('keeps the state row vote and skips the launch when the tmux probe fails', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    mockListSessionNamesEffect.mockImplementation(() => Effect.fail(new Error('tmux down')) as never);
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            workspace,
+            reviewRunId: REVIEW_AGENT_RUN_ID,
+            reviewContextManifestPath: manifestPath,
+          }
+        : {
+            id: agentId,
+            issueId: 'PAN-1059',
+            role: 'review',
+            status: 'running',
+            startedAt: '2000-01-01T00:00:00.000Z',
+          },
+    );
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('already launched');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockMarkAgentStoppedState).not.toHaveBeenCalled();
   });
 });
 
@@ -1277,3 +1482,23 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
+  it('teaches the synthesis parent to discard replayed signals from dead attempts', () => {
+    const prompt = buildReviewRolePrompt({
+      issueId: 'PAN-1059',
+      branch: 'feature/pan-1059',
+      workspace: '/tmp/ws',
+      reviewDir: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef',
+      runId: 'agent-pan-1059-review-deadbeef',
+      contextManifestPath: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef/context.json',
+    });
+    expect(prompt).toContain('STANDBY — REVIEW SYNTHESIS for PAN-1059');
+    expect(prompt).not.toContain('PHASE 1 — SHARED DISCOVERY');
+    expect(prompt).toContain('STALE-SIGNAL GUARD (PAN-3549)');
+    expect(prompt).toContain('stat -c %y <manifest path>');
+    expect(prompt).toContain('discard any signal whose deadline is older');
+    expect(prompt).toContain('Run ID: agent-pan-1059-review-deadbeef');
+  });
+});
+

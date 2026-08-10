@@ -372,6 +372,7 @@ describe('markRecordPipelineClosedOutSync', () => {
         mergeStatus: 'merged',
         closedOut: true,
         closedOutAt: '2026-06-27T00:00:00.000Z',
+        reopenedAt: '2026-06-20T00:00:00.000Z',
         updatedAt: '2026-06-27T00:00:00.000Z',
       },
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
@@ -396,6 +397,7 @@ describe('markRecordPipelineClosedOutSync', () => {
     const record = readIssueRecordSync(project, 'PAN-2054');
     expect(record?.pipeline.closedOut).toBe(true);
     expect(record?.pipeline.closedOutAt).toBe('2026-06-27T00:00:00.000Z');
+    expect(record?.pipeline.reopenedAt).toBe('2026-06-20T00:00:00.000Z');
   });
 });
 

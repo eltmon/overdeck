@@ -104,7 +104,13 @@ Use **Preview brief** to inspect the scope that the Flywheel will receive before
 - terminal prerequisites; and
 - completed PRD re-verification.
 
-The Flywheel page and issue tree also show read-only order-book projections. Those projections link to `/orders` for changes.
+The Flywheel page and issue tree also show read-only order-book projections. Those projections link to `/orders?project=<key>` for the project the book actually lives in, so the link lands on the right books.
+
+### Pick the project
+
+Order books are per-project state, and the page header carries a **Project** picker listing every project Overdeck has registered. It opens on the project the server resolved for you, and choosing another one reloads the page against that project's books — every read and write the page makes is scoped to the selection, so you cannot edit one project's book while looking at another's.
+
+The selection is mirrored into the URL as `/orders?project=mind-your-now`, which makes it a shareable deep link: opening that URL selects the project before the first load. Without the parameter the page shows the project containing the dashboard server's own working directory, exactly as it did before.
 
 ## Use the CLI
 
@@ -123,14 +129,28 @@ pan orders remove 2026-07-18-refactor-p3-remainder PAN-2445
 
 `add` defaults to Lane A. `--after <issue>` inserts after an existing item in the target lane. `--reverify` keeps the issue held until its PRD has been checked against current `main`.
 
-Queue the validated draft from `/orders`, then start it with either command:
+Queue the validated draft from `/orders` or from the terminal, then start it with either command:
 
 ```bash
+pan orders queue 2026-07-18-refactor-p3-remainder
 pan orders start 2026-07-18-refactor-p3-remainder
 pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 ```
 
+`queue` is the CLI form of the dashboard's **Queue book** action — it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
+
 Both start commands use the same validator and singleton Flywheel run gate. If validation or gate acquisition fails, the book remains ready.
+
+### Work on another project's books
+
+Every `pan orders` verb takes `--project <key>`, naming a project from your registry, so you do not have to `cd` into a project to manage its campaign:
+
+```bash
+pan orders list --project mind-your-now
+pan orders queue 2026-08-01-frontend-sweep --project mind-your-now
+```
+
+Without the flag, the command resolves the project that contains your current directory, as before. An unregistered key fails with `Unknown project: <key>` instead of reporting the book as missing.
 
 ## What drained means
 
@@ -175,11 +195,16 @@ Retrospective: no findings recognized.
 
 | State after completion | Next action |
 | --- | --- |
-| Another book is ready | Start the first ready book in queue order. |
-| No ready book and auto-pickup is on | Start a normal bookless backlog run. |
-| No ready book and auto-pickup is off | Stay stopped and surface a needs-you message. |
+| Another book is ready in this project | Start the first ready book in queue order. |
+| No ready book here, but one is ready in another project | Start that book in its own project. |
+| No ready book anywhere and auto-pickup is on | Start a normal bookless backlog run. |
+| No ready book anywhere and auto-pickup is off | Stay stopped and surface a needs-you message. |
 
 This continuation happens in the existing persistent Flywheel path; it does not create a one-shot agent.
+
+Continuation looks across projects, not only the one that just finished: when the completing project's queue is empty, Overdeck checks every registered project in registry order and starts the first ready book it finds, in that project's own repo and with that project's flywheel brief. `pan flywheel complete` names the project when this happens, so the output reads `started RUN-42 with order book 2026-08-01-frontend-sweep (project: mind-your-now)`.
+
+This scan is not limited by the finished run's scope. Marking a book ready is your explicit release of that work, so a ready book anywhere is already authorized; scope only governs whether the Flywheel may pull unlisted issues from the backlog. If you do not want a queued book to start automatically, leave it as a draft until you do.
 
 ## Intentional off-book work
 

@@ -46,8 +46,10 @@ run `pan sync` manually. Manual sync is useful when:
 ```
 
 **Key points:**
-- Skill bundles are copied recursively, including their scripts, references, and templates.
+- Skill bundles are copied recursively, including their scripts, references, and templates; empty source directories are ignored.
 - Manifest ownership lets `pan sync` update Overdeck-managed files without overwriting user-owned skills.
+- When a bundled skill, agent, or rule is removed, the next sync prunes its managed cache and harness copies.
+- User-modified stale files are preserved, released from manifest ownership, and listed in the sync output.
 - Claude Code discovers `~/.claude/skills/`; Codex, Pi, and Oh My Pi discover the shared Agent Skills standard directory at `~/.agents/skills/`.
 - New harness sessions see changes after `pan sync`; already-running sessions keep the skill catalog loaded at launch.
 - Invocation syntax belongs to the harness: Claude uses `/skill-name`, while Codex uses `$skill-name` or natural-language skill selection.

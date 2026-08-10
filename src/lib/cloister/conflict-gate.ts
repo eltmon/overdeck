@@ -1,7 +1,8 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { messageAgent, spawnRun } from '../agents.js';
+import { messageAgent } from '../agents/messaging.js';
+import { spawnRun } from '../agents/spawn.js';
 import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 
 const execAsync = promisify(exec);
@@ -211,8 +212,6 @@ export async function resolveConflictGate(
       issueId,
       {
         blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined,
-        // PAN-3154: clear the branch-invalidation marker in the same write that clears the blocker.
-        conflictsSince: undefined,
       },
       status,
     );

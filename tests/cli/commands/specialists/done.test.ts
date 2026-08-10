@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../src/lib/internal-token.js';
 
 const {
   mockSetReviewStatus,
+  mockGetReviewStatus,
   mockDeliverReviewVerdictFeedback,
   mockResolveProject,
   mockReadWorkspacePlan,
@@ -11,8 +13,10 @@ const {
   mockFlushJournalWrites,
   mockReadVerdictFallback,
   mockVerdictFallbackPath,
+  mockSurfaceIssueFeedbackNeedsYou,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
@@ -20,6 +24,7 @@ const {
   mockFlushJournalWrites: vi.fn(),
   mockReadVerdictFallback: vi.fn(),
   mockVerdictFallbackPath: vi.fn(),
+  mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
@@ -28,13 +33,17 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     setReviewStatus: mockSetReviewStatus,
     setReviewStatusSync: mockSetReviewStatus,
-    getReviewStatus: vi.fn(),
-    getReviewStatusSync: vi.fn(),
+    getReviewStatus: mockGetReviewStatus,
+    getReviewStatusSync: mockGetReviewStatus,
   };
 });
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+}));
+
+vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
+  surfaceIssueFeedbackNeedsYou: mockSurfaceIssueFeedbackNeedsYou,
 }));
 
 vi.mock('../../../../src/lib/overdeck/review-status-record-sync.js', () => ({
@@ -61,10 +70,14 @@ vi.mock('node:fs', async (importOriginal) => ({
   existsSync: vi.fn(() => true),
 }));
 
+let currentReviewStatus: Record<string, unknown> | undefined;
+
 describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
+    vi.stubEnv('OVERDECK_INTERNAL_TOKEN', 'test-token');
+    _resetInternalTokenCacheForTests();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
@@ -73,16 +86,20 @@ describe('specialists done command', () => {
     mockVerdictFallbackPath.mockReturnValue(
       '/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json',
     );
+    currentReviewStatus = undefined;
+    mockGetReviewStatus.mockImplementation(() => currentReviewStatus);
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
-      return {
+      currentReviewStatus = {
         issueId: 'PAN-1059',
         reviewStatus: 'blocked',
         testStatus: 'pending',
         updatedAt: new Date().toISOString(),
         readyForMerge: false,
         prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+        ...currentReviewStatus,
         ...update,
       };
+      return currentReviewStatus;
     });
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -99,6 +116,7 @@ describe('specialists done command', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    _resetInternalTokenCacheForTests();
     vi.restoreAllMocks();
   });
 
@@ -222,22 +240,76 @@ describe('specialists done command', () => {
     });
   });
 
-  it('PAN-2524: persists the verdict before a hanging feedback delivery times out', async () => {
+  it('PAN-3642: allows summary resume plus all same-key retry stages to settle', async () => {
     vi.useFakeTimers();
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    const stages: string[] = [];
+    const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.promise(async () => {
+      await delay(5_000);
+      stages.push('summary-resumed');
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await delay(12_000);
+        stages.push(`ambiguous-${attempt}`);
+        await delay(2_000);
+      }
+      await delay(12_000);
+      stages.push('delivered');
+      return {
+        feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+        prCommentPosted: true,
+        agentMessageSent: true,
+      };
+    }));
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     const completion = doneCommand('review', 'pan-1059', {
       status: 'blocked',
+      notes: 'deliver after compaction',
+      runId: 'agent-pan-1059-review-abcdef12',
+    });
+    await vi.advanceTimersByTimeAsync(59_000);
+
+    await expect(completion).resolves.toBeUndefined();
+    expect(stages).toEqual([
+      'summary-resumed',
+      'ambiguous-1',
+      'ambiguous-2',
+      'ambiguous-3',
+      'delivered',
+    ]);
+    expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('PAN-2524/PAN-3642: persists the verdict and a retryable stuck state on outer timeout', async () => {
+    vi.useFakeTimers();
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    const {
+      doneCommand,
+      FEEDBACK_DELIVERY_TIMEOUT_MS,
+    } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    const completion = doneCommand('review', 'pan-1059', {
+      status: 'blocked',
       notes: 'durable first',
+      runId: 'agent-pan-1059-review-abcdef12',
     });
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'durable first',
     });
 
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(FEEDBACK_DELIVERY_TIMEOUT_MS);
     await expect(completion).resolves.toBeUndefined();
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-1059',
+      expect.stringContaining('retry remains required'),
+      {
+        specialist: 'review-agent',
+        retryable: true,
+        source: 'specialists-done-timeout',
+        runId: 'agent-pan-1059-review-abcdef12',
+      },
+    );
   });
 
   it('forces a successful CLI exit after durable completion', async () => {
@@ -297,7 +369,10 @@ describe('specialists done command', () => {
     expect(mockReadWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059');
     expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/done', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-token',
+      },
       body: JSON.stringify({
         specialist: 'inspect',
         issueId: 'PAN-1059',

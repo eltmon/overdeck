@@ -416,9 +416,14 @@ export class TldrDaemonService {
     console.log(`Warming TLDR index for ${this.workspacePath}...`);
 
     try {
+      // flock dedup (PAN-3534): shares .tldr/warm.lock with the tldr-post-edit
+      // hook so concurrent warms of the same checkout collapse to one. In
+      // background mode a held lock skips silently (-n); in foreground mode we
+      // queue behind the running warm rather than double-indexing concurrently.
+      const lockSetup = `mkdir -p .tldr`;
       const cmd = background
-        ? `cd "${this.workspacePath}" && "${tldrBin}" warm . >/dev/null 2>&1 &`
-        : `cd "${this.workspacePath}" && "${tldrBin}" warm .`;
+        ? `cd "${this.workspacePath}" && ${lockSetup} && (flock -n .tldr/warm.lock "${tldrBin}" warm . >/dev/null 2>&1 &)`
+        : `cd "${this.workspacePath}" && ${lockSetup} && flock .tldr/warm.lock "${tldrBin}" warm .`;
 
       await execAsync(cmd);
       console.log(`✓ TLDR index warming initiated for ${this.workspacePath}`);

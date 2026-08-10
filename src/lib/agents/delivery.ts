@@ -25,7 +25,7 @@ import {
 } from '../channels/injection-budget.js';
 import {
   captureTranscriptUserRecordSnapshot,
-  hasNewTranscriptUserRecord,
+  probeTranscriptSince,
   type TranscriptUserRecordSnapshot,
 } from '../transcript-landing.js';
 
@@ -251,7 +251,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody}`));
         });
       },
     );
@@ -616,24 +616,25 @@ async function assertTmuxTargetCanReceive(normalizedId: string, caller: string):
 const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 30_000;
 const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
 
-async function waitForTranscriptUserRecordLanding(
+async function waitForTranscriptMessageLanding(
   workspace: string,
   sessionId: string,
   before: TranscriptUserRecordSnapshot,
-  snapshot: typeof captureTranscriptUserRecordSnapshot,
+  message: string,
+  probe: typeof probeTranscriptSince,
   timeoutMs = RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS,
   intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  const fromByteOffset = before.readOffset ?? before.fileSize;
+  const fromByteOffset = before.readOffset ?? before.fileSize ?? 0;
   do {
-    const after = await snapshot(workspace, sessionId, { fromByteOffset });
-    if (hasNewTranscriptUserRecord(before, after)) return true;
+    const result = await probe(workspace, sessionId, fromByteOffset, message);
+    if (result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0) return true;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   } while (Date.now() < deadline);
 
-  const after = await snapshot(workspace, sessionId, { fromByteOffset });
-  return hasNewTranscriptUserRecord(before, after);
+  const result = await probe(workspace, sessionId, fromByteOffset, message);
+  return result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0;
 }
 
 export async function deliverResumeMessageWithTranscriptConfirmation(args: {
@@ -647,19 +648,22 @@ export async function deliverResumeMessageWithTranscriptConfirmation(args: {
   intervalMs?: number;
   deliver?: typeof deliverAgentMessage;
   snapshot?: typeof captureTranscriptUserRecordSnapshot;
+  probe?: typeof probeTranscriptSince;
 }): Promise<{ delivered: boolean; attempts: number; lastDelivery?: DeliveryResult }> {
   const snapshot = args.snapshot ?? captureTranscriptUserRecordSnapshot;
+  const probe = args.probe ?? probeTranscriptSince;
   const deliver = args.deliver ?? deliverAgentMessage;
   const before = await snapshot(args.workspace, args.sessionId);
   let lastDelivery: DeliveryResult | undefined;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
-    if (lastDelivery.ok && await waitForTranscriptUserRecordLanding(
+    if (lastDelivery.ok && await waitForTranscriptMessageLanding(
       args.workspace,
       args.sessionId,
       before,
-      snapshot,
+      args.message,
+      probe,
       args.timeoutMs,
       args.intervalMs,
     )) {
@@ -684,6 +688,7 @@ export async function deliverInitialPromptWithRetry(
     settleDelayMs?: number;
     deliver?: typeof deliverAgentMessage;
     snapshot?: typeof captureTranscriptUserRecordSnapshot;
+    probe?: typeof probeTranscriptSince;
     getState?: (agentId: string) => Promise<AgentState | null>;
     waitForReady?: typeof waitForPromptReady;
     sessionExists?: (agentId: string) => Promise<boolean>;
@@ -692,6 +697,7 @@ export async function deliverInitialPromptWithRetry(
   const normalizedId = normalizeAgentId(agentId);
   const deliver = options.deliver ?? deliverAgentMessage;
   const snapshot = options.snapshot ?? captureTranscriptUserRecordSnapshot;
+  const probe = options.probe ?? probeTranscriptSince;
   const getState = options.getState ?? (async (id: string) => {
     try {
       return await Effect.runPromise(getAgentState(normalizeAgentId(id)));
@@ -806,11 +812,12 @@ export async function deliverInitialPromptWithRetry(
       const result = await deliver(agentId, deliveredPrompt, caller, kickoffDeliveryMethod);
       if (result.ok) {
         if (!confirmationTarget) return result;
-        const confirmed = await waitForTranscriptUserRecordLanding(
+        const confirmed = await waitForTranscriptMessageLanding(
           confirmationTarget.workspace,
           confirmationTarget.sessionId,
           confirmationTarget.before,
-          snapshot,
+          deliveredPrompt,
+          probe,
           options.timeoutMs,
           options.intervalMs,
         );

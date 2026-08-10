@@ -518,11 +518,20 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       relocateVenvScripts(mainVenvPath, venvPath);
       result.steps.push('Copied Python venv from main branch (shebangs relocated)');
     } else {
-      // Create fresh venv and install llm-tldr
+      // Create fresh venv and install llm-tldr.
+      // CPU-only torch FIRST (PAN-3534): llm-tldr hard-depends on
+      // sentence-transformers → torch, and the default GPU wheel drags in
+      // ~6.85GB of nvidia/triton/cuda per venv that nothing here uses (warm
+      // and the read-enforcer are CPU background work). Pre-installing the
+      // CPU wheel satisfies the dependency and keeps the venv under 1GB.
       await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
       const pipPath = join(venvPath, 'bin', 'pip');
-      await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 120000 });
-      result.steps.push('Created Python venv and installed llm-tldr');
+      await execAsync(`"${pipPath}" install torch --index-url https://download.pytorch.org/whl/cpu`, {
+        cwd: workspacePath,
+        timeout: 300000,
+      });
+      await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 300000 });
+      result.steps.push('Created Python venv and installed llm-tldr (CPU-only torch)');
 
       // Apply .tsx/.jsx support patch (upstream llm-tldr only checks .ts)
       const patchScript = join(projectConfig.path, 'scripts', 'patches', 'llm-tldr-tsx-support.py');

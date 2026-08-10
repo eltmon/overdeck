@@ -18,7 +18,14 @@
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
-- **Lint:** ESLint + `scripts/lint-skills.sh` (skill/CLI drift) via `npm run lint`.
+- **Lint:** `npm run lint` is ESLint plus ~20 chained shell guards in `scripts/`
+  (skill/CLI drift, state doors, prompt trailers, file size, circular deps,
+  ratchet audit, …). `npm run typecheck` chains root + hooks + evals + the two
+  dashboard halves, where server and frontend are shrink-only ratchets
+  (`scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`) — note
+  those two ratchets live in the **typecheck** chain, not the lint chain.
+  `packages/effect-acp` is checked by the root `typecheck:acp` lane; `packages/contracts`
+  remains typechecked by no root gate.
 - **Agent substrate:** tmux on a dedicated `overdeck` socket
   (`tmux -L overdeck`); per-agent state under `~/.overdeck/agents/`;
   harnesses: claude-code, pi, and codex with persistent transports.
@@ -28,4 +35,4 @@
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-08-06 -->

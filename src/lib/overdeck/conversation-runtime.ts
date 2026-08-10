@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../claude-permissions.js';
-import { getProjectSync, listProjectsSync } from '../projects.js';
+import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
@@ -858,21 +858,42 @@ export async function spawnConversationSession(
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
+export interface ResolvedRegisteredProject {
+  key: string;
+  config: ProjectConfig;
+}
+
+/** Resolve a project key or display name without blocking the dashboard event loop. */
+export async function resolveRegisteredProject(
+  input: string,
+): Promise<ResolvedRegisteredProject | { error: string }> {
+  const projects = await listProjectsAsync();
+  const project = projects.find((candidate) => candidate.key === input)
+    ?? projects.find((candidate) => candidate.config.name === input);
+  return project ?? { error: `Unknown project: ${input}` };
+}
+
 /**
  * Resolve a conversation's cwd from a project identifier.
  *
  * The Command Deck identifies projects by display name, not yaml key
  * (PAN-2590) — accept either, like GET /api/session-trees does.
  */
-export function resolveProjectCwd(projectKey: string): { cwd: string } | { error: string } {
-  const projectConfig = getProjectSync(projectKey)
-    ?? listProjectsSync().find((p) => p.config.name === projectKey)?.config
-    ?? null;
-  if (!projectConfig) return { error: `Unknown project: ${projectKey}` };
-  if (!projectConfig.path || !existsSync(projectConfig.path)) {
-    return { error: `Project path does not exist: ${projectConfig.path || '(unset)'} (project: ${projectKey})` };
+export async function resolveProjectCwd(
+  projectIdentifier: string,
+): Promise<{ key: string; cwd: string } | { error: string }> {
+  const resolved = await resolveRegisteredProject(projectIdentifier);
+  if ('error' in resolved) return resolved;
+  const projectPath = resolved.config.path;
+  if (!projectPath) {
+    return { error: `Project path does not exist: (unset) (project: ${projectIdentifier})` };
   }
-  return { cwd: projectConfig.path };
+  try {
+    await stat(projectPath);
+  } catch {
+    return { error: `Project path does not exist: ${projectPath} (project: ${projectIdentifier})` };
+  }
+  return { key: resolved.key, cwd: projectPath };
 }
 
 export interface ConversationCreateRequestBody { [key: string]: unknown }
@@ -882,8 +903,8 @@ export async function handleConversationCreate(
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-    const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
-    const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
+    const model = typeof body['model'] === 'string' ? body['model'].trim() || undefined : undefined;
+    const effort = typeof body['effort'] === 'string' ? body['effort'].trim() || undefined : undefined;
     const harness = await resolveAllowedHarness(body['harness'], model);
     const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
@@ -891,10 +912,12 @@ export async function handleConversationCreate(
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (effort && !SAFE_EFFORT_PATTERN.test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     let cwd = getDefaultCwd();
+    let canonicalProjectKey: string | undefined;
     if (projectKey) {
-      const resolved = resolveProjectCwd(projectKey);
+      const resolved = await resolveProjectCwd(projectKey);
       if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
       cwd = resolved.cwd;
+      canonicalProjectKey = resolved.key;
     }
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });
@@ -906,7 +929,7 @@ export async function handleConversationCreate(
     console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
     const MAX_TITLE_LEN = 60;
     const title = message ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '') : 'New conversation';
-    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness });
+    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey });
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
     void (async () => {
       try {

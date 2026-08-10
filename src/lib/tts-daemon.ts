@@ -5,7 +5,7 @@ import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { LOGS_DIR, OVERDECK_HOME, SYNC_SOURCES, packageRoot } from './paths.js';
+import { LOGS_DIR, OVERDECK_HOME, SYNC_SOURCES, activeDeploymentRepoRoot, isDeploymentGenerationRoot, packageRoot } from './paths.js';
 import { loadConfigSync, type NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { ProcessSpawnError, FsError } from './errors.js';
 
@@ -94,15 +94,45 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}async function resolveQwenTtsPackageDirPromise(): Promise<string> {
-  const candidates = [
-    join(packageRoot, 'packages', 'qwen-tts-linux-x64'),
-    join(packageRoot, 'node_modules', 'qwen-tts-linux-x64'),
-  ];
-  for (const candidate of candidates) {
-    if (await pathExists(candidate)) return candidate;
+}
+
+export interface QwenTtsPackageDirDeps {
+  pkgRoot?: string;
+  repoRoot?: () => string | null;
+  exists?: (path: string) => Promise<boolean>;
+  ensureDir?: (path: string) => Promise<unknown>;
+}
+
+/**
+ * A `pan reload` deployment generation tracks `packages/qwen-tts-linux-x64` in
+ * git, but the gitignored `.venv` inside it never exists there — `pan install`
+ * populates the primary checkout only. When running from a generation, prefer
+ * the active checkout's copy (same redirect as `resolveSyncSourcesRoot`,
+ * PAN-3327), and prefer a directory whose venv actually exists over bare
+ * directory existence, because every generation has the venv-less tracked dir.
+ */
+export async function resolveQwenTtsPackageDirPromise(deps: QwenTtsPackageDirDeps = {}): Promise<string> {
+  const pkgRoot = deps.pkgRoot ?? packageRoot;
+  const exists = deps.exists ?? pathExists;
+  const ensureDir = deps.ensureDir ?? (async (path: string) => mkdir(path, { recursive: true }));
+
+  const roots: string[] = [];
+  if (isDeploymentGenerationRoot(pkgRoot)) {
+    const repoRoot = (deps.repoRoot ?? activeDeploymentRepoRoot)();
+    if (repoRoot) roots.push(repoRoot);
   }
-  await mkdir(candidates[0], { recursive: true });
+  roots.push(pkgRoot);
+  const candidates = roots.flatMap((root) => [
+    join(root, 'packages', 'qwen-tts-linux-x64'),
+    join(root, 'node_modules', 'qwen-tts-linux-x64'),
+  ]);
+  for (const candidate of candidates) {
+    if (await exists(join(candidate, '.venv', 'bin', 'python'))) return candidate;
+  }
+  for (const candidate of candidates) {
+    if (await exists(candidate)) return candidate;
+  }
+  await ensureDir(candidates[0]);
   return candidates[0];
 }async function resolveTtsDaemonScriptPromise(): Promise<string> {
   const script = join(SYNC_SOURCES.skills, 'pan-tts', 'scripts', 'tts_daemon.py');

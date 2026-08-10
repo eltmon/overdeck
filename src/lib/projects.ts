@@ -20,6 +20,7 @@ import {
   withProjectsConfigWriteSync,
 } from './projects-config-write.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
+import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
@@ -357,8 +358,8 @@ export interface ProjectConfig {
    * rebasing onto the new main.
    */
   merge_train?: 'enabled' | 'disabled';
-  /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
-  quality_gates?: Record<string, QualityGateConfig>;
+  /** Merge checks: pre-push quality gates and main-verification fallback requirements. */
+  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[];
   /** Version-string propagation performed after a UAT batch merge. */
   version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */
@@ -448,15 +449,14 @@ interface ProjectRenamePlan {
   changed: boolean;
 }
 
-// Mtime-based cache: re-parse projects.yaml only when the file changes on disk.
-// Without this cache, every call to resolveProjectFromIssue (enrichment service,
-// deacon patrol, status updates — dozens of times per minute) re-read and re-parsed
-// the YAML, consuming ~50% of the server's non-idle CPU and causing 1.5-second
-// event loop stalls.
+// Re-parse projects.yaml only when its mtime changes. Re-reading it on every
+// resolver call consumed ~50% of the server's non-idle CPU and caused event-loop
+// stalls.
 let _projectsCache: { mtime: number; config: ProjectsConfig } | null = null;
 
 export function invalidateProjectsConfigCache(): void {
   _projectsCache = null;
+  notifyProjectsConfigInvalidated();
 }
 
 export function loadProjectsConfigSync(): ProjectsConfig {
@@ -511,7 +511,7 @@ function updateProjectsConfigSync<T>(
       result: mutation.result,
     };
   });
-  _projectsCache = null;
+  invalidateProjectsConfigCache();
   return result;
 }
 
@@ -525,7 +525,7 @@ async function updateProjectsConfigAsync<T>(
       result: mutation.result,
     };
   });
-  _projectsCache = null;
+  invalidateProjectsConfigCache();
   return result;
 }
 
@@ -537,7 +537,7 @@ export function saveProjectsConfigSync(config: ProjectsConfig): void {
   withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
     atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, yaml);
   });
-  _projectsCache = null;
+  invalidateProjectsConfigCache();
 }
 
 /**
@@ -549,6 +549,38 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
     key,
     config: projectConfig,
   }));
+}
+
+function resolveProjectKeyForCwdFromProjects(
+  cwd: string,
+  projects: ReadonlyArray<{ key: string; config: ProjectConfig }>,
+): string | null {
+  const normalizedCwd = resolve(cwd);
+  let bestMatch: { key: string; pathLength: number } | null = null;
+
+  for (const { key, config } of projects) {
+    if (!config.path) continue;
+    const projectPath = resolve(config.path);
+    const pathPrefix = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
+    if (
+      (normalizedCwd === projectPath || normalizedCwd.startsWith(pathPrefix))
+      && projectPath.length > (bestMatch?.pathLength ?? -1)
+    ) {
+      bestMatch = { key, pathLength: projectPath.length };
+    }
+  }
+
+  return bestMatch?.key ?? null;
+}
+
+/** Resolve the registered project owning a cwd via longest path-prefix match. */
+export function resolveProjectKeyForCwd(cwd: string): string | null {
+  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
+}
+
+/** Async request-path variant of {@link resolveProjectKeyForCwd}. */
+export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
+  return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
 }
 
 /**
@@ -1101,7 +1133,7 @@ export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, 
       await withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
         atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, out)
       ));
-      _projectsCache = null;
+      invalidateProjectsConfigCache();
     },
     catch: (cause) =>
       new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'saveProjectsConfig', cause }),

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { access, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -29,9 +29,12 @@ import {
   listConversations,
   updateConversationCost,
   updateConversationTitle,
+  setConversationProjectKey,
   canReplaceTitle,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { listProjectsAsync, type ProjectConfig } from '../projects.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -56,6 +59,7 @@ import {
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
+import { findClaudeSessionFileById, findSubagentTranscriptById } from './claude-session-file-search.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -65,7 +69,7 @@ export interface ConversationReadResult {
 export interface ConversationReadDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   tmuxSessionExists(sessionName: string): Promise<boolean>;
-  listSessionNames(): Promise<string[]>;
+  listSessionNames(): Promise<readonly string[]>;
   shouldReportUnresolvedLiveSession(conv: Pick<Conversation, 'status' | 'harness'> | null | undefined): boolean;
 }
 
@@ -93,73 +97,21 @@ const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
  */
 const CLAUDE_SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * A Claude Code subagent transcript id, as used to name
+ * `<session-dir>/subagents/agent-<id>.jsonl`. The search indexer recurses into
+ * subagents dirs, so those transcripts appear in palette results with the bare
+ * agent id as their sessionId; clicking one arrives here. Like the UUID shape,
+ * only this exact shape may trigger the by-id sweep — and the 10-hex floor
+ * keeps Overdeck's own short `agent-<digits>` work-agent names out of it
+ * (those resolve through resolveSpecialistSessionFile above, or nowhere).
+ */
+const SUBAGENT_TRANSCRIPT_ID_PATTERN = /^agent-[0-9a-f]{10,20}$/i;
+
 /** The transcript of an indexed-but-unregistered Claude session, or null. */
 async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
-  if (!CLAUDE_SESSION_UUID_PATTERN.test(name)) return null;
-  return findClaudeSessionFileById(name);
-}
-
-/**
- * Find a Claude Code session JSONL by its (globally-unique) session id, searching
- * every project dir under ~/.claude/projects/. Claude keys session files by the
- * cwd AT RUNTIME, so when a repo directory is renamed (e.g. Projects/panopticon-cli
- * → Projects/overdeck) a conversation's recorded cwd goes stale and the
- * deterministic sessionFilePath(cwd, id) points at a dir that no longer exists,
- * while the JSONL itself lives under the new encoded dir. A by-id search recovers
- * it. Mirrors the cross-dir lookup the non-DB specialist/agent fallback already
- * uses below.
- */
-// PAN-2220: memoize by-id lookups. The sweep below stats <sessionId>.jsonl in
-// EVERY project dir (~2,200 on this machine), and the conversation-list
-// enrichment resolves session files per row per request — for each stale-cwd
-// conversation that meant a full sweep on every list build (~1.7s of
-// event-loop-adjacent syscall storm). A found path is stable (re-verified
-// with one existsSync); a miss is re-swept after a short TTL so a transcript
-// that appears later is still discovered.
-const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
-const SESSION_FILE_MISS_TTL_MS = 60_000;
-
-async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
-  if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
-  const cached = sessionFileByIdCache.get(sessionId);
-  if (cached) {
-    if (cached.path) {
-      if (existsSync(cached.path)) return cached.path;
-      sessionFileByIdCache.delete(sessionId);
-    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
-      return null;
-    }
-  }
-  try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const dirs = await readdir(claudeProjects);
-    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-    const candidates = dirs
-      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
-    const STAT_BATCH_SIZE = 50;
-    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
-      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-      const checks = await Promise.all(
-        batch.map(async (candidate) => {
-          try {
-            await stat(candidate);
-            return candidate;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const found = checks.find((c): c is string => c !== null);
-      if (found) {
-        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
-        return found;
-      }
-    }
-  } catch {
-    /* ~/.claude/projects unreadable */
-  }
-  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
+  if (CLAUDE_SESSION_UUID_PATTERN.test(name)) return findClaudeSessionFileById(name);
+  if (SUBAGENT_TRANSCRIPT_ID_PATTERN.test(name)) return findSubagentTranscriptById(name);
   return null;
 }
 
@@ -796,6 +748,70 @@ export function patchConversationTitle(
   }
 
   return { status: 200, body: { success: true } };
+}
+
+async function pathExistsAsync(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The project a conversation effectively belongs to (PAN-1577): the explicit
+ * project_key override when set, otherwise the registered project whose path
+ * contains its cwd. Null when neither resolves. This is the single source of
+ * truth for "is this conversation already in project X" — it must agree with
+ * the frontend's resolveEffectiveProjectKey (projectsData.ts) or a cwd-grouped
+ * conversation's move would look like a no-op client-side but still move
+ * server-side (or vice versa).
+ */
+function resolveEffectiveProjectKey(
+  conv: { cwd: string; projectKey: string | null },
+  projects: readonly { key: string; config: ProjectConfig }[],
+): string | null {
+  if (conv.projectKey) return conv.projectKey;
+  const matched = projects.find(
+    ({ config }) => config.path && (conv.cwd === config.path || conv.cwd.startsWith(config.path + '/')),
+  );
+  return matched?.key ?? null;
+}
+
+/**
+ * Reassign a conversation's project — sets only the project_key override.
+ * Deliberately never touches cwd, the tmux session, or the backing session
+ * file; those stay put so the sacred JSONL is never relocated (PAN-1577).
+ */
+export async function handleConversationMove(
+  name: string,
+  body: Record<string, unknown>,
+  deps: { invalidateListEnrichmentCache?: () => void } = {},
+): Promise<{ status: number; body: Conversation | { error: string } }> {
+  const conv = getConversationByName(name);
+  if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
+
+  const projectKey = typeof body.projectKey === 'string' ? body.projectKey.trim() : '';
+  const projects = await listProjectsAsync();
+  const targetConfig = projectKey ? projects.find((p) => p.key === projectKey)?.config : null;
+  if (!projectKey || !targetConfig || !(await pathExistsAsync(targetConfig.path))) {
+    return { status: 400, body: { error: `Unknown project: ${projectKey}` } };
+  }
+
+  const effectiveKey = resolveEffectiveProjectKey(conv, projects);
+  if (effectiveKey === projectKey) {
+    return { status: 200, body: conv };
+  }
+
+  setConversationProjectKey(name, projectKey);
+  deps.invalidateListEnrichmentCache?.();
+  getEventStore().emitOnly({
+    type: 'conversation.moved',
+    timestamp: new Date().toISOString(),
+    payload: { conversationName: name, projectKey },
+  });
+  return { status: 200, body: getConversationByName(name) ?? conv };
 }
 
 const retitleInFlight = new Set<string>();

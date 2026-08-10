@@ -25,16 +25,6 @@ const blockedReviewDriftObservations = new Map<
 const lastResetAnchors = new Map<string, string>();
 const resetLoopEscalated = new Set<string>();
 
-function uniformReviewerVerdictAnchor(status: ReviewStatus): string | undefined {
-  const verdicts = Object.values(status.reviewerVerdicts ?? {});
-  if (verdicts.length === 0) return undefined;
-  const anchors = verdicts
-    .map(verdict => verdict?.atCommit)
-    .filter((anchor): anchor is string => Boolean(anchor));
-  if (anchors.length !== verdicts.length) return undefined;
-  return anchors.every(anchor => anchor === anchors[0]) ? anchors[0] : undefined;
-}
-
 /**
  * Detect issues where the agent pushed new commits after a review verdict.
  *
@@ -62,8 +52,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       }
       if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
 
-      const reviewedAnchor = status.reviewedAtCommit
-        ?? (isBlocked ? uniformReviewerVerdictAnchor(status) : undefined);
+      const reviewedAnchor = status.reviewedAtCommit;
       if (!reviewedAnchor) {
         blockedReviewDriftObservations.delete(issueId);
         if (isBlocked) {

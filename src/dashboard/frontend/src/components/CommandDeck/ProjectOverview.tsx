@@ -14,7 +14,6 @@ import {
 } from './pipeline-helpers';
 import { PipelineSection } from './PipelineSection';
 import { ProjectSettingsDisclosure } from './ProjectSettingsDisclosure';
-import { useOpenNewWorkspace } from './useNewWorkspaceModal';
 
 export type { IssueCostBreakdown };
 
@@ -233,10 +232,7 @@ export function ProjectOverview({
   onOpenAgents,
   onNewWorkspace,
 }: ProjectOverviewProps) {
-  // Falls back to the dialog store so this button needs no prop drilled
-  // through CommandDeck and ProjectHome; the prop stays for direct testing.
-  const openFromStore = useOpenNewWorkspace();
-  const openNewWorkspace = onNewWorkspace ?? openFromStore;
+  const openNewWorkspace = onNewWorkspace ?? ((key: string) => { window.history.pushState({ tab: 'workspace-new' }, '', `/workspaces/new?project=${encodeURIComponent(key)}`); window.dispatchEvent(new PopStateEvent('popstate')); });
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
   const pipelineRef = useRef<HTMLDivElement>(null);
 
@@ -532,7 +528,7 @@ function HeroBillboard({ metrics }: { metrics: HeroMetric[] }) {
               }}
             >
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
-              <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+              <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-mono), "SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
               {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
             </div>
           );

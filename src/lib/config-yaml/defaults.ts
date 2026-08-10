@@ -11,12 +11,13 @@ import type { NormalizedConfig } from './schema.js';
  * with absolute floors (small boxes still get a workable reserve). Computed
  * once at module load — totalmem() is stable for the process lifetime.
  */
-function computeGovernorReserveDefaultsGb(): { soft: number; hard: number; recovery: number } {
+function computeGovernorReserveDefaultsGb(): { soft: number; hard: number; recovery: number; watch: number } {
   const totalGb = totalmem() / (1024 ** 3);
   return {
     soft: Math.max(0.15 * totalGb, 8),
     hard: Math.max(0.08 * totalGb, 4),
     recovery: Math.max(0.25 * totalGb, 12),
+    watch: Math.max(0.20 * totalGb, 10),
   };
 }
 
@@ -205,6 +206,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
     governorHardReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.hard,
     governorRecoveryReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.recovery,
+    governorWatchReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.watch,
     // PAN-2500: cold-start footprint defaults — work agents carry a docker
     // workspace stack + build tooling, review/test specialists are lighter.
     governorFootprintDefaultWorkGb: 2,
@@ -222,6 +224,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   },
   ui: {
     openInEditorCommand: null,
+    theme: 'broadsheet',
   },
   experimental: {
     experimentalFeatures: false,

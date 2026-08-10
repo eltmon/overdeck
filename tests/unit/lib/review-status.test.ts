@@ -61,29 +61,29 @@ describe('review status', () => {
     expect(invalidWrite).toBeTypeOf('function');
   });
 
-  it('rejects a review verdict whose evidence HEAD differs from the verified target HEAD', () => {
-    const verifiedHead = rehydrateHeadAnchor('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-    const staleReviewHead = rehydrateHeadAnchor('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+  it('rejects a test verdict whose evidence HEAD differs from the reviewed target HEAD', () => {
+    const reviewedHead = rehydrateHeadAnchor('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const staleTestHead = rehydrateHeadAnchor('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     setReviewStatusSync('PAN-3377', {
-      reviewStatus: 'pending',
-      verificationStatus: 'passed',
-      lastVerifiedCommit: verifiedHead,
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      reviewedAtCommit: reviewedHead,
     });
     mockUpdateIssueRecordForIssue.mockClear();
 
     const status = setReviewStatusSync('PAN-3377', {
-      reviewStatus: 'passed',
-      reviewedAtCommit: staleReviewHead,
-      reviewNotes: 'stale review result',
+      testStatus: 'passed',
+      lastVerifiedCommit: staleTestHead,
+      testNotes: 'stale test result',
     });
 
-    expect(status.reviewStatus).toBe('pending');
-    expect(status.reviewedAtCommit).toBeUndefined();
+    expect(status.testStatus).toBe('pending');
+    expect(status.lastVerifiedCommit).toBeUndefined();
     expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleReviewHead));
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(verifiedHead));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleTestHead));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(reviewedHead));
     warn.mockRestore();
   });
 

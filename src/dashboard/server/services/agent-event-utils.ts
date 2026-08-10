@@ -31,6 +31,17 @@ export const bodyToEvent = (
           agentId,
           activity: source['activity'],
           currentTool: source['tool'] as string | undefined,
+          hookName: source['hookName'] as string | undefined,
+        },
+      };
+    case 'hook_fired':
+      return {
+        type: 'agent.hook_fired',
+        timestamp,
+        payload: {
+          agentId,
+          hookName: source['hookName'],
+          tool: source['tool'] as string | undefined,
         },
       };
     case 'thinking_start':

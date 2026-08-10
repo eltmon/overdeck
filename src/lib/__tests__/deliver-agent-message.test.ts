@@ -157,28 +157,35 @@ describe('resume auto-continue transcript confirmation', () => {
     timeoutMs: 300,
     intervalMs: 100,
   };
+  const snapshot = vi.fn(async () => ({
+    sessionFile: '/tmp/session.jsonl',
+    userRecordCount: 0,
+    fileSize: 100,
+    readOffset: 100,
+  }));
 
-  it('confirms landing on first delivery without redelivery', async () => {
-    let userRecordCount = 0;
-    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
-    const deliver = vi.fn(async () => {
-      userRecordCount = 1;
-      return { ok: true, path: 'supervisor' as const };
-    });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-    await expect(deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot })).resolves.toMatchObject({
+  it('confirms the delivered message on first delivery without redelivery', async () => {
+    const probe = vi.fn(async () => ({ matchedUserRecord: true, compactBoundaryCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    await expect(deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe })).resolves.toMatchObject({
       delivered: true,
       attempts: 1,
     });
     expect(deliver).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith('/tmp/workspace', 'session-1', 100, 'continue');
   });
 
-  it('redelivers exactly once and reports false when no user record lands', async () => {
+  it('does not mistake a compaction summary user record for the delivered message', async () => {
     vi.useFakeTimers();
-    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 1 }));
     const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
 
-    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe });
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
@@ -188,16 +195,30 @@ describe('resume auto-continue transcript confirmation', () => {
     expect(deliver).toHaveBeenCalledTimes(2);
   });
 
-  it('reports delivered when the user record lands after the one redelivery', async () => {
+  it('accepts a real assistant turn after PostCompact recovery as confirmed continuation', async () => {
+    const probe = vi.fn(async () => ({
+      matchedUserRecord: false,
+      realAssistantTurnCount: 1,
+      compactBoundaryCount: 1,
+    }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    await expect(deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe })).resolves.toMatchObject({
+      delivered: true,
+      attempts: 1,
+    });
+  });
+
+  it('reports delivered when the message lands after the one redelivery', async () => {
     vi.useFakeTimers();
-    let userRecordCount = 0;
-    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
+    let landed = false;
+    const probe = vi.fn(async () => ({ matchedUserRecord: landed, compactBoundaryCount: 0 }));
     const deliver = vi.fn(async () => {
-      if (deliver.mock.calls.length === 2) userRecordCount = 1;
+      if (deliver.mock.calls.length === 2) landed = true;
       return { ok: true, path: 'supervisor' as const };
     });
 
-    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe });
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
@@ -242,6 +263,7 @@ describe('initial kickoff transcript confirmation', () => {
       readOffset: options?.fromByteOffset ?? 100,
     }));
     const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 0 }));
 
     const result = deliverInitialPromptWithRetry(
       baseState.id,
@@ -253,6 +275,7 @@ describe('initial kickoff transcript confirmation', () => {
         getState: vi.fn(async () => baseState),
         deliver,
         snapshot,
+        probe,
       },
     );
 
@@ -268,19 +291,16 @@ describe('initial kickoff transcript confirmation', () => {
     expect(deliver).toHaveBeenCalledTimes(2);
   });
 
-  it('returns ok on first delivery when a new user record lands', async () => {
-    let userRecordCount = 0;
+  it('returns ok on first delivery when the kickoff message lands', async () => {
     const snapshot = vi.fn(async () => ({
       sessionFile: '/tmp/session.jsonl',
-      userRecordCount,
+      userRecordCount: 0,
       fileSize: 100,
       rangeStartByte: 0,
       readOffset: 100,
     }));
-    const deliver = vi.fn(async () => {
-      userRecordCount = 1;
-      return { ok: true, path: 'supervisor' as const };
-    });
+    const probe = vi.fn(async () => ({ matchedUserRecord: true, compactBoundaryCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
 
     await expect(deliverInitialPromptWithRetry(
       baseState.id,
@@ -292,6 +312,7 @@ describe('initial kickoff transcript confirmation', () => {
         getState: vi.fn(async () => baseState),
         deliver,
         snapshot,
+        probe,
       },
     )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
     expect(deliver).toHaveBeenCalledTimes(1);
@@ -392,14 +413,14 @@ describe('initial kickoff transcript confirmation', () => {
 
   it('keeps strict PTY supervisor delivery for Claude Code kickoffs', async () => {
     const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
-    let userRecordCount = 0;
     const snapshot = vi.fn(async () => ({
       sessionFile: '/tmp/session.jsonl',
-      userRecordCount: userRecordCount++,
+      userRecordCount: 0,
       fileSize: 100,
       rangeStartByte: 0,
       readOffset: 100,
     }));
+    const probe = vi.fn(async () => ({ matchedUserRecord: true, compactBoundaryCount: 0 }));
 
     await expect(deliverInitialPromptWithRetry(
       baseState.id,
@@ -411,6 +432,7 @@ describe('initial kickoff transcript confirmation', () => {
         getState: vi.fn(async () => baseState),
         deliver,
         snapshot,
+        probe,
       },
     )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
 
@@ -477,6 +499,7 @@ describe('initial kickoff transcript confirmation', () => {
         }
     ));
     const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 0 }));
 
     const result = deliverInitialPromptWithRetry(
       baseState.id,
@@ -488,6 +511,7 @@ describe('initial kickoff transcript confirmation', () => {
         getState: vi.fn(async () => baseState),
         deliver,
         snapshot,
+        probe,
       },
     );
 

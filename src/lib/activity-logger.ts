@@ -15,7 +15,7 @@
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 import type { DomainEvent } from '@overdeck/contracts';
-import type { Role } from './agents.js';
+import type { Role } from './agents/role.js';
 import { getDashboardApiUrlSync } from './config.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
@@ -128,6 +128,27 @@ function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
  */
 export async function emitActivityEntryDurable(options: EmitActivityOptions): Promise<void> {
   await persistActivityEvent(buildActivityEntryEvent(options));
+}
+
+/**
+ * Append an arbitrary domain event through the process-local event store.
+ *
+ * The provider is shared with activity emission (it is set by
+ * src/dashboard/server/event-store.ts in the server and by deacon-main.ts in
+ * the deacon child). Resolves false when no store is wired — CLI and test
+ * contexts must not crash on an emit.
+ */
+export async function appendDomainEventAsync(
+  event: Omit<DomainEvent, 'sequence'>,
+): Promise<boolean> {
+  const store = getActivityEventStore();
+  if (!store) return false;
+  try {
+    await store.appendAsync(event);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function buildActivityEntryEvent(options: EmitActivityOptions): Omit<DomainEvent, 'sequence'> {

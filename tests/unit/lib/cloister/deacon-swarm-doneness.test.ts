@@ -141,6 +141,7 @@ function makeCoordinateDeps(
     isSlotWorktreeClean: vi.fn(async () => true),
     sendCompletionNudge: vi.fn(async () => {}),
     slotWorktreeExists: vi.fn(() => false),
+    stopSlotAgent: vi.fn(async () => {}),
     verifyAndMergeSlot: vi.fn(async () => ({
       verified: false,
       merged: false,

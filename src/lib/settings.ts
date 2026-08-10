@@ -38,7 +38,7 @@ export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-
 export type ZAIModel = 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
-export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max';
+export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
@@ -289,7 +289,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const dashscopeModels: DashScopeModel[] = settings.api_keys.dashscope
-    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']
+    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']
     : [];
 
   const xaiModels: GrokModel[] = settings.api_keys.xai

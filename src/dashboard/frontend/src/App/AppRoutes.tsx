@@ -27,6 +27,7 @@ import { FlywheelPage } from '../pages/FlywheelPage';
 import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
+import { NewWorkspacePage } from '../pages/NewWorkspacePage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
 import type { Issue } from '../types';
@@ -56,6 +57,7 @@ interface AppRoutesProps {
   /** PAN-1990: the workspace-registry id restored from /workspace/<id>. */
   workspaceRouteId: string | null;
   onWorkspaceViewBack: () => void;
+  onWorkspaceCreated: (workspaceId: string) => void;
   initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
@@ -88,6 +90,7 @@ export function AppRoutes({
   cockpitRoute,
   workspaceRouteId,
   onWorkspaceViewBack,
+  onWorkspaceCreated,
   initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
@@ -131,6 +134,11 @@ export function AppRoutes({
             cockpitIssue={cockpitRoute}
             onCockpitChange={onCockpitChange}
           />
+        </div>
+      )}
+      {activeTab === 'workspace-new' && (
+        <div className="w-full h-full overflow-hidden">
+          <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (
@@ -262,11 +270,11 @@ export function AppRoutes({
       )}
       {activeTab === 'god-view' && (
         <BootstrapGate fallback={
-          <div className="w-full h-full overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <GodViewSkeleton />
           </div>
         }>
-          <div className="w-full h-full overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <GodViewPage />
           </div>
         </BootstrapGate>

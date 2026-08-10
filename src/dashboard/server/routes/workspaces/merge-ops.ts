@@ -33,6 +33,7 @@ import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
+import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { setMergeQueueAdvanceHandler } from '../../services/merge-queue-service.js';
@@ -158,7 +159,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
   return lines.join('\n') || `Automated PR for ${issueId}`;
 }
 
-async function ensurePRExists(
+export async function ensurePRExists(
   issueId: string,
   options?: { cwd?: string; branchName?: string; targetBranch?: string }
 ): Promise<{ created: boolean; prUrl?: string; error?: string }> {
@@ -169,14 +170,14 @@ async function ensurePRExists(
     const execOptions: Parameters<typeof execFileAsync>[2] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
-    // Check for existing PR
-    let existingOut: string = '';
+    // Reuse an open PR for this head/base pair, or a merged PR for terminal reconciliation.
+    // A closed unmerged PR must not prevent a fresh PR for new branch commits.
     try {
-      const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions);
-      existingOut = String(stdout);
-    } catch { /* no existing PR */ }
-    const existing = existingOut.trim();
-    if (existing) return { created: false, prUrl: existing };
+      const { stdout } = await execFileAsync('gh', ['pr', 'list', '--head', branchName, '--base', targetBranch, '--state', 'all', '--json', 'url,state', '--limit', '100'], execOptions);
+      const pullRequests = JSON.parse(String(stdout)) as Array<{ url?: string; state?: string }>;
+      const existing = pullRequests.find(pr => pr.state === 'OPEN') ?? pullRequests.find(pr => pr.state === 'MERGED');
+      if (existing?.url) return { created: false, prUrl: existing.url };
+    } catch { /* no reusable PR */ }
 
     // Build rich PR body if workspace path is available
     const prBody = options?.cwd ? await buildRichPRBody(issueId, options.cwd) : `Automated PR for ${issueId}`;
@@ -238,6 +239,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/sync-main',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     if (!parseIssueIdSync(issueId)) {
@@ -246,10 +248,10 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
     const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const issueLower = issueId.toLowerCase();
+    const requestedWorkspacePath = new URL(request.url, 'http://localhost').searchParams.get('workspacePath') ?? undefined;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    if (workspaceInfo.isRemote) {
+    if (!requestedWorkspacePath && workspaceInfo.isRemote) {
       return jsonResponse(
         {
           success: false,
@@ -259,20 +261,17 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
       );
     }
 
-    const workspacePath =
-      workspaceInfo.localPath ||
-      join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-    if (!existsSync(workspacePath)) {
+    const target = resolveIssueWorkspaceSyncTarget(issueId, projectPath, requestedWorkspacePath);
+    if (!target) {
       return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
+        { success: false, error: 'Workspace does not exist or is not owned by this issue' },
         { status: 400 }
       );
     }
 
-    console.log(`[sync-main] Starting sync for ${issueId} at ${workspacePath}`);
+    console.log(`[sync-main] Starting sync for ${issueId} at ${target.path} (${target.branchName})`);
 
-    const result = yield* Effect.promise(() => syncMainIntoWorkspace(workspacePath, issueId));
+    const result = yield* Effect.promise(() => syncMainIntoWorkspace(target.path, issueId));
 
     if (result.success) {
       if (result.alreadyUpToDate) {

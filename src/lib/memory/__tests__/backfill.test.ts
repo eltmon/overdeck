@@ -75,7 +75,7 @@ beforeEach(async () => {
     path: workspacePath,
     issueId: 'PAN-9001',
   });
-});
+}, 20_000);
 
 afterEach(() => {
   closeMemoryFtsDatabases();
@@ -97,7 +97,9 @@ function writeFixtureSession(dirName: string, sessionId: string, cwd: string): s
 }
 
 describe('backfillMemoryFromTranscripts (ac1)', () => {
-  it('a fixture session whose cwd matches a workspace produces a written observation', async () => {
+  // Real claim/commit/write pipeline on real SQLite + FS — exceeds the 5s
+  // default under verification-gate load (nice -19, parallel forks), so opt in.
+  it('a fixture session whose cwd matches a workspace produces a written observation', { timeout: 20_000 }, async () => {
     writeFixtureSession('matched-project', 'session-matched', workspacePath);
 
     const result = await backfillMemoryFromTranscripts({ extract: async () => extractedStub(), ...quietHooks });
@@ -109,7 +111,7 @@ describe('backfillMemoryFromTranscripts (ac1)', () => {
 });
 
 describe('backfillMemoryFromTranscripts (ac2)', () => {
-  it('a fixture session whose cwd matches no workspace is skipped, producing no observation', async () => {
+  it('a fixture session whose cwd matches no workspace is skipped, producing no observation', { timeout: 20_000 }, async () => {
     writeFixtureSession('unmatched-project', 'session-unmatched', '/nowhere/this/matches');
 
     const result = await backfillMemoryFromTranscripts({ extract: async () => extractedStub() });
@@ -121,7 +123,7 @@ describe('backfillMemoryFromTranscripts (ac2)', () => {
 });
 
 describe('backfillMemoryFromTranscripts (ac3)', () => {
-  it('a second run creates zero new observation rows for an already-processed session', async () => {
+  it('a second run creates zero new observation rows for an already-processed session', { timeout: 20_000 }, async () => {
     writeFixtureSession('matched-project', 'session-repeat', workspacePath);
 
     const first = await backfillMemoryFromTranscripts({ extract: async () => extractedStub(), ...quietHooks });
@@ -134,7 +136,7 @@ describe('backfillMemoryFromTranscripts (ac3)', () => {
 });
 
 describe('backfillMemoryFromTranscripts (ac4)', () => {
-  it('--dry-run persists nothing and leaves the fixture JSONL byte-identical', async () => {
+  it('--dry-run persists nothing and leaves the fixture JSONL byte-identical', { timeout: 20_000 }, async () => {
     const path = writeFixtureSession('matched-project', 'session-dry-run', workspacePath);
     const before = readFileSync(path);
 

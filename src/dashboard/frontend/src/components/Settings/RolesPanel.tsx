@@ -18,7 +18,6 @@ interface RoleSubConfig {
 }
 
 type ReviewModeValue = 'quick' | 'full' | 'none';
-type ReReviewScopeValue = 'all' | 'changed' | 'blockers';
 
 interface RoleConfig {
   model?: RoleModelRef;
@@ -26,8 +25,6 @@ interface RoleConfig {
   effort?: Effort;
   /** PAN-1862: review role only — what kind of review runs (default quick). */
   mode?: ReviewModeValue;
-  /** PAN-1862: review role only — which convoy reviewers re-run on re-review (default changed). */
-  reReviewScope?: ReReviewScopeValue;
   maxAgents?: number;
   scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
@@ -743,7 +740,6 @@ export function RolesPanel() {
                   // surface for that invariant — full mode only (quick/none
                   // neither fork nor cache-share).
                   const reviewMode: ReviewModeValue = settings?.roles?.review?.mode ?? 'quick';
-                  const reReviewScope: ReReviewScopeValue = settings?.roles?.review?.reReviewScope ?? 'changed';
                   const resolvedReviewModels = (role.subRoles ?? []).map((sr) => ({
                     id: sr.id,
                     resolved: resolveModelRef(getSubRoleModel(settings, role, sr), workhorses, parentModelRefForSubRoles),
@@ -765,21 +761,6 @@ export function RolesPanel() {
                             <option value="none">None — skip AI review (verification gate still runs)</option>
                           </select>
                         </label>
-                        {reviewMode === 'full' && (
-                          <label className="block">
-                            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Re-review scope</span>
-                            <select
-                              value={reReviewScope}
-                              onChange={(event) => saveMutation.mutate({ role: role.id, patch: { reReviewScope: event.target.value as ReReviewScopeValue } })}
-                              disabled={saveMutation.isPending}
-                              className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-                            >
-                              <option value="changed">Changed — blockers + reviewers whose files changed (default)</option>
-                              <option value="all">All — re-run every reviewer each cycle</option>
-                              <option value="blockers">Blockers — re-run only reviewers that blocked</option>
-                            </select>
-                          </label>
-                        )}
                       </div>
                       {reviewMode === 'full' && !uniform && (
                         <div

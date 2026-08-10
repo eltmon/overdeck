@@ -1,6 +1,6 @@
-import { rehydrateHeadAnchor, type HeadAnchor } from '../git-utils.js';
-import { getReviewStatusSync } from '../review-status.js';
+import type { HeadAnchor } from '../git-utils.js';
 import { evaluateWorkspaceAnchorDrift } from '../workspace-anchor-drift.js';
+import { readVerdictPreservationStatus } from './work-start-verdicts.js';
 
 export type PipelineVerdictPreservationDecision =
   | { preserve: true; reason: string; refreshedAnchor?: HeadAnchor }
@@ -12,7 +12,7 @@ export async function shouldPreservePipelineVerdicts(
   workspacePath: string,
 ): Promise<PipelineVerdictPreservationDecision> {
   try {
-    const status = getReviewStatusSync(issueId);
+    const status = readVerdictPreservationStatus(issueId);
     if (!status) return { preserve: false, reason: 'no pipeline verdicts are recorded' };
     if (!status.reviewedAtCommit) {
       return { preserve: false, reason: 'the review verdict has no commit anchor' };
@@ -30,7 +30,7 @@ export async function shouldPreservePipelineVerdicts(
     const verdict = await evaluateWorkspaceAnchorDrift(
       issueId,
       workspacePath,
-      rehydrateHeadAnchor(status.reviewedAtCommit),
+      status.reviewedAtCommit,
     );
     switch (verdict.kind) {
       case 'current':

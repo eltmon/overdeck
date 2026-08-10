@@ -8,7 +8,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from '
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { CostEvent, readEventsSync, readEventsFromLineSync, getLastEventMetadataSync } from './events.js';
+import {
+  CostEvent,
+  forEachCostEventSync,
+  getEventsFileSizeSync,
+  readEventsFromByteOffsetSync,
+} from './events.js';
 import { FsError } from '../errors.js';
 
 // ============== Types ==============
@@ -44,13 +49,14 @@ export interface CostCache {
   status: 'live' | 'migrating' | 'stale';
   lastEventTs: string | null;
   lastEventLine: number;
+  lastEventByteOffset: number;
   retentionDays: number;
   issues: Record<string, IssueStats>;
 }
 
 // ============== Constants ==============
 
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const DEFAULT_RETENTION_DAYS = 90;
 
 // Use functions for paths to allow test mocking via process.env.HOME
@@ -99,6 +105,7 @@ function createEmptyCache(): CostCache {
     status: 'live',
     lastEventTs: null,
     lastEventLine: 0,
+    lastEventByteOffset: 0,
     retentionDays: DEFAULT_RETENTION_DAYS,
     issues: {},
   };
@@ -129,27 +136,30 @@ export function saveCacheSync(cache: CostCache): void {
  * Update cache incrementally from new events
  * @param events Array of events to add
  * @param newLineNumber Optional new line number (for correct tracking with malformed lines)
+ * @param newByteOffset Optional byte cursor after the last complete event line
  */
-export function updateCacheFromEventsSync(events: CostEvent[], newLineNumber?: number): CostCache {
+export function updateCacheFromEventsSync(
+  events: CostEvent[],
+  newLineNumber?: number,
+  newByteOffset?: number,
+): CostCache {
   const cache = loadCacheSync();
 
   for (const event of events) {
     addEventToCache(cache, event);
   }
 
-  // Update metadata
+  // Update metadata. Byte offsets let the hot path read only appended bytes
+  // instead of loading and splitting the entire event log on every query.
   if (events.length > 0) {
-    const lastEvent = events[events.length - 1];
-    cache.lastEventTs = lastEvent.ts;
-
-    // Use provided line number if available (handles malformed lines correctly)
-    // Otherwise fall back to incrementing by event count (for backward compatibility)
-    if (newLineNumber !== undefined) {
-      cache.lastEventLine = newLineNumber;
-    } else {
-      cache.lastEventLine += events.length;
-    }
+    cache.lastEventTs = events[events.length - 1].ts;
   }
+  if (newLineNumber !== undefined) {
+    cache.lastEventLine = newLineNumber;
+  } else if (events.length > 0) {
+    cache.lastEventLine += events.length;
+  }
+  if (newByteOffset !== undefined) cache.lastEventByteOffset = newByteOffset;
 
   cache.status = 'live';
 
@@ -244,21 +254,15 @@ export function rebuildCacheSync(): CostCache {
   const cache = createEmptyCache();
   cache.status = 'migrating';
 
-  // Read all events
-  const events = readEventsSync();
-  console.log(`Processing ${events.length} events...`);
-
-  for (const event of events) {
-    addEventToCache(cache, event);
-  }
-
-  // Update metadata
-  const metadata = getLastEventMetadataSync();
+  // Stream the log once. Rebuilds are rare, but the log can be hundreds of
+  // megabytes, so even this cold path must not materialize every event at once.
+  const metadata = forEachCostEventSync((event) => addEventToCache(cache, event));
   cache.lastEventTs = metadata.lastEventTs;
   cache.lastEventLine = metadata.lastEventLine;
+  cache.lastEventByteOffset = metadata.byteOffset;
   cache.status = 'live';
 
-  console.log(`Cache rebuilt: ${Object.keys(cache.issues).length} issues, ${events.length} events`);
+  console.log(`Cache rebuilt: ${Object.keys(cache.issues).length} issues, ${metadata.totalEvents} events`);
 
   saveCacheSync(cache);
   return cache;
@@ -270,35 +274,32 @@ export function rebuildCacheSync(): CostCache {
  */
 export function syncCacheSync(): CostCache {
   const cache = loadCacheSync();
+  const fileSize = getEventsFileSizeSync();
 
-  // Check if there are new events
-  const metadata = getLastEventMetadataSync();
+  if (fileSize === cache.lastEventByteOffset) return cache;
 
-  if (metadata.lastEventLine === cache.lastEventLine) {
-    // Already up to date
-    return cache;
+  if (cache.lastEventByteOffset === 0 && cache.lastEventLine === 0 && fileSize > 0) {
+    return rebuildCacheSync();
   }
 
-  if (metadata.lastEventLine < cache.lastEventLine) {
-    // Events file was truncated (retention cleanup) - rebuild
+  if (fileSize < cache.lastEventByteOffset) {
+    // Events file was truncated by retention cleanup.
     console.log('Events file was truncated, rebuilding cache...');
     return rebuildCacheSync();
   }
 
-  // Read new events (returns both events and new line position)
-  const { events: newEvents, newLine } = readEventsFromLineSync(cache.lastEventLine);
+  const delta = readEventsFromByteOffsetSync(cache.lastEventByteOffset);
+  const newLine = cache.lastEventLine + delta.linesRead;
 
-  if (newEvents.length > 0) {
-    console.log(`Syncing cache with ${newEvents.length} new events...`);
-    return updateCacheFromEventsSync(newEvents, newLine);
+  if (delta.events.length > 0) {
+    console.log(`Syncing cache with ${delta.events.length} new events...`);
+  }
+  if (delta.newOffset !== cache.lastEventByteOffset) {
+    return updateCacheFromEventsSync(delta.events, newLine, delta.newOffset);
   }
 
-  // Even if no events, update line number in case file was appended with only malformed lines
-  if (newLine !== cache.lastEventLine) {
-    cache.lastEventLine = newLine;
-    saveCacheSync(cache);
-  }
-
+  // A writer may be between bytes and the terminating newline. Leave the
+  // cursor unchanged so the complete event is picked up on the next sync.
   return cache;
 }
 
@@ -360,14 +361,13 @@ export function getCacheStatus(): {
   needsSync: boolean;
 } {
   const cache = loadCacheSync();
-  const metadata = getLastEventMetadataSync();
 
   return {
     status: cache.status,
     lastEventTs: cache.lastEventTs,
     eventCount: cache.lastEventLine,
     issueCount: Object.keys(cache.issues).length,
-    needsSync: metadata.lastEventLine !== cache.lastEventLine,
+    needsSync: getEventsFileSizeSync() !== cache.lastEventByteOffset,
   };
 }
 

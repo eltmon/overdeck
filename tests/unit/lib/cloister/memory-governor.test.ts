@@ -202,27 +202,44 @@ describe('assessMemoryPressure', () => {
     expect((await assessMemoryPressure()).band).toBe('ok');
   });
 
-  it('holds admissions when RAM is healthy but swap has no free runway', async () => {
+  it('admits when swap is full but PSI shows no stalls (swap residency is not pressure)', async () => {
+    // Operator-approved correction (PAN-3485 follow-up): full-but-idle swap
+    // with PSI 0.00 must NOT hold admissions — pages swapped during a leak era
+    // sit unused for weeks, and holding for them wedges the whole pipeline.
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
       swapFree: 0,
     }));
 
-    expect((await assessMemoryPressure()).band).toBe('soft');
+    expect((await assessMemoryPressure()).band).toBe('ok');
   });
 
-  it('re-admits from low swap only after swap reaches its recovery threshold', async () => {
+  it('still sheds when full swap comes with live memory stalls', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 0,
+      psiFullAvg10: 2.5,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('hard');
+  });
+
+  it('keeps the swap-recovery hysteresis only while PSI is unavailable', async () => {
+    // PSI null = cannot prove safety → the conservative hold with its
+    // swap-recovery threshold still applies.
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
       swapFree: 1 * GIB,
+      psiFullAvg10: null,
     }));
     expect((await assessMemoryPressure()).band).toBe('soft');
 
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
       swapFree: 3 * GIB,
+      psiFullAvg10: null,
     }));
     expect((await assessMemoryPressure()).band).toBe('soft');
 
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
       swapFree: 4 * GIB,
+      psiFullAvg10: null,
     }));
     expect((await assessMemoryPressure()).band).toBe('ok');
   });

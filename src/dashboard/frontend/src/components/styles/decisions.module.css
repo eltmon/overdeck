@@ -34,7 +34,7 @@
 }
 
 .groupCount {
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 10.5px;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -103,7 +103,7 @@
 }
 
 .subject {
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 11px;
   color: var(--muted-foreground);
 }
@@ -136,7 +136,7 @@
 }
 
 .mono {
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
 .answer {
@@ -164,7 +164,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: var(--radius-sm);
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   color: var(--warning-foreground);

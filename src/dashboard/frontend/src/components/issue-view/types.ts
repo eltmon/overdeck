@@ -29,7 +29,7 @@ export interface IssueHeaderModel {
   title?: string;
   branch?: string;
   projectName?: string;
-  /** Canonical pipeline phase (plan | work | review | test | ship | merged | verifying). */
+  /** Canonical pipeline phase (plan | work | review | test | verify | ship | merged | verifying). */
   phase: string;
   /** Resolved total cost formatted for display, e.g. "$1.23". */
   cost?: string;

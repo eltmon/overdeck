@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -262,5 +262,119 @@ describe('Sidebar pipeline filter groups', () => {
     expect(dot).toBeInTheDocument();
     expect(dot).toHaveStyle('background: #fff');
     expect(panButton).toHaveTextContent('PAN');
+  });
+});
+
+// ─── Drag-drop move onto a sidebar project (PAN-1577) ──────────────────────
+
+function fakeDataTransfer(seed?: Record<string, string>) {
+  const store = new Map<string, string>(seed ? Object.entries(seed) : []);
+  return {
+    effectAllowed: 'uninitialized',
+    dropEffect: 'none',
+    get types() { return Array.from(store.keys()); },
+    setData: (type: string, value: string) => { store.set(type, value); },
+    getData: (type: string) => store.get(type) ?? '',
+  };
+}
+
+describe('Sidebar drag-drop move (PAN-1577)', () => {
+  function renderSidebarWithProjects() {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/version') return Response.json({ version: '0.5.0', isDev: false });
+      if (url === '/api/issues/resource-allocated') return Response.json([]);
+      if (url === '/api/registered-projects') {
+        return Response.json([
+          { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+          { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+        ]);
+      }
+      if (url === '/api/conversations') return Response.json([]);
+      if (url.endsWith('/move') && init?.method === 'PATCH') {
+        return Response.json({ projectKey: 'krux' });
+      }
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <QueryClientProvider client={client}>
+        <Sidebar activeTab="pipeline" onTabChange={vi.fn()} onSearchOpen={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    return { fetchMock };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('highlights the hovered project on drag-over and clears it on drag-leave (ac2)', async () => {
+    renderSidebarWithProjects();
+    const kruxButton = await within(screen.getByTestId('sidebar-projects')).findByTestId('sidebar-project-Krux');
+
+    const dataTransfer = fakeDataTransfer({ 'application/json': JSON.stringify({ name: 'conv-a', projectKey: null }) });
+    fireEvent.dragOver(kruxButton, { dataTransfer });
+    expect(kruxButton.className).toContain('ring-2');
+
+    fireEvent.dragLeave(kruxButton);
+    expect(kruxButton.className).not.toContain('ring-2');
+  });
+
+  it('moves the conversation via the shared mutation on drop (ac1)', async () => {
+    const { fetchMock } = renderSidebarWithProjects();
+    const kruxButton = await within(screen.getByTestId('sidebar-projects')).findByTestId('sidebar-project-Krux');
+
+    const dataTransfer = fakeDataTransfer({ 'application/json': JSON.stringify({ name: 'conv-a', projectKey: null }) });
+    fireEvent.dragOver(kruxButton, { dataTransfer });
+    fireEvent.drop(kruxButton, { dataTransfer });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/conv-a/move',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ projectKey: 'krux' }),
+        }),
+      );
+    });
+  });
+
+  it('is a no-op (no mutation call) when dropped onto the conversation\'s current project (ac3)', async () => {
+    const { fetchMock } = renderSidebarWithProjects();
+    const kruxButton = await within(screen.getByTestId('sidebar-projects')).findByTestId('sidebar-project-Krux');
+
+    const dataTransfer = fakeDataTransfer({ 'application/json': JSON.stringify({ name: 'conv-a', projectKey: 'krux' }) });
+    fireEvent.dragOver(kruxButton, { dataTransfer });
+    fireEvent.drop(kruxButton, { dataTransfer });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/move'),
+      expect.anything(),
+    );
+  });
+
+  it('is a no-op when dropped onto the cwd-derived project and there is no explicit override (review fix: effective resolution)', async () => {
+    const { fetchMock } = renderSidebarWithProjects();
+    const kruxButton = await within(screen.getByTestId('sidebar-projects')).findByTestId('sidebar-project-Krux');
+
+    // No projectKey override -- the conversation is only ever grouped into
+    // Krux via cwd inference. Dropping it onto Krux must still be recognized
+    // as already-there, not a real move.
+    const dataTransfer = fakeDataTransfer({
+      'application/json': JSON.stringify({ name: 'conv-a', projectKey: null, cwd: '/home/user/Projects/krux/sub' }),
+    });
+    fireEvent.dragOver(kruxButton, { dataTransfer });
+    fireEvent.drop(kruxButton, { dataTransfer });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/move'),
+      expect.anything(),
+    );
   });
 });

@@ -32,7 +32,7 @@ export const TERMINAL_GATE_VALUES = {
 
 /** Fields that carry a gate's evidence and must move with its status as one unit. */
 export const GATE_COMPANIONS = {
-  reviewStatus: ['reviewNotes', 'reviewedAtCommit', 'reviewerVerdicts'],
+  reviewStatus: ['reviewNotes', 'reviewedAtCommit'],
   testStatus: ['testNotes'],
   uatStatus: ['uatNotes'],
   verificationStatus: ['verificationNotes', 'lastVerifiedCommit'],

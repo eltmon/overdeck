@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
-import { listBooks } from './resolver.js';
+import { listBooks, orderIssueStoreStatus } from './resolver.js';
 import { liveOrderIssueLookup } from './resolver.js';
 import type {
   OrderBookFinding,
@@ -104,12 +104,27 @@ export function validateBookForStart(
   book: OrderBook,
   options: {
     issueLookup?: OrderIssueLookup;
+    storeStatus?: () => { started: boolean; issueCount: number };
     hasPrd?: (issueId: string) => boolean;
     books?: readonly OrderBook[];
   } = {},
 ): OrderBookValidationResult {
   const blocks: OrderBookFinding[] = [];
   const warns: OrderBookFinding[] = [];
+
+  const storeStatus = options.issueLookup
+    ? null
+    : (options.storeStatus ?? orderIssueStoreStatus)();
+  const storeUnavailable = storeStatus !== null
+    && (!storeStatus.started || storeStatus.issueCount === 0);
+  if (storeUnavailable) {
+    blocks.push({
+      code: 'issue-store-unavailable',
+      issue: book.id,
+      message: 'Issue store is unavailable or empty — start the dashboard once (`pan up`) to populate the shared issue cache, then retry',
+    });
+  }
+
   if (book.items.length === 0) {
     blocks.push({
       code: 'empty-book',
@@ -123,17 +138,19 @@ export function validateBookForStart(
     ids.add(item.issue.toUpperCase());
     item.prereqs.forEach((prereq) => ids.add(prereq.toUpperCase()));
   }
-  const issueState = issueLookup([...ids]);
+  const issueState = storeUnavailable ? new Map() : issueLookup([...ids]);
 
-  for (const item of book.items) {
-    const issue = item.issue.toUpperCase();
-    const state = issueState.get(issue);
-    if (!state?.open) {
-      blocks.push({
-        code: 'issue-not-open',
-        issue,
-        message: state ? `${issue} is not open` : `${issue} could not be resolved as an open issue`,
-      });
+  if (!storeUnavailable) {
+    for (const item of book.items) {
+      const issue = item.issue.toUpperCase();
+      const state = issueState.get(issue);
+      if (!state?.open) {
+        blocks.push({
+          code: 'issue-not-open',
+          issue,
+          message: state ? `${issue} is not open` : `${issue} could not be resolved as an open issue`,
+        });
+      }
     }
   }
 
@@ -151,15 +168,17 @@ export function validateBookForStart(
   }
 
   const bookIssues = new Set(book.items.map((item) => item.issue.toUpperCase()));
-  for (const item of book.items) {
-    for (const rawPrereq of item.prereqs) {
-      const prereq = rawPrereq.toUpperCase();
-      if (!bookIssues.has(prereq) && !issueState.has(prereq)) {
-        blocks.push({
-          code: 'unresolved-prerequisite',
-          issue: item.issue,
-          message: `${item.issue} prerequisite ${prereq} could not be resolved`,
-        });
+  if (!storeUnavailable) {
+    for (const item of book.items) {
+      for (const rawPrereq of item.prereqs) {
+        const prereq = rawPrereq.toUpperCase();
+        if (!bookIssues.has(prereq) && !issueState.has(prereq)) {
+          blocks.push({
+            code: 'unresolved-prerequisite',
+            issue: item.issue,
+            message: `${item.issue} prerequisite ${prereq} could not be resolved`,
+          });
+        }
       }
     }
   }

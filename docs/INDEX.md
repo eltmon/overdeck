@@ -22,6 +22,7 @@
 |----------|-------------|
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) | Three-plane state model: permanent git records, local SQLite runtime registry, and tmux liveness oracle |
+| [EFFECT-BRIDGING.md](./EFFECT-BRIDGING.md) | Effect-native route boundaries: direct yields, Promise bridges, and typed failure handling |
 | [CONVERSATION-SUBAGENTS.md](./CONVERSATION-SUBAGENTS.md) | Claude Code subagent transcript layout, parent-row join, transport, status derivation, and path safety |
 | [CODEBASE-HEALTH-ROADMAP.md](./CODEBASE-HEALTH-ROADMAP.md) | Architecture debt-reduction roadmap (four epics A–D): why fix-work dominates feature-work, the deep-module diagnosis, and the handoff-orchestration execution model. PRDs under [codebase-health/](./codebase-health/) |
 | [PAN-1908-POST-MERGE-RUNBOOK.md](./PAN-1908-POST-MERGE-RUNBOOK.md) | Post-merge close-out runbook for superseded/narrowed issues tracked by PAN-1908 |
@@ -50,7 +51,10 @@
 | [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, status vs state, and skill → CLI → API → UI mapping |
 | [flywheel-brief.md](./flywheel-brief.md) | Default operating contract the Flywheel orchestrator reads at the start of every run |
 | [UAT-BATCH-TRAINS.md](./UAT-BATCH-TRAINS.md) | UAT batch trains (PAN-1737): auto-assembled rolling `uat/*` generations with in-batch conflict resolution, promote-the-batch merge, on-demand live UAT stacks, the reconciler, API, and the "UAT batches" card |
-| [MERGE-WORKFLOW.md](./MERGE-WORKFLOW.md) | Per-issue merge state machine (work-done → review-passed → rebased → merged); the escape-hatch path that batch promotion sits above |
+| [MERGE-WORKFLOW.md](./MERGE-WORKFLOW.md) | Per-issue merge state machine (work-done → review-passed → rebased → merged); the escape-hatch path that batch promotion sits above; post-merge handoff idempotency + Docker cleanup |
+| [AGENT-MESSAGE-DELIVERY.md](./AGENT-MESSAGE-DELIVERY.md) | Orchestrator-to-agent delivery: PTY supervisor transport, legacy Channels fallback, tmux paste fallback, blocking-choice-menu guard |
+| [DASHBOARD-ARCHITECTURE.md](./DASHBOARD-ARCHITECTURE.md) | Dashboard server structure (Effect HTTP + RPC), the two WebSocket endpoints, terminal snapshot/ready protocol, frontend data flow |
+| [PIPELINE-GATES.md](./PIPELINE-GATES.md) | Verification gate, verdict feedback routing, review convergence gate, and agent auto-resume gates |
 | [MERGE-TRAIN.md](./MERGE-TRAIN.md) | Historical PAN-1691 merge-train PRD — superseded by UAT-BATCH-TRAINS.md; retained for the engine/policy decision record |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Consolidated into `flywheel-brief.md` and `FLYWHEEL.md` (redirect only — original content in git history) |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Consolidated into `flywheel-brief.md` (redirect only — original content in git history) |
@@ -113,7 +117,7 @@
 | Document | Description |
 |----------|-------------|
 | [CLAUDE.md](../CLAUDE.md) | Agent instructions (commit rules, messaging API, completion requirements) |
-| [.claude/rules/dashboard-node22-only.md](../.claude/rules/dashboard-node22-only.md) | Why dashboard must run under Node 22 (not Bun): node-pty PTY exits, circular ESM deps |
+| [sync-sources/rules/dashboard-node22-only.md](../sync-sources/rules/dashboard-node22-only.md) | Why dashboard must run under Node 22 (not Bun): node-pty PTY exits, circular ESM deps |
 
 ---
 
@@ -222,7 +226,7 @@
 - **"build"** / **"tsdown"** / **"rolldown"** / **"vite"** → BUILD.md
 - **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
 - **"dist"** / **"production build"** → BUILD.md
-- **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `.claude/rules/dashboard-node22-only.md`, CLAUDE.md
+- **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `sync-sources/rules/dashboard-node22-only.md`, CLAUDE.md
 - **"electron"** / **"desktop"** / **"AppImage"** / **"DMG"** / **"electron-builder"** → DESKTOP-APP.md, BUILD.md
 - **"tray"** / **"system tray"** / **"notification"** / **"auto-start"** / **"nag"** → DESKTOP-APP.md
 - **"command palette"** / **"Cmd+K"** / **"Ctrl+K"** → DESKTOP-APP.md

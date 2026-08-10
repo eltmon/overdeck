@@ -16,16 +16,19 @@
  */
 
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
+  rmSync,
   statSync,
+  writeFileSync,
 } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { spawn, execSync, exec } from 'child_process';
+import { spawn, execSync, exec, type ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
 import { Effect, Data } from 'effect';
@@ -46,14 +49,24 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'overdeck-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v7.1.39';
+// v7.2.113 (PAN-1862 cache follow-up): derives the Codex prompt_cache_key
+// deterministically from the X-Claude-Code-Session-Id request header instead of
+// v7.1.39's random uuid memoized per (model, metadata.user_id) with a 1h
+// absolute expiry. The old scheme sharded the OpenAI prompt cache per Claude
+// session (user_id embeds the session uuid), rotated keys mid-session every
+// hour, and cold-started all caching on proxy restart.
+const CLIPROXY_RELEASE_VERSION = 'v7.2.113';
 
 export function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
 }
 
-export function getCliproxyBinary(): string {
-  return join(BIN_DIR, 'cliproxy');
+export function getCliproxyBinary(platform: NodeJS.Platform = process.platform): string {
+  return join(BIN_DIR, platform === 'win32' ? 'cliproxy.exe' : 'cliproxy');
+}
+
+export function extractedBinaryName(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? 'cli-proxy-api.exe' : 'cli-proxy-api';
 }
 
 export function getCliproxyConfigPath(): string {
@@ -418,12 +431,21 @@ export function detectPlatformAsset(
 
   if (platform === 'linux') os = 'linux';
   else if (platform === 'darwin') os = 'darwin';
+  else if (platform === 'win32') os = 'windows';
 
   if (arch === 'x64') cpu = 'amd64';
   else if (arch === 'arm64') cpu = 'aarch64';
 
   if (!os || !cpu) return null;
-  return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.tar.gz` };
+  const ext = os === 'windows' ? 'zip' : 'tar.gz';
+  return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.${ext}` };
+}
+
+export function isExecutableMode(
+  mode: number,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform === 'win32' || (mode & 0o111) !== 0;
 }
 
 export function isCliproxyInstalled(): boolean {
@@ -431,7 +453,7 @@ export function isCliproxyInstalled(): boolean {
   if (!existsSync(bin)) return false;
   try {
     const st = statSync(bin);
-    return st.isFile() && (st.mode & 0o111) !== 0;
+    return st.isFile() && isExecutableMode(st.mode);
   } catch {
     return false;
   }
@@ -443,9 +465,13 @@ function expectedCliproxyVersion(): string {
 }
 
 /** Parse "CLIProxyAPI Version: 7.1.39, Commit: ..." → "7.1.39". */
-function parseCliproxyVersion(output: string): string | null {
+export function parseCliproxyVersion(output: string): string | null {
   const m = output.match(/Version:\s*v?(\d+\.\d+\.\d+)/i);
   return m ? m[1] : null;
+}
+
+export function execFailureStdout(err: unknown): string {
+  return (err as { stdout?: string | Buffer })?.stdout?.toString() ?? '';
 }
 
 /**
@@ -455,7 +481,8 @@ function parseCliproxyVersion(output: string): string | null {
  * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
  * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
  * An unreadable version is treated as out-of-date so we re-pull rather than
- * trust a mystery binary.
+ * trust a mystery binary. CLIProxyAPI v7.2.113 deliberately does not define
+ * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
 function isCliproxyUpToDateSync(): boolean {
   if (!isCliproxyInstalled()) return false;
@@ -465,8 +492,8 @@ function isCliproxyUpToDateSync(): boolean {
       timeout: 5_000,
     }).toString();
     return parseCliproxyVersion(out) === expectedCliproxyVersion();
-  } catch {
-    return false;
+  } catch (err) {
+    return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();
   }
 }
 
@@ -476,8 +503,8 @@ async function isCliproxyUpToDateTask(): Promise<boolean> {
   try {
     const { stdout } = await execAsync(`"${getCliproxyBinary()}" --version`, { timeout: 5_000 });
     return parseCliproxyVersion(stdout) === expectedCliproxyVersion();
-  } catch {
-    return false;
+  } catch (err) {
+    return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();
   }
 }
 
@@ -494,7 +521,7 @@ export function installCliproxySync(force = false): void {
   if (!asset) {
     throw new Error(
       `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
-      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+      + `GPT subscription routing requires linux, darwin, or windows on amd64/arm64.`,
     );
   }
 
@@ -504,19 +531,19 @@ export function installCliproxySync(force = false): void {
   const archivePath = join(tmpDir, asset.archive);
 
   execSync(`curl -fsSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
-  execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+  execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
 
-  // Release archives extract a binary named "cli-proxy-api" at the root of the tar
-  // (alongside README/LICENSE/config.example.yaml).
-  const extracted = join(tmpDir, 'cli-proxy-api');
+  const extracted = join(tmpDir, extractedBinaryName());
   if (!existsSync(extracted)) {
-    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+    throw new Error(`cliproxy archive did not contain expected ${extractedBinaryName()} binary`);
   }
 
   const target = getCliproxyBinary();
-  execSync(`install -m 0755 "${extracted}" "${target}"`, { stdio: 'pipe' });
+  rmSync(target, { force: true });
+  copyFileSync(extracted, target);
+  chmodSync(target, 0o755);
   try {
-    execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+    rmSync(tmpDir, { recursive: true, force: true });
   } catch { /* non-fatal */ }
 }
 
@@ -532,7 +559,7 @@ async function installCliproxyTask(force = false): Promise<void> {
   if (!asset) {
     throw new Error(
       `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
-      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+      + `GPT subscription routing requires linux, darwin, or windows on amd64/arm64.`,
     );
   }
 
@@ -542,17 +569,19 @@ async function installCliproxyTask(force = false): Promise<void> {
   const archivePath = join(tmpDir, asset.archive);
 
   await execAsync(`curl -fsSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
-  await execAsync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
+  await execAsync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
 
-  const extracted = join(tmpDir, 'cli-proxy-api');
+  const extracted = join(tmpDir, extractedBinaryName());
   if (!existsSync(extracted)) {
-    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+    throw new Error(`cliproxy archive did not contain expected ${extractedBinaryName()} binary`);
   }
 
   const target = getCliproxyBinary();
-  await execAsync(`install -m 0755 "${extracted}" "${target}"`, { timeout: 10_000 });
+  await rm(target, { force: true });
+  await copyFile(extracted, target);
+  await chmod(target, 0o755);
   try {
-    await execAsync(`rm -rf "${tmpDir}"`, { timeout: 10_000 });
+    await rm(tmpDir, { recursive: true, force: true });
   } catch { /* non-fatal */ }
 }
 
@@ -576,6 +605,14 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+export function netstatShowsListener(output: string, port: number): boolean {
+  const localPort = new RegExp(`[.:]${port}$`);
+  return output.split(/\r?\n/).some((line) => {
+    const columns = line.trim().split(/\s+/);
+    return /\bLISTENING\b/i.test(line) && localPort.test(columns[1] ?? '');
+  });
+}
+
 export function isCliproxyRunningSync(): boolean {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
@@ -583,6 +620,14 @@ export function isCliproxyRunningSync(): boolean {
   // Use bash /dev/tcp instead of lsof — busybox lsof on Alpine ignores -t/-i
   // and returns all processes, making this check both incorrect and dangerous.
   try {
+    if (process.platform === 'win32') {
+      const output = execSync('netstat -ano -p TCP', {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        timeout: 5_000,
+      });
+      return netstatShowsListener(output, CLIPROXY_PORT);
+    }
     execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${CLIPROXY_PORT}'`, {
       encoding: 'utf8',
       stdio: 'pipe',
@@ -672,6 +717,33 @@ export function getCliproxyClientEnv(): Record<string, string> {
 
 // ─── Async lifecycle (safe for dashboard server — no execSync) ─────────────────
 
+export async function waitForCliproxySpawn(
+  child: Pick<ChildProcess, 'once' | 'removeListener' | 'pid' | 'unref'>,
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const cleanup = () => {
+      child.removeListener('spawn', onSpawn);
+      child.removeListener('error', onError);
+    };
+    const onSpawn = () => {
+      cleanup();
+      if (!child.pid) {
+        reject(new Error('Failed to spawn cliproxy'));
+        return;
+      }
+      child.unref();
+      resolve(child.pid);
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    child.once('spawn', onSpawn);
+    child.once('error', onError);
+  });
+}
+
 /** Check whether the cliproxy TCP port is accepting connections. */
 async function checkCliproxyPortTask(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -734,21 +806,20 @@ async function startCliproxyTask(): Promise<void> {
   const config = getCliproxyConfigPath();
   const logPath = getCliproxyLogPath();
 
-  const { openSync } = await import('fs');
+  const { closeSync, openSync } = await import('fs');
   const logFd = openSync(logPath, 'a');
 
-  const child = spawn(bin, ['-config', config], {
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    cwd: getCliproxyDir(),
-  });
-
-  if (!child.pid) {
-    throw new Error('Failed to spawn cliproxy');
+  try {
+    const child = spawn(bin, ['-config', config], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      cwd: getCliproxyDir(),
+    });
+    const pid = await waitForCliproxySpawn(child);
+    writeFileSync(getCliproxyPidPath(), String(pid));
+  } finally {
+    closeSync(logFd);
   }
-
-  writeFileSync(getCliproxyPidPath(), String(child.pid));
-  child.unref();
 }
 
 /** Restart cliproxy asynchronously. Safe for the event loop. */

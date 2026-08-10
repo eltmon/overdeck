@@ -9,6 +9,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/settings/test-api-key
  *   POST /api/settings/validate-api-key
  *   PUT  /api/settings
+ *   PUT  /api/settings/design-language
  */
 
 import { randomBytes } from 'node:crypto';
@@ -20,6 +21,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import {
   loadSettingsApi,
   saveSettingsApi,
+  saveDesignLanguage,
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
@@ -32,6 +34,7 @@ import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
+import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
@@ -155,6 +158,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'qwen3-coder-plus': { apiModel: 'qwen3-coder-plus' },
   'qwen3-plus': { apiModel: 'qwen3-plus' },
   'qwen3.7-max': { apiModel: 'qwen3.7-max' },
+  'qwen3.8-max': { apiModel: 'qwen3.8-max' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -484,7 +488,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'dashscope': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'qwen3-max') : 'qwen3-max';
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/chat/completions`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -708,13 +712,13 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'dashscope': {
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/models`, {
               headers: { 'Authorization': `Bearer ${apiKey}` },
             });
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'];
+              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
@@ -927,6 +931,35 @@ const putUiThemeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: PUT /api/settings/design-language ─────────────────────────────────
+// The Overdeck Theme (Ledger/Broadsheet) picker saves here directly instead of
+// GET-then-PUT /api/settings: that client round trip left a window in which a
+// concurrent settings save (another tab, or the top-level Settings form) could
+// commit and then be silently overwritten by this save's now-stale snapshot of
+// every other field. A single request that only ever carries `theme` and reads
+// the current document fresh server-side removes that window (PAN-3410 review
+// finding — no-loss guarantee, FR-7).
+
+const putDesignLanguageRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/design-language',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const theme = (body as { theme?: unknown } | null)?.theme;
+      if (theme !== 'ledger' && theme !== 'broadsheet') {
+        return jsonResponse({ error: "theme must be 'ledger' or 'broadsheet'" }, { status: 400 });
+      }
+      await Effect.runPromise(saveDesignLanguage(theme));
+      return jsonResponse({ success: true });
+    });
+  })),
+);
+
 // ─── Route: GET /api/settings/openrouter/models ──────────────────────────────
 
 const getOpenRouterModelsRoute = HttpRouter.add(
@@ -1125,6 +1158,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getConversationSearchReindexProgressRoute,
   putSettingsRoute,
   putUiThemeRoute,
+  putDesignLanguageRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,
