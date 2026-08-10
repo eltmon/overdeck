@@ -4,17 +4,17 @@
     "created": "2026-08-10T20:18:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3655: Unify issue Conversation/Terminal switching with the shared segmented selector",
-    "updated": "2026-08-10T20:22:42.368Z"
+    "updated": "2026-08-10T20:23:02.033Z"
   },
   "plan": {
     "id": "pan-3655",
     "title": "Unify issue Conversation/Terminal switching with the shared segmented selector",
-    "status": "proposed",
+    "status": "running",
     "uid": "be66b8aa-f84a-453c-b445-ce8d303d9334",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-10T20:18:32Z",
-    "updated": "2026-08-10T20:22:42.368Z",
+    "updated": "2026-08-10T20:23:02.033Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3655",
@@ -585,5 +585,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
