@@ -35,18 +35,9 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3291",
-      "lane": "A",
-      "order": 4,
-      "prereqs": [],
-      "reVerify": false,
-      "addedAt": "2026-07-30T02:58:41.679Z",
-      "addedBy": "operator"
-    },
-    {
       "issue": "PAN-3297",
       "lane": "A",
-      "order": 5,
+      "order": 4,
       "prereqs": [],
       "reVerify": false,
       "addedAt": "2026-07-30T02:58:41.679Z",
@@ -54,5 +45,5 @@
     }
   ],
   "createdAt": "2026-07-30T02:58:20.266Z",
-  "updatedAt": "2026-08-10T02:27:23.234Z"
+  "updatedAt": "2026-08-10T02:27:27.939Z"
 }
