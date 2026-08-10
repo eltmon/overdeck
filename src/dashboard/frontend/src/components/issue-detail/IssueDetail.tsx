@@ -50,14 +50,18 @@ export const ISSUE_DETAIL_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'plan', label: 'Plan map' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'conversation', label: 'Conversation' },
-  { id: 'terminal', label: 'Terminal' },
+  { id: 'session', label: 'Session' },
   { id: 'activity', label: 'Activity' },
   { id: 'files', label: 'Files' },
   { id: 'artifacts', label: 'Artifacts' },
 ] as const;
 
-export type IssueDetailTabId = (typeof ISSUE_DETAIL_TABS)[number]['id'];
+export type IssueDetailTabId =
+  | (typeof ISSUE_DETAIL_TABS)[number]['id']
+  | 'conversation'
+  | 'terminal';
+
+const SESSION_TAB_IDS = new Set<string>(['session', 'conversation', 'terminal']);
 
 export interface IssueDetailProps {
   issueId: string;
@@ -248,7 +252,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
     <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background/95 px-[14px]" role="tablist" aria-label="Issue drawer sections">
       <div className="flex min-w-0 items-center overflow-x-auto">
         {ISSUE_DETAIL_TABS.map((entry) => {
-          const active = tab === entry.id;
+          const active = entry.id === 'session' ? SESSION_TAB_IDS.has(tab) : tab === entry.id;
           return (
             <button
               key={entry.id}
@@ -260,7 +264,11 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
                 'relative flex shrink-0 items-center px-[14px] py-[10px] text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
                 active && 'text-foreground',
               )}
-              onClick={() => onSelectTab(entry.id)}
+              onClick={() => onSelectTab(
+                entry.id === 'session'
+                  ? tab === 'terminal' ? 'terminal' : 'conversation'
+                  : entry.id,
+              )}
             >
               {entry.label}
               {entry.id === 'tasks' ? (
@@ -301,24 +309,29 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
       issueId={issueId}
       agents={agents}
       reviewStatus={reviewStatus}
-      activeAgentId={tab === 'conversation' ? effectiveAgentId : null}
+      activeAgentId={tab === 'conversation' || tab === 'session' ? effectiveAgentId : null}
       onOpenAgentConversation={openAgentConversation}
     />
   );
 
-  const conversationPane = (
+  const sessionPane = (
+    view: 'conversation' | 'terminal',
+    onChangeView?: (view: 'conversation' | 'terminal') => void,
+  ) => (
     // The wrapper must be a constrained flex column (min-h-0 + flex-1): as a
     // plain block div its min-height:auto content floor blew out the grid
     // cell, so MessagesTimeline's overflow-y:auto never engaged and the
     // drawer conversation could not scroll (clipped by the drawer aside).
     <div data-section="DrawerAgentSession" className="flex min-h-0 flex-1 flex-col"><DrawerAgentSession
-      view="conversation"
+      view={view}
       agents={agents}
       agentId={effectiveAgentId}
       onSelectAgent={setSelectedAgentId}
+      onChangeView={onChangeView}
       issueId={issueId}
     /></div>
   );
+  const conversationPane = sessionPane('conversation');
 
   if (density === 'rail') {
     // Compact inline expansion: rail + active conversation + one action strip.
@@ -348,7 +361,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
         <div
           className={cn(
             'flex min-w-0 flex-col',
-            tab === 'conversation' || tab === 'terminal'
+            SESSION_TAB_IDS.has(tab)
               ? 'min-h-0 p-[14px]'
               : 'overflow-auto px-[22px] py-[18px]',
           )}
@@ -377,16 +390,8 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
             <div data-testid="drawer-tab-panel-files" data-section="ChangedFilesView">
               <ChangedFilesView issueId={issueId} />
             </div>
-          ) : tab === 'conversation' ? (
-            conversationPane
-          ) : tab === 'terminal' ? (
-            <div data-section="DrawerAgentSession" className="flex min-h-0 flex-1 flex-col"><DrawerAgentSession
-              view="terminal"
-              agents={agents}
-              agentId={effectiveAgentId}
-              onSelectAgent={setSelectedAgentId}
-              issueId={issueId}
-            /></div>
+          ) : SESSION_TAB_IDS.has(tab) ? (
+            sessionPane(tab === 'terminal' ? 'terminal' : 'conversation', onSelectTab)
           ) : (
             <TabPlaceholder tab={tab} />
           )}
