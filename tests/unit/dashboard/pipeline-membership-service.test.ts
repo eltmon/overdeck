@@ -17,6 +17,7 @@ import {
   PipelineMembershipUnavailableError,
   PIPELINE_PROJECT_CONCURRENCY,
 } from '../../../src/lib/pipeline-membership-gather.js';
+import { shouldRefreshMembershipForResourceRefresh } from '../../../src/dashboard/server/services/project-resource-refresh-queue.js';
 
 describe('pipeline membership service', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -212,6 +213,43 @@ describe('pipeline membership service', () => {
     await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
 
     expect(getMembership).toHaveBeenCalledOnce();
+  });
+
+  it('PAN-3647: a close-out status event refreshes post-merge limbo to clean terminal immediately', async () => {
+    const project = { name: 'close-out', path: '/close-out', github_repo: 'owner/close-out', issue_prefix: 'PAN' };
+    const signals = {
+      issueId: 'PAN-3417',
+      issueOpen: true,
+      hasOpenPr: false,
+      hasMergedPr: true,
+      hasConventionBranch: true,
+      branchUnmerged: false,
+      hasMergedBranchWork: true,
+      phaseLabel: 'verifying-on-main' as string | null,
+      hasXbriefSpec: true,
+      explicitlyReady: false,
+    };
+    const gather = vi.fn(async () => [{ ...signals }]);
+    const getMembership = createPipelineMembershipService({ gather, now: Date.now });
+
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+    expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.memberships?.[0]?.bucket)
+      .toBe('post_merge_limbo');
+
+    signals.issueOpen = false;
+    signals.phaseLabel = null;
+    const context = {
+      reasonsByProjectPath: new Map([[project.path, new Set(['issue.statusChanged:closed-out'])]]),
+    };
+    expect(shouldRefreshMembershipForResourceRefresh(context)).toBe(true);
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+
+    expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.memberships?.[0]).toMatchObject({
+      issueId: 'PAN-3417',
+      bucket: 'clean_terminal',
+      inPipeline: false,
+    });
+    expect(gather).toHaveBeenCalledTimes(2);
   });
 
   it('PAN-2893: invalidate() drops the settled TTL entry so the next call re-gathers immediately', async () => {

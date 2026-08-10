@@ -136,12 +136,19 @@ export function createProjectResourceRefreshQueue(
 const MEMBERSHIP_REFRESH_REASONS = new Set([
   'boot-warm',
   'periodic-convergence',
+  'issue.statusChanged:closed-out',
 ]);
+
+export function shouldRefreshMembershipForResourceRefresh(
+  context: ProjectResourceRefreshContext,
+): boolean {
+  return [...context.reasonsByProjectPath.values()]
+    .some((projectReasons) => [...projectReasons].some((reason) => MEMBERSHIP_REFRESH_REASONS.has(reason)));
+}
 
 const projectResourceRefreshQueue = createProjectResourceRefreshQueue({
   refreshProjects: (projects, context) => refreshResourceAllocatedProjects(projects, {
-    refreshMembership: [...context.reasonsByProjectPath.values()]
-      .some((projectReasons) => [...projectReasons].some((reason) => MEMBERSHIP_REFRESH_REASONS.has(reason))),
+    refreshMembership: shouldRefreshMembershipForResourceRefresh(context),
   }),
 });
 

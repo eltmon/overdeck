@@ -40,6 +40,18 @@ describe('createResourceRefreshTriggers', () => {
     expect(deps.enqueueProjects).toHaveBeenCalledExactlyOnceWith([panProject], 'agent.started');
   });
 
+  it('routes a close-out status event to its project queue', () => {
+    const { deps, emit } = makeDeps();
+    createResourceRefreshTriggers(deps);
+
+    emit({
+      type: 'issue.statusChanged',
+      payload: { issueId: 'PAN-42', canonicalStatus: 'done', labels: ['bug', 'closed-out'] },
+    });
+
+    expect(deps.enqueueProjects).toHaveBeenCalledExactlyOnceWith([panProject], 'issue.statusChanged:closed-out');
+  });
+
   it('resolves projectKey before issue and agent fallbacks', () => {
     const { deps, emit } = makeDeps();
     createResourceRefreshTriggers(deps);
