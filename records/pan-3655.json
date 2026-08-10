@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:24:51.615Z",
+  "updated": "2026-08-10T20:29:39.202Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "extract-view-toggle": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3655",
         "agentId": "agent-pan-3655",
         "pid": 4150738,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-10T20:24:51.615Z"
+        "claimedAt": "2026-08-10T20:24:51.615Z",
+        "itemId": "extract-view-toggle",
+        "outcome": "completed",
+        "reason": "Added reusable accessible ViewToggle component with focused unit coverage",
+        "releasedAt": "2026-08-10T20:29:39.202Z"
+      }
+    ],
+    "statusReasons": {
+      "extract-view-toggle": {
+        "reason": "Added reusable accessible ViewToggle component with focused unit coverage",
+        "updatedAt": "2026-08-10T20:29:39.202Z"
       }
     }
   },
   "statusOverrides": {
-    "extract-view-toggle": "running"
+    "extract-view-toggle": "completed",
+    "extract-view-toggle.ac1": "completed",
+    "extract-view-toggle.ac2": "completed",
+    "extract-view-toggle.ac3": "completed",
+    "extract-view-toggle.ac4": "completed"
   }
 }
