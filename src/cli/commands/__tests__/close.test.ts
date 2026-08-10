@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => {
     createInterface: vi.fn(),
     existsSync: vi.fn(() => true),
     readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/overdeck:PAN\n'),
+    appendOnce: vi.fn().mockResolvedValue('appended'),
+    getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
   };
 });
 
@@ -43,6 +45,15 @@ vi.mock('../../../lib/projects.js', async (importActual) => ({
   findProjectByTeamSync: mocks.findProjectByTeam,
   resolveProjectFromIssue: mocks.resolveProjectFromIssue,
   resolveProjectFromIssueSync: mocks.resolveProjectFromIssue,
+}));
+
+vi.mock('../../../lib/cloister/deacon-event-client.js', () => ({
+  createDeaconEventClient: vi.fn(() => ({ appendOnce: mocks.appendOnce })),
+}));
+
+vi.mock('../../../lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/config.js')>()),
+  getDashboardApiUrlSync: mocks.getDashboardApiUrlSync,
 }));
 
 import { closeOutCommand } from '../close.js';
@@ -101,6 +112,23 @@ describe('closeOutCommand', () => {
     expect(mocks.closeOut).toHaveBeenCalledOnce();
   });
 
+  it('publishes a settled cross-process status event after successful close-out', async () => {
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
+
+    expect(mocks.getDashboardApiUrlSync).toHaveBeenCalledOnce();
+    expect(mocks.appendOnce).toHaveBeenCalledWith({
+      type: 'issue.statusChanged',
+      timestamp: expect.any(String),
+      payload: {
+        issueId: 'PAN-1190',
+        status: 'Done',
+        state: 'done',
+        canonicalStatus: 'done',
+        labels: ['closed-out'],
+      },
+    }, expect.stringMatching(/^close-out-membership-refresh:PAN-1190:/));
+  });
+
   it('maps per-row accept options into closeOut and renders accepted attribution', async () => {
     mocks.closeOut.mockReturnValueOnce(Effect.succeed({
       workflow: 'close-out', issueId: 'PAN-1190', success: true, duration: 1, steps: [],
@@ -141,6 +169,7 @@ describe('closeOutCommand', () => {
     const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain('server is stale');
     expect(output).toContain('--accept-deploy');
+    expect(mocks.appendOnce).not.toHaveBeenCalled();
   });
 
   it('includes the gate in JSON output', async () => {

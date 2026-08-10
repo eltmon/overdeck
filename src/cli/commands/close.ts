@@ -21,8 +21,39 @@ import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 import { acceptFlagFor, canAcceptDodMisses, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 import { isTrackerIssueClosed } from '../../lib/cloister/issue-closed.js';
+import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 
 const execFileAsync = promisify(execFile);
+
+async function notifyCloseOutMembershipRefresh(issueId: string): Promise<void> {
+  const timestamp = new Date().toISOString();
+  let outcome: 'appended' | 'duplicate' | 'failed' = 'failed';
+  try {
+    outcome = await createDeaconEventClient({
+      dashboardUrl: getDashboardApiUrlSync(),
+      appendOnceTimeoutMs: 2_000,
+    }).appendOnce({
+      type: 'issue.statusChanged',
+      timestamp,
+      payload: {
+        issueId,
+        status: 'Done',
+        state: 'done',
+        canonicalStatus: 'done',
+        labels: ['closed-out'],
+      },
+    }, `close-out-membership-refresh:${issueId}:${timestamp}`);
+  } catch {
+    // Close-out is already durable; periodic convergence repairs a missed live signal.
+  }
+
+  if (outcome === 'failed') {
+    console.warn(chalk.yellow(
+      `Close-out completed for ${issueId}, but the live dashboard did not acknowledge its membership refresh signal; boot or periodic convergence will repair the snapshot.`,
+    ));
+  }
+}
 
 interface CloseOutOptions {
   force?: boolean;
@@ -379,6 +410,10 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
       ? { residueDisposition: { reason: residueReason, by: process.env.OVERDECK_AGENT_ID || userInfo().username } }
       : {}),
   }));
+
+  if (result.success) {
+    await notifyCloseOutMembershipRefresh(issueUpper);
+  }
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));

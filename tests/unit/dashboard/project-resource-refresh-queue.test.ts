@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createProjectResourceRefreshQueue,
   PROJECT_RESOURCE_REFRESH_DEBOUNCE_MS,
+  shouldRefreshMembershipForResourceRefresh,
 } from '../../../src/dashboard/server/services/project-resource-refresh-queue.js';
 
 const project = (name: string) => ({ name, path: `/${name}`, issue_prefix: name.toUpperCase() });
@@ -37,6 +38,18 @@ describe('project resource refresh queue', () => {
       [beta.path, new Set(['agent.created'])],
     ]));
     queue.stop();
+  });
+
+  it('re-gathers membership for close-out status changes but not agent-only refreshes', () => {
+    const closeOutContext = {
+      reasonsByProjectPath: new Map([['/alpha', new Set(['issue.statusChanged:closed-out'])]]),
+    };
+    const nonTerminalContext = {
+      reasonsByProjectPath: new Map([['/alpha', new Set(['issue.statusChanged', 'agent.stopped'])]]),
+    };
+
+    expect(shouldRefreshMembershipForResourceRefresh(closeOutContext)).toBe(true);
+    expect(shouldRefreshMembershipForResourceRefresh(nonTerminalContext)).toBe(false);
   });
 
   it('runs at most one follow-up when the active project changes again', async () => {

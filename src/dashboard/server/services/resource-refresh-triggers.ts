@@ -16,6 +16,7 @@ const TRIGGER_EVENT_TYPES = new Set([
   'agent.stopped',
   'agent.completed',
   'agent.heartbeat_dead',
+  'issue.statusChanged',
 ]);
 
 export interface ResourceRefreshEvent {
@@ -40,6 +41,7 @@ export function createResourceRefreshTriggers(deps: ResourceRefreshTriggerDeps):
       projectKey?: unknown;
       issueId?: unknown;
       agentId?: unknown;
+      labels?: unknown;
     } | undefined;
 
     let project: ProjectConfig | null = null;
@@ -58,7 +60,12 @@ export function createResourceRefreshTriggers(deps: ResourceRefreshTriggerDeps):
       warn(`[resource-refresh] skipped ${event.type}: affected project could not be resolved`);
       return;
     }
-    deps.enqueueProjects([project], event.type);
+    const reason = event.type === 'issue.statusChanged'
+      && Array.isArray(payload?.labels)
+      && payload.labels.some((label) => String(label).toLowerCase() === 'closed-out')
+      ? 'issue.statusChanged:closed-out'
+      : event.type;
+    deps.enqueueProjects([project], reason);
   });
 }
 
