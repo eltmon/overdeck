@@ -24,7 +24,14 @@ const mockRunRelease = vi.hoisted(() =>
 
 // ── Track cleanup side effects ────────────────────────────────────────────────
 const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: true, details: ['skipped'] })));
-const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
+const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
+  agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
+)));
+const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
+  agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
+)));
+const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentId === 'strike-pan-399')));
+const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
@@ -97,12 +104,12 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeys: vi.fn(() => Effect.void),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
-  sessionExists: vi.fn(() => Effect.succeed(false)),
+  sessionExists: mockSessionExists,
   sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
   listSessionNames: vi.fn(() => Effect.succeed([])),
   listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-  killSession: vi.fn(() => Effect.void),
+  killSession: mockKillSession,
   killSessionSync: vi.fn(() => Effect.void),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
   capturePane: vi.fn(() => Effect.succeed('')),
@@ -190,7 +197,7 @@ vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
-  getAgentState: vi.fn(() => Effect.succeed(null)),
+  getAgentState: mockGetAgentState,
   getAgentStateSync: vi.fn().mockReturnValue(null),
 }));
 
@@ -249,7 +256,12 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     // the orphaned-task sweep were retired with beads (PAN-2648); the surviving
     // cleanup steps are label cleanup, agent pausing, and the reset marker.
     expect(mockCleanupMergedLabels).toHaveBeenCalled();
-    expect(mockSetAgentPaused).toHaveBeenCalled();
+    expect(mockSetAgentPaused).toHaveBeenCalledWith(
+      `strike-${ISSUE_ID.toLowerCase()}`,
+      'awaiting close-out (verify on main)',
+      true,
+    );
+    expect(mockKillSession).toHaveBeenCalledWith(`strike-${ISSUE_ID.toLowerCase()}`);
     expect(mockCreateResetMarker).toHaveBeenCalled();
     await vi.waitFor(() =>
       expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase()),

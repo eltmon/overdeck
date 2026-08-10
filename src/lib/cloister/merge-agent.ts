@@ -468,13 +468,13 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
 
-    // 3. Pause work/planning agents and kill their tmux panes to free resources.
+    // 3. Pause work/planning/strike agents and kill their tmux panes to free resources.
     try {
       const { setAgentPaused, getAgentState } = await import('../agents.js');
       const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
-      for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
+      for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`]) {
         // Pause, then VERIFY the gate actually persisted to state.json. A server
         // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
         // pending-post-merge.json) or a concurrent deacon read-modify-write on
