@@ -2,7 +2,7 @@
   "issueId": "PAN-3655",
   "schemaVersion": 2,
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:11:38.806Z",
+  "updated": "2026-08-10T20:11:40.159Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3655: Unify issue Conversation/Terminal switching with the shared segmented selector",
       "timestamp": "2026-08-10T20:11:38.805Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
