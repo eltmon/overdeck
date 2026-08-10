@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:23:11.147Z",
+  "updated": "2026-08-10T21:27:32.093Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "passed",
@@ -102,10 +102,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-10T21:18:35.358Z",
-    "updatedAt": "2026-08-10T21:23:03.880Z",
-    "reviewNotes": "All four reviewers reported no blockers; requirements complete, with two advisory correctness notes.",
+    "updatedAt": "2026-08-10T21:27:30.796Z",
+    "reviewNotes": "All four reviewers reported a clean second cycle; the only new commit is a verified test-label update.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3656",
+    "reviewedAtCommit": "aad826fc365250c84033eae99f3c84019db6ba73",
     "lastVerifiedCommit": "aad826fc365250c84033eae99f3c84019db6ba73",
     "reviewRequestedAt": "2026-08-10T21:18:35.358Z",
     "reviewSpawnedAt": "2026-08-10T21:12:42.824Z",
@@ -155,9 +157,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 172256,
-            "output": 9776,
-            "cacheRead": 2241536,
+            "input": 1638706,
+            "output": 38271,
+            "cacheRead": 18567168,
             "cacheWrite": 0
           }
         },
@@ -195,10 +197,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 52,
-            "output": 7358,
-            "cacheRead": 2571112,
-            "cacheWrite": 126297
+            "input": 114,
+            "output": 16836,
+            "cacheRead": 7014892,
+            "cacheWrite": 174114
           }
         },
         "work": {
@@ -212,21 +214,21 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2663306,
-          "output": 143555,
-          "cacheRead": 54051328,
+          "input": 4129756,
+          "output": 172050,
+          "cacheRead": 70376960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 52,
-          "output": 7358,
-          "cacheRead": 2571112,
-          "cacheWrite": 126297
+          "input": 114,
+          "output": 16836,
+          "cacheRead": 7014892,
+          "cacheWrite": 174114
         }
       },
       "costAtCloseOut": {
-        "usd": 45.552495,
-        "pricingAsOf": "2026-08-10T21:23:03.900Z"
+        "usd": 63.005615,
+        "pricingAsOf": "2026-08-10T21:27:30.809Z"
       }
     },
     "merges": [
