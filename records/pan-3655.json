@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:50:02.622Z",
+  "updated": "2026-08-10T20:50:21.082Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "legacy-nav-and-no-loss-audit": {
+        "writerId": "agent-pan-3655",
+        "agentId": "agent-pan-3655",
+        "pid": 301700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-10T20:50:21.082Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3655",
@@ -178,6 +186,7 @@
     "delete-cockpit-bespoke-strip.ac1": "completed",
     "delete-cockpit-bespoke-strip.ac2": "completed",
     "delete-cockpit-bespoke-strip.ac3": "completed",
-    "delete-cockpit-bespoke-strip.ac4": "completed"
+    "delete-cockpit-bespoke-strip.ac4": "completed",
+    "legacy-nav-and-no-loss-audit": "running"
   }
 }
