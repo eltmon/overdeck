@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-10T02:29:27.489Z",
-  "updated": "2026-08-10T03:12:43.068Z",
+  "updated": "2026-08-10T15:04:20.318Z",
   "pipeline": {
     "issueId": "PAN-3647",
     "reviewStatus": "pending",
@@ -61,5 +61,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-10T15:04:20.318Z"
+    }
+  ]
 }
