@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:08:10.236Z",
+  "updated": "2026-08-10T21:08:13.540Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -26,8 +26,47 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T20:30:15.525Z",
-    "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx."
+    "updatedAt": "2026-08-10T21:08:13.538Z",
+    "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
+    "reviewRequestedAt": "2026-08-10T21:08:13.538Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/ISSUE-VIEW.md",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+        "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ViewToggle.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/ISSUE-VIEW.md",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+        "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+        "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ViewToggle.tsx"
+      ],
+      "recordedAt": "2026-08-10T21:08:10.235Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3656"
   },
   "closeOut": {
     "usage": {
