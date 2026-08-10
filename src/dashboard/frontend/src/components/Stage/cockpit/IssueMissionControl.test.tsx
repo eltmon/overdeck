@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -298,17 +299,48 @@ vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed file
 // cover the cockpit chrome (tabs, header, lane). The mount contract is
 // asserted via this props-recording stub.
 vi.mock('../../issue-detail/IssueDetail', () => ({
-  IssueDetail: (props: { issueId: string; density: string; tab: string; showTabs?: boolean }) => (
-    <div
-      data-testid="issue-detail-page-mock"
-      data-issue-id={props.issueId}
-      data-density={props.density}
-      data-tab={props.tab}
-      data-show-tabs={String(props.showTabs ?? true)}
-    >
-      {props.tab === 'conversation' ? <div data-testid="issue-detail-composer" /> : null}
-    </div>
-  ),
+  IssueDetail: (props: {
+    issueId: string;
+    density: string;
+    tab: string;
+    showTabs?: boolean;
+    onSelectTab: (tab: 'conversation' | 'terminal') => void;
+  }) => {
+    const [selectedSession, setSelectedSession] = useState('agent-pan-1661')
+    return (
+      <div
+        data-testid="issue-detail-page-mock"
+        data-issue-id={props.issueId}
+        data-density={props.density}
+        data-tab={props.tab}
+        data-selected-session={selectedSession}
+        data-show-tabs={String(props.showTabs ?? true)}
+      >
+        <div role="tablist" aria-label="Agent session view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={props.tab === 'conversation'}
+            onClick={() => props.onSelectTab('conversation')}
+          >
+            Conversation
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={props.tab === 'terminal'}
+            onClick={() => props.onSelectTab('terminal')}
+          >
+            Terminal
+          </button>
+        </div>
+        <button type="button" onClick={() => setSelectedSession('agent-pan-1661-slot-2')}>
+          Select specialist session
+        </button>
+        {props.tab === 'conversation' ? <div data-testid="issue-detail-composer" /> : null}
+      </div>
+    )
+  },
 }))
 
 import { IssueMissionControl } from './IssueMissionControl'
@@ -518,11 +550,13 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
   })
 
-  it('switches Conversation and Terminal inside Session and reveals the terminal body', async () => {
+  it('switches Conversation and Terminal through the shared Session selector', async () => {
     const { container } = renderMissionControl()
-    const sessionViews = screen.getByRole('tablist', { name: 'Session views' })
+    expect(screen.queryByRole('tablist', { name: 'Session views' })).not.toBeInTheDocument()
+    const sessionViews = screen.getByRole('tablist', { name: 'Agent session view' })
     const conversation = within(sessionViews).getByRole('tab', { name: 'Conversation' })
     const terminal = within(sessionViews).getByRole('tab', { name: 'Terminal' })
+    fireEvent.click(screen.getByRole('button', { name: 'Select specialist session' }))
 
     expect(conversation).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
@@ -534,7 +568,14 @@ describe('IssueMissionControl', () => {
     expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'terminal')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
     expect(terminal).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-selected-session', 'agent-pan-1661-slot-2')
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', inline: 'nearest' }))
+
+    fireEvent.click(conversation)
+
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'conversation')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-selected-session', 'agent-pan-1661-slot-2')
   })
 
   it('shows a blue live signal and leaves composer ownership with IssueDetail', () => {
