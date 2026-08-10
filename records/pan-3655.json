@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:45:39.498Z",
+  "updated": "2026-08-10T20:50:02.622Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "delete-cockpit-bespoke-strip": {
-        "writerId": "agent-pan-3655",
-        "agentId": "agent-pan-3655",
-        "pid": 245706,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-10T20:45:39.498Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3655",
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Consolidated top-level tabs to Session while retaining legacy conversation/terminal modes and selected-agent state",
         "releasedAt": "2026-08-10T20:45:22.413Z"
+      },
+      {
+        "writerId": "agent-pan-3655",
+        "agentId": "agent-pan-3655",
+        "pid": 245706,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-10T20:45:39.498Z",
+        "itemId": "delete-cockpit-bespoke-strip",
+        "outcome": "completed",
+        "reason": "Removed bespoke cockpit sub-tabs and verified the embedded shared selector drives both directions without losing selection",
+        "releasedAt": "2026-08-10T20:50:02.622Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +146,10 @@
       "consolidate-issue-detail-tabs": {
         "reason": "Consolidated top-level tabs to Session while retaining legacy conversation/terminal modes and selected-agent state",
         "updatedAt": "2026-08-10T20:45:22.413Z"
+      },
+      "delete-cockpit-bespoke-strip": {
+        "reason": "Removed bespoke cockpit sub-tabs and verified the embedded shared selector drives both directions without losing selection",
+        "updatedAt": "2026-08-10T20:50:02.622Z"
       }
     }
   },
@@ -167,6 +174,10 @@
     "consolidate-issue-detail-tabs.ac3": "completed",
     "consolidate-issue-detail-tabs.ac4": "completed",
     "consolidate-issue-detail-tabs.ac5": "completed",
-    "delete-cockpit-bespoke-strip": "running"
+    "delete-cockpit-bespoke-strip": "completed",
+    "delete-cockpit-bespoke-strip.ac1": "completed",
+    "delete-cockpit-bespoke-strip.ac2": "completed",
+    "delete-cockpit-bespoke-strip.ac3": "completed",
+    "delete-cockpit-bespoke-strip.ac4": "completed"
   }
 }
