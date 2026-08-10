@@ -66,7 +66,7 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:17:57.551Z",
+  "updated": "2026-08-10T21:18:02.099Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -76,7 +76,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T21:17:56.117Z",
+    "updatedAt": "2026-08-10T21:17:58.458Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3656",
@@ -177,7 +177,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.682102,
-        "pricingAsOf": "2026-08-10T21:17:57.546Z"
+        "pricingAsOf": "2026-08-10T21:18:02.093Z"
       }
     },
     "merges": [
