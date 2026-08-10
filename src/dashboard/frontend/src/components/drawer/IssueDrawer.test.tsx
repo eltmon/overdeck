@@ -991,36 +991,55 @@ describe('IssueDrawer', () => {
     expect(strip!.querySelector('[data-specialist="correctness"]')!.getAttribute('data-status')).toBe('done');
   });
 
-  it('renders the Conversation tab with the no-agent empty state', () => {
+  it('resolves a legacy Conversation URL to the consolidated Session surface', () => {
     window.history.replaceState(null, '', '/?issue=PAN-1&tab=conversation');
 
     renderDrawer();
 
+    expect(screen.getByTestId('drawer-tab-session')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('drawer-tab-conversation')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-tab-terminal')).not.toBeInTheDocument();
     const panel = screen.getByTestId('drawer-tab-panel-conversation');
-    expect(panel).toBeInTheDocument();
     expect(within(panel).getByText(/Nothing here yet — no agent has started/)).toBeInTheDocument();
     expect(within(panel).getByText(/Start work and the live conversation appears here/)).toBeInTheDocument();
   });
 
-  it('renders the Terminal tab with the no-agent empty state', () => {
+  it('resolves a legacy Terminal URL to the consolidated Session surface', () => {
     window.history.replaceState(null, '', '/?issue=PAN-1&tab=terminal');
 
     renderDrawer();
 
+    expect(screen.getByTestId('drawer-tab-session')).toHaveAttribute('aria-selected', 'true');
     const panel = screen.getByTestId('drawer-tab-panel-terminal');
-    expect(panel).toBeInTheDocument();
     expect(within(panel).getByText(/live terminal/)).toBeInTheDocument();
   });
 
-  it('switches to the Conversation and Terminal tabs from the tab strip', () => {
+  it('opens Session from the tab strip and switches modes through the in-pane selector', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1': {
+          id: 'agent-pan-1',
+          issueId: 'PAN-1',
+          runtime: 'claude-code',
+          harness: 'claude-code',
+          model: 'gpt-5.5',
+          status: 'running',
+          role: 'work',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    fireEvent.click(screen.getByTestId('drawer-tab-conversation'));
+    fireEvent.click(screen.getByTestId('drawer-tab-session'));
     expect(screen.getByTestId('drawer-tab-panel-conversation')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('drawer-tab-terminal'));
+    const selector = screen.getByRole('tablist', { name: 'Agent session view' });
+    fireEvent.click(within(selector).getByRole('tab', { name: 'Terminal' }));
     expect(screen.getByTestId('drawer-tab-panel-terminal')).toBeInTheDocument();
   });
 describe('conversation switching (PAN-2908 C-DETAIL)', () => {
