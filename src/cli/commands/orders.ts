@@ -2,7 +2,7 @@ import type { OrderBook, OrderBookLane } from '@overdeck/contracts';
 import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
 
-import { getBook, listBooks } from '../../lib/orders/resolver.js';
+import { getBook, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
 import {
   addItems,
   createBook,
@@ -158,8 +158,9 @@ export async function runOrdersAdd(
     .sort((left, right) => left.order - right.order);
   let targetOrder = laneItems.length + 1;
   if (options.after) {
-    const anchor = book.items.find((item) => item.issue.toUpperCase() === options.after!.toUpperCase());
-    if (!anchor) throw new Error(`Issue ${options.after.toUpperCase()} is not in order book ${bookId}`);
+    const anchorIssue = normalizeOrderIssueId(stateRoot, options.after).toUpperCase();
+    const anchor = book.items.find((item) => item.issue.toUpperCase() === anchorIssue);
+    if (!anchor) throw new Error(`Issue ${anchorIssue} is not in order book ${bookId}`);
     if (anchor.lane !== targetLane) {
       throw new Error(`Issue ${anchor.issue} is in Lane ${anchor.lane}; --after must name an item in Lane ${targetLane}`);
     }

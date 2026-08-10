@@ -1,12 +1,69 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
 import type { SequenceNode } from '../backlog/types.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { LEGACY_PARKED_LABELS, PARKED_LABEL } from '../backlog/pickup.js';
+import { getOverdeckHome } from '../paths.js';
+import { findProjectByPathSync, getProjectSync } from '../projects.js';
 import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync, readOrderBookIndex } from './io.js';
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
 const COMPLETE_STATUS = 'complete';
+
+/**
+ * The issue prefix (e.g. "PAN") of the project that owns an orders state root,
+ * or null when it cannot be determined. Migrated roots are
+ * `<overdeckHome>/state/<projectKey>` — the basename is the projects.yaml key.
+ * Legacy roots live inside the project checkout, where path containment is the
+ * authoritative match (a checkout dir name can collide with another project's
+ * yaml key, so the basename key lookup runs only for true migrated roots).
+ */
+export function issuePrefixForStateRoot(stateRoot: string): string | null {
+  try {
+    const byPath = findProjectByPathSync(stateRoot);
+    if (byPath?.issue_prefix) return byPath.issue_prefix.toUpperCase();
+    if (dirname(stateRoot) === join(getOverdeckHome(), 'state')) {
+      const byKey = getProjectSync(basename(stateRoot));
+      if (byKey?.issue_prefix) return byKey.issue_prefix.toUpperCase();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Canonical form for an order-book issue reference: bare digits gain the
+ * project prefix ("2351" → "PAN-2351"); anything else passes through
+ * unchanged. Books written before the write door normalized on entry carry
+ * bare numbers; every read-side consumer (validation, progress, membership,
+ * dispatch) resolves them through this.
+ */
+export function normalizeOrderIssueId(stateRoot: string, issueId: string): string {
+  if (!/^\d+$/.test(issueId)) return issueId;
+  const prefix = issuePrefixForStateRoot(stateRoot);
+  return prefix ? `${prefix}-${issueId}` : issueId;
+}
+
+function normalizeBookIssues(stateRoot: string, book: OrderBook): OrderBook {
+  const hasBare = book.items.some(
+    (item) => /^\d+$/.test(item.issue) || item.prereqs.some((prereq) => /^\d+$/.test(prereq)),
+  );
+  if (!hasBare) return book;
+  const prefix = issuePrefixForStateRoot(stateRoot);
+  if (!prefix) return book;
+  const expand = (id: string): string => (/^\d+$/.test(id) ? `${prefix}-${id}` : id);
+  return {
+    ...book,
+    items: book.items.map((item) => ({
+      ...item,
+      issue: expand(item.issue),
+      prereqs: item.prereqs.map(expand),
+    })),
+  };
+}
+
 type IssueServiceModule = typeof import('../../dashboard/server/services/issue-service-singleton.js');
 let issueServiceModule: IssueServiceModule | null = null;
 
@@ -98,16 +155,17 @@ export function listBooks(stateRoot: string): OrderBook[] {
   return listOrderBookIds(stateRoot).map((id) => {
     const book = readOrderBook(stateRoot, id);
     if (!book) throw new Error(`Order book index references missing book ${id}`);
-    return book;
+    return normalizeBookIssues(stateRoot, book);
   });
 }
 
 export function getBook(stateRoot: string, bookId: string): OrderBook | null {
-  return readOrderBook(stateRoot, bookId);
+  const book = readOrderBook(stateRoot, bookId);
+  return book ? normalizeBookIssues(stateRoot, book) : null;
 }
 
 export function getBookAsync(stateRoot: string, bookId: string): Promise<OrderBook | null> {
-  return readOrderBookAsync(stateRoot, bookId);
+  return readOrderBookAsync(stateRoot, bookId).then((book) => (book ? normalizeBookIssues(stateRoot, book) : null));
 }
 
 /** The first 'ready' book in index.json queue order, or null if none is ready. */

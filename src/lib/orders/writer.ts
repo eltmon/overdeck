@@ -5,7 +5,7 @@ import type {
   OrderBookSettings,
   OrderBookStatus,
 } from '@overdeck/contracts';
-import { firstReadyBookInQueue, getBook, listBooks, membership } from './resolver.js';
+import { firstReadyBookInQueue, getBook, listBooks, membership, normalizeOrderIssueId } from './resolver.js';
 import { writeOrderBookState } from './io.js';
 
 export interface CreateOrderBookInput {
@@ -91,7 +91,7 @@ export async function addItems(
   const addedAt = timestamp(at);
   const additions: OrderBookItem[] = [];
   for (const item of items) {
-    const issue = item.issue.toUpperCase();
+    const issue = normalizeOrderIssueId(stateRoot, item.issue).toUpperCase();
     if (existing.has(issue) || additions.some((candidate) => candidate.issue.toUpperCase() === issue)) {
       throw new Error(`Issue ${issue} is already in order book ${bookId}`);
     }
@@ -102,7 +102,7 @@ export async function addItems(
     additions.push({
       ...item,
       issue,
-      prereqs: item.prereqs.map((prereq) => prereq.toUpperCase()),
+      prereqs: item.prereqs.map((prereq) => normalizeOrderIssueId(stateRoot, prereq).toUpperCase()),
       addedAt: item.addedAt ?? addedAt,
       addedBy: item.addedBy ?? actor,
     });
@@ -118,7 +118,7 @@ export async function removeItem(
   at?: string,
 ): Promise<OrderBook> {
   const book = requireBook(stateRoot, bookId);
-  const issue = issueId.toUpperCase();
+  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
   if (!book.items.some((item) => item.issue.toUpperCase() === issue)) {
     throw new Error(`Issue ${issue} is not in order book ${bookId}`);
   }
@@ -135,7 +135,7 @@ export async function moveItem(
   at?: string,
 ): Promise<OrderBook> {
   const book = requireBook(stateRoot, bookId);
-  const issue = issueId.toUpperCase();
+  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
   const moving = book.items.find((item) => item.issue.toUpperCase() === issue);
   if (!moving) throw new Error(`Issue ${issue} is not in order book ${bookId}`);
   if (!Number.isInteger(order) || order < 1) throw new Error('Order must be a positive integer');
@@ -156,7 +156,7 @@ export async function setItemRequirements(
   at?: string,
 ): Promise<OrderBook> {
   const book = requireBook(stateRoot, bookId);
-  const issue = issueId.toUpperCase();
+  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
   let found = false;
   const items = book.items.map((item) => {
     if (item.issue.toUpperCase() !== issue) return item;
@@ -165,7 +165,7 @@ export async function setItemRequirements(
       ...item,
       prereqs: requirements.prereqs === undefined
         ? item.prereqs
-        : [...new Set(requirements.prereqs.map((prereq) => prereq.toUpperCase()))],
+        : [...new Set(requirements.prereqs.map((prereq) => normalizeOrderIssueId(stateRoot, prereq).toUpperCase()))],
       reVerify: requirements.reVerify ?? item.reVerify,
       planAtPickup: requirements.planAtPickup ?? item.planAtPickup,
     };

@@ -7,7 +7,7 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { backlogCandidates, computeBookProgress, getBook, getBookAsync, listBooks, liveOrderIssueLookup } from '../../../lib/orders/resolver.js';
+import { backlogCandidates, computeBookProgress, getBook, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
@@ -427,10 +427,11 @@ export async function patchOrderItemPayload(
 ): Promise<RouteResult> {
   return routeResult(async () => {
     const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
+    const canonicalIssue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
     const existing = requireBook(stateRoot, bookId).items.find(
-      (item) => item.issue.toUpperCase() === issueId.toUpperCase(),
+      (item) => item.issue.toUpperCase() === canonicalIssue,
     );
-    if (!existing) throw new Error(`Issue ${issueId.toUpperCase()} is not in order book ${bookId}`);
+    if (!existing) throw new Error(`Issue ${canonicalIssue} is not in order book ${bookId}`);
 
     let changed = false;
     if (body['lane'] !== undefined || body['order'] !== undefined) {

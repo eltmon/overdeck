@@ -59,6 +59,7 @@ import {
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
+import { findClaudeSessionFileById, findSubagentTranscriptById } from './claude-session-file-search.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -111,128 +112,6 @@ const SUBAGENT_TRANSCRIPT_ID_PATTERN = /^agent-[0-9a-f]{10,20}$/i;
 async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
   if (CLAUDE_SESSION_UUID_PATTERN.test(name)) return findClaudeSessionFileById(name);
   if (SUBAGENT_TRANSCRIPT_ID_PATTERN.test(name)) return findSubagentTranscriptById(name);
-  return null;
-}
-
-/**
- * Find a Claude Code session JSONL by its (globally-unique) session id, searching
- * every project dir under ~/.claude/projects/. Claude keys session files by the
- * cwd AT RUNTIME, so when a repo directory is renamed (e.g. Projects/panopticon-cli
- * → Projects/overdeck) a conversation's recorded cwd goes stale and the
- * deterministic sessionFilePath(cwd, id) points at a dir that no longer exists,
- * while the JSONL itself lives under the new encoded dir. A by-id search recovers
- * it. Mirrors the cross-dir lookup the non-DB specialist/agent fallback already
- * uses below.
- */
-// PAN-2220: memoize by-id lookups. The sweep below stats <sessionId>.jsonl in
-// EVERY project dir (~2,200 on this machine), and the conversation-list
-// enrichment resolves session files per row per request — for each stale-cwd
-// conversation that meant a full sweep on every list build (~1.7s of
-// event-loop-adjacent syscall storm). A found path is stable (re-verified
-// with one existsSync); a miss is re-swept after a short TTL so a transcript
-// that appears later is still discovered.
-const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
-const SESSION_FILE_MISS_TTL_MS = 60_000;
-
-async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
-  if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
-  const cached = sessionFileByIdCache.get(sessionId);
-  if (cached) {
-    if (cached.path) {
-      if (existsSync(cached.path)) return cached.path;
-      sessionFileByIdCache.delete(sessionId);
-    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
-      return null;
-    }
-  }
-  try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const dirs = await readdir(claudeProjects);
-    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-    const candidates = dirs
-      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
-    const STAT_BATCH_SIZE = 50;
-    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
-      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-      const checks = await Promise.all(
-        batch.map(async (candidate) => {
-          try {
-            await stat(candidate);
-            return candidate;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const found = checks.find((c): c is string => c !== null);
-      if (found) {
-        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
-        return found;
-      }
-    }
-  } catch {
-    /* ~/.claude/projects unreadable */
-  }
-  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
-  return null;
-}
-
-/**
- * Find a subagent transcript `<session-dir>/subagents/agent-<id>.jsonl` by its
- * agent id, searching every session dir of every project dir under
- * ~/.claude/projects/. Same memoization contract as findClaudeSessionFileById:
- * the sweep readdir+stats one level deeper, so a miss is cached for the TTL
- * and a found path is re-verified with one existsSync.
- */
-async function findSubagentTranscriptById(agentId: string): Promise<string | null> {
-  const cached = sessionFileByIdCache.get(agentId);
-  if (cached) {
-    if (cached.path) {
-      if (existsSync(cached.path)) return cached.path;
-      sessionFileByIdCache.delete(agentId);
-    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
-      return null;
-    }
-  }
-  try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-    const projectDirs = (await readdir(claudeProjects)).filter((dir) => SAFE_DIR_PATTERN.test(dir));
-    const STAT_BATCH_SIZE = 50;
-    for (const projectDir of projectDirs) {
-      let sessionDirs: string[];
-      try {
-        sessionDirs = await readdir(join(claudeProjects, projectDir));
-      } catch {
-        continue;
-      }
-      const candidates = sessionDirs
-        .filter((entry) => SAFE_DIR_PATTERN.test(entry) && !entry.endsWith('.jsonl'))
-        .map((entry) => join(claudeProjects, projectDir, entry, 'subagents', `${agentId}.jsonl`));
-      for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
-        const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-        const checks = await Promise.all(
-          batch.map(async (candidate) => {
-            try {
-              await stat(candidate);
-              return candidate;
-            } catch {
-              return null;
-            }
-          }),
-        );
-        const found = checks.find((c): c is string => c !== null);
-        if (found) {
-          sessionFileByIdCache.set(agentId, { path: found, ts: Date.now() });
-          return found;
-        }
-      }
-    }
-  } catch {
-    /* ~/.claude/projects unreadable */
-  }
-  sessionFileByIdCache.set(agentId, { path: null, ts: Date.now() });
   return null;
 }
 
