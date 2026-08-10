@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:50:21.082Z",
+  "updated": "2026-08-10T20:53:15.972Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "legacy-nav-and-no-loss-audit": {
-        "writerId": "agent-pan-3655",
-        "agentId": "agent-pan-3655",
-        "pid": 301700,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-10T20:50:21.082Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3655",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Removed bespoke cockpit sub-tabs and verified the embedded shared selector drives both directions without losing selection",
         "releasedAt": "2026-08-10T20:50:02.622Z"
+      },
+      {
+        "writerId": "agent-pan-3655",
+        "agentId": "agent-pan-3655",
+        "pid": 301700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-10T20:50:21.082Z",
+        "itemId": "legacy-nav-and-no-loss-audit",
+        "outcome": "completed",
+        "reason": "Added legacy drawer URL coverage and an explicit eight-section destination audit",
+        "releasedAt": "2026-08-10T20:53:15.972Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "delete-cockpit-bespoke-strip": {
         "reason": "Removed bespoke cockpit sub-tabs and verified the embedded shared selector drives both directions without losing selection",
         "updatedAt": "2026-08-10T20:50:02.622Z"
+      },
+      "legacy-nav-and-no-loss-audit": {
+        "reason": "Added legacy drawer URL coverage and an explicit eight-section destination audit",
+        "updatedAt": "2026-08-10T20:53:15.972Z"
       }
     }
   },
@@ -187,6 +194,10 @@
     "delete-cockpit-bespoke-strip.ac2": "completed",
     "delete-cockpit-bespoke-strip.ac3": "completed",
     "delete-cockpit-bespoke-strip.ac4": "completed",
-    "legacy-nav-and-no-loss-audit": "running"
+    "legacy-nav-and-no-loss-audit": "completed",
+    "legacy-nav-and-no-loss-audit.ac1": "completed",
+    "legacy-nav-and-no-loss-audit.ac2": "completed",
+    "legacy-nav-and-no-loss-audit.ac3": "completed",
+    "legacy-nav-and-no-loss-audit.ac4": "completed"
   }
 }
