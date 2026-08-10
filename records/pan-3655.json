@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:31:03.011Z",
+  "updated": "2026-08-10T20:36:38.643Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "adopt-view-toggle-conversation-flywheel": {
-        "writerId": "agent-pan-3655",
-        "agentId": "agent-pan-3655",
-        "pid": 44690,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-10T20:31:03.010Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3655",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Added reusable accessible ViewToggle component with focused unit coverage",
         "releasedAt": "2026-08-10T20:29:39.202Z"
+      },
+      {
+        "writerId": "agent-pan-3655",
+        "agentId": "agent-pan-3655",
+        "pid": 44690,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-10T20:31:03.010Z",
+        "itemId": "adopt-view-toggle-conversation-flywheel",
+        "outcome": "completed",
+        "reason": "Replaced both source-view selectors with the shared ViewToggle while preserving behavior",
+        "releasedAt": "2026-08-10T20:36:38.643Z"
       }
     ],
     "statusReasons": {
       "extract-view-toggle": {
         "reason": "Added reusable accessible ViewToggle component with focused unit coverage",
         "updatedAt": "2026-08-10T20:29:39.202Z"
+      },
+      "adopt-view-toggle-conversation-flywheel": {
+        "reason": "Replaced both source-view selectors with the shared ViewToggle while preserving behavior",
+        "updatedAt": "2026-08-10T20:36:38.643Z"
       }
     }
   },
@@ -107,6 +114,10 @@
     "extract-view-toggle.ac2": "completed",
     "extract-view-toggle.ac3": "completed",
     "extract-view-toggle.ac4": "completed",
-    "adopt-view-toggle-conversation-flywheel": "running"
+    "adopt-view-toggle-conversation-flywheel": "completed",
+    "adopt-view-toggle-conversation-flywheel.ac1": "completed",
+    "adopt-view-toggle-conversation-flywheel.ac2": "completed",
+    "adopt-view-toggle-conversation-flywheel.ac3": "completed",
+    "adopt-view-toggle-conversation-flywheel.ac4": "completed"
   }
 }
