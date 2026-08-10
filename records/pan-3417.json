@@ -10,45 +10,56 @@
   ],
   "feedback": [],
   "created": "2026-08-01T19:02:54.507Z",
-  "updated": "2026-08-10T01:35:34.024Z",
+  "updated": "2026-08-10T01:39:52.269Z",
   "pipeline": {
     "issueId": "PAN-3417",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T01:34:55.749Z",
+    "updatedAt": "2026-08-10T01:39:52.256Z",
     "strikeReadyHead": "46f21b20988f29c7153183e1229933ec693d9155",
     "strikeReadyAt": "2026-08-10T01:33:54.731Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-10T01:40:52.250Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-10T01:39:52.250Z",
+        "strikeHead": "46f21b20988f29c7153183e1229933ec693d9155",
+        "mainHead": "8afadf5086c87be554fdae538f37ae9cb7b6eb8f",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1563448,
-            "output": 50372,
-            "cacheRead": 19279360,
+            "input": 1646826,
+            "output": 53257,
+            "cacheRead": 20729856,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1563448,
-          "output": 50372,
-          "cacheRead": 19279360,
+          "input": 1646826,
+          "output": 53257,
+          "cacheRead": 20729856,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.96808,
-        "pricingAsOf": "2026-08-10T01:35:31.970Z"
+        "usd": 20.196768,
+        "pricingAsOf": "2026-08-10T01:39:52.258Z"
       }
     },
     "merges": [],
