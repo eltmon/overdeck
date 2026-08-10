@@ -258,7 +258,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     expect(mockCleanupMergedLabels).toHaveBeenCalled();
     expect(mockSetAgentPaused).toHaveBeenCalledWith(
       `strike-${ISSUE_ID.toLowerCase()}`,
-      'strike branch merged; further verification is moot',
+      'awaiting close-out (verify on main)',
       true,
     );
     expect(mockKillSession).toHaveBeenCalledWith(`strike-${ISSUE_ID.toLowerCase()}`);

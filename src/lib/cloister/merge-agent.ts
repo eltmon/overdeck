@@ -473,12 +473,8 @@ export async function postMergeLifecycle(
       const { setAgentPaused, getAgentState } = await import('../agents.js');
       const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
-      const agentReasons = new Map([
-        [`agent-${issueLower}`, 'awaiting close-out (verify on main)'],
-        [`planning-${issueLower}`, 'awaiting close-out (verify on main)'],
-        [`strike-${issueLower}`, 'strike branch merged; further verification is moot'],
-      ]);
-      for (const [agentId, reason] of agentReasons) {
+      const reason = 'awaiting close-out (verify on main)';
+      for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`]) {
         // Pause, then VERIFY the gate actually persisted to state.json. A server
         // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
         // pending-post-merge.json) or a concurrent deacon read-modify-write on
