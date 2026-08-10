@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:08:06.416Z",
+  "updated": "2026-08-10T21:08:10.236Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -218,5 +218,42 @@
     "docs-issue-view-session-selector.ac1": "completed",
     "docs-issue-view-session-selector.ac2": "completed",
     "docs-issue-view-session-selector.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ViewToggle.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+      "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ViewToggle.tsx"
+    ],
+    "recordedAt": "2026-08-10T21:08:10.235Z"
   }
 }
