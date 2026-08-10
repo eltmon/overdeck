@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:36:53.081Z",
+  "updated": "2026-08-10T20:40:48.125Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "selector-in-drawer-agent-session": {
-        "writerId": "agent-pan-3655",
-        "agentId": "agent-pan-3655",
-        "pid": 142166,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-10T20:36:53.081Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3655",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Replaced both source-view selectors with the shared ViewToggle while preserving behavior",
         "releasedAt": "2026-08-10T20:36:38.643Z"
+      },
+      {
+        "writerId": "agent-pan-3655",
+        "agentId": "agent-pan-3655",
+        "pid": 142166,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-10T20:36:53.081Z",
+        "itemId": "selector-in-drawer-agent-session",
+        "outcome": "completed",
+        "reason": "Added optional shared selector with terminal availability reasons and selection-persistence coverage",
+        "releasedAt": "2026-08-10T20:40:48.125Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "adopt-view-toggle-conversation-flywheel": {
         "reason": "Replaced both source-view selectors with the shared ViewToggle while preserving behavior",
         "updatedAt": "2026-08-10T20:36:38.643Z"
+      },
+      "selector-in-drawer-agent-session": {
+        "reason": "Added optional shared selector with terminal availability reasons and selection-persistence coverage",
+        "updatedAt": "2026-08-10T20:40:48.125Z"
       }
     }
   },
@@ -127,6 +134,9 @@
     "adopt-view-toggle-conversation-flywheel.ac2": "completed",
     "adopt-view-toggle-conversation-flywheel.ac3": "completed",
     "adopt-view-toggle-conversation-flywheel.ac4": "completed",
-    "selector-in-drawer-agent-session": "running"
+    "selector-in-drawer-agent-session": "completed",
+    "selector-in-drawer-agent-session.ac1": "completed",
+    "selector-in-drawer-agent-session.ac2": "completed",
+    "selector-in-drawer-agent-session.ac3": "completed"
   }
 }
