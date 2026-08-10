@@ -2283,3 +2283,27 @@ PAN-3620's eventual landing used the previously closed PR #3632 after that PR wa
 **Ordinary canonical recovery then succeeded without another compact rotation.** `pan recover PAN-3647 --json` resolved the fresh `session.id`, resumed session `f6fc8744-03f0-4749-b04d-2d0ad9b9f1af`, and confirmed the continuation against the correct transcript. The agent reconstructed the strike state and is now running `pan sync-main PAN-3647` against green main `8cab238c4a`; full typecheck, lint, and test gates plus fresh readiness remain mandatory before Deacon landing.
 
 **The all-project read-door sweep is stable.** Overdeck has one `in_flight` row (PAN-3647), five unreleased `planned_backlog` rows, and one zombie PR; Mind Your Now has seven operator-owned zombie PRs; TIN-1 remains planned and parked. papers-please and puzzdom remain `tracker_unconfigured`; lexerra and krux remain `forge_unavailable` on GitHub 404. Productive concurrency is one because auto-pickup is off and no second item is released.
+
+### RUN-86 ticks 9–11 — 2026-08-10T15:24Z–15:32Z — recovered strike reached fresh readiness and complete green gates
+
+**PAN-3647 synced every main advance, passed the complete gate, and recorded fresh readiness at `efed78c576`.** Typecheck and lint passed; 37 focused regressions passed; the full suite passed 13,641 tests with 51 skipped. PR #3648 then reached a complete green check set while current main `f1f7e254e8` was also green. Deacon retained sole landing ownership throughout; no manual merge or direct-main shortcut was used.
+
+**The recovery defects remained distinct.** PAN-3653 owns the missing red-main→green-main wake and live-but-idle recovery path. PAN-3654 owns compact recovery's split session pointer and false transcript confirmation. Neither defect was hidden by the successful instance recovery.
+
+### RUN-86 ticks 12–13 — 2026-08-10T15:40Z–15:53Z — fresh readiness was deadlocked behind stale stuck state
+
+**A fully green, mergeable strike still received no Deacon claim because canonical state was contradictory:** `strikeLandingState=ready` coexisted with `stuck=true` and `stuckReason=feedback_delivery_needs_you`. `pan strike-ready` cleared stuck state only when the readiness head was unchanged, but valid recovery produced a new head; Deacon then skipped every stuck candidate before claiming readiness. Added the exact fresh-head reproduction to existing PAN-2874 rather than filing a duplicate.
+
+**Clearing the obsolete gate through `pan unstick PAN-3647` restored the normal landing path.** This was instance recovery through the canonical door, not an inline machinery change. A bounded watch then observed Deacon claim and merge the unchanged verified head.
+
+### RUN-86 tick 14 — 2026-08-10T16:02Z — PAN-3647 merged; complete main verification and deploy remained
+
+**Deacon squash-merged PR #3648 as `9c5d29d670`; canonical strike landing state became `landed`.** The strike session was removed by post-merge lifecycle. Close-out remained blocked while CI, state-plane-branches, and no-planning-on-main were running and the live Node 22 dashboard still served parent `8cab238c4a`.
+
+### RUN-86 tick 15 — 2026-08-10T16:16Z — cohort drained and close-out proved the membership fix live
+
+**Every Definition-of-Done row passed for PAN-3647.** All three workflows completed successfully on `9c5d29d670`, the live Node 22 dashboard served that exact build, `pan close PAN-3647 --force --json` passed review, tests, branch verification, merge, post-merge lifecycle, verify-on-main, deploy, and teardown, and GitHub issue #3647 closed with the `closed-out` label. The first fresh project-qualified membership read classified PAN-3647 as `clean_terminal`; Overdeck now has 372 clean-terminal rows, five unreleased planned-backlog rows, one operator-owned zombie PR, and no in-flight or post-merge-limbo row.
+
+**Close-out also reproduced known PAN-3047 cleanup residue.** The teardown gate passed but preserved the strike worktree and both `strike/pan-3647` branch refs because raw ancestry cannot recognize a squash merge. The occurrence is recorded on PAN-3047. The residue was not deleted manually because branch/worktree deletion is a one-way door; canonical membership is already terminal and the cohort is drained.
+
+**RUN-86 retrospective.** The adopted cohort delivered two substrate fixes: PAN-3417 now retires merged strike sessions, and PAN-3647 now invalidates membership snapshots after CLI close-out. The run also produced precise evidence for four recovery/landing gaps: PAN-3653, PAN-3654, PAN-2874, and PAN-3047. The largest orchestration failure was the 31-minute watcher stall: it observed a local object database without fetching while claiming to verify remote deployment. Future watchers must query the source they claim to cover, enumerate every terminal failure state, and have a bounded exit. PAN-3651 remains supervised-only state write-door machinery under TENET-10; PAN-3652 remains unreleased. No additional backlog pickup is legal with `auto_pickup_backlog=false`.
