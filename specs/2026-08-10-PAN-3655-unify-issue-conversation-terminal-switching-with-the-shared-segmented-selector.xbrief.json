@@ -1,0 +1,589 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-10T20:18:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3655: Unify issue Conversation/Terminal switching with the shared segmented selector",
+    "updated": "2026-08-10T20:22:42.368Z"
+  },
+  "plan": {
+    "id": "pan-3655",
+    "title": "Unify issue Conversation/Terminal switching with the shared segmented selector",
+    "status": "proposed",
+    "uid": "be66b8aa-f84a-453c-b445-ce8d303d9334",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-10T20:18:32Z",
+    "updated": "2026-08-10T20:22:42.368Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3655",
+        "label": "PAN-3655",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "issue-detail",
+      "cockpit",
+      "ui-consistency"
+    ],
+    "narratives": {
+      "Problem": "Issue detail presents Conversation and Terminal as peer top-level tabs (ISSUE_DETAIL_TABS, IssueDetail.tsx:49-58) and the cockpit Session tab renders a bespoke Tailwind sub-tab strip (IssueMissionControl.tsx:805-827), while the dashboard's established pattern — the enclosed Conversation | Terminal segmented selector (viewToggle classes, command-deck.module.css:3425-3457) — is used by ConversationPanel and FlywheelConversationPane but not by the issue surfaces. The selector markup itself is also copy-pasted between those two source-of-truth surfaces with no shared component.",
+      "Proposal": "Extract one reusable ViewToggle component (components/shared/ViewToggle.tsx) over the canonical viewToggle CSS; adopt it in ConversationPanel and FlywheelConversationPane; render it from DrawerAgentSession's toolbar behind a new onChangeView prop; consolidate ISSUE_DETAIL_TABS to a single Session tab while preserving 'conversation'/'terminal' as addressable store tab values (legacy ?tab=terminal links keep working); delete the cockpit's bespoke strip so the embedded IssueDetail session pane drives the switch through the existing onSelectTab → resolveTabSelection path.",
+      "NonGoals": "- Do not fold AgentOutputPanel (activity/terminal), AgentSection (transcript/conversation/terminal), or SessionPanel (sessionPanelToggleBtn styles) into the shared component — different option sets/styles.\n- Do not move or restyle the viewToggle CSS in command-deck.module.css.\n- Do not change terminal attach mechanics, XTerminal, or /ws/terminal.\n- Do not change the cockpit Plan / Changes / Activity sub-tab strips.\n- Do not rename store drawer.tab values or migrate stored URLs."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Shared ViewToggle component lives in components/shared/; the viewToggle CSS stays in command-deck.module.css",
+        "rationale": "The CSS classes are the visual source of truth imported by four components from that module today; moving them churns every importer for no behavioral gain. The reusable unit is the component. shared/ already hosts cross-surface primitives (ContextMenu, Tooltip)."
+      },
+      {
+        "summary": "Keep 'conversation' and 'terminal' as valid drawer.tab store values; only the displayed tab strip consolidates to one Session entry",
+        "rationale": "Satisfies the legacy-navigation requirement with zero migration: the store tab is a free string, ?tab=terminal deep links and openIssue()'s 'conversation' default already use these values, and the cockpit's LEGACY_TAB_MAP already maps them."
+      },
+      {
+        "summary": "Selector placement is the DrawerAgentSession toolbar, not a new IssueDetail header row or ConversationPanel's header",
+        "rationale": "DrawerAgentSession is the one integration point both issue shells (drawer/page IssueDetail and cockpit embed) already share; ConversationPanel hides its header when embedded."
+      },
+      {
+        "summary": "Consolidated tab is { id: 'session', label: 'Session' }",
+        "rationale": "Matches the cockpit's existing Session tab and docs/ISSUE-VIEW.md vocabulary instead of introducing a third name."
+      },
+      {
+        "summary": "Terminal availability signal is !isEndedAgent(agent)",
+        "rationale": "The same rule the terminal body already applies (DrawerAgentSession.tsx:214); no new liveness probe to drift from body behavior."
+      },
+      {
+        "summary": "AgentOutputPanel, AgentSection, and SessionPanel keep their current toggles",
+        "rationale": "They switch different option sets (and SessionPanel uses different styles); the issue scopes the selector to ConversationPanel, Flywheel, IssueDetail, and IssueMissionControl."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-view-toggle",
+        "title": "Extract shared ViewToggle segmented selector component with unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3655",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "adopt-view-toggle-conversation-flywheel",
+            "selector-in-drawer-agent-session"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ViewToggle.tsx",
+            "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/shared/ViewToggle.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ViewToggle.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/shared/ViewToggle.tsx per the PRD sketch (.pan/drafts/PAN-3655.md, 'Before / after sketches'): a ViewToggleOption type { id, label, disabled?, disabledReason? } and a ViewToggle component taking { options, value, onChange, ariaLabel }. It renders a div with the viewToggle class from ../CommandDeck/styles/command-deck.module.css, role=\"tablist\", aria-label={ariaLabel}; each option is a type=\"button\" role=\"tab\" button with the viewToggleBtn class plus viewToggleBtnActive when value === option.id, aria-selected, onClick={() => onChange(option.id)}; a disabled option sets the disabled attribute, title={disabledReason}, and aria-label={`${label} — ${disabledReason}`}. Do NOT move or modify the CSS. Add ViewToggle.test.tsx beside it covering: renders all option labels; active option has aria-selected=true and the active class; clicking an option calls onChange with its id; a disabled option renders disabled with the reason in title and aria-label; the container exposes role=\"tablist\" with the given aria-label."
+        },
+        "items": [
+          {
+            "id": "extract-view-toggle.ac1",
+            "title": "ViewToggle renders one role=\"tab\" button per option inside a role=\"tablist\" container with the provided aria-label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-view-toggle.ac2",
+            "title": "ViewToggle marks the option matching value with aria-selected=true and the viewToggleBtnActive class, and fires onChange with the clicked option id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-view-toggle.ac3",
+            "title": "ViewToggle renders a disabled option with the disabled attribute and its disabledReason in both title and aria-label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-view-toggle.ac4",
+            "title": "ViewToggle applies the viewToggle/viewToggleBtn classes imported from CommandDeck/styles/command-deck.module.css without modifying that stylesheet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "adopt-view-toggle-conversation-flywheel",
+        "title": "Adopt ViewToggle in ConversationPanel and FlywheelConversationPane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes",
+            "typecheck completes without errors",
+            "lint passes with no file-size ratchet failure"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the inline toggle markup in ConversationPanel.tsx:720-735 with <ViewToggle ariaLabel=\"Conversation view\" value={effectiveViewMode} onChange={handleViewMode} options={[{ id: 'conversation', label: 'Conversation' }, { id: 'terminal', label: 'Terminal' }]} />, keeping the surrounding `showTerminal &&` conditional exactly as-is. Replace the inline markup in FlywheelConversationPane.tsx:294-313 with the same component using ariaLabel=\"Flywheel pane view\" and its existing viewMode/setViewMode state. Remove any now-unused imports in both files (e.g. toggleStyles in FlywheelConversationPane if no other usage remains). Behavior and rendered classes must be unchanged. ConversationPanel.tsx is allowlisted at 1518 lines in scripts/file-size-allowlist.txt — the refactor must not grow it (it should shrink slightly). Update chat/__tests__/ConversationPanel.test.tsx only if its queries depend on the old markup shape; the role/tab semantics are preserved so most queries should keep working."
+        },
+        "items": [
+          {
+            "id": "adopt-view-toggle-conversation-flywheel.ac1",
+            "title": "ConversationPanel renders the shared ViewToggle with Conversation and Terminal options only when showTerminal is true, preserving the existing conditional",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-view-toggle-conversation-flywheel.ac2",
+            "title": "FlywheelConversationPane renders the shared ViewToggle with aria-label \"Flywheel pane view\" driving its existing viewMode state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-view-toggle-conversation-flywheel.ac3",
+            "title": "ConversationPanel.tsx stays at or below its allowlisted 1518-line count and lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-view-toggle-conversation-flywheel.ac4",
+            "title": "chat/__tests__/ConversationPanel.test.tsx passes against the shared component",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "selector-in-drawer-agent-session",
+        "title": "Render the shared selector from DrawerAgentSession behind an onChangeView prop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DrawerAgentSession.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In DrawerAgentSession.tsx add an optional prop `onChangeView?: (view: 'conversation' | 'terminal') => void`. When provided, render <ViewToggle> as the first child of the existing toolbar row (the div at DrawerAgentSession.tsx:136, before the agent picker), per the PRD sketch: value={view}, ariaLabel=\"Agent session view\", options Conversation (never disabled) and Terminal (disabled when `!agent || isEndedAgent(agent)` with disabledReason 'No agent selected — start work to attach a terminal' when there is no agent, else 'Session ended — no live terminal to attach'). When onChangeView is absent render no selector (preserves current callers during the transition and any simple-mode embedding). Reuse the existing isEndedAgent import. Extend DrawerAgentSession.test.tsx: selector appears when onChangeView is provided; Terminal is disabled with the ended reason for a stopped agent; clicking Conversation/Terminal calls onChangeView with that id; the selected agent picker is unaffected by selector clicks."
+        },
+        "items": [
+          {
+            "id": "selector-in-drawer-agent-session.ac1",
+            "title": "DrawerAgentSession renders the ViewToggle in its toolbar row when onChangeView is provided, and renders no selector when it is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-in-drawer-agent-session.ac2",
+            "title": "DrawerAgentSession disables the Terminal segment with an explanatory title/aria-label when the selected agent is ended or no agent is selected, while Conversation stays enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-in-drawer-agent-session.ac3",
+            "title": "Clicking a selector segment emits onChangeView with 'conversation' or 'terminal' and preserves the selected agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "consolidate-issue-detail-tabs",
+        "title": "Consolidate ISSUE_DETAIL_TABS to one Session tab with a single session body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail/IssueDetail.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueDetail.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In IssueDetail.tsx: (1) Replace the 'conversation' and 'terminal' entries in ISSUE_DETAIL_TABS (lines 49-58) with one { id: 'session', label: 'Session' } entry between Tasks and Activity. (2) Change IssueDetailTabId from the derived typeof to an explicit union of the displayed ids plus 'conversation' | 'terminal' (PRD sketch). (3) Add module-level helpers: SESSION_TAB_IDS = new Set<string>(['session', 'conversation', 'terminal']) and use it so the Session tab button renders active (aria-selected + underline) when tab is any of the three; clicking the Session button calls onSelectTab(tab === 'terminal' ? 'terminal' : 'conversation'). (4) Collapse the two body branches (lines 380-389) into one `tab === 'conversation' || tab === 'terminal' || tab === 'session'` branch rendering DrawerAgentSession with view={tab === 'terminal' ? 'terminal' : 'conversation'} and onChangeView={(next) => onSelectTab(next)} — agent selection stays owned by IssueDetail (lines 284-290), so it survives the switch. (5) Keep `openAgentConversation` calling onSelectTab('conversation') (shell conversation switcher behavior unchanged). Update IssueDetail.test.tsx: the tab strip shows Session (data-testid drawer-tab-session) and no separate drawer-tab-conversation/drawer-tab-terminal buttons; rendering with tab=\"terminal\" shows the terminal panel (drawer-tab-panel-terminal test id preserved via DrawerAgentSession); selector clicks call onSelectTab with 'conversation'/'terminal'; agent selection persists across both switch directions."
+        },
+        "items": [
+          {
+            "id": "consolidate-issue-detail-tabs.ac1",
+            "title": "The IssueDetail tab strip renders one Session tab (data-testid drawer-tab-session) and no longer renders separate drawer-tab-conversation or drawer-tab-terminal tab buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consolidate-issue-detail-tabs.ac2",
+            "title": "The Session tab renders aria-selected=true when tab is 'session', 'conversation', or 'terminal', and clicking it preserves terminal mode when already in terminal mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consolidate-issue-detail-tabs.ac3",
+            "title": "The session body renders DrawerAgentSession with view derived from the tab and passes onChangeView that calls onSelectTab('conversation' | 'terminal')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consolidate-issue-detail-tabs.ac4",
+            "title": "A Conversation ⇄ Terminal switch via the selector preserves the effective selected agent id across both directions, including a non-default swarm/specialist selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consolidate-issue-detail-tabs.ac5",
+            "title": "Rendering IssueDetail with tab=\"terminal\" or tab=\"conversation\" opens the session surface in the matching mode (legacy values remain addressable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-cockpit-bespoke-strip",
+        "title": "Delete the cockpit Session tab's bespoke Conversation/Terminal strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "IssueMissionControl.test.tsx passes",
+            "typecheck completes without errors",
+            "issue-view-no-loss.test.ts passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In IssueMissionControl.tsx delete the bespoke Session sub-view tablist block (lines 805-827 — the div with role=\"tablist\" aria-label=\"Session views\" mapping ['conversation','terminal'] to Tailwind pill buttons). The IssueDetail embed at lines 829-841 stays exactly as-is: tab={issueDetailTab} ('conversation' | 'terminal') and the onSelectTab handler mapping through resolveTabSelection — the shared selector inside the embedded session pane now drives selectTab('session', subView) through that existing path. Do NOT touch LEGACY_TAB_MAP, issueDetailTabFor, DEFAULT_SUB_VIEW, or the Plan/Changes/Activity sub-tab strips. Keep the scrollIntoView effect for terminal mode. Update IssueMissionControl.test.tsx: the bespoke 'Session views' tablist is gone; the Session tab renders the shared selector (role=tablist aria-label 'Agent session view' from DrawerAgentSession); clicking Terminal in the selector switches the body to terminal mode and back; a ?tab=terminal route selection still opens Session in terminal mode; the selected session does not change across the switch."
+        },
+        "items": [
+          {
+            "id": "delete-cockpit-bespoke-strip.ac1",
+            "title": "IssueMissionControl no longer renders the bespoke role=\"tablist\" aria-label=\"Session views\" strip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-cockpit-bespoke-strip.ac2",
+            "title": "The cockpit Session tab shows the shared selector and one click switches the body between transcript and terminal while activeSubView stays in sync via selectTab('session', subView)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-cockpit-bespoke-strip.ac3",
+            "title": "A cockpit URL with ?tab=terminal still resolves to the Session tab in terminal mode through LEGACY_TAB_MAP",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-cockpit-bespoke-strip.ac4",
+            "title": "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts passes unchanged (Session tab inventory entry and its relocation surface remain accurate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-nav-and-no-loss-audit",
+        "title": "Add drawer legacy-navigation tests and the old-tabs no-loss audit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx src/components/issue-detail/issue-session-tabs.no-loss.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssueDrawer.test.tsx passes",
+            "the no-loss audit test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Two parts. (1) Update IssueDrawer.test.tsx legacy/deep-link tests: '/?issue=PAN-1&tab=terminal' opens the drawer with the session surface in terminal mode (drawer-tab-panel-terminal present) and the tab strip shows the Session tab active instead of separate Conversation/Terminal tab buttons; '/?issue=PAN-1&tab=conversation' resolves likewise in conversation mode; the existing 'switches to the Conversation and Terminal tabs from the tab strip' test is rewritten to click the Session tab and then drive the in-pane selector. (2) Create src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx: a fixed enumeration of the eight OLD tab ids ['overview','plan','tasks','conversation','terminal','activity','files','artifacts'] where each maps to its post-consolidation destination — overview/plan/tasks/activity/files/artifacts remain literal entries in ISSUE_DETAIL_TABS, conversation and terminal resolve to the 'session' tab in conversation/terminal mode respectively — asserted by rendering IssueDetail with each legacy tab value and checking the Session tab is active plus the correct panel renders for the two session modes, and by asserting ISSUE_DETAIL_TABS still contains the six non-session ids. This test is the no-loss audit gate required by the engineering rules; it must fail if any old section loses its destination."
+        },
+        "items": [
+          {
+            "id": "legacy-nav-and-no-loss-audit.ac1",
+            "title": "Given '/?issue=PAN-1&tab=terminal', the drawer opens the consolidated session surface in terminal mode with the Session tab active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-nav-and-no-loss-audit.ac2",
+            "title": "Given '/?issue=PAN-1&tab=conversation', the drawer opens the session surface in conversation mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-nav-and-no-loss-audit.ac3",
+            "title": "The no-loss audit test enumerates all eight old ISSUE_DETAIL_TABS ids and proves each resolves to a destination, failing when any old section loses its home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-nav-and-no-loss-audit.ac4",
+            "title": "ISSUE_DETAIL_TABS still contains overview, plan, tasks, activity, files, and artifacts as literal entries (no other section is lost to the consolidation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-issue-view-session-selector",
+        "title": "Update docs/ISSUE-VIEW.md and DrawerAgentSession module header for the consolidated session surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-10T20:18:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/ISSUE-VIEW.md: (1) the cockpit Session bullet (line 35) now states that Conversation and Terminal are view modes of one session surface switched by the shared ViewToggle segmented selector (components/shared/ViewToggle.tsx), used identically by the drawer/page IssueDetail tab strip (one Session tab), the cockpit embed, ConversationPanel, and FlywheelConversationPane; (2) the legacy ?tab= paragraph (line 41) notes the drawer values 'conversation' and 'terminal' remain valid and open the consolidated Session surface in the matching mode. Also update the module header comment of DrawerAgentSession.tsx (lines 1-15) to describe the toolbar selector and the onChangeView contract instead of 'the IssueDrawer's Conversation and Terminal tabs'. No Mintlify page documents the issue tab strip (verified 2026-08-10), so docs/ISSUE-VIEW.md remains the documentation owner."
+        },
+        "items": [
+          {
+            "id": "docs-issue-view-session-selector.ac1",
+            "title": "docs/ISSUE-VIEW.md shows that the drawer, cockpit, ConversationPanel, and Flywheel surfaces share one ViewToggle selector for Conversation ⇄ Terminal switching",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-view-session-selector.ac2",
+            "title": "docs/ISSUE-VIEW.md records that legacy ?tab=conversation and ?tab=terminal values resolve to the consolidated Session surface in the matching mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-view-session-selector.ac3",
+            "title": "The DrawerAgentSession module header covers the toolbar selector and the onChangeView contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-view-toggle",
+        "to": "adopt-view-toggle-conversation-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-view-toggle",
+        "to": "selector-in-drawer-agent-session",
+        "type": "blocks"
+      },
+      {
+        "from": "selector-in-drawer-agent-session",
+        "to": "consolidate-issue-detail-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "consolidate-issue-detail-tabs",
+        "to": "delete-cockpit-bespoke-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "consolidate-issue-detail-tabs",
+        "to": "legacy-nav-and-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-cockpit-bespoke-strip",
+        "to": "docs-issue-view-session-selector",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-10-PAN-3655-unify-issue-conversation-terminal-switching-with-the-shared-segmented-selector.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
