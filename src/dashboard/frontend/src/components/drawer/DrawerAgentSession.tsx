@@ -23,6 +23,7 @@ import { StartAgentCta } from '../issue-view/StartAgentCta';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { agentToConversation, isEndedAgent, type SessionAgent } from '../../lib/agentConversation';
+import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // Re-exported so existing importers (IssueDrawer, dock, tests) keep working —
@@ -72,13 +73,15 @@ interface DrawerAgentSessionProps {
   /** The agent to display — resolved by IssueDrawer, shared across both tabs. */
   agentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  /** Switch the shared session surface between transcript and terminal modes. */
+  onChangeView?: (view: 'conversation' | 'terminal') => void;
   /** Needed for the no-agent start surface (StartAgentCta). */
   issueId?: string | null;
   /** Hide ConversationPanel's composer — the parent provides its own (simple mode). */
   hideComposer?: boolean;
 }
 
-export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issueId, hideComposer = false }: DrawerAgentSessionProps) {
+export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onChangeView, issueId, hideComposer = false }: DrawerAgentSessionProps) {
   const testId = `drawer-tab-panel-${view}`;
 
   const agent = useMemo(
@@ -103,12 +106,35 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issue
     refetchInterval: 30_000,
   });
 
+  const terminalDisabledReason = !agent
+    ? 'No agent selected — start work to attach a terminal'
+    : isEndedAgent(agent)
+      ? 'Session ended — no live terminal to attach'
+      : undefined;
+  const viewToggle = onChangeView ? (
+    <ViewToggle
+      ariaLabel="Agent session view"
+      value={view}
+      onChange={onChangeView}
+      options={[
+        { id: 'conversation', label: 'Conversation' },
+        {
+          id: 'terminal',
+          label: 'Terminal',
+          disabled: Boolean(terminalDisabledReason),
+          disabledReason: terminalDisabledReason,
+        },
+      ]}
+    />
+  ) : null;
+
   if (!agent || !conversation) {
     return (
       <div
         data-testid={testId}
         className="rounded-[var(--radius)] border border-dashed border-border bg-card/60 p-[18px]"
       >
+        {viewToggle && <div className="mb-[12px] flex items-center">{viewToggle}</div>}
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {view === 'conversation' ? 'Conversation' : 'Terminal'}
         </div>
@@ -134,6 +160,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issue
   return (
     <div data-testid={testId} className="flex min-h-0 flex-1 flex-col gap-[10px]">
       <div className="flex shrink-0 items-center gap-[8px]">
+        {viewToggle}
         {agents.length > 1 && (
           <>
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
