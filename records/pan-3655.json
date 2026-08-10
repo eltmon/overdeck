@@ -21,7 +21,9 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/ISSUE-VIEW.md",
@@ -49,16 +51,17 @@
       "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
       "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+      "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
       "src/dashboard/frontend/src/components/issue-detail/IssueDetail.test.tsx",
       "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
       "src/dashboard/frontend/src/components/issue-detail/issue-session-tabs.no-loss.test.tsx",
       "src/dashboard/frontend/src/components/shared/ViewToggle.test.tsx",
       "src/dashboard/frontend/src/components/shared/ViewToggle.tsx"
     ],
-    "recordedAt": "2026-08-10T21:08:10.235Z"
+    "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:17:36.656Z",
+  "updated": "2026-08-10T21:17:49.084Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "failed",
