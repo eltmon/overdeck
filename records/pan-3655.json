@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T20:29:54.880Z",
+  "updated": "2026-08-10T20:30:15.600Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T20:29:54.853Z",
-    "inspectNotes": "Inspecting item extract-view-toggle"
+    "updatedAt": "2026-08-10T20:30:15.525Z",
+    "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 232724,
-            "output": 10762,
-            "cacheRead": 5291520,
+            "input": 234950,
+            "output": 10918,
+            "cacheRead": 5480960,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 232724,
-          "output": 10762,
-          "cacheRead": 5291520,
+          "input": 234950,
+          "output": 10918,
+          "cacheRead": 5480960,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.13224,
-        "pricingAsOf": "2026-08-10T20:29:54.859Z"
+        "usd": 4.24277,
+        "pricingAsOf": "2026-08-10T20:30:15.563Z"
       }
     },
     "merges": [],
