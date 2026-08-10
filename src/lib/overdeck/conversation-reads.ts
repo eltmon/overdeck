@@ -96,10 +96,22 @@ const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
  */
 const CLAUDE_SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * A Claude Code subagent transcript id, as used to name
+ * `<session-dir>/subagents/agent-<id>.jsonl`. The search indexer recurses into
+ * subagents dirs, so those transcripts appear in palette results with the bare
+ * agent id as their sessionId; clicking one arrives here. Like the UUID shape,
+ * only this exact shape may trigger the by-id sweep — and the 10-hex floor
+ * keeps Overdeck's own short `agent-<digits>` work-agent names out of it
+ * (those resolve through resolveSpecialistSessionFile above, or nowhere).
+ */
+const SUBAGENT_TRANSCRIPT_ID_PATTERN = /^agent-[0-9a-f]{10,20}$/i;
+
 /** The transcript of an indexed-but-unregistered Claude session, or null. */
 async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
-  if (!CLAUDE_SESSION_UUID_PATTERN.test(name)) return null;
-  return findClaudeSessionFileById(name);
+  if (CLAUDE_SESSION_UUID_PATTERN.test(name)) return findClaudeSessionFileById(name);
+  if (SUBAGENT_TRANSCRIPT_ID_PATTERN.test(name)) return findSubagentTranscriptById(name);
+  return null;
 }
 
 /**
@@ -163,6 +175,64 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
     /* ~/.claude/projects unreadable */
   }
   sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
+  return null;
+}
+
+/**
+ * Find a subagent transcript `<session-dir>/subagents/agent-<id>.jsonl` by its
+ * agent id, searching every session dir of every project dir under
+ * ~/.claude/projects/. Same memoization contract as findClaudeSessionFileById:
+ * the sweep readdir+stats one level deeper, so a miss is cached for the TTL
+ * and a found path is re-verified with one existsSync.
+ */
+async function findSubagentTranscriptById(agentId: string): Promise<string | null> {
+  const cached = sessionFileByIdCache.get(agentId);
+  if (cached) {
+    if (cached.path) {
+      if (existsSync(cached.path)) return cached.path;
+      sessionFileByIdCache.delete(agentId);
+    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
+      return null;
+    }
+  }
+  try {
+    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+    const projectDirs = (await readdir(claudeProjects)).filter((dir) => SAFE_DIR_PATTERN.test(dir));
+    const STAT_BATCH_SIZE = 50;
+    for (const projectDir of projectDirs) {
+      let sessionDirs: string[];
+      try {
+        sessionDirs = await readdir(join(claudeProjects, projectDir));
+      } catch {
+        continue;
+      }
+      const candidates = sessionDirs
+        .filter((entry) => SAFE_DIR_PATTERN.test(entry) && !entry.endsWith('.jsonl'))
+        .map((entry) => join(claudeProjects, projectDir, entry, 'subagents', `${agentId}.jsonl`));
+      for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
+        const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+        const checks = await Promise.all(
+          batch.map(async (candidate) => {
+            try {
+              await stat(candidate);
+              return candidate;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const found = checks.find((c): c is string => c !== null);
+        if (found) {
+          sessionFileByIdCache.set(agentId, { path: found, ts: Date.now() });
+          return found;
+        }
+      }
+    }
+  } catch {
+    /* ~/.claude/projects unreadable */
+  }
+  sessionFileByIdCache.set(agentId, { path: null, ts: Date.now() });
   return null;
 }
 

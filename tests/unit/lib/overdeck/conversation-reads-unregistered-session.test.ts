@@ -25,9 +25,11 @@ import {
 } from '../../../../src/lib/overdeck/conversation-reads.js';
 
 const SESSION_ID = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+const SUBAGENT_ID = 'agent-a8256731048d42b38';
 
 let fakeHome: string;
 let sessionFile: string;
+let subagentFile: string;
 
 /** Fails the test if the registered-conversation path is taken instead. */
 const deps = {
@@ -53,6 +55,10 @@ beforeEach(async () => {
   await mkdir(projectDir, { recursive: true });
   sessionFile = join(projectDir, `${SESSION_ID}.jsonl`);
   await writeFile(sessionFile, jsonlLine('u-1', 'first message') + jsonlLine('u-2', 'second message'));
+  const subagentsDir = join(projectDir, SESSION_ID, 'subagents');
+  await mkdir(subagentsDir, { recursive: true });
+  subagentFile = join(subagentsDir, `${SUBAGENT_ID}.jsonl`);
+  await writeFile(subagentFile, jsonlLine('su-1', 'subagent first') + jsonlLine('su-2', 'subagent second'));
 });
 
 afterEach(async () => {
@@ -87,6 +93,38 @@ describe('reads for an indexed Claude session with no conversation row', () => {
 
   it('does not sweep for names that are not Claude session ids', async () => {
     const response = await getConversationMessagesRead('not-a-session-id', deps);
+
+    expect(response).toMatchObject({ status: 404 });
+  });
+});
+
+describe('reads for an indexed subagent transcript (agent-<id>)', () => {
+  it('locates a message by byte offset instead of 404ing', async () => {
+    const secondLineOffset = jsonlLine('su-1', 'subagent first').length;
+
+    const response = await getConversationMessageLocator(SUBAGENT_ID, secondLineOffset, deps);
+
+    expect(response.status).toBeUndefined();
+    expect(response.body).toMatchObject({ messageIndex: 1, byteOffset: secondLineOffset });
+  });
+
+  it('serves the subagent transcript messages', async () => {
+    const response = await getConversationMessagesRead(SUBAGENT_ID, deps);
+
+    expect(response.status).toBeUndefined();
+    const body = response.body as { messages: Array<{ text: string }> };
+    expect(body.messages.map((message) => message.text)).toEqual(['subagent first', 'subagent second']);
+  });
+
+  it('still 404s an agent id with no transcript anywhere', async () => {
+    const missing = 'agent-0000000000000000a';
+
+    expect(await getConversationMessageLocator(missing, 0, deps)).toMatchObject({ status: 404 });
+    expect(await getConversationMessagesRead(missing, deps)).toMatchObject({ status: 404 });
+  });
+
+  it('does not sweep for short Overdeck work-agent names (agent-<digits>)', async () => {
+    const response = await getConversationMessagesRead('agent-3651', deps);
 
     expect(response).toMatchObject({ status: 404 });
   });
