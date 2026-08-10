@@ -58,7 +58,7 @@
     "recordedAt": "2026-08-10T21:08:10.235Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:08:25.658Z",
+  "updated": "2026-08-10T21:09:58.223Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "pending",
@@ -69,7 +69,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-10T21:08:20.992Z",
-    "updatedAt": "2026-08-10T21:08:21.537Z",
+    "updatedAt": "2026-08-10T21:09:08.095Z",
     "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3656",
     "reviewRequestedAt": "2026-08-10T21:08:20.992Z",
@@ -116,24 +116,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 494265,
-            "output": 64199,
-            "cacheRead": 30360576,
+            "input": 496863,
+            "output": 64775,
+            "cacheRead": 31032320,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 494265,
-          "output": 64199,
-          "cacheRead": 30360576,
+          "input": 496863,
+          "output": 64775,
+          "cacheRead": 31032320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.577583,
-        "pricingAsOf": "2026-08-10T21:08:25.653Z"
+        "usd": 19.943725,
+        "pricingAsOf": "2026-08-10T21:09:37.080Z"
       }
     },
     "merges": [
