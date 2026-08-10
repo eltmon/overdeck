@@ -1,17 +1,16 @@
 {
   "issueId": "PAN-3647",
   "schemaVersion": 2,
-  "feedback": [
+  "sessionHistory": [
     {
-      "seq": 1,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-10T15:07:46Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3647 needs operator attention after 1 cycle(s).\n1. strike 335969117565a0ea258f908a1b166482929b2b95; main e9703d52ce22755ce3ae96d6e216609cecd0fb98; transport-failed: Strike merge request failed: fetch failed\n2. strike 335969117565a0ea258f908a1b166482929b2b95; main e9703d52ce22755ce3ae96d6e216609cecd0fb98; failed: Stale strike signal: recorded HEAD 335969117565a0ea258f908a1b166482929b2b95 differs from origin/strike/pan-3647 at ece7f3fd5d04963ab934852d8308f2b91cda36b6\n3. strike ece7f3fd5d04963ab934852d8308f2b91cda36b6; main 8cab238c4a1ac161afe0a433fd14ae7deb93fdea; failed: GitHub PR #3648 has failing required checks on HEAD ece7f3fd. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3648 for details.; recovery not delivered: agent is in failure backoff (1 failure)"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-10T15:04:20.318Z"
     }
   ],
+  "feedback": [],
   "created": "2026-08-10T02:29:27.489Z",
-  "updated": "2026-08-10T15:07:46.423Z",
+  "updated": "2026-08-10T15:08:30.780Z",
   "pipeline": {
     "issueId": "PAN-3647",
     "reviewStatus": "pending",
@@ -21,15 +20,13 @@
     "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T03:12:04.712Z",
-    "mergeNotes": "Stale strike signal: recorded HEAD 335969117565a0ea258f908a1b166482929b2b95 differs from origin/strike/pan-3647 at ece7f3fd5d04963ab934852d8308f2b91cda36b6",
+    "updatedAt": "2026-08-10T15:07:43.978Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3647 after its harness exited before push.",
     "lastVerifiedCommit": "ece7f3fd5d04963ab934852d8308f2b91cda36b6",
-    "strikeReadyHead": "335969117565a0ea258f908a1b166482929b2b95",
-    "strikeReadyAt": "2026-08-10T02:53:11.030Z",
-    "strikeLandingState": "landing",
+    "strikeReadyHead": "ece7f3fd5d04963ab934852d8308f2b91cda36b6",
+    "strikeReadyAt": "2026-08-10T15:07:43.977Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-08-10T02:59:37.323Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-10T02:58:37.323Z",
@@ -37,6 +34,13 @@
         "mainHead": "e9703d52ce22755ce3ae96d6e216609cecd0fb98",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-08-10T03:12:04.718Z",
+        "strikeHead": "335969117565a0ea258f908a1b166482929b2b95",
+        "mainHead": "e9703d52ce22755ce3ae96d6e216609cecd0fb98",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 335969117565a0ea258f908a1b166482929b2b95 differs from origin/strike/pan-3647 at ece7f3fd5d04963ab934852d8308f2b91cda36b6"
       }
     ]
   },
@@ -45,41 +49,29 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 557750,
-            "output": 42820,
-            "cacheRead": 19635200,
+            "input": 736535,
+            "output": 53814,
+            "cacheRead": 25953280,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 557750,
-          "output": 42820,
-          "cacheRead": 19635200,
+          "input": 736535,
+          "output": 53814,
+          "cacheRead": 25953280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.89095,
-        "pricingAsOf": "2026-08-10T03:12:40.500Z"
+        "usd": 18.273735,
+        "pricingAsOf": "2026-08-10T15:07:44.003Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-08-10T15:04:20.318Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-10T15:07Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-10T15:07:46.423Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
