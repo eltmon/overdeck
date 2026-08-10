@@ -39,6 +39,7 @@ import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './Su
 import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
+import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -718,20 +719,15 @@ export function ConversationPanel({
             <div className={styles.conversationHeaderActions}>
               {/* View toggle — only when session is live */}
               {showTerminal && (
-                <div className={styles.viewToggle}>
-                  <button
-                    className={`${styles.viewToggleBtn} ${effectiveViewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
-                    onClick={() => handleViewMode('conversation')}
-                  >
-                    Conversation
-                  </button>
-                  <button
-                    className={`${styles.viewToggleBtn} ${effectiveViewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
-                    onClick={() => handleViewMode('terminal')}
-                  >
-                    Terminal
-                  </button>
-                </div>
+                <ViewToggle
+                  ariaLabel="Conversation view"
+                  value={effectiveViewMode}
+                  onChange={handleViewMode}
+                  options={[
+                    { id: 'conversation', label: 'Conversation' },
+                    { id: 'terminal', label: 'Terminal' },
+                  ]}
+                />
               )}
 
               <button

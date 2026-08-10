@@ -6,8 +6,8 @@ import type { FlywheelStatus } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
-import toggleStyles from '../CommandDeck/styles/command-deck.module.css';
 import { useConfirm } from '../DialogProvider';
+import { ViewToggle } from '../shared/ViewToggle';
 
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 
@@ -291,28 +291,22 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className={toggleStyles.viewToggle} role="tablist" aria-label="Flywheel pane view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'conversation'}
-                className={`${toggleStyles.viewToggleBtn} ${viewMode === 'conversation' ? toggleStyles.viewToggleBtnActive : ''}`}
-                onClick={() => setViewMode('conversation')}
-              >
-                Conversation
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'terminal'}
-                className={`${toggleStyles.viewToggleBtn} ${viewMode === 'terminal' ? toggleStyles.viewToggleBtnActive : ''}`}
-                onClick={() => setViewMode('terminal')}
-                title={conversation ? 'Attach to flywheel-orchestrator tmux session' : 'No flywheel-orchestrator session yet'}
-                disabled={!conversation}
-              >
-                Terminal
-              </button>
-            </div>
+            <ViewToggle
+              ariaLabel="Flywheel pane view"
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { id: 'conversation', label: 'Conversation' },
+                {
+                  id: 'terminal',
+                  label: 'Terminal',
+                  disabled: !conversation,
+                  disabledReason: conversation
+                    ? 'Attach to flywheel-orchestrator tmux session'
+                    : 'No flywheel-orchestrator session yet',
+                },
+              ]}
+            />
             {/* v3 control bar (PAN-1694): Pause/Resume primary, secondary actions under
                 ⋯ More, Abort red + isolated. PAN-RUN-11 guard preserved — no action is
                 state-gated-away: Pause/Resume/Abort are always visible, and New Run /
