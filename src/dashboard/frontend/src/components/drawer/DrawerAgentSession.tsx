@@ -1,13 +1,13 @@
 /**
- * DrawerAgentSession — wires the IssueDrawer's Conversation and Terminal tabs
- * to a real agent session.
+ * DrawerAgentSession — renders one issue-scoped agent session as a transcript
+ * or live terminal.
  *
- * The drawer is issue-scoped, so it picks one of the issue's agents (defaulting
- * to the active work agent) and renders either its JSONL transcript
- * (`<ConversationPanel>`) or its live tmux terminal (`<XTerminal>`). When the
- * issue has more than one agent — e.g. a swarm — a compact picker lets the user
- * switch between sessions; the selection is owned by `<IssueDrawer>` so it
- * survives a Conversation ⇄ Terminal tab switch.
+ * The toolbar can expose the shared Conversation | Terminal selector through
+ * `onChangeView`; its parent owns the active view mode. The component picks the
+ * requested issue agent (defaulting to the active work agent) and renders its
+ * JSONL transcript (`<ConversationPanel>`) or tmux terminal (`<XTerminal>`).
+ * When an issue has multiple agents — e.g. a swarm — the compact picker changes
+ * sessions independently, so the parent-owned selection survives view switches.
  *
  * A work agent's `id` is both its tmux session name and its session-file key,
  * so a `Conversation` can be synthesized from the `Agent` alone — the same
