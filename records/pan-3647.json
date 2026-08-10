@@ -10,17 +10,17 @@
   ],
   "feedback": [],
   "created": "2026-08-10T02:29:27.489Z",
-  "updated": "2026-08-10T15:24:24.645Z",
+  "updated": "2026-08-10T15:53:51.057Z",
   "pipeline": {
     "issueId": "PAN-3647",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "pending",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-10T15:24:24.626Z",
+    "updatedAt": "2026-08-10T15:53:20.326Z",
     "mergeNotes": "GitHub PR #3648 has failing required checks on HEAD ece7f3fd. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3648 for details.; recovery not delivered: agent is in failure backoff (1 failure)",
     "lastVerifiedCommit": "ece7f3fd5d04963ab934852d8308f2b91cda36b6",
     "strikeReadyHead": "efed78c5762e3d3389fac32d28fd14237a30adaa",
@@ -56,24 +56,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 870384,
-            "output": 59454,
-            "cacheRead": 28222464,
+            "input": 878688,
+            "output": 60617,
+            "cacheRead": 28717568,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 870384,
-          "output": 59454,
-          "cacheRead": 28222464,
+          "input": 878688,
+          "output": 60617,
+          "cacheRead": 28717568,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.246772,
-        "pricingAsOf": "2026-08-10T15:24:24.636Z"
+        "usd": 20.570734,
+        "pricingAsOf": "2026-08-10T15:53:20.336Z"
       }
     },
     "merges": [],
