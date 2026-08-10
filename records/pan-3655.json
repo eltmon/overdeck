@@ -66,19 +66,20 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:20:07.682Z",
+  "updated": "2026-08-10T21:20:09.539Z",
   "pipeline": {
     "issueId": "PAN-3655",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-10T21:18:35.358Z",
-    "updatedAt": "2026-08-10T21:18:35.783Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-08-10T21:20:06.905Z",
+    "reviewNotes": "All four reviewers reported no blockers; requirements complete, with two advisory correctness notes.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: tablist/tab + aria-label semantics, aria-selected + viewToggleBtnActive + onChange(option.id), disabled option carries disabledReason in title and aria-label, classes imported from CommandDeck/styles/command-deck.module.css (viewToggle/viewToggleBtn/viewToggleBtnActive all present at command-deck.module.css:3425/3436/3453) with the stylesheet unmodified — commit adds only ViewToggle.tsx and ViewToggle.test.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3656",
     "reviewRequestedAt": "2026-08-10T21:18:35.358Z",
@@ -129,9 +130,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 136873,
-            "output": 2463,
-            "cacheRead": 823808,
+            "input": 170442,
+            "output": 9676,
+            "cacheRead": 2099200,
             "cacheWrite": 0
           }
         },
@@ -178,15 +179,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2627923,
-          "output": 136242,
-          "cacheRead": 52633600,
+          "input": 2661492,
+          "output": 143455,
+          "cacheRead": 53908992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.543675,
-        "pricingAsOf": "2026-08-10T21:18:38.945Z"
+        "usd": 44.565606,
+        "pricingAsOf": "2026-08-10T21:20:06.966Z"
       }
     },
     "merges": [
@@ -195,7 +196,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3655",
