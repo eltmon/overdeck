@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveTrackerTypeSync = vi.fn();
+const mockResolveGitHubIssueSync = vi.fn();
 const mockGetIssue = vi.fn();
 const mockCreateTracker = vi.fn(() => ({ getIssue: mockGetIssue }));
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerTypeSync: (id: string) => mockResolveTrackerTypeSync(id),
+  resolveGitHubIssueSync: (id: string) => mockResolveGitHubIssueSync(id),
 }));
 vi.mock('../../../../lib/tracker/factory.js', () => ({
   createTracker: (config: unknown) => mockCreateTracker(config),
 }));
 
 // Import once at module scope; vi.mock hoisting ensures mocks are wired.
-const { resolveMissingIssueTitles } = await import('../issue-title-fallback.js');
+const { resolveMissingIssueTitles, resolveMissingIssue } = await import('../issue-title-fallback.js');
 
 const { Effect } = await import('effect');
 
@@ -69,5 +71,57 @@ describe('resolveMissingIssueTitles', () => {
     const resolved = await resolveMissingIssueTitles(ids);
     expect(resolved.size).toBe(8);
     expect(mockGetIssue).toHaveBeenCalledTimes(8);
+  });
+});
+
+// PAN-3659: createTracker({ type }) alone throws for GitHub (owner/repo
+// required), which silently broke this fallback for every GitHub issue.
+describe('GitHub tracker binding (PAN-3659)', () => {
+  beforeEach(() => {
+    mockResolveTrackerTypeSync.mockReset().mockReturnValue('github');
+    mockResolveGitHubIssueSync.mockReset();
+    mockGetIssue.mockReset();
+    mockCreateTracker.mockClear();
+  });
+
+  it('binds owner/repo from the issue prefix for github issues', async () => {
+    mockResolveGitHubIssueSync.mockReturnValue({
+      isGitHub: true, owner: 'eltmon', repo: 'overdeck', prefix: 'PAN', number: 3659,
+    });
+    mockGetIssue.mockReturnValue(issueEffect('backfill fix'));
+
+    const result = await resolveMissingIssueTitles(['PAN-3659']);
+
+    expect(mockCreateTracker).toHaveBeenCalledWith({ type: 'github', owner: 'eltmon', repo: 'overdeck' });
+    expect(result.get('PAN-3659')).toBe('backfill fix');
+  });
+
+  it('resolves nothing when the github prefix maps to no repo', async () => {
+    mockResolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
+
+    const result = await resolveMissingIssueTitles(['ZZZ-9']);
+
+    expect(result.size).toBe(0);
+    expect(mockCreateTracker).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveMissingIssue', () => {
+  beforeEach(() => {
+    mockResolveTrackerTypeSync.mockReset().mockReturnValue('linear');
+    mockGetIssue.mockReset();
+    mockCreateTracker.mockClear();
+  });
+
+  it('returns the full tracker issue and memoizes it case-insensitively', async () => {
+    const full = { title: 'Full row', state: 'closed', url: 'https://linear.app/x/MIN-9999' };
+    mockGetIssue.mockReturnValue(Effect.succeed(full));
+
+    const first = await resolveMissingIssue('MIN-9999');
+    expect(first).toEqual(full);
+
+    const second = await resolveMissingIssue('min-9999');
+    expect(second).toBe(full);
+    expect(mockGetIssue).toHaveBeenCalledTimes(1);
   });
 });

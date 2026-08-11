@@ -805,6 +805,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── subscribeIssueEvents ──────────────────────────────────────────────────
       [WS_METHODS.subscribeIssueEvents]: (input) => {
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
+        // PAN-3659: an issue closed beyond the tracker sync window is absent
+        // from the snapshot, so the issue view renders "Issue details"
+        // instead of its title. Backfill it through the issue service's
+        // tracker door — a no-op when the issue is already present.
+        // Fire-and-forget; resolution failures are memoized downstream.
+        void import('./services/issue-service-singleton.js')
+          .then(({ getSharedIssueService }) => getSharedIssueService().backfillIssue(input.issueId))
+          .catch(() => {});
         return eventStore.streamEvents.pipe(
           Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),

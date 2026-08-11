@@ -3,6 +3,12 @@ import { computeTaskCounts, IssueDataService, shouldRefreshPlanningStateForIssue
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 import { mergeConfigs } from '../../../../lib/config-yaml.js';
 
+const mockResolveMissingIssue = vi.hoisted(() => vi.fn());
+vi.mock('../issue-title-fallback.js', () => ({
+  resolveMissingIssue: (id: string) => mockResolveMissingIssue(id),
+  resolveMissingIssueTitles: vi.fn(async () => new Map()),
+}));
+
 describe('computeTaskCounts', () => {
   function makeDoc(items: Array<{ status: string }>): XBriefDocument {
     return {
@@ -326,5 +332,129 @@ describe('IssueDataService getIssues memoization', () => {
       .map((issue) => issue.identifier);
 
     expect(actual).toEqual(expected);
+  });
+});
+
+// PAN-3659: issues closed beyond the tracker sync window (closedWindowDays)
+// vanish from the read model, so the issue view renders "Issue details"
+// instead of the title. backfillIssue re-resolves them through the tracker
+// door on demand and holds them until the windowed poll covers them again.
+describe('IssueDataService.backfillIssue (PAN-3659)', () => {
+  function makeService() {
+    const svc = new IssueDataService({ getBackoffMs: () => 0 } as any);
+    vi.spyOn(svc as any, 'schedulePlanningRefreshForIssues').mockImplementation(() => {});
+    vi.spyOn(svc as any, 'scheduleReviewStatusRefreshForIssues').mockImplementation(() => {});
+    return svc;
+  }
+
+  function trackerIssue(overrides: Record<string, unknown> = {}) {
+    return {
+      id: '2925',
+      ref: '#2925',
+      title: 'Red main: parseProcessTable missing',
+      description: 'body',
+      state: 'closed',
+      labels: [],
+      author: 'eltmon',
+      url: 'https://github.com/eltmon/overdeck/issues/2925',
+      tracker: 'github',
+      createdAt: '2026-07-10T00:00:00.000Z',
+      updatedAt: '2026-07-19T15:27:13.000Z',
+      ...overrides,
+    } as any;
+  }
+
+  beforeEach(() => {
+    mockResolveMissingIssue.mockReset();
+  });
+
+  it('adds a resolved issue to getIssues() when absent from the windowed poll', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+
+    await svc.backfillIssue('PAN-2925');
+
+    const row = svc.getIssues().find((issue: any) => issue.identifier === 'PAN-2925');
+    expect(row).toBeTruthy();
+    expect(row.title).toBe('Red main: parseProcessTable missing');
+    expect(row.status).toBe('Done');
+    expect(row.canonicalStatus).toBe('done');
+    expect(row.id).toBe('github-eltmon-overdeck-2925');
+    expect(row.url).toBe('https://github.com/eltmon/overdeck/issues/2925');
+    expect(row.project.name).toBe('eltmon/overdeck');
+    expect(row.source).toBe('github');
+    expect(row.sourceRepo).toBe('eltmon/overdeck');
+    expect(row.completedAt).toBe('2026-07-19T15:27:13.000Z');
+  });
+
+  it('is a no-op when the issue is already in the fetched list', async () => {
+    const svc = makeService();
+    (svc as any).trackers.github.lastFetchedIssues = [{ identifier: 'PAN-2925', title: 'already here' }];
+
+    await svc.backfillIssue('pan-2925');
+
+    expect(mockResolveMissingIssue).not.toHaveBeenCalled();
+    expect((svc as any).backfilledIssues.size).toBe(0);
+  });
+
+  it('prunes the backfilled row once the windowed poll covers the issue again', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue());
+    await svc.backfillIssue('PAN-2925');
+    expect((svc as any).backfilledIssues.size).toBe(1);
+
+    (svc as any).trackers.github.lastFetchedIssues = [
+      { identifier: 'PAN-2925', title: 'fetched title', status: 'Done', updatedAt: '2026-08-01T00:00:00.000Z' },
+    ];
+    (svc as any).pushUpdated();
+
+    expect((svc as any).backfilledIssues.size).toBe(0);
+    const rows = svc.getIssues().filter((issue: any) => issue.identifier === 'PAN-2925');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].title).toBe('fetched title');
+  });
+
+  it('shares one in-flight resolution across concurrent calls', async () => {
+    const svc = makeService();
+    let resolveFn: (value: unknown) => void = () => {};
+    mockResolveMissingIssue.mockReturnValue(new Promise((resolve) => { resolveFn = resolve; }));
+
+    const first = svc.backfillIssue('PAN-2925');
+    const second = svc.backfillIssue('PAN-2925');
+    expect(mockResolveMissingIssue).toHaveBeenCalledTimes(1);
+
+    resolveFn(trackerIssue());
+    await Promise.all([first, second]);
+    expect((svc as any).backfilledIssues.size).toBe(1);
+  });
+
+  it('records nothing when the tracker cannot resolve the issue', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(null);
+
+    await svc.backfillIssue('PAN-2925');
+
+    expect((svc as any).backfilledIssues.size).toBe(0);
+    expect(svc.getIssues().find((issue: any) => issue.identifier === 'PAN-2925')).toBeUndefined();
+  });
+
+  it('formats a non-github issue with the canonical display status', async () => {
+    const svc = makeService();
+    mockResolveMissingIssue.mockResolvedValue(trackerIssue({
+      state: 'in_progress',
+      tracker: 'linear',
+      url: 'https://linear.app/mind-your-now/issue/MIN-663/some-slug',
+      priority: 2,
+    }));
+
+    await svc.backfillIssue('MIN-663');
+
+    const row = svc.getIssues().find((issue: any) => issue.identifier === 'MIN-663');
+    expect(row).toBeTruthy();
+    expect(row.status).toBe('In Progress');
+    expect(row.canonicalStatus).toBe('in_progress');
+    expect(row.id).toBe('backfill-linear-min-663');
+    expect(row.priority).toBe(2);
+    expect(row.completedAt).toBeUndefined();
   });
 });

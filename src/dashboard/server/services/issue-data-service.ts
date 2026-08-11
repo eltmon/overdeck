@@ -18,6 +18,8 @@ import { stat } from 'fs/promises';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
+import { resolveMissingIssue } from './issue-title-fallback.js';
+import type { Issue as TrackerIssue } from '../../../lib/tracker/interface.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
@@ -83,6 +85,20 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
 export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
   const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
   return canonical !== 'done' && canonical !== 'canceled';
+}
+
+/**
+ * Display status for a canonical state — the same mapping the GitHub/Linear
+ * fetch formatters apply inline, extracted for the PAN-3659 backfill adapter.
+ */
+export function displayStatusForCanonical(canonical: string): string {
+  return canonical === 'todo' ? 'Todo' :
+    canonical === 'in_progress' ? 'In Progress' :
+    canonical === 'in_review' ? 'In Review' :
+    canonical === 'verifying_on_main' ? 'Verifying' :
+    canonical === 'done' ? 'Done' :
+    canonical === 'canceled' ? 'Canceled' :
+    canonical === 'backlog' ? 'Backlog' : 'Todo';
 }
 
 // Poll intervals (ms)
@@ -286,6 +302,11 @@ export class IssueDataService {
   private reviewStatusRefreshQueued = false;
   private reviewStatusRefreshIssueIds = new Set<string>();
   private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
+  /** Issues resolved on demand after aging out of the tracker sync window
+   * (PAN-3659). Keyed by uppercase identifier; merged into computeIssues and
+   * pruned when the windowed poll covers the issue again. */
+  private backfilledIssues = new Map<string, any>();
+  private backfillInFlight = new Map<string, Promise<void>>();
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
@@ -447,6 +468,18 @@ export class IssueDataService {
       ...this.trackers.linear.lastFetchedIssues,
       ...this.trackers.rally.lastFetchedIssues,
     ];
+
+    // Merge issues backfilled on demand (PAN-3659). Fetched rows win on
+    // identifier collision; pruneBackfilledIssues removes the overlap on the
+    // next pushUpdated, this only guards the in-between window.
+    if (this.backfilledIssues.size > 0) {
+      const fetchedKeys = new Set(
+        allIssues.map((issue) => issue?.identifier?.toLowerCase()).filter(Boolean),
+      );
+      for (const row of this.backfilledIssues.values()) {
+        if (!fetchedKeys.has(row.identifier.toLowerCase())) allIssues.push(row);
+      }
+    }
 
     // Merge shadow state from the in-memory cache. The cache is refreshed
     // asynchronously by `refreshShadowStatesCache()` — we never hit disk here,
@@ -762,10 +795,123 @@ export class IssueDataService {
 
   private pushUpdated(): void {
     this.invalidateGetIssuesCache();
+    this.pruneBackfilledIssues();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
     this.scheduleReviewStatusRefreshForIssues(cachedIssues);
     this._onIssuesChanged?.(this.getIssues());
+  }
+
+  /**
+   * PAN-3659: ensure an issue that aged out of the tracker sync window still
+   * appears in getIssues(). The GitHub poll only fetches closed issues
+   * updated within `closedWindowDays`, so an issue closed longer ago vanishes
+   * from the read model and the issue view falls back to "Issue details"
+   * instead of the title. This resolves the issue once through the tracker's
+   * getIssue door (memoized in issue-title-fallback), adapts it to the
+   * dashboard shape, and holds it in a bucket that survives windowed polls
+   * until the poll covers the issue again. Fire-and-forget safe: concurrent
+   * and repeat calls share one in-flight resolution.
+   */
+  async backfillIssue(issueId: string): Promise<void> {
+    const key = issueId.trim().toUpperCase();
+    if (!key) return;
+    if (this.hasIssueByIdentifier(key)) return;
+
+    let pending = this.backfillInFlight.get(key);
+    if (!pending) {
+      pending = (async () => {
+        const issue = await resolveMissingIssue(key);
+        if (!issue || this.hasIssueByIdentifier(key)) return;
+        this.backfilledIssues.set(key, this.formatBackfilledIssue(issue, key));
+        this.pushUpdated();
+      })()
+        .catch(() => { /* resolution failures are memoized downstream */ })
+        .finally(() => this.backfillInFlight.delete(key));
+      this.backfillInFlight.set(key, pending);
+    }
+    return pending;
+  }
+
+  private hasIssueByIdentifier(uppercaseIdentifier: string): boolean {
+    const lower = uppercaseIdentifier.toLowerCase();
+    for (const tracker of ['github', 'linear', 'rally'] as const) {
+      if (this.trackers[tracker]?.lastFetchedIssues.some(
+        (issue: any) => issue?.identifier?.toLowerCase() === lower,
+      )) {
+        return true;
+      }
+    }
+    return this.backfilledIssues.has(uppercaseIdentifier);
+  }
+
+  /** Drop backfilled rows the windowed poll now covers again. */
+  private pruneBackfilledIssues(): void {
+    if (this.backfilledIssues.size === 0) return;
+    const fetched = new Set<string>();
+    for (const tracker of ['github', 'linear', 'rally'] as const) {
+      for (const issue of this.trackers[tracker]?.lastFetchedIssues ?? []) {
+        const identifier = issue?.identifier?.toLowerCase();
+        if (identifier) fetched.add(identifier);
+      }
+    }
+    for (const key of [...this.backfilledIssues.keys()]) {
+      if (fetched.has(key.toLowerCase())) this.backfilledIssues.delete(key);
+    }
+  }
+
+  /**
+   * Adapt a tracker-door Issue to the dashboard issue shape used by the
+   * windowed fetch formatters. Owner/repo/number come from the issue URL,
+   * not from config, so this stays hermetic under test.
+   */
+  private formatBackfilledIssue(issue: TrackerIssue, identifier: string): any {
+    const canonicalStatus = issue.tracker === 'github'
+      ? mapGitHubStateToCanonical(issue.state, issue.labels ?? [])
+      : issue.state === 'closed' ? 'done'
+      : issue.state === 'in_review' ? 'in_review'
+      : issue.state === 'in_progress' ? 'in_progress'
+      : 'todo';
+
+    const githubMatch = issue.tracker === 'github'
+      ? issue.url?.match(/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/)
+      : null;
+    const [, ghOwner, ghRepo, ghNumber] = githubMatch ?? [];
+    const sourceRepo = ghOwner && ghRepo ? `${ghOwner}/${ghRepo}` : undefined;
+    const labelNames = issue.labels ?? [];
+
+    return {
+      id: sourceRepo
+        ? `github-${ghOwner}-${ghRepo}-${ghNumber}`
+        : `backfill-${issue.tracker}-${identifier.toLowerCase()}`,
+      identifier,
+      title: issue.title,
+      description: issue.description ?? '',
+      author: issue.author ?? '',
+      status: displayStatusForCanonical(canonicalStatus),
+      canonicalStatus,
+      state: canonicalStatus,
+      priority: issue.priority ?? (
+        labelNames.some((l) => l.includes('priority') && l.includes('high')) ? 2 :
+        labelNames.some((l) => l.includes('priority') && l.includes('urgent')) ? 1 :
+        labelNames.some((l) => l.includes('priority') && l.includes('low')) ? 4 : 3
+      ),
+      assignee: issue.assignee
+        ? { name: issue.assignee, email: `${issue.assignee}@${issue.tracker}` }
+        : undefined,
+      labels: labelNames,
+      url: issue.url,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      // The tracker-door Issue has no closedAt; for a closed issue its last
+      // update is the closest available approximation.
+      completedAt: issue.state === 'closed' ? issue.updatedAt : undefined,
+      project: sourceRepo
+        ? { id: `github-${ghOwner}-${ghRepo}`, name: sourceRepo, color: '#333', icon: 'github' }
+        : { id: `backfill-${issue.tracker}`, name: issue.tracker, color: '#333', icon: issue.tracker },
+      source: issue.tracker,
+      sourceRepo,
+    };
   }
 
   private getCachedTrackerIssues(): any[] {
