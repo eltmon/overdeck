@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-11T09:29:52.171Z",
+  "updated": "2026-08-11T10:31:49.154Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "passed",
@@ -104,7 +104,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-10T21:18:35.358Z",
-    "updatedAt": "2026-08-11T09:29:27.398Z",
+    "updatedAt": "2026-08-11T10:31:46.677Z",
     "reviewNotes": "All four reviewers reported a clean second cycle; the only new commit is a verified test-label update.",
     "testNotes": "install/typecheck/frontend-typecheck/lint/build/server-bundle/test all passed at HEAD aad826fc36 (.overdeck/verification-latest.json, ranAt 21:23:03Z)",
     "uatNotes": "Workspace dashboard on isolated port 3711 (prod :3011 untouched); Playwright verified one-click Conversation<->Terminal switch, agent-selection persistence across a specialist agent, legacy ?tab= deep links, and disabled-Terminal state with accessible reason, in both drawer/page IssueDetail and cockpit IssueMissionControl.",
@@ -232,7 +232,7 @@
       },
       "costAtCloseOut": {
         "usd": 65.638731,
-        "pricingAsOf": "2026-08-11T09:29:27.481Z"
+        "pricingAsOf": "2026-08-11T10:31:46.757Z"
       }
     },
     "merges": [
