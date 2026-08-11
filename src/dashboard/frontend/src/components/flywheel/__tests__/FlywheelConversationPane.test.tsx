@@ -235,7 +235,11 @@ describe('FlywheelConversationPane', () => {
     await waitFor(() => {
       expect(screen.getByText(/No flywheel-orchestrator session yet/)).toBeInTheDocument();
     });
-    expect(screen.getByRole('tab', { name: 'Terminal' })).toBeDisabled();
+    const terminal = screen.getByRole('tab', {
+      name: 'Terminal — No flywheel-orchestrator session yet',
+    });
+    expect(terminal).toBeDisabled();
+    expect(terminal).toHaveAttribute('title', 'No flywheel-orchestrator session yet');
     expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
   });
 

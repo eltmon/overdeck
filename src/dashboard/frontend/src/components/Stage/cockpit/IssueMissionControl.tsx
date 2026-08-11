@@ -802,30 +802,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 preserving the ONE IssueDetail page-density renderer. */}
             {issueDetailTab && (
               <div ref={sessionContentRef} data-section="Session tab" className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}>
-                {activeTab === 'session' ? (
-                  <div
-                    role="tablist"
-                    aria-label="Session views"
-                    className="flex shrink-0 gap-1 border-b border-border px-3 py-2"
-                  >
-                    {(['conversation', 'terminal'] as const).map((subView) => (
-                      <button
-                        key={subView}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeSubView === subView}
-                        onClick={() => selectTab('session', subView)}
-                        className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                          activeSubView === subView
-                            ? 'bg-primary/9 text-primary'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
-                      >
-                        {subView === 'conversation' ? 'Conversation' : 'Terminal'}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
                 <IssueDetail
                   issueId={issueId}
                   density="page"

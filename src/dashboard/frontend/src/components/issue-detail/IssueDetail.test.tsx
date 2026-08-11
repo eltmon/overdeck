@@ -7,6 +7,7 @@
  * strip). End-to-end rail/strip conversation switching is covered through
  * the drawer in IssueDrawer.test.tsx.
  */
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,8 +18,21 @@ import { IssueDetail } from './IssueDetail';
 // Heavy children mocked: the transcript chain (xterm/ConversationPanel),
 // the activity rail, and the action menu (store-coupled actions).
 vi.mock('../drawer/DrawerAgentSession', () => ({
-  DrawerAgentSession: (props: { agentId: string | null; view: string }) => (
-    <div data-testid={`mock-agent-session-${props.view}`} data-agent-id={props.agentId ?? ''} />
+  DrawerAgentSession: (props: {
+    agentId: string | null;
+    view: 'conversation' | 'terminal';
+    onSelectAgent: (agentId: string) => void;
+    onChangeView?: (view: 'conversation' | 'terminal') => void;
+  }) => (
+    <div data-testid={`mock-agent-session-${props.view}`} data-agent-id={props.agentId ?? ''}>
+      <button type="button" onClick={() => props.onSelectAgent('agent-review-1')}>Select specialist</button>
+      {props.onChangeView && (
+        <>
+          <button type="button" onClick={() => props.onChangeView?.('conversation')}>Conversation mode</button>
+          <button type="button" onClick={() => props.onChangeView?.('terminal')}>Terminal mode</button>
+        </>
+      )}
+    </div>
   ),
   pickDefaultDrawerAgent: (agents: readonly Agent[]) =>
     agents.find((a) => a.role === 'work' && a.status === 'running') ?? agents[0] ?? null,
@@ -62,13 +76,30 @@ function renderDetail(ui: React.ReactElement) {
   return render(<QueryClientProvider client={qc}><DialogProvider>{ui}</DialogProvider></QueryClientProvider>);
 }
 
+function ControlledSessionDetail() {
+  const [tab, setTab] = useState<'conversation' | 'terminal'>('conversation');
+  return (
+    <IssueDetail
+      issueId="PAN-1"
+      density="drawer"
+      agents={AGENTS}
+      tab={tab}
+      onSelectTab={(next) => {
+        if (next === 'conversation' || next === 'terminal') setTab(next);
+      }}
+    />
+  );
+}
+
 describe('IssueDetail (C-DETAIL one component)', () => {
-  it('drawer density renders the tab strip, shell, and status rail', () => {
+  it('drawer density renders one active Session tab, shell, and status rail', () => {
     renderDetail(
       <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="conversation" onSelectTab={() => {}} tasksBadge="3/13" />,
     );
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tab-conversation').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('drawer-tab-session')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('drawer-tab-conversation')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-tab-terminal')).not.toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveTextContent('3/13');
     expect(screen.getByTestId('mock-detail-shell')).toBeInTheDocument();
     expect(screen.getByTestId('mock-activity-rail')).toBeInTheDocument();
@@ -76,13 +107,23 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-work-1');
   });
 
-  it('tab clicks are host-controlled via onSelectTab', () => {
+  it('the Session tab is host-controlled and preserves terminal mode', () => {
     const onSelectTab = vi.fn();
-    renderDetail(
+    const { rerender } = renderDetail(
       <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="overview" onSelectTab={onSelectTab} />,
     );
-    fireEvent.click(screen.getByTestId('drawer-tab-terminal'));
-    expect(onSelectTab).toHaveBeenCalledWith('terminal');
+    fireEvent.click(screen.getByTestId('drawer-tab-session'));
+    expect(onSelectTab).toHaveBeenCalledWith('conversation');
+
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <DialogProvider>
+          <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="terminal" onSelectTab={onSelectTab} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByTestId('drawer-tab-session'));
+    expect(onSelectTab).toHaveBeenLastCalledWith('terminal');
   });
 
   it('the shell conversation switcher selects the agent and asks for the conversation tab', () => {
@@ -92,6 +133,40 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     );
     fireEvent.click(screen.getByTestId('open-review-conversation'));
     expect(onSelectTab).toHaveBeenCalledWith('conversation');
+    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
+  });
+
+  it('legacy terminal and conversation tab values open the matching session mode', () => {
+    const onSelectTab = vi.fn();
+    const { rerender } = renderDetail(
+      <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="terminal" onSelectTab={onSelectTab} />,
+    );
+
+    expect(screen.getByTestId('drawer-tab-session')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('mock-agent-session-terminal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation mode' }));
+    expect(onSelectTab).toHaveBeenCalledWith('conversation');
+
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <DialogProvider>
+          <IssueDetail issueId="PAN-1" density="drawer" agents={AGENTS} tab="session" onSelectTab={onSelectTab} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('mock-agent-session-conversation')).toBeInTheDocument();
+  });
+
+  it('preserves a selected specialist across both selector switch directions', () => {
+    renderDetail(<ControlledSessionDetail />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select specialist' }));
+    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal mode' }));
+    expect(screen.getByTestId('mock-agent-session-terminal')).toHaveAttribute('data-agent-id', 'agent-review-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation mode' }));
     expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-review-1');
   });
 

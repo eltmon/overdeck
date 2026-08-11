@@ -1,13 +1,13 @@
 /**
- * DrawerAgentSession — wires the IssueDrawer's Conversation and Terminal tabs
- * to a real agent session.
+ * DrawerAgentSession — renders one issue-scoped agent session as a transcript
+ * or live terminal.
  *
- * The drawer is issue-scoped, so it picks one of the issue's agents (defaulting
- * to the active work agent) and renders either its JSONL transcript
- * (`<ConversationPanel>`) or its live tmux terminal (`<XTerminal>`). When the
- * issue has more than one agent — e.g. a swarm — a compact picker lets the user
- * switch between sessions; the selection is owned by `<IssueDrawer>` so it
- * survives a Conversation ⇄ Terminal tab switch.
+ * The toolbar can expose the shared Conversation | Terminal selector through
+ * `onChangeView`; its parent owns the active view mode. The component picks the
+ * requested issue agent (defaulting to the active work agent) and renders its
+ * JSONL transcript (`<ConversationPanel>`) or tmux terminal (`<XTerminal>`).
+ * When an issue has multiple agents — e.g. a swarm — the compact picker changes
+ * sessions independently, so the parent-owned selection survives view switches.
  *
  * A work agent's `id` is both its tmux session name and its session-file key,
  * so a `Conversation` can be synthesized from the `Agent` alone — the same
@@ -23,6 +23,7 @@ import { StartAgentCta } from '../issue-view/StartAgentCta';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { agentToConversation, isEndedAgent, type SessionAgent } from '../../lib/agentConversation';
+import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // Re-exported so existing importers (IssueDrawer, dock, tests) keep working —
@@ -72,13 +73,15 @@ interface DrawerAgentSessionProps {
   /** The agent to display — resolved by IssueDrawer, shared across both tabs. */
   agentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  /** Switch the shared session surface between transcript and terminal modes. */
+  onChangeView?: (view: 'conversation' | 'terminal') => void;
   /** Needed for the no-agent start surface (StartAgentCta). */
   issueId?: string | null;
   /** Hide ConversationPanel's composer — the parent provides its own (simple mode). */
   hideComposer?: boolean;
 }
 
-export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issueId, hideComposer = false }: DrawerAgentSessionProps) {
+export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onChangeView, issueId, hideComposer = false }: DrawerAgentSessionProps) {
   const testId = `drawer-tab-panel-${view}`;
 
   const agent = useMemo(
@@ -103,12 +106,35 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issue
     refetchInterval: 30_000,
   });
 
+  const terminalDisabledReason = !agent
+    ? 'No agent selected — start work to attach a terminal'
+    : isEndedAgent(agent)
+      ? 'Session ended — no live terminal to attach'
+      : undefined;
+  const viewToggle = onChangeView ? (
+    <ViewToggle
+      ariaLabel="Agent session view"
+      value={view}
+      onChange={onChangeView}
+      options={[
+        { id: 'conversation', label: 'Conversation' },
+        {
+          id: 'terminal',
+          label: 'Terminal',
+          disabled: Boolean(terminalDisabledReason),
+          disabledReason: terminalDisabledReason,
+        },
+      ]}
+    />
+  ) : null;
+
   if (!agent || !conversation) {
     return (
       <div
         data-testid={testId}
         className="rounded-[var(--radius)] border border-dashed border-border bg-card/60 p-[18px]"
       >
+        {viewToggle && <div className="mb-[12px] flex items-center">{viewToggle}</div>}
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {view === 'conversation' ? 'Conversation' : 'Terminal'}
         </div>
@@ -134,6 +160,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issue
   return (
     <div data-testid={testId} className="flex min-h-0 flex-1 flex-col gap-[10px]">
       <div className="flex shrink-0 items-center gap-[8px]">
+        {viewToggle}
         {agents.length > 1 && (
           <>
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">

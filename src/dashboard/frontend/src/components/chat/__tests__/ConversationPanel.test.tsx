@@ -502,8 +502,8 @@ describe('ConversationPanel rename flow', () => {
       onViewModeChange,
     });
 
-    expect(screen.getByRole('button', { name: 'Terminal' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Conversation' }));
+    expect(screen.getByRole('tab', { name: 'Terminal' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Conversation' }));
 
     expect(onViewModeChange).toHaveBeenCalledWith('conversation');
   });
