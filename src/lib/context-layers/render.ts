@@ -8,8 +8,9 @@
  */
 
 import type { Harness } from '@overdeck/contracts';
+import { loadConfigSync } from '../config-yaml.js';
 import { renderForHarness } from './harness.js';
-import { renderBundledRules } from './rules.js';
+import { disabledRuleNames, renderBundledRules } from './rules.js';
 import { globalContextFile, resolveProjectContextFile, readLayerContent } from './layers.js';
 
 /** Opening marker of the Overdeck-managed region in a target CLAUDE.md. */
@@ -163,8 +164,17 @@ export function userContentOutsideRegion(existing: string): string {
  */
 export function renderGlobalLayer(harness: Harness, includeDevRules: boolean): string {
   const layer = renderForHarness(readLayerContent(globalContextFile()), harness).trim();
-  const rules = renderBundledRules(harness, includeDevRules);
+  const rules = renderBundledRules(harness, includeDevRules, configDisabledRuleNames());
   return [layer, rules].filter((s) => s.length > 0).join('\n\n---\n\n');
+}
+
+/** Resolve the config-disabled bundled-rule names; a broken config disables nothing. */
+export function configDisabledRuleNames(): Set<string> {
+  try {
+    return disabledRuleNames(loadConfigSync().config.context);
+  } catch {
+    return new Set();
+  }
 }
 
 /**

@@ -109,6 +109,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     swarm: { ...DEFAULT_CONFIG.swarm },
+    context: { rules: { ...DEFAULT_CONFIG.context.rules } },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
     },
@@ -233,6 +234,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   // Merge in reverse order (lowest precedence first)
   for (const config of validConfigs.reverse()) {
     if (config.swarm) result.swarm = { ...result.swarm, ...config.swarm };
+    if (config.context?.rules) {
+      result.context = { rules: { ...result.context.rules, ...config.context.rules } };
+    }
     // Merge providers
     if (config.models?.providers) {
       const providers = config.models.providers;

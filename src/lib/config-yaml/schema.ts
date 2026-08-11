@@ -146,6 +146,20 @@ export interface NormalizedKnowledgeConfig {
   postMergeAutoRetro: boolean;
 }
 
+export interface ContextConfig {
+  /**
+   * Per-bundled-rule enable map, keyed by rule file basename without `.md`
+   * (e.g. `ste-writing`). Absent or `true` folds the rule into rendered
+   * context; `false` omits it. Evaluated at render time (`pan sync` and the
+   * dashboard Context-page preview), so toggling needs a sync + new session.
+   */
+  rules?: Record<string, boolean>;
+}
+
+export interface NormalizedContextConfig {
+  rules: Record<string, boolean>;
+}
+
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
 
 export interface ConversationsConfig {
@@ -543,6 +557,9 @@ export interface YamlConfig {
   /** OKF/knowledge-agent behavior */
   knowledge?: KnowledgeConfig;
 
+  /** Context-layer distribution configuration (bundled-rule gating) */
+  context?: ContextConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -756,6 +773,8 @@ export interface NormalizedShadowConfig {
 export interface NormalizedConfig {
   /** Automatic swarm-selection policy. Off is the safe built-in default. */
   swarm: SwarmPolicyConfig;
+  /** Context-layer distribution: bundled-rule opt-out map (PAN-3658). */
+  context: NormalizedContextConfig;
   /** tmux runtime configuration */
   tmux: {
     configMode: TmuxConfigMode;

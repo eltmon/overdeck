@@ -160,6 +160,21 @@ carries a `scope:` frontmatter key:
 - `scope: dev` — folded in only on a overdeck checkout (`isDevMode()`),
   for rules about developing Overdeck itself.
 
+### Config gating (`context.rules`)
+
+Every bundled rule is on by default. `context.rules` in
+`~/.overdeck/config.yaml` is a per-rule opt-out map keyed by the rule's file
+basename (no `.md`): `false` omits the rule, any absent key (or `true`) keeps
+it. Example: `context: { rules: { ste-writing: false } }`.
+
+The gate lives in `disabledRuleNames()` (`src/lib/context-layers/rules.ts`)
+and threads through both render surfaces — `renderGlobalLayer()` (sync, ACP,
+`pan context diff`) and the dashboard Context-page preview
+(`renderBundledRulesAsync` in `src/dashboard/server/routes/context.ts`) — so
+the preview always matches what ships. The map is read at render time:
+toggling requires `pan sync` plus a new session. First gated rule:
+`ste-writing` (PAN-3658).
+
 ## `pan context` CLI
 
 ```

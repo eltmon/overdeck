@@ -16,6 +16,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { Harness } from '@overdeck/contracts';
+import type { ContextConfig } from '../config-yaml.js';
 import { SYNC_SOURCES } from '../paths.js';
 import { renderForHarness } from './harness.js';
 
@@ -61,15 +62,36 @@ export function readBundledRules(): BundledRule[] {
 }
 
 /**
+ * Rule names switched off via `context.rules: { <name>: false }` in
+ * config.yaml. Absent keys and `true` mean the rule stays on, so a bundled
+ * rule is default-on and the map only ever lists opt-outs.
+ */
+export function disabledRuleNames(context: ContextConfig | undefined): Set<string> {
+  return new Set(
+    Object.entries(context?.rules ?? {})
+      .filter(([, enabled]) => enabled === false)
+      .map(([name]) => name),
+  );
+}
+
+/**
  * Render the applicable bundled rules into one CLAUDE.md section.
  *
  * `includeDev` admits `scope: dev` rules — set it from `isDevMode()` so they
- * only fold in on a overdeck checkout. Each rule body is rendered for
- * the target harness so any `{{#harness:*}}` blocks resolve. Returns '' when
- * no rules apply.
+ * only fold in on a overdeck checkout. `disabled` names rules switched off in
+ * config (see {@link disabledRuleNames}); callers that render for real
+ * distribution or preview must pass it so both surfaces agree. Each rule body
+ * is rendered for the target harness so any `{{#harness:*}}` blocks resolve.
+ * Returns '' when no rules apply.
  */
-export function renderBundledRules(harness: Harness, includeDev: boolean): string {
-  const rules = readBundledRules().filter((r) => includeDev || r.scope === 'universal');
+export function renderBundledRules(
+  harness: Harness,
+  includeDev: boolean,
+  disabled: ReadonlySet<string> = new Set(),
+): string {
+  const rules = readBundledRules().filter(
+    (r) => (includeDev || r.scope === 'universal') && !disabled.has(r.name),
+  );
   const sections = rules
     .map((r) => renderForHarness(r.body, harness).trim())
     .filter((s) => s.length > 0);

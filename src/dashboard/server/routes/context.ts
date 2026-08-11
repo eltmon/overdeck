@@ -34,7 +34,7 @@ import {
   resolveWorkspaceContextFile,
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
-import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
+import { configDisabledRuleNames, hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
 import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
@@ -367,10 +367,12 @@ function parseRule(raw: string): { scope: RuleScope; body: string } {
 
 async function renderBundledRulesAsync(harness: Harness): Promise<string> {
   const includeDev = isDevMode();
+  const disabled = configDisabledRuleNames();
   const entries = await readdir(SYNC_SOURCES.rules, { withFileTypes: true }).catch(() => []);
   const sections = await Promise.all(
     entries
       .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .filter((entry) => !disabled.has(entry.name.replace(/\.md$/, '')))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(async (entry) => {
         const file = join(SYNC_SOURCES.rules, entry.name);

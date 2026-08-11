@@ -13,6 +13,7 @@
 1314 src/lib/tmux.ts # PAN-3212
 1224 src/lib/lifecycle/workflows.ts # PAN-3396
 1049 src/lib/config-yaml/schema.ts # PAN-3410
+1068 src/lib/config-yaml/schema.ts # PAN-3658
 900 src/lib/launcher-generator.ts # PAN-1837
 1186 src/lib/sync.ts # PAN-3450
 1060 src/lib/agents/spawn.ts # PAN-1837

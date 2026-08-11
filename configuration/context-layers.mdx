@@ -55,6 +55,23 @@ Overdeck ships engineering rules inside the package under
 
 Rules ship with `pan install` and refresh on every `pan sync`.
 
+### Switching a bundled rule off
+
+Every bundled rule is on by default. To switch one off on a machine, name it
+under `context.rules` in `~/.overdeck/config.yaml`, with the rule's file
+basename as the key:
+
+```yaml
+context:
+  rules:
+    ste-writing: false # omit the Simplified Technical English writing rule
+```
+
+`false` omits the rule from every rendered surface — the managed regions, the
+Pi/Codex render artifacts, and the dashboard Context-page preview. Any absent
+key (or `true`) leaves the rule on. The map is read at render time, so after a
+change, run `pan sync`; the new render reaches new sessions only.
+
 ## What each harness actually reads
 
 Each harness consumes context through its own native mechanism. `pan sync`

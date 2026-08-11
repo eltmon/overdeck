@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseRule, readBundledRules, renderBundledRules } from '../../../src/lib/context-layers/rules.js';
+import { disabledRuleNames, parseRule, readBundledRules, renderBundledRules } from '../../../src/lib/context-layers/rules.js';
 
 describe('parseRule', () => {
   it('reads scope: dev from frontmatter and strips the frontmatter from the body', () => {
@@ -54,5 +54,28 @@ describe('renderBundledRules', () => {
   it('produces a single Overdeck Engineering Rules section', () => {
     const out = renderBundledRules('claude-code', true);
     expect(out.match(/## Overdeck Engineering Rules/g)).toHaveLength(1);
+  });
+
+  it('folds the ste-writing rule by default', () => {
+    const out = renderBundledRules('claude-code', false);
+    expect(out).toContain('ASD-STE100');
+  });
+
+  it('omits a rule named in the disabled set', () => {
+    const out = renderBundledRules('claude-code', false, new Set(['ste-writing']));
+    expect(out).not.toContain('ASD-STE100');
+    expect(out).toContain('Work agents run through');
+  });
+});
+
+describe('disabledRuleNames', () => {
+  it('collects only rules explicitly set to false', () => {
+    const names = disabledRuleNames({ rules: { 'ste-writing': false, 'writing-style': true } });
+    expect([...names]).toEqual(['ste-writing']);
+  });
+
+  it('returns an empty set when the context section is absent', () => {
+    expect(disabledRuleNames(undefined).size).toBe(0);
+    expect(disabledRuleNames({}).size).toBe(0);
   });
 });
