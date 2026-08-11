@@ -89,7 +89,7 @@ projects:
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
 | `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN") |
-| `tracker` | No | Tracker type: `linear`, `github`, `gitlab`, `rally` |
+| `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`. Set it explicitly when the code host and issue tracker differ. |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
 | `issue_routing` | No | Label-based routing rules |
@@ -99,6 +99,27 @@ projects:
 | `release` | No | Coordinated post-merge release configuration |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
+
+### Separate the issue tracker from the code host
+
+The `tracker` field selects where issues and workflow states live. Code-host fields such as `github_repo` and `gitlab_repo` independently select where Overdeck reads pull requests or merge requests.
+
+Set `tracker` explicitly whenever those systems differ. For example, this project tracks `LEX-*` issues in Linear while hosting its source code and pull requests on GitHub:
+
+```yaml
+projects:
+  lexerra:
+    name: "Lexerra"
+    path: /home/user/projects/lexerra
+    issue_prefix: LEX
+    tracker: linear
+    linear_project: Lexerra
+    github_repo: eltmon/lexerra
+```
+
+Keep both credentials available: Overdeck uses the Linear API for issue state and authenticated GitHub access for pull-request evidence. Do not remove `github_repo` to force Linear routing, because that would also remove the project's GitHub pull-request lens.
+
+See [Issue Tracker Integration](/configuration/issue-trackers#tracker-and-code-host-can-differ) for troubleshooting and additional examples.
 
 ## Release Configuration
 

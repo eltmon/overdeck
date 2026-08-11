@@ -276,21 +276,43 @@ The dashboard shows issues from all configured trackers:
 
 ## Multi-Tracker Workflows
 
-### Mixed Tracker Pattern
+### Tracker and Code Host Can Differ
 
-A common pattern is using different trackers for different projects:
+The issue tracker and code host are independent project settings. The `tracker` field selects where issues and workflow states live, while `github_repo` or `gitlab_repo` selects where Overdeck reads pull requests or merge requests.
+
+Set `tracker` explicitly when one project uses different systems. This example tracks `APP-*` issues in Linear while hosting source code and pull requests on GitHub:
+
+```yaml
+projects:
+  myapp:
+    name: "My Application"
+    path: /home/user/projects/myapp
+    issue_prefix: APP
+    tracker: linear
+    linear_project: My Application
+    github_repo: myorg/myapp
+```
+
+This setup requires both Linear credentials and authenticated GitHub access. Overdeck queries Linear for issue state and labels, then queries GitHub for pull-request evidence. Keep `github_repo`; removing it would hide GitHub pull requests from pipeline membership.
+
+If a Linear-tracked, GitHub-hosted project reports a GitHub Issues request such as `/repos/myorg/myapp/issues?...labels=planning` instead, check for a missing `tracker: linear`. Without that explicit setting, tracker inference may select GitHub Issues from `github_repo`. A GitHub 404 can be misleading here because private repositories also return 404 when the selected GitHub credential lacks access.
+
+### Different Trackers Across Projects
+
+A separate pattern is using different trackers for different projects:
 
 ```yaml
 projects:
   myapp:
     name: "My Application"
     issue_prefix: APP
-    # Linear for this project
+    tracker: linear
 
   myapp-oss:
     name: "My App OSS Components"
+    issue_prefix: OSS
+    tracker: github
     github_repo: myorg/myapp-oss
-    # GitHub Issues for this project
 ```
 
 ### Syncing Between Trackers
