@@ -670,6 +670,27 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(onSelectProject).toHaveBeenCalledWith(null);
   });
 
+  it('auto-selects the only project with features when none is selected', async () => {
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ onSelectProject });
+
+    await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('test-project'));
+  });
+
+  it('does not auto-select a project while a conversation deep-link is pending', async () => {
+    // Auto-select goes through onSelectProject's default path, which clears the
+    // conversation route — it must yield to a pending /conv deep-link (convId).
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ convId: '1', onSelectProject });
+
+    // The deep-link effect itself selects the conversation's project with
+    // { updateUrl: false }; only the bare auto-select call must be absent.
+    await waitFor(() =>
+      expect(onSelectProject).toHaveBeenCalledWith(expect.anything(), { updateUrl: false }),
+    );
+    expect(onSelectProject).not.toHaveBeenCalledWith('test-project');
+  });
+
   it('returns the created conversation name and opens its agent pane', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');

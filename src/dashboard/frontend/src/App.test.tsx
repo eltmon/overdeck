@@ -151,15 +151,17 @@ vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
 }));
 vi.mock('./components/CommandDeck', () => ({
-  CommandDeck: ({ conversationViewMode, onConversationViewModeChange, selectedProject, onSelectProject }: {
+  CommandDeck: ({ conversationViewMode, onConversationViewModeChange, selectedProject, onSelectProject, convId }: {
     conversationViewMode?: 'conversation' | 'terminal';
     onConversationViewModeChange?: (mode: 'conversation' | 'terminal') => void;
     selectedProject?: string | null;
     onSelectProject?: (project: string | null) => void;
+    convId?: string | null;
   }) => (
     <div>
       <div data-testid="view-mode">{conversationViewMode}</div>
       <div data-testid="selected-project">{selectedProject ?? ''}</div>
+      <div data-testid="conv-id">{convId ?? ''}</div>
       <button onClick={() => onConversationViewModeChange?.('terminal')}>Terminal</button>
       <button onClick={() => onConversationViewModeChange?.('conversation')}>Conversation</button>
       <button onClick={() => onSelectProject?.('panopticon-cli')}>Select panopticon</button>
@@ -440,6 +442,22 @@ describe('App primary routing', () => {
 
     expect(window.location.pathname).toBe('/command-deck/panopticon-cli');
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  it('clears a stale conversation route when a command deck project is selected', () => {
+    // Regression: with a conversation route lingering in App state, remounting
+    // CommandDeck re-applied it (its applied-marker ref dies with the component)
+    // and flipped the deck back to the old conversation's project while the URL
+    // kept the newly picked one.
+    window.history.replaceState(null, '', '/conv/55');
+    renderApp();
+    expect(screen.getByTestId('conv-id').textContent).toBe('55');
+
+    fireEvent.click(screen.getByText('Select panopticon'));
+
+    expect(window.location.pathname).toBe('/command-deck/panopticon-cli');
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+    expect(screen.getByTestId('conv-id').textContent).toBe('');
   });
 
   it('marks the parent surface when the drawer is open', () => {

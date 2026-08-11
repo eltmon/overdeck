@@ -238,8 +238,11 @@ export default function App() {
     if (window.location.pathname !== path) {
       window.history.pushState({ tab: 'command-deck', project: project.key }, '', path);
     }
+    // Same reason as handleSelectProject: the new project is newer intent than a
+    // lingering conversation route, which would flip the deck away on remount.
+    setConversationRoute(null);
     usePanesStore.getState().ensureHome(project.key);
-  }, [queryClient]);
+  }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
   useEffect(() => {
@@ -568,9 +571,16 @@ export default function App() {
     // selection leaves it default (true).
     if (opts?.updateUrl !== false) {
       const path = projectName ? `/command-deck/${encodeURIComponent(projectName)}` : '/command-deck';
+      commandDeckPathRef.current = path;
       if (window.location.pathname !== path) {
         window.history.pushState({ tab: 'command-deck', project: projectName }, '', path);
       }
+      // An explicit project pick is newer intent than any lingering conversation
+      // route. Clear it, or CommandDeck's conv deep-link effect re-applies the
+      // stale conversation on remount (its appliedConvId ref dies with the
+      // component) and flips the deck back to that conversation's project while
+      // the URL keeps the picked one.
+      setConversationRoute(null);
     }
     if (projectName) {
       // ensureHome hydrates/creates the workspace and replaces the store object,
@@ -581,7 +591,7 @@ export default function App() {
       const home = (fresh.panesByWorkspace[projectName] ?? []).find((p) => p.paneType === 'home');
       if (home) fresh.setActivePane(projectName, home.paneId);
     }
-  }, []);
+  }, [setConversationRoute]);
 
   // Handle browser back/forward
   useEffect(() => {

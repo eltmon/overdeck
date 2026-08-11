@@ -390,12 +390,15 @@ export function CommandDeck({
   }, [projects, sessionTreeMap]);
 
   useEffect(() => {
-    if (selectedProject || !onSelectProject) return;
+    // A pending conversation deep-link (convId) must win over auto-select:
+    // onSelectProject's default path clears the conversation route, which would
+    // drop the deep-link before the effect below applies it.
+    if (selectedProject || !onSelectProject || convId) return;
     const projectsWithFeatures = projectsWithSessions.filter((project) => project.features.length > 0);
     if (projectsWithFeatures.length === 1) {
       onSelectProject(projectsWithFeatures[0]!.name);
     }
-  }, [onSelectProject, projectsWithSessions, selectedProject]);
+  }, [convId, onSelectProject, projectsWithSessions, selectedProject]);
 
   const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
 
