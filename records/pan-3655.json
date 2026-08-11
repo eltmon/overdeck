@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-10T21:17:49.084Z"
   },
   "created": "2026-08-10T20:11:38.806Z",
-  "updated": "2026-08-10T21:32:47.063Z",
+  "updated": "2026-08-11T01:13:30.914Z",
   "pipeline": {
     "issueId": "PAN-3655",
     "reviewStatus": "passed",
@@ -99,11 +99,12 @@
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-10T21:18:35.358Z",
-    "updatedAt": "2026-08-10T21:31:24.947Z",
+    "updatedAt": "2026-08-11T01:13:25.479Z",
     "reviewNotes": "All four reviewers reported a clean second cycle; the only new commit is a verified test-label update.",
     "testNotes": "install/typecheck/frontend-typecheck/lint/build/server-bundle/test all passed at HEAD aad826fc36 (.overdeck/verification-latest.json, ranAt 21:23:03Z)",
     "uatNotes": "Workspace dashboard on isolated port 3711 (prod :3011 untouched); Playwright verified one-click Conversation<->Terminal switch, agent-selection persistence across a specialist agent, legacy ?tab= deep links, and disabled-Terminal state with accessible reason, in both drawer/page IssueDetail and cockpit IssueMissionControl.",
@@ -200,10 +201,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 218,
-            "output": 28323,
-            "cacheRead": 17761061,
-            "cacheWrite": 242729
+            "input": 222,
+            "output": 28940,
+            "cacheRead": 18247035,
+            "cacheWrite": 243557
           }
         },
         "work": {
@@ -223,15 +224,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 218,
-          "output": 28323,
-          "cacheRead": 17761061,
-          "cacheWrite": 242729
+          "input": 222,
+          "output": 28940,
+          "cacheRead": 18247035,
+          "cacheWrite": 243557
         }
       },
       "costAtCloseOut": {
-        "usd": 65.533288,
-        "pricingAsOf": "2026-08-10T21:32:47.055Z"
+        "usd": 65.638731,
+        "pricingAsOf": "2026-08-11T01:13:25.672Z"
       }
     },
     "merges": [
