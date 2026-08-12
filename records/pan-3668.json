@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:01:11.136Z",
+  "updated": "2026-08-12T18:03:48.494Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "config-schema-prime-agent": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2703273,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T18:01:11.135Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Added prime-agent to plan, start, strike, and artifact CLI help and regenerated the canonical composer-command manifest; manifest lint passes.",
         "releasedAt": "2026-08-12T18:01:01.803Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2703273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:01:11.135Z",
+        "itemId": "config-schema-prime-agent",
+        "outcome": "completed",
+        "reason": "Added prime-agent role/provider validation and normalized primeAgent binaryPath/RPC startup timeout configuration with merge tests; added the required PAN-3668 schema-size audit after the push gate rejected growth.",
+        "releasedAt": "2026-08-12T18:03:48.493Z"
       }
     ],
     "statusReasons": {
@@ -140,6 +143,10 @@
       "cli-harness-flag-help": {
         "reason": "Added prime-agent to plan, start, strike, and artifact CLI help and regenerated the canonical composer-command manifest; manifest lint passes.",
         "updatedAt": "2026-08-12T18:01:01.803Z"
+      },
+      "config-schema-prime-agent": {
+        "reason": "Added prime-agent role/provider validation and normalized primeAgent binaryPath/RPC startup timeout configuration with merge tests; added the required PAN-3668 schema-size audit after the push gate rejected growth.",
+        "updatedAt": "2026-08-12T18:03:48.493Z"
       }
     }
   },
@@ -160,6 +167,8 @@
     "cli-harness-flag-help": "completed",
     "cli-harness-flag-help.ac1": "completed",
     "cli-harness-flag-help.ac2": "completed",
-    "config-schema-prime-agent": "running"
+    "config-schema-prime-agent": "completed",
+    "config-schema-prime-agent.ac1": "completed",
+    "config-schema-prime-agent.ac2": "completed"
   }
 }
