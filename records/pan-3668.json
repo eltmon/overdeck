@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T17:57:16.758Z",
+  "updated": "2026-08-12T17:58:36.562Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "contracts-enumerations": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2652404,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T17:57:16.758Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Verified the exhaustive Prime Agent behavior record, including executable identity, RPC lifecycle semantics, capability flags, context injection, and timeout.",
         "releasedAt": "2026-08-12T17:57:06.556Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2652404,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T17:57:16.758Z",
+        "itemId": "contracts-enumerations",
+        "outcome": "completed",
+        "reason": "Added prime-agent to context previews, flywheel records, artifact provenance, and telemetry harness domains with contract coverage.",
+        "releasedAt": "2026-08-12T17:58:36.562Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "contracts-prime-behavior-record": {
         "reason": "Verified the exhaustive Prime Agent behavior record, including executable identity, RPC lifecycle semantics, capability flags, context injection, and timeout.",
         "updatedAt": "2026-08-12T17:57:06.556Z"
+      },
+      "contracts-enumerations": {
+        "reason": "Added prime-agent to context previews, flywheel records, artifact provenance, and telemetry harness domains with contract coverage.",
+        "updatedAt": "2026-08-12T17:58:36.562Z"
       }
     }
   },
@@ -124,6 +131,8 @@
     "contracts-prime-behavior-record.ac1": "completed",
     "contracts-prime-behavior-record.ac2": "completed",
     "contracts-prime-behavior-record.ac3": "completed",
-    "contracts-enumerations": "running"
+    "contracts-enumerations": "completed",
+    "contracts-enumerations.ac1": "completed",
+    "contracts-enumerations.ac2": "completed"
   }
 }
