@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:03:59.031Z",
+  "updated": "2026-08-12T18:05:22.959Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "provider-map": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2743120,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T18:03:59.031Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Added prime-agent role/provider validation and normalized primeAgent binaryPath/RPC startup timeout configuration with merge tests; added the required PAN-3668 schema-size audit after the push gate rejected growth.",
         "releasedAt": "2026-08-12T18:03:48.493Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2743120,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:03:59.031Z",
+        "itemId": "provider-map",
+        "outcome": "completed",
+        "reason": "Added explicit table-driven Prime provider/model routing for verified API-key and subscription providers; unsupported mappings fail without choosing a fallback model.",
+        "releasedAt": "2026-08-12T18:05:22.958Z"
       }
     ],
     "statusReasons": {
@@ -155,6 +158,10 @@
       "config-schema-prime-agent": {
         "reason": "Added prime-agent role/provider validation and normalized primeAgent binaryPath/RPC startup timeout configuration with merge tests; added the required PAN-3668 schema-size audit after the push gate rejected growth.",
         "updatedAt": "2026-08-12T18:03:48.493Z"
+      },
+      "provider-map": {
+        "reason": "Added explicit table-driven Prime provider/model routing for verified API-key and subscription providers; unsupported mappings fail without choosing a fallback model.",
+        "updatedAt": "2026-08-12T18:05:22.958Z"
       }
     }
   },
@@ -178,6 +185,9 @@
     "config-schema-prime-agent": "completed",
     "config-schema-prime-agent.ac1": "completed",
     "config-schema-prime-agent.ac2": "completed",
-    "provider-map": "running"
+    "provider-map": "completed",
+    "provider-map.ac1": "completed",
+    "provider-map.ac2": "completed",
+    "provider-map.ac3": "completed"
   }
 }
