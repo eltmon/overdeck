@@ -49,6 +49,8 @@ import {
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
+export const SUPPORTED_PRIME_AGENT_VERSION_MIN = '0.1.0';
+export const SUPPORTED_PRIME_AGENT_VERSION_MAX_EXCLUSIVE = '1.0.0';
 const execAsync = promisify(exec);
 
 function compareSemver(a: string, b: string): number {
@@ -81,6 +83,64 @@ export async function checkKimi(
     status: 'ok',
     message: kimi.version ?? 'Installed (version unknown)',
   }];
+}
+
+function parseSemver(value: string | null): string | null {
+  return value?.match(/(\d+\.\d+\.\d+)/)?.[1] ?? null;
+}
+
+export async function checkPrimeAgent(
+  probe?: PrerequisiteProbe,
+  resolver?: PrerequisiteResolver,
+): Promise<CheckResult[]> {
+  const prime = await checkSystemPrerequisite('prime-agent', probe, resolver);
+  if (!prime.found) {
+    return [{
+      name: prime.name,
+      status: 'warn',
+      message: 'Not installed (prime-agent harness unavailable)',
+      fix: `Install: ${prime.install.linux}`,
+    }];
+  }
+
+  const version = parseSemver(prime.version);
+  if (!version) {
+    return [{
+      name: prime.name,
+      status: 'warn',
+      message: 'Detected but `prime-agent --version` did not return a semantic version',
+      fix: `Install a supported release >= ${SUPPORTED_PRIME_AGENT_VERSION_MIN} and < ${SUPPORTED_PRIME_AGENT_VERSION_MAX_EXCLUSIVE}`,
+    }];
+  }
+  if (compareSemver(version, SUPPORTED_PRIME_AGENT_VERSION_MIN) < 0
+    || compareSemver(version, SUPPORTED_PRIME_AGENT_VERSION_MAX_EXCLUSIVE) >= 0) {
+    return [{
+      name: prime.name,
+      status: 'warn',
+      message: `v${version} is unsupported; requires >= ${SUPPORTED_PRIME_AGENT_VERSION_MIN} and < ${SUPPORTED_PRIME_AGENT_VERSION_MAX_EXCLUSIVE}`,
+      fix: 'Install a compatible Prime Agent release; Overdeck will not fall back to another harness.',
+    }];
+  }
+
+  const effectiveResolver = resolver ?? (async (command, options) => {
+    const { resolveHarnessBinary } = await import('../../lib/harness-binary.js');
+    return options?.primeAgentHarness ? resolveHarnessBinary('prime-agent') : null;
+  });
+  const executable = await effectiveResolver('prime-agent', { primeAgentHarness: true });
+  try {
+    const help = executable && probe ? await probe(executable, ['--help']) : '';
+    if (probe && !/(?:--mode\b[^\n]*\brpc\b|--mode\s+<[^>]+>)/i.test(help)) {
+      return [{
+        name: prime.name,
+        status: 'warn',
+        message: `v${version} does not advertise the required --mode rpc capability`,
+        fix: 'Install a Prime Agent build with RPC mode support.',
+      }];
+    }
+  } catch {
+    return [{ name: prime.name, status: 'warn', message: `v${version}; RPC capability probe failed`, fix: 'Run `prime-agent --help` and verify --mode rpc is available.' }];
+  }
+  return [{ name: prime.name, status: 'ok', message: `v${version} (RPC mode available)` }];
 }
 
 export function checkCodex(): CheckResult[] {
@@ -748,6 +808,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+
+  // Prime Agent is optional, but an installed build must match the pinned RPC protocol range.
+  for (const c of await checkPrimeAgent()) checks.push(c);
 
   // Check Overdeck directories
   const directories = [
