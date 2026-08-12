@@ -2,7 +2,7 @@
   "issueId": "PAN-3664",
   "schemaVersion": 2,
   "created": "2026-08-12T04:38:51.554Z",
-  "updated": "2026-08-12T04:38:51.555Z",
+  "updated": "2026-08-12T04:42:54.990Z",
   "pipeline": {
     "issueId": "PAN-3664",
     "reviewStatus": "pending",
@@ -19,5 +19,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-12T04:42:54.989Z"
+    }
+  ]
 }
