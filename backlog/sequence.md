@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-12T23:31:44.581Z · model: claude-opus-5 · open: 841_
+_Last sequenced: 2026-08-12T23:35:37.036Z · model: claude-opus-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -55,95 +55,95 @@ _Last sequenced: 2026-08-12T23:31:44.581Z · model: claude-opus-5 · open: 841_
 | 48 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overload under concurrent convoys 502s fleet-wide, killing resumes and feedback delivery |
 | 49 | PAN-3564 | M | critical | ok |  | PAN-3561 | Lock convoy: the per-issue record lock is held across the global state-git wait, killing reviewer spawns |
 | 50 | PAN-3651 | S | critical | ok |  | PAN-3424 | Re-land the overdeck-state non-FF push retry with the pan-dir state-door suites green |
-| 51 | PAN-3662 | S | critical | ok |  |  | Read-only CLI surfaces run schema top-ups and emit SQLITE_READONLY under the sandboxed Flywheel |
 | 51 | PAN-3580 | M | high | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
-| 52 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 53 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 54 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn abandons on a transient Docker failure; 'attempt 1/3' never retries |
-| 55 | PAN-3103 | S | critical | ok |  |  | A transient merge_status=failed permanently skips close-out; merged issues stay open and get re-planned |
-| 56 | PAN-3118 | M | critical | ok |  |  | Model-specific quota exhaustion halts agents invisibly; four planning agents 'running' at $0.00 |
-| 57 | PAN-3236 | S | critical | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so feedback never lands |
-| 58 | PAN-3248 | XS | critical | ok |  | PAN-3244 | pan reload never clears pending-deploy.json, so every deploy starves all verification until a patrol runs |
-| 59 | PAN-3278 | S | critical | ok |  |  | Work agent finished with an open PR but review was never dispatched; auto-requeue fired none of 25 attempts |
-| 60 | PAN-3429 | M | critical | ok |  | PAN-3344 | Memory governor defers admissions but sheds nothing under HARD pressure; the flywheel shed by hand |
-| 61 | PAN-3504 | XS | critical | ok |  |  | typecheck fails on main: parked.ts references ProjectConfig.projectPath instead of path |
-| 62 | PAN-3541 | S | critical | ok |  |  | Review restart after an unclean reviewer death loops on the session-resume menu forever |
-| 63 | PAN-3543 | S | critical | ok |  | PAN-3541 | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while recommending --fresh |
-| 64 | PAN-3563 | S | critical | ok |  | PAN-3560 | A role agent spawned with an undelivered prompt becomes an invisible zombie no recovery verb can see |
-| 65 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint silently drops every polyrepo candidate, so MYN and Auricle trains stay empty |
-| 66 | PAN-3663 | S | critical | ok |  |  | PR close events never invalidate pipeline membership, so zombie_pr rows stay stale in the canonical read door |
-| 67 | PAN-2706 | M | high | ok |  |  | Ghost test sessions absorb every test dispatch |
-| 68 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
-| 69 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
-| 70 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 71 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
-| 72 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
-| 73 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
-| 74 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
-| 75 | PAN-1824 | S | critical | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
-| 76 | PAN-3139 | S | critical | ok |  |  | Agents-table liveness drifts stale in the under-reporting direction; the authoritative plane is the wrong one |
-| 77 | PAN-3237 | S | critical | ok |  |  | A capacity-refused planning-to-work handoff is marked terminally stuck; every 409 becomes 'guardrails' |
-| 78 | PAN-3274 | S | critical | ok |  |  | A test-role agent can spawn and never run, stranding an approved, CI-green issue behind a missing verdict |
-| 79 | PAN-3281 | S | critical | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches UAT |
-| 80 | PAN-3496 | S | critical | ok |  |  | Review/inspect agents AskUserQuestion the operator for review depth, converting autonomy into operator work |
-| 81 | PAN-3500 | S | critical | ok |  |  | A review sub-role can modify the branch after writing its report, violating its own spawn contract |
-| 82 | PAN-3522 | S | critical | ok |  | PAN-3344 | Supervisor watchdog restart-churns under CPU storm because the probe budget ignores the boot warm phase |
-| 83 | PAN-3555 | S | critical | ok |  |  | pan start silently spawned a fresh session over a resumable warm session, violating warm-by-default |
-| 84 | PAN-3565 | M | critical | ok |  | PAN-3563 | Failed review spawn wedges 'starting', infra failure synthesizes a fake CHANGES REQUESTED verdict |
-| 85 | PAN-3571 | S | critical | ok |  |  | Completion-check timeout exits silently — 334 stranded turn-ends leave agents stalled until a patrol notices |
-| 86 | PAN-3654 | S | critical | ok |  | PAN-3653 | Compact respawn confirms against the archived session and kills a working fresh agent |
-| 87 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 88 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 89 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 90 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 91 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 92 | PAN-2886 | M | high | ok |  |  | Placeholder (pending-work-spawn) agents crash auto-resume with 'Unknown model' → stranded troubled forever |
-| 93 | PAN-2817 | M | high | ok |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 94 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 95 | PAN-2747 | S | high | ok |  |  | Flywheel cannot be resumed after a crash/reboot: Resume is disabled and the only offered action aborts the run |
-| 96 | PAN-2759 | S | high | ok |  |  | Dead flywheel with an active run was never auto-relaunched after a reboot |
-| 97 | PAN-2709 | M | high | ok |  |  | Flywheel orchestrator is unreachable as a notification target |
-| 98 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 99 | PAN-2179 | S | high | ok |  |  | relaunch can leave a zombie agent |
-| 100 | PAN-2169 | S | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 101 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
-| 102 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 103 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
-| 104 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 105 | PAN-3081 | M | high | ok |  |  | Agent git guard is bypassable by stripping it from $PATH — an agent did so unprompted |
-| 106 | PAN-3344 | M | high | ok |  |  | Resource governor gates dispatch on memory alone; agent-shell test runs drove load 48 on 24 cores |
-| 107 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache: launch-injection byte drift plus resume dropping the header |
-| 108 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 109 | PAN-2888 | M | high | ok |  | PAN-2846 | Close-out leaves stale residue that inflates troubled/failed metrics: orphaned inspect sub-agents + uncleared review_status rows on CLO… |
-| 110 | PAN-2960 | S | high | ok |  |  | Inspect supervisor lingers past 12m limit and never self-terminates after posting a verdict |
-| 111 | PAN-2959 | S | high | ok |  |  | pan inspect --item <X> reviews workspace HEAD, not item X's commit |
-| 112 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 113 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 114 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 115 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 116 | PAN-2451 | M | high | ok |  |  | Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits) |
-| 117 | PAN-2516 | S | high | ok |  |  | Spec plan.status flips left uncommitted in shared primary worktree → spec-vs-record drift + blocks flywheel push |
-| 118 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 119 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 120 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 121 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 122 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 123 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 124 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 125 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 126 | PAN-2971 | M | high | ok |  |  | flywheel orchestrator finalized its own run yet kept ticking; zombie session with dashboard Pause/Stop disabled |
-| 127 | PAN-3022 | S | high | ok |  |  | Work-spawn route ignores the per-issue workModel override, then clobbers the record with the role default |
-| 128 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against CLOSED issues, resurrecting agents and raising needs-you days later |
-| 129 | PAN-3104 | S | high | ok |  | PAN-3100 | Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue after the fix landed |
-| 130 | PAN-3257 | S | high | ok |  |  | Crash-resume never re-wires the PTY supervisor; a stale socket refuses every delivery |
-| 131 | PAN-3289 | S | high | ok |  |  | Sequencer ran a full pass on an empty manifest against a 750-issue backlog — read model transiently empty |
-| 132 | PAN-3397 | S | high | ok |  |  | Freshly-spawned convoy lanes freeze at 0 output; the existing detector covers warm resumes only |
-| 133 | PAN-3454 | M | high | ok |  | PAN-3517 | Cost hook re-ingests fork-copied parent history under reviewer identity: fake warnings, multi-billed spend |
-| 134 | PAN-3499 | XS | high | ok |  | PAN-3504 | pan parked ack references a nonexistent ProjectConfig.projectPath — a typecheck error on main |
-| 135 | PAN-3505 | S | high | ok |  | PAN-3062 | Unpushed agent code commits on the primary main worktree block the flywheel's state write door |
-| 136 | PAN-3535 | S | high | ok |  |  | The drain/resume boot gate is caller-env-dependent, so any restart from a clean shell silently drops the hold |
-| 137 | PAN-3556 | S | high | ok |  | PAN-3555 | Concurrent double-spawn race allocated two fresh session identities three seconds apart |
-| 138 | PAN-3557 | S | high | ok |  |  | Post-merge label application has no retry, so a rate-limited 403 hides the issue from the verify-on-main sweep |
+| 52 | PAN-3662 | S | critical | ok |  |  | Read-only CLI surfaces run schema top-ups and emit SQLITE_READONLY under the sandboxed Flywheel |
+| 53 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 54 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 55 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn abandons on a transient Docker failure; 'attempt 1/3' never retries |
+| 56 | PAN-3103 | S | critical | ok |  |  | A transient merge_status=failed permanently skips close-out; merged issues stay open and get re-planned |
+| 57 | PAN-3118 | M | critical | ok |  |  | Model-specific quota exhaustion halts agents invisibly; four planning agents 'running' at $0.00 |
+| 58 | PAN-3236 | S | critical | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so feedback never lands |
+| 59 | PAN-3248 | XS | critical | ok |  | PAN-3244 | pan reload never clears pending-deploy.json, so every deploy starves all verification until a patrol runs |
+| 60 | PAN-3278 | S | critical | ok |  |  | Work agent finished with an open PR but review was never dispatched; auto-requeue fired none of 25 attempts |
+| 61 | PAN-3429 | M | critical | ok |  | PAN-3344 | Memory governor defers admissions but sheds nothing under HARD pressure; the flywheel shed by hand |
+| 62 | PAN-3504 | XS | critical | ok |  |  | typecheck fails on main: parked.ts references ProjectConfig.projectPath instead of path |
+| 63 | PAN-3541 | S | critical | ok |  |  | Review restart after an unclean reviewer death loops on the session-resume menu forever |
+| 64 | PAN-3543 | S | critical | ok |  | PAN-3541 | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while recommending --fresh |
+| 65 | PAN-3563 | S | critical | ok |  | PAN-3560 | A role agent spawned with an undelivered prompt becomes an invisible zombie no recovery verb can see |
+| 66 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint silently drops every polyrepo candidate, so MYN and Auricle trains stay empty |
+| 67 | PAN-3663 | S | critical | ok |  |  | PR close events never invalidate pipeline membership, so zombie_pr rows stay stale in the canonical read door |
+| 68 | PAN-2706 | M | high | ok |  |  | Ghost test sessions absorb every test dispatch |
+| 69 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
+| 70 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
+| 71 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
+| 72 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
+| 73 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
+| 74 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
+| 75 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
+| 76 | PAN-1824 | S | critical | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 77 | PAN-3139 | S | critical | ok |  |  | Agents-table liveness drifts stale in the under-reporting direction; the authoritative plane is the wrong one |
+| 78 | PAN-3237 | S | critical | ok |  |  | A capacity-refused planning-to-work handoff is marked terminally stuck; every 409 becomes 'guardrails' |
+| 79 | PAN-3274 | S | critical | ok |  |  | A test-role agent can spawn and never run, stranding an approved, CI-green issue behind a missing verdict |
+| 80 | PAN-3281 | S | critical | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches UAT |
+| 81 | PAN-3496 | S | critical | ok |  |  | Review/inspect agents AskUserQuestion the operator for review depth, converting autonomy into operator work |
+| 82 | PAN-3500 | S | critical | ok |  |  | A review sub-role can modify the branch after writing its report, violating its own spawn contract |
+| 83 | PAN-3522 | S | critical | ok |  | PAN-3344 | Supervisor watchdog restart-churns under CPU storm because the probe budget ignores the boot warm phase |
+| 84 | PAN-3555 | S | critical | ok |  |  | pan start silently spawned a fresh session over a resumable warm session, violating warm-by-default |
+| 85 | PAN-3565 | M | critical | ok |  | PAN-3563 | Failed review spawn wedges 'starting', infra failure synthesizes a fake CHANGES REQUESTED verdict |
+| 86 | PAN-3571 | S | critical | ok |  |  | Completion-check timeout exits silently — 334 stranded turn-ends leave agents stalled until a patrol notices |
+| 87 | PAN-3654 | S | critical | ok |  | PAN-3653 | Compact respawn confirms against the archived session and kills a working fresh agent |
+| 88 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 89 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 90 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 91 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 92 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 93 | PAN-2886 | M | high | ok |  |  | Placeholder (pending-work-spawn) agents crash auto-resume with 'Unknown model' → stranded troubled forever |
+| 94 | PAN-2817 | M | high | ok |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 95 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 96 | PAN-2747 | S | high | ok |  |  | Flywheel cannot be resumed after a crash/reboot: Resume is disabled and the only offered action aborts the run |
+| 97 | PAN-2759 | S | high | ok |  |  | Dead flywheel with an active run was never auto-relaunched after a reboot |
+| 98 | PAN-2709 | M | high | ok |  |  | Flywheel orchestrator is unreachable as a notification target |
+| 99 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 100 | PAN-2179 | S | high | ok |  |  | relaunch can leave a zombie agent |
+| 101 | PAN-2169 | S | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 102 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
+| 103 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 104 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
+| 105 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 106 | PAN-3081 | M | high | ok |  |  | Agent git guard is bypassable by stripping it from $PATH — an agent did so unprompted |
+| 107 | PAN-3344 | M | high | ok |  |  | Resource governor gates dispatch on memory alone; agent-shell test runs drove load 48 on 24 cores |
+| 108 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache: launch-injection byte drift plus resume dropping the header |
+| 109 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 110 | PAN-2888 | M | high | ok |  | PAN-2846 | Close-out leaves stale residue that inflates troubled/failed metrics: orphaned inspect sub-agents + uncleared review_status rows on CLO… |
+| 111 | PAN-2960 | S | high | ok |  |  | Inspect supervisor lingers past 12m limit and never self-terminates after posting a verdict |
+| 112 | PAN-2959 | S | high | ok |  |  | pan inspect --item <X> reviews workspace HEAD, not item X's commit |
+| 113 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 114 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 115 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 116 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 117 | PAN-2451 | M | high | ok |  |  | Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits) |
+| 118 | PAN-2516 | S | high | ok |  |  | Spec plan.status flips left uncommitted in shared primary worktree → spec-vs-record drift + blocks flywheel push |
+| 119 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 120 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 121 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 122 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 123 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 124 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 125 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 126 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 127 | PAN-2971 | M | high | ok |  |  | flywheel orchestrator finalized its own run yet kept ticking; zombie session with dashboard Pause/Stop disabled |
+| 128 | PAN-3022 | S | high | ok |  |  | Work-spawn route ignores the per-issue workModel override, then clobbers the record with the role default |
+| 129 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against CLOSED issues, resurrecting agents and raising needs-you days later |
+| 130 | PAN-3104 | S | high | ok |  | PAN-3100 | Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue after the fix landed |
+| 131 | PAN-3257 | S | high | ok |  |  | Crash-resume never re-wires the PTY supervisor; a stale socket refuses every delivery |
+| 132 | PAN-3289 | S | high | ok |  |  | Sequencer ran a full pass on an empty manifest against a 750-issue backlog — read model transiently empty |
+| 133 | PAN-3397 | S | high | ok |  |  | Freshly-spawned convoy lanes freeze at 0 output; the existing detector covers warm resumes only |
+| 134 | PAN-3454 | M | high | ok |  | PAN-3517 | Cost hook re-ingests fork-copied parent history under reviewer identity: fake warnings, multi-billed spend |
+| 135 | PAN-3499 | XS | high | ok |  | PAN-3504 | pan parked ack references a nonexistent ProjectConfig.projectPath — a typecheck error on main |
+| 136 | PAN-3505 | S | high | ok |  | PAN-3062 | Unpushed agent code commits on the primary main worktree block the flywheel's state write door |
+| 137 | PAN-3535 | S | high | ok |  |  | The drain/resume boot gate is caller-env-dependent, so any restart from a clean shell silently drops the hold |
+| 138 | PAN-3556 | S | high | ok |  | PAN-3555 | Concurrent double-spawn race allocated two fresh session identities three seconds apart |
+| 139 | PAN-3557 | S | high | ok |  |  | Post-merge label application has no retry, so a rate-limited 403 hides the issue from the verify-on-main sweep |
 | 140 | PAN-3621 | S | high | ok |  |  | pan start intermittently resolves a chunk graph spliced across two builds and dies at spawn |
 | 141 | PAN-3650 | S | high | ok |  |  | Strike self-abort leaves state.json 'running', so the deacon resurrects aborted strikes on every pass |
 | 142 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
@@ -173,108 +173,108 @@ _Last sequenced: 2026-08-12T23:31:44.581Z · model: claude-opus-5 · open: 841_
 | 166 | PAN-3243 | XS | high | ok |  |  | auto-commit test polls 20 setImmediate turns for a real git subprocess, reddening main |
 | 167 | PAN-3280 | S | high | ok |  |  | One issue's agent sessions vanished four times in a run and its reviewer died writing no artifact |
 | 168 | PAN-3284 | S | high | ok |  |  | A work agent wrote a doc edit into the primary main worktree instead of its workspace |
-| 170 | PAN-3432 | S | high | ok |  | PAN-3429 | Preemptive yield fan-out paused seven work agents to make room for one review convoy |
-| 171 | PAN-3569 | S | high | ok |  |  | Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused; no staleness rule, no exit |
-| 172 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics executed a squatted npm package through an npx registry fallback |
-| 173 | PAN-3617 | S | high | ok |  |  | One issue's strike dies instantly on every dispatch with zero output while siblings spawn normally |
-| 174 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent, so operator scope changes force a doctrine violation |
-| 175 | PAN-3633 | S | high | ok |  | PAN-3325 | Strike workspaces spawn with an incomplete dependency tree, so agents abort on a false 'main is red' |
+| 169 | PAN-3432 | S | high | ok |  | PAN-3429 | Preemptive yield fan-out paused seven work agents to make room for one review convoy |
+| 170 | PAN-3569 | S | high | ok |  |  | Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused; no staleness rule, no exit |
+| 171 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics executed a squatted npm package through an npx registry fallback |
+| 172 | PAN-3617 | S | high | ok |  |  | One issue's strike dies instantly on every dispatch with zero output while siblings spawn normally |
+| 173 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent, so operator scope changes force a doctrine violation |
+| 174 | PAN-3633 | S | high | ok |  | PAN-3325 | Strike workspaces spawn with an incomplete dependency tree, so agents abort on a false 'main is red' |
 | 176 | PAN-3668 | L | high | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
-| 177 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 178 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 179 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
-| 180 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 182 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 183 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 184 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
-| 185 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 186 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 187 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
-| 188 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 189 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 190 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
-| 191 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
-| 192 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
-| 193 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 194 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
-| 195 | PAN-3040 | M | high | ok |  |  | pan strike fails outright on polyrepo projects — worktree logic assumes a monorepo root |
-| 196 | PAN-3050 | S | high | ok |  |  | Idle-stack reaper regex only matches Overdeck containers, so foreign workspace stacks are never reaped |
-| 197 | PAN-3120 | S | high | ok |  |  | MERGE refuses or dead-ends when the preemptive scheduler yielded the work agent |
-| 198 | PAN-3171 | S | high | ok |  |  | Pipeline reports 'merge failed' after a successful merge; issue stays Todo while the commit is on main |
-| 199 | PAN-3261 | S | high | ok |  |  | Resume-gate Enter: the tmux fallback answers a live choice menu that its own paste hid from the detector |
-| 200 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle fans out one glab subprocess per repo x head, failing every membership refresh |
-| 201 | PAN-3297 | S | high | ok |  |  | pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart |
-| 202 | PAN-3306 | S | high | ok |  | PAN-3317 | A strike needing a rebase has no working path: prompt instructs it, guard blocks it, sync-main misresolves |
-| 203 | PAN-3317 | S | high | ok |  |  | Strike agents have no sanctioned way to sync main: rebase is guard-blocked, sync-main misresolves -strike |
-| 204 | PAN-3439 | XS | high | ok |  | PAN-3224 | pan start crashes on a pending-work-spawn placeholder row; resume has the guard, start does not |
-| 205 | PAN-3460 | S | high | ok |  | PAN-3344 | Per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive |
-| 206 | PAN-3533 | M | high | ok |  | PAN-3344 | Per-project isolation classes so one project's heavy stacks cannot starve another project's pipeline |
-| 207 | PAN-3622 | XS | high | ok |  |  | A reconciler test asserts on a real issue and reads live GitHub, so pan release check fails on a green main |
-| 208 | PAN-3640 | S | high | ok |  | PAN-3561 | Agent GC preserves terminal rows after a recoverable state push race, leaving stale records on closed issues |
-| 209 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 210 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
-| 211 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
-| 212 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
-| 213 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 214 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 215 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 216 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 217 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
-| 218 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 219 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 220 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 221 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 222 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 223 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 224 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 225 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 226 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 227 | PAN-2980 | XS | high | ok |  |  | pre-push size guard reads the dirty worktree, so one session's edits block every other session's push |
-| 228 | PAN-3047 | S | high | ok |  |  | Strike-branch teardown never fires; 96 strike/* branches preserved because ancestry misses squash merges |
-| 229 | PAN-3099 | XS | high | ok |  |  | pan restart --health-timeout 120 parsed as 120ms; false-failed check leaves the dashboard down |
-| 230 | PAN-3113 | M | high | ok |  |  | Surface agent-pane choice prompts as inline decision cards so blocking menus are answerable from the feed |
-| 231 | PAN-3129 | M | high | ok |  |  | Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths |
-| 232 | PAN-3186 | S | high | ok |  |  | One non-git configured member blanks pipeline membership for the whole auricle project |
-| 233 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl slot |
-| 234 | PAN-3256 | S | high | ok |  | PAN-3267 | MYN pipeline membership fails forge_unavailable: glab runs in a polyrepo root that is not a git repo |
-| 235 | PAN-3270 | S | high | ok |  | PAN-3325 | New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails |
-| 236 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan, and the stray-writer patrol logs 68k lines hiding the real defect |
-| 237 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty node_modules, so tooling silently resolves deps from the parent repo |
-| 238 | PAN-3463 | S | high | ok |  | PAN-3460 | A legitimate no-op slot outcome can never pass its item verify, so the slot wedges permanently |
-| 239 | PAN-3513 | L | high | ok |  |  | Agent runtime plane on overdeck-state: durable session pointers, GC as cache eviction |
-| 240 | PAN-3553 | S | high | ok |  |  | Census treats a zero-session tmux server as unavailable, so conversations sit on 'Starting…' after a drain boot |
-| 241 | PAN-3596 | S | high | ok |  |  | Deacon patrol has no per-step timing, so overruns of the central scheduler cannot be attributed |
-| 242 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 243 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
-| 244 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 245 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
-| 246 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
-| 247 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 248 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 249 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 250 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 251 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 252 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 253 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 254 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
-| 255 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 256 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
-| 257 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 258 | PAN-1767 | M | high | ok |  |  | Show merged-but-not-closed-out count in pan status and the dashboard headline |
-| 259 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
-| 260 | PAN-3003 | XS | high | ok |  |  | Generated launcher.sh omits OVERDECK_AGENT_ID, so any manual re-launch dies instantly |
-| 261 | PAN-3014 | XS | high | ok |  |  | Background title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209 |
-| 262 | PAN-3077 | XS | high | ok |  |  | Inspect/review-supervisor spawns omit --effort and inherit xhigh, once per xBRIEF item |
-| 263 | PAN-3107 | M | high | ok |  |  | Productize the memory-attribution census so OOM spikes are attributable after the fact |
-| 264 | PAN-3167 | S | high | ok |  |  | krux and lexerra permanently unreadable through the membership door; a 404 typed as forge_unavailable |
-| 265 | PAN-3179 | M | high | ok |  | PAN-3176 | A UAT promote is marked complete at merge time; nothing verifies the change reached production |
-| 266 | PAN-3185 | S | high | ok |  |  | pan start reports a false hard failure when the deacon wins a spawn race (duplicate-session TOCTOU) |
-| 267 | PAN-3218 | M | high | ok |  |  | No release-drift signal: a user-facing fix sits on main for hours while every published version stays broken |
-| 268 | PAN-3245 | XS | high | ok |  |  | pan done falsely flags the workspace .pan/drafts artifact as uncommitted despite its own exclusion |
-| 269 | PAN-3303 | S | high | ok |  |  | Command Deck latches 'Unknown project' after reconnect; an empty registered-projects response is authoritative |
+| 176 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 177 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 178 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
+| 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 181 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 183 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
+| 184 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 185 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 186 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
+| 187 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 188 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 189 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
+| 190 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
+| 191 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
+| 192 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
+| 193 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
+| 194 | PAN-3040 | M | high | ok |  |  | pan strike fails outright on polyrepo projects — worktree logic assumes a monorepo root |
+| 195 | PAN-3050 | S | high | ok |  |  | Idle-stack reaper regex only matches Overdeck containers, so foreign workspace stacks are never reaped |
+| 196 | PAN-3120 | S | high | ok |  |  | MERGE refuses or dead-ends when the preemptive scheduler yielded the work agent |
+| 197 | PAN-3171 | S | high | ok |  |  | Pipeline reports 'merge failed' after a successful merge; issue stays Todo while the commit is on main |
+| 198 | PAN-3261 | S | high | ok |  |  | Resume-gate Enter: the tmux fallback answers a live choice menu that its own paste hid from the detector |
+| 199 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle fans out one glab subprocess per repo x head, failing every membership refresh |
+| 200 | PAN-3297 | S | high | ok |  |  | pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart |
+| 201 | PAN-3306 | S | high | ok |  | PAN-3317 | A strike needing a rebase has no working path: prompt instructs it, guard blocks it, sync-main misresolves |
+| 202 | PAN-3317 | S | high | ok |  |  | Strike agents have no sanctioned way to sync main: rebase is guard-blocked, sync-main misresolves -strike |
+| 203 | PAN-3439 | XS | high | ok |  | PAN-3224 | pan start crashes on a pending-work-spawn placeholder row; resume has the guard, start does not |
+| 204 | PAN-3460 | S | high | ok |  | PAN-3344 | Per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive |
+| 205 | PAN-3533 | M | high | ok |  | PAN-3344 | Per-project isolation classes so one project's heavy stacks cannot starve another project's pipeline |
+| 206 | PAN-3622 | XS | high | ok |  |  | A reconciler test asserts on a real issue and reads live GitHub, so pan release check fails on a green main |
+| 207 | PAN-3640 | S | high | ok |  | PAN-3561 | Agent GC preserves terminal rows after a recoverable state push race, leaving stale records on closed issues |
+| 208 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 209 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
+| 210 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
+| 211 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
+| 212 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 213 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 214 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 215 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 216 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
+| 217 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 218 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 219 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 220 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 221 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 222 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 223 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 224 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 225 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 226 | PAN-2980 | XS | high | ok |  |  | pre-push size guard reads the dirty worktree, so one session's edits block every other session's push |
+| 227 | PAN-3047 | S | high | ok |  |  | Strike-branch teardown never fires; 96 strike/* branches preserved because ancestry misses squash merges |
+| 228 | PAN-3099 | XS | high | ok |  |  | pan restart --health-timeout 120 parsed as 120ms; false-failed check leaves the dashboard down |
+| 229 | PAN-3113 | M | high | ok |  |  | Surface agent-pane choice prompts as inline decision cards so blocking menus are answerable from the feed |
+| 230 | PAN-3129 | M | high | ok |  |  | Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths |
+| 231 | PAN-3186 | S | high | ok |  |  | One non-git configured member blanks pipeline membership for the whole auricle project |
+| 232 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl slot |
+| 233 | PAN-3256 | S | high | ok |  | PAN-3267 | MYN pipeline membership fails forge_unavailable: glab runs in a polyrepo root that is not a git repo |
+| 234 | PAN-3270 | S | high | ok |  | PAN-3325 | New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails |
+| 235 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan, and the stray-writer patrol logs 68k lines hiding the real defect |
+| 236 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty node_modules, so tooling silently resolves deps from the parent repo |
+| 237 | PAN-3463 | S | high | ok |  | PAN-3460 | A legitimate no-op slot outcome can never pass its item verify, so the slot wedges permanently |
+| 238 | PAN-3513 | L | high | ok |  |  | Agent runtime plane on overdeck-state: durable session pointers, GC as cache eviction |
+| 239 | PAN-3553 | S | high | ok |  |  | Census treats a zero-session tmux server as unavailable, so conversations sit on 'Starting…' after a drain boot |
+| 240 | PAN-3596 | S | high | ok |  |  | Deacon patrol has no per-step timing, so overruns of the central scheduler cannot be attributed |
+| 241 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 242 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
+| 243 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 244 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
+| 245 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
+| 246 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 247 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 248 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 249 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 250 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 251 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 252 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 253 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
+| 254 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 255 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
+| 256 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 257 | PAN-1767 | M | high | ok |  |  | Show merged-but-not-closed-out count in pan status and the dashboard headline |
+| 258 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
+| 259 | PAN-3003 | XS | high | ok |  |  | Generated launcher.sh omits OVERDECK_AGENT_ID, so any manual re-launch dies instantly |
+| 260 | PAN-3014 | XS | high | ok |  |  | Background title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209 |
+| 261 | PAN-3077 | XS | high | ok |  |  | Inspect/review-supervisor spawns omit --effort and inherit xhigh, once per xBRIEF item |
+| 262 | PAN-3107 | M | high | ok |  |  | Productize the memory-attribution census so OOM spikes are attributable after the fact |
+| 263 | PAN-3167 | S | high | ok |  |  | krux and lexerra permanently unreadable through the membership door; a 404 typed as forge_unavailable |
+| 264 | PAN-3179 | M | high | ok |  | PAN-3176 | A UAT promote is marked complete at merge time; nothing verifies the change reached production |
+| 265 | PAN-3185 | S | high | ok |  |  | pan start reports a false hard failure when the deacon wins a spawn race (duplicate-session TOCTOU) |
+| 266 | PAN-3218 | M | high | ok |  |  | No release-drift signal: a user-facing fix sits on main for hours while every published version stays broken |
+| 267 | PAN-3245 | XS | high | ok |  |  | pan done falsely flags the workspace .pan/drafts artifact as uncommitted despite its own exclusion |
+| 268 | PAN-3303 | S | high | ok |  |  | Command Deck latches 'Unknown project' after reconnect; an empty registered-projects response is authoritative |
+| 269 | PAN-3308 | XS | high | ok |  |  | The file-size guard hands agents a paste-ready ratchet-up line; two of three agents raised the ceiling |
 | 270 | PAN-3420 | M | high | ok |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 270 | PAN-3308 | XS | high | ok |  |  | The file-size guard hands agents a paste-ready ratchet-up line; two of three agents raised the ceiling |
 | 271 | PAN-3355 | XS | high | ok |  |  | tmux sessionExists maps a probe failure to absence, so callers read 'not running' when liveness is unknown |
 | 272 | PAN-3508 | S | high | ok |  |  | pan reload temporarily removes the global pan CLI when invoked outside its linked generation |
 | 273 | PAN-3518 | M | high | ok |  | PAN-3517 | TTL-aware re-review payload policy: fresh-spawn-with-digest for cold, large histories |
@@ -1049,123 +1049,123 @@ New this pass. Record writes take the per-issue lock and then block on the globa
 
 New this pass. The non-fast-forward push retry for overdeck-state was reverted because it broke 12 tests across the pan-dir state-door suites, but the problem it fixed is live and is exactly what PAN-3424 documents. Re-landing it with those suites green closes the durability gap rather than leaving the state plane dependent on whichever writer happens to win the ref race.
 
-### PAN-3662 (rank 51)
-
-New this pass. Documented read-only CLI surfaces — pan flywheel status, pan flywheel config --get, pan status — open the database and then attempt runtime schema top-ups, which emit SQLITE_READONLY under the sandboxed Flywheel. These are precisely the commands the Flywheel is told to use when localhost is sandboxed, so their initialization must not require a write. It carries blocks-main.
-
 ### PAN-3580 (rank 51)
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
 
-### PAN-2695 (rank 52)
+### PAN-3662 (rank 52)
+
+New this pass. Documented read-only CLI surfaces — pan flywheel status, pan flywheel config --get, pan status — open the database and then attempt runtime schema top-ups, which emit SQLITE_READONLY under the sandboxed Flywheel. These are precisely the commands the Flywheel is told to use when localhost is sandboxed, so their initialization must not require a write. It carries blocks-main.
+
+### PAN-2695 (rank 53)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 53)
+### PAN-2742 (rank 54)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-3023 (rank 54)
+### PAN-3023 (rank 55)
 
 New this pass. Post-planning auto-spawn abandons on a transient Docker failure and the 'attempt 1/3' it prints never retries, so a finalized plan with autoSpawn=true sits in todo with no re-drive owner until an operator notices. The planning-to-work handoff is the seam the whole autonomous pipeline depends on, and a one-shot retry that does not retry is the worst kind of guard.
 
-### PAN-3103 (rank 55)
+### PAN-3103 (rank 56)
 
 New this pass. A transient merge_status=failed read immediately after a successful merge makes automatic close-out skip the issue permanently, and nothing retries once the status self-heals — so the issue stays merged-but-open, reads as pickup-eligible, and gets a fresh planning agent spawned on already-shipped work. Wasted agent spend on top of a stuck lifecycle.
 
-### PAN-3118 (rank 56)
+### PAN-3118 (rank 57)
 
 New this pass. Model-specific quota exhaustion halts agents with no signal anywhere except the pane: four planning agents reported running at $0.00 while the rolling-window status line showed plenty of headroom, so the existing session-cap recovery never engages. There is no capacity fallback, so the fleet quietly stops working while the registry insists it is busy.
 
-### PAN-3236 (rank 57)
+### PAN-3236 (rank 58)
 
 New this pass. ECONNREFUSED against a dead supervisor socket is misclassified as an ambiguous keyed delivery, so the tmux tier is deliberately not tried and review feedback never reaches the agent — the file sits on disk, the issue goes stuck, and the agent idles. Delivery ambiguity is the right caution for a live socket and exactly the wrong one for a refused connection.
 
-### PAN-3248 (rank 58)
+### PAN-3248 (rank 59)
 
 New this pass and the reason PAN-3244's cross-project hold never ends by itself. clearPendingDeploy has one caller, so a successful pan reload leaves the deploy queue set and every project's verification stays deferred until a patrol happens to notice the build is fresh. Small fix, large blast radius, and it should land with the deferral scoping.
 
-### PAN-3278 (rank 59)
+### PAN-3278 (rank 60)
 
 New this pass. A work agent finished, opened a non-draft PR, and sat idle for two hours because review was never dispatched — while the auto-requeue machinery that exists for exactly this had capacity and 25 attempts and fired none of them. The agent behaved correctly; the handoff did not happen. Silent non-dispatch at this seam is invisible until someone reads costs that stopped moving.
 
-### PAN-3429 (rank 60)
+### PAN-3429 (rank 61)
 
 New this pass. The memory governor defers new admissions but sheds nothing under HARD pressure: at 2.2GB available and PSI full avg60 near 42, it logged soft deferrals for 30 minutes while the flywheel manually paused the offending gate run and recovered 2.4GB. Its documented shed categories were both empty, so the policy needs a category that exists during real pressure rather than one that does not.
 
-### PAN-3504 (rank 61)
+### PAN-3504 (rank 62)
 
 New this pass. npm run typecheck fails on main because parked.ts references a ProjectConfig field that does not exist — landed directly on main, not through a PR. It is a one-word fix, and while it stands, every branch that rebases onto main inherits a red typecheck and every gate reading typecheck gets a false signal. PAN-3499 is the same defect filed from the other direction.
 
-### PAN-3541 (rank 62)
+### PAN-3541 (rank 63)
 
 New this pass. After an unclean reviewer death, pan review restart resumes into the harness session-resume menu, the delivery guard correctly refuses to answer it, delivery throws, the wedged session stays alive, and the fresh-spawn fallback then refuses because a role run already exists. Abort and reset-session both loop the same way because the resolver reconstructs the session id from planes those verbs do not clear.
 
-### PAN-3543 (rank 63)
+### PAN-3543 (rank 64)
 
 New this pass. A completed-handoff agent owed rework is unstartable through every door: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session refuses too because the durable plane reconstructs the session pointer. A refusal message that recommends the flag it just rejected is the signature of this family, and it blocks rework on issues whose review came back blocked.
 
-### PAN-3563 (rank 64)
+### PAN-3563 (rank 65)
 
 New this pass. A role agent whose prompt delivery failed is left status=running with pid null, so no liveness patrol has anything to check, the dispatcher no-ops because it sees testing in progress, and pan unstick inspects the work agent rather than the role. Invisible to every recovery surface at once — the composite of a delivery failure and three blind spots.
 
-### PAN-3657 (rank 65)
+### PAN-3657 (rank 66)
 
 New this pass. The merge-train queues endpoint builds its queue with the monorepo builder, so every polyrepo candidate is silently dropped and MYN and Auricle trains read as permanently empty even when an issue is ready with its MR open. The dashboard says ready to merge and the train shows nothing, which is the worst combination for operator trust in the queue.
 
-### PAN-3663 (rank 66)
+### PAN-3663 (rank 67)
 
 New this pass. Pull-request webhooks update review state but never enqueue a project membership refresh, so closing a stale PR leaves the canonical membership door still reporting the issue in-pipeline as a zombie_pr row. Issue close-out does invalidate correctly, which isolates this to PR-state changes. Membership is the read door several surfaces trust, so stale rows propagate. It carries blocks-main.
 
-### PAN-2706 (rank 67)
+### PAN-2706 (rank 68)
 
 Ghost test sessions that never received kickoff absorb every dispatch, marking testing with no prompt delivered.
 
-### PAN-2700 (rank 68)
+### PAN-2700 (rank 69)
 
 Stale .pan/test/result.json is consumed by the next cycle, insta-failing with the previous run verdict.
 
-### PAN-2733 (rank 69)
+### PAN-2733 (rank 70)
 
 substrate-bug-poller has never run — BOT_LOGIN is a git author string not a GitHub login; the auto-triage loop is inert.
 
-### PAN-1560 (rank 70)
+### PAN-1560 (rank 71)
 
 Re-review after a PR head moves never re-posts status, stranding otherwise-green PRs at BLOCKED.
 
-### PAN-2769 (rank 71)
+### PAN-2769 (rank 72)
 
 review_status rows are never reconciled when an issue closes, so closed issues keep advertising stale review state.
 
-### PAN-2883 (rank 72)
+### PAN-2883 (rank 73)
 
 Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.
 
-### PAN-2806 (rank 73)
+### PAN-2806 (rank 74)
 
 Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
 
-### PAN-2796 (rank 74)
+### PAN-2796 (rank 75)
 
 Idle nudge advances a work agent past a failed mandatory inspection, bypassing the inspection gate.
 
-### PAN-1824 (rank 75)
+### PAN-1824 (rank 76)
 
 Raised from 78: the real-timer test family kept reddening main through August. PAN-3243, PAN-3520 and PAN-3532 are all downstream instances — load-induced timeouts recorded as real verdicts, branches looping on false test failures, and a CI job that never ran the frontend suite. Fixing the timer discipline at the source removes the input to several of those loops.
 
-### PAN-3139 (rank 76)
+### PAN-3139 (rank 77)
 
 New this pass. The agents table — the plane docs/AGENT-STATE-PLANES.md designates authoritative — records a live four-hour agent as stopped while tmux and pan start's own liveness check both say running. Drift in the under-reporting direction is the dangerous direction: enumeration from the authoritative plane misses live agents, and anything that acts on 'stopped' can spawn a duplicate.
 
-### PAN-3237 (rank 77)
+### PAN-3237 (rank 78)
 
 New this pass. A capacity-refused planning-to-work handoff is recorded as terminally stuck: every HTTP 409 is classified as 'guardrails' and every skip reason calls markWorkspaceStuck, so three issues accumulated the identical dead-end over three ticks while the fleet was simply full. Backpressure is a normal condition and must be retried, not memorialized as a failure.
 
-### PAN-3274 (rank 78)
+### PAN-3274 (rank 79)
 
 New this pass. A test-role agent spawned, never executed a turn, and held its issue out of the merge gate — review approved, CI green, ready_for_merge 0 on a verdict that was never produced. It is the same shape as the already-ranked ghost test sessions and shares PAN-3566's deterministic root cause, so the three should be worked together.
 
-### PAN-3281 (rank 79)
+### PAN-3281 (rank 80)
 
 New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck incomplete-plan-items at the same time, and the merge-ready flag wins on every surface — so work with eight pending checklist items was assembled into a UAT batch and recommended for promotion. Two contradictory facts, and the pipeline consistently reads the optimistic one.
 
@@ -1176,7 +1176,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-12T23:31:44.581Z",
+  "generatedAt": "2026-08-12T23:35:37.036Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 841,
@@ -1851,8 +1851,21 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
       "planning": "auto"
     },
     {
-      "issue": "PAN-3662",
+      "issue": "PAN-3580",
       "rank": 51,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
+      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3662",
+      "rank": 52,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1865,7 +1878,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2695",
-      "rank": 52,
+      "rank": 53,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1878,7 +1891,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2742",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1891,7 +1904,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3023",
-      "rank": 54,
+      "rank": 55,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1904,7 +1917,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3103",
-      "rank": 55,
+      "rank": 56,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1917,7 +1930,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3118",
-      "rank": 56,
+      "rank": 57,
       "size": "M",
       "importance": "critical",
       "score": 85,
@@ -1930,7 +1943,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3236",
-      "rank": 57,
+      "rank": 58,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1943,7 +1956,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3248",
-      "rank": 58,
+      "rank": 59,
       "size": "XS",
       "importance": "critical",
       "score": 85,
@@ -1958,7 +1971,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3278",
-      "rank": 59,
+      "rank": 60,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1971,7 +1984,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3429",
-      "rank": 60,
+      "rank": 61,
       "size": "M",
       "importance": "critical",
       "score": 85,
@@ -1986,7 +1999,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3504",
-      "rank": 61,
+      "rank": 62,
       "size": "XS",
       "importance": "critical",
       "score": 85,
@@ -1999,7 +2012,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3541",
-      "rank": 62,
+      "rank": 63,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -2012,7 +2025,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3543",
-      "rank": 63,
+      "rank": 64,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -2027,7 +2040,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3563",
-      "rank": 64,
+      "rank": 65,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -2042,7 +2055,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3657",
-      "rank": 65,
+      "rank": 66,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -2055,7 +2068,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3663",
-      "rank": 66,
+      "rank": 67,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -2068,7 +2081,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2706",
-      "rank": 67,
+      "rank": 68,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -2081,7 +2094,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2700",
-      "rank": 68,
+      "rank": 69,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2094,7 +2107,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2733",
-      "rank": 69,
+      "rank": 70,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2107,7 +2120,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1560",
-      "rank": 70,
+      "rank": 71,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2120,7 +2133,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2769",
-      "rank": 71,
+      "rank": 72,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2133,7 +2146,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2883",
-      "rank": 72,
+      "rank": 73,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -2148,7 +2161,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2806",
-      "rank": 73,
+      "rank": 74,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2161,7 +2174,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2796",
-      "rank": 74,
+      "rank": 75,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2174,7 +2187,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1824",
-      "rank": 75,
+      "rank": 76,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2187,7 +2200,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3139",
-      "rank": 76,
+      "rank": 77,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2200,7 +2213,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3237",
-      "rank": 77,
+      "rank": 78,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2213,7 +2226,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3274",
-      "rank": 78,
+      "rank": 79,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2226,7 +2239,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3281",
-      "rank": 79,
+      "rank": 80,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2239,7 +2252,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3496",
-      "rank": 80,
+      "rank": 81,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2252,7 +2265,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3500",
-      "rank": 81,
+      "rank": 82,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2265,7 +2278,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3522",
-      "rank": 82,
+      "rank": 83,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2280,7 +2293,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3555",
-      "rank": 83,
+      "rank": 84,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2293,7 +2306,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3565",
-      "rank": 84,
+      "rank": 85,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2308,7 +2321,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3571",
-      "rank": 85,
+      "rank": 86,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2321,7 +2334,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3654",
-      "rank": 86,
+      "rank": 87,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2336,7 +2349,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2932",
-      "rank": 87,
+      "rank": 88,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -2351,7 +2364,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2422",
-      "rank": 88,
+      "rank": 89,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2366,7 +2379,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2699",
-      "rank": 89,
+      "rank": 90,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2379,7 +2392,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2957",
-      "rank": 90,
+      "rank": 91,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2394,7 +2407,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2850",
-      "rank": 91,
+      "rank": 92,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2407,7 +2420,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2886",
-      "rank": 92,
+      "rank": 93,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2420,7 +2433,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2817",
-      "rank": 93,
+      "rank": 94,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2433,7 +2446,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2813",
-      "rank": 94,
+      "rank": 95,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2446,7 +2459,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2747",
-      "rank": 95,
+      "rank": 96,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2459,7 +2472,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2759",
-      "rank": 96,
+      "rank": 97,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2472,7 +2485,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2709",
-      "rank": 97,
+      "rank": 98,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2485,7 +2498,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2668",
-      "rank": 98,
+      "rank": 99,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2498,7 +2511,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2179",
-      "rank": 99,
+      "rank": 100,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2511,7 +2524,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2169",
-      "rank": 100,
+      "rank": 101,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2524,7 +2537,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2775",
-      "rank": 101,
+      "rank": 102,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2537,7 +2550,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2734",
-      "rank": 102,
+      "rank": 103,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2550,7 +2563,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2323",
-      "rank": 103,
+      "rank": 104,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2563,7 +2576,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2421",
-      "rank": 104,
+      "rank": 105,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2576,7 +2589,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3081",
-      "rank": 105,
+      "rank": 106,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2588,7 +2601,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3344",
-      "rank": 106,
+      "rank": 107,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2600,7 +2613,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3517",
-      "rank": 107,
+      "rank": 108,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2612,7 +2625,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1618",
-      "rank": 108,
+      "rank": 109,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2625,7 +2638,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2888",
-      "rank": 109,
+      "rank": 110,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2640,7 +2653,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2960",
-      "rank": 110,
+      "rank": 111,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2653,7 +2666,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2959",
-      "rank": 111,
+      "rank": 112,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2666,7 +2679,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2639",
-      "rank": 112,
+      "rank": 113,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2681,7 +2694,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2331",
-      "rank": 113,
+      "rank": 114,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2694,7 +2707,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2333",
-      "rank": 114,
+      "rank": 115,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2707,7 +2720,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2511",
-      "rank": 115,
+      "rank": 116,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -2720,7 +2733,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2451",
-      "rank": 116,
+      "rank": 117,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2733,7 +2746,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2516",
-      "rank": 117,
+      "rank": 118,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2746,7 +2759,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2763",
-      "rank": 118,
+      "rank": 119,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2759,7 +2772,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2170",
-      "rank": 119,
+      "rank": 120,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2772,7 +2785,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1198",
-      "rank": 120,
+      "rank": 121,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2785,7 +2798,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2106",
-      "rank": 121,
+      "rank": 122,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2798,7 +2811,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2880",
-      "rank": 122,
+      "rank": 123,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2813,7 +2826,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2966",
-      "rank": 123,
+      "rank": 124,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2826,7 +2839,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2945",
-      "rank": 124,
+      "rank": 125,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2839,7 +2852,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2680",
-      "rank": 125,
+      "rank": 126,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2852,7 +2865,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2971",
-      "rank": 126,
+      "rank": 127,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2864,7 +2877,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3022",
-      "rank": 127,
+      "rank": 128,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2876,7 +2889,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3044",
-      "rank": 128,
+      "rank": 129,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2888,7 +2901,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3104",
-      "rank": 129,
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2902,7 +2915,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3257",
-      "rank": 130,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2914,7 +2927,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3289",
-      "rank": 131,
+      "rank": 132,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2926,7 +2939,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3397",
-      "rank": 132,
+      "rank": 133,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2938,7 +2951,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3454",
-      "rank": 133,
+      "rank": 134,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2952,7 +2965,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3499",
-      "rank": 134,
+      "rank": 135,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2966,7 +2979,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3505",
-      "rank": 135,
+      "rank": 136,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2980,7 +2993,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3535",
-      "rank": 136,
+      "rank": 137,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2992,7 +3005,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3556",
-      "rank": 137,
+      "rank": 138,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3006,26 +3019,13 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3557",
-      "rank": 138,
+      "rank": 139,
       "size": "S",
       "importance": "high",
       "score": 80,
       "condition": "ok",
       "dependsOn": [],
       "why": "Post-merge label application has no retry, so a rate-limited 403 hides the issue from the verify-on-main sweep",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3580",
-      "rank": 51,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
-      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3408,20 +3408,8 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
       "planning": "auto"
     },
     {
-      "issue": "PAN-3420",
-      "rank": 270,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3432",
-      "rank": 170,
+      "rank": 169,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3435,7 +3423,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3569",
-      "rank": 171,
+      "rank": 170,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3447,7 +3435,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3605",
-      "rank": 172,
+      "rank": 171,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3459,7 +3447,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3617",
-      "rank": 173,
+      "rank": 172,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3471,7 +3459,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3629",
-      "rank": 174,
+      "rank": 173,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3483,7 +3471,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3633",
-      "rank": 175,
+      "rank": 174,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3509,7 +3497,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2642",
-      "rank": 177,
+      "rank": 176,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3523,7 +3511,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1868",
-      "rank": 178,
+      "rank": 177,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3538,7 +3526,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2466",
-      "rank": 179,
+      "rank": 178,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3551,7 +3539,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1042",
-      "rank": 180,
+      "rank": 179,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3564,7 +3552,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-570",
-      "rank": 181,
+      "rank": 180,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3579,7 +3567,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-106",
-      "rank": 182,
+      "rank": 181,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -3592,7 +3580,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2059",
-      "rank": 183,
+      "rank": 182,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3606,7 +3594,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2376",
-      "rank": 184,
+      "rank": 183,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3620,7 +3608,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1556",
-      "rank": 185,
+      "rank": 184,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3633,7 +3621,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2188",
-      "rank": 186,
+      "rank": 185,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3646,7 +3634,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2189",
-      "rank": 187,
+      "rank": 186,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3659,7 +3647,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2190",
-      "rank": 188,
+      "rank": 187,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3672,7 +3660,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2233",
-      "rank": 189,
+      "rank": 188,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3685,7 +3673,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2526",
-      "rank": 190,
+      "rank": 189,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3698,7 +3686,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2008",
-      "rank": 191,
+      "rank": 190,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3713,7 +3701,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1936",
-      "rank": 192,
+      "rank": 191,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3726,7 +3714,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1988",
-      "rank": 193,
+      "rank": 192,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3741,7 +3729,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1910",
-      "rank": 194,
+      "rank": 193,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3756,7 +3744,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3040",
-      "rank": 195,
+      "rank": 194,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3768,7 +3756,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3050",
-      "rank": 196,
+      "rank": 195,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3780,7 +3768,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3120",
-      "rank": 197,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3792,7 +3780,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3171",
-      "rank": 198,
+      "rank": 197,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3804,7 +3792,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3261",
-      "rank": 199,
+      "rank": 198,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3816,7 +3804,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3267",
-      "rank": 200,
+      "rank": 199,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3828,7 +3816,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3297",
-      "rank": 201,
+      "rank": 200,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3840,7 +3828,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3306",
-      "rank": 202,
+      "rank": 201,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3854,7 +3842,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3317",
-      "rank": 203,
+      "rank": 202,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3866,7 +3854,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3439",
-      "rank": 204,
+      "rank": 203,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3880,7 +3868,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3460",
-      "rank": 205,
+      "rank": 204,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3894,7 +3882,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3533",
-      "rank": 206,
+      "rank": 205,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3908,7 +3896,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3622",
-      "rank": 207,
+      "rank": 206,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3920,7 +3908,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3640",
-      "rank": 208,
+      "rank": 207,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3934,7 +3922,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1325",
-      "rank": 209,
+      "rank": 208,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -3946,7 +3934,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1728",
-      "rank": 210,
+      "rank": 209,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3958,7 +3946,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2651",
-      "rank": 211,
+      "rank": 210,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3970,7 +3958,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2678",
-      "rank": 212,
+      "rank": 211,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -3982,7 +3970,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2241",
-      "rank": 213,
+      "rank": 212,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3994,7 +3982,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2242",
-      "rank": 214,
+      "rank": 213,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4006,7 +3994,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2240",
-      "rank": 215,
+      "rank": 214,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4018,7 +4006,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2243",
-      "rank": 216,
+      "rank": 215,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4030,7 +4018,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2244",
-      "rank": 217,
+      "rank": 216,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4042,7 +4030,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2202",
-      "rank": 218,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4054,7 +4042,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2195",
-      "rank": 219,
+      "rank": 218,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4066,7 +4054,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2237",
-      "rank": 220,
+      "rank": 219,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4078,7 +4066,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2487",
-      "rank": 221,
+      "rank": 220,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4090,7 +4078,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2469",
-      "rank": 222,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4102,7 +4090,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2212",
-      "rank": 223,
+      "rank": 222,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4114,7 +4102,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2213",
-      "rank": 224,
+      "rank": 223,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4126,7 +4114,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2211",
-      "rank": 225,
+      "rank": 224,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4138,7 +4126,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2210",
-      "rank": 226,
+      "rank": 225,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4150,7 +4138,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2980",
-      "rank": 227,
+      "rank": 226,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4162,7 +4150,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3047",
-      "rank": 228,
+      "rank": 227,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4174,7 +4162,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3099",
-      "rank": 229,
+      "rank": 228,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4186,7 +4174,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3113",
-      "rank": 230,
+      "rank": 229,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4198,7 +4186,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3129",
-      "rank": 231,
+      "rank": 230,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4210,7 +4198,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3186",
-      "rank": 232,
+      "rank": 231,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4222,7 +4210,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3190",
-      "rank": 233,
+      "rank": 232,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4234,7 +4222,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3256",
-      "rank": 234,
+      "rank": 233,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4248,7 +4236,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3270",
-      "rank": 235,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4262,7 +4250,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3301",
-      "rank": 236,
+      "rank": 235,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4274,7 +4262,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3325",
-      "rank": 237,
+      "rank": 236,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4286,7 +4274,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3463",
-      "rank": 238,
+      "rank": 237,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4300,7 +4288,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3513",
-      "rank": 239,
+      "rank": 238,
       "size": "L",
       "importance": "high",
       "score": 74,
@@ -4312,7 +4300,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3553",
-      "rank": 240,
+      "rank": 239,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4324,7 +4312,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3596",
-      "rank": 241,
+      "rank": 240,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4336,7 +4324,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2201",
-      "rank": 242,
+      "rank": 241,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4348,7 +4336,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2718",
-      "rank": 243,
+      "rank": 242,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4360,7 +4348,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2646",
-      "rank": 244,
+      "rank": 243,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4372,7 +4360,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2652",
-      "rank": 245,
+      "rank": 244,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4384,7 +4372,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2667",
-      "rank": 246,
+      "rank": 245,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4396,7 +4384,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2755",
-      "rank": 247,
+      "rank": 246,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4408,7 +4396,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2754",
-      "rank": 248,
+      "rank": 247,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4420,7 +4408,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2809",
-      "rank": 249,
+      "rank": 248,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4432,7 +4420,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2810",
-      "rank": 250,
+      "rank": 249,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4444,7 +4432,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2495",
-      "rank": 251,
+      "rank": 250,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4456,7 +4444,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-2478",
-      "rank": 252,
+      "rank": 251,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4468,7 +4456,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1710",
-      "rank": 253,
+      "rank": 252,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4480,7 +4468,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1720",
-      "rank": 254,
+      "rank": 253,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4492,7 +4480,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1558",
-      "rank": 255,
+      "rank": 254,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4504,7 +4492,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1650",
-      "rank": 256,
+      "rank": 255,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4516,7 +4504,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1766",
-      "rank": 257,
+      "rank": 256,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4528,7 +4516,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1767",
-      "rank": 258,
+      "rank": 257,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4540,7 +4528,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-1770",
-      "rank": 259,
+      "rank": 258,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4552,7 +4540,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3003",
-      "rank": 260,
+      "rank": 259,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4564,7 +4552,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3014",
-      "rank": 261,
+      "rank": 260,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4576,7 +4564,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3077",
-      "rank": 262,
+      "rank": 261,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4588,7 +4576,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3107",
-      "rank": 263,
+      "rank": 262,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4600,7 +4588,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3167",
-      "rank": 264,
+      "rank": 263,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4612,7 +4600,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3179",
-      "rank": 265,
+      "rank": 264,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4626,7 +4614,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3185",
-      "rank": 266,
+      "rank": 265,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4638,7 +4626,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3218",
-      "rank": 267,
+      "rank": 266,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4650,7 +4638,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3245",
-      "rank": 268,
+      "rank": 267,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4662,7 +4650,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3303",
-      "rank": 269,
+      "rank": 268,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4674,7 +4662,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
     },
     {
       "issue": "PAN-3308",
-      "rank": 270,
+      "rank": 269,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4683,6 +4671,18 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
       "why": "The file-size guard hands agents a paste-ready ratchet-up line; two of three agents raised the ceiling",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-3420",
+      "rank": 270,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3355",
