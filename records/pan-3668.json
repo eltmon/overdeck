@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:01:01.804Z",
+  "updated": "2026-08-12T18:01:11.136Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "config-schema-prime-agent": {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2703273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:01:11.135Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -151,6 +159,7 @@
     "contracts-enumerations.ac2": "completed",
     "cli-harness-flag-help": "completed",
     "cli-harness-flag-help.ac1": "completed",
-    "cli-harness-flag-help.ac2": "completed"
+    "cli-harness-flag-help.ac2": "completed",
+    "config-schema-prime-agent": "running"
   }
 }
