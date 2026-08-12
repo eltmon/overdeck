@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T17:58:47.166Z",
+  "updated": "2026-08-12T18:01:01.804Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "cli-harness-flag-help": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2673257,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T17:58:47.165Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Added prime-agent to context previews, flywheel records, artifact provenance, and telemetry harness domains with contract coverage.",
         "releasedAt": "2026-08-12T17:58:36.562Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2673257,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T17:58:47.165Z",
+        "itemId": "cli-harness-flag-help",
+        "outcome": "completed",
+        "reason": "Added prime-agent to plan, start, strike, and artifact CLI help and regenerated the canonical composer-command manifest; manifest lint passes.",
+        "releasedAt": "2026-08-12T18:01:01.803Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "contracts-enumerations": {
         "reason": "Added prime-agent to context previews, flywheel records, artifact provenance, and telemetry harness domains with contract coverage.",
         "updatedAt": "2026-08-12T17:58:36.562Z"
+      },
+      "cli-harness-flag-help": {
+        "reason": "Added prime-agent to plan, start, strike, and artifact CLI help and regenerated the canonical composer-command manifest; manifest lint passes.",
+        "updatedAt": "2026-08-12T18:01:01.803Z"
       }
     }
   },
@@ -142,6 +149,8 @@
     "contracts-enumerations": "completed",
     "contracts-enumerations.ac1": "completed",
     "contracts-enumerations.ac2": "completed",
-    "cli-harness-flag-help": "running"
+    "cli-harness-flag-help": "completed",
+    "cli-harness-flag-help.ac1": "completed",
+    "cli-harness-flag-help.ac2": "completed"
   }
 }
