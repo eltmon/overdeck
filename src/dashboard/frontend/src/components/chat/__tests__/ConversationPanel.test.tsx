@@ -545,6 +545,51 @@ describe('ConversationPanel rename flow', () => {
   });
 });
 
+describe('ConversationPanel resume message control', () => {
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      const defaultResponse = defaultConversationResponse(method, url);
+      if (defaultResponse) return defaultResponse;
+      if (method === 'POST' && url === '/api/conversations/test-conv/resume') {
+        return Response.json({ ...mockConversation, status: 'active', sessionAlive: true });
+      }
+      return undefined;
+    });
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('places a checked send-message checkbox beside the resume button', () => {
+    renderPanel();
+
+    expect(screen.getByRole('checkbox', { name: 'Send resume message' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+  });
+
+  it('passes the checkbox choice to the resume endpoint', async () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Send resume message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+
+    await waitFor(() => {
+      const resumeCall = fetchControl.fetchMock.mock.calls.find(([url]) => String(url) === '/api/conversations/test-conv/resume');
+      expect(resumeCall).toBeDefined();
+      expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toMatchObject({ sendResumeContract: false });
+    });
+  });
+});
+
 describe('ConversationPanel empty-state gating (workLog-only agent sessions)', () => {
   const workOnlyData = {
     messages: [],

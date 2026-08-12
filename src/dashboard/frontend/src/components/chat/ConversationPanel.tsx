@@ -12,10 +12,12 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
+import { ConversationResumeControls } from './ConversationResumeControls';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
+import { resumeConversation } from './conversationResumeApi';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import {
@@ -104,9 +106,7 @@ interface ConversationPanelProps {
   roundMarkers?: ReadonlyArray<RoundMarker>;
   /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
   roundMetadata?: ReviewerRoundMetadata;
-  /** When true, hide the header chrome (title, status, toggles) and suppress
-   *  Resume/Archive — used when embedded inside SessionPanel where ZoneB
-   *  already shows session info and specialists can't be resumed. */
+  /** Suppress header and built-in actions when a parent owns that chrome. */
   embedded?: boolean;
   /** Agent ID for fetching turn diffs. Omit to skip diff display. */
   agentId?: string;
@@ -115,22 +115,15 @@ interface ConversationPanelProps {
   targetMessageIndex?: number;
   targetMessageNonce?: number;
   onTargetMessageHandled?: () => void;
-  /**
-   * Controlled tool-call visibility. When provided (embedded agent panes that
-   * render their own Tools toggle in the parent header), overrides the
-   * internal per-conversation localStorage state.
-   */
+  /** Controlled tool-call visibility for embedded agent panes. */
   hideToolCalls?: boolean;
   onToggleHideToolCalls?: () => void;
-  /** When provided in embedded mode, shows a resume/action bar instead of the
-   *  composer. Use when the session is ended and the parent wants a custom CTA. */
+  /** Custom embedded resume action and label. */
   onEmbeddedResume?: () => void;
-  /** Label for the embedded resume button. Defaults to "Resume Session". */
   embeddedResumeLabel?: string;
-  /** Hide the composer entirely — the parent renders its own way to talk to
-   *  the agent (e.g. simple mode's jargon-free steering composer). */
+  /** Hide the composer when the parent renders its own input. */
   hideComposer?: boolean;
-  /** Called when a message POST fails — use to trigger a conversation refetch. */
+  /** Called when a message POST fails. */
   onSendFailed?: () => void;
 }
 
@@ -149,16 +142,6 @@ async function updateConversationDeliveryMethod(
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
   }
-}
-
-async function resumeConversation(name: string, model?: string, effort?: string, harness?: Harness): Promise<Conversation> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, effort, harness }),
-  });
-  if (!res.ok) throw new Error('Failed to resume conversation');
-  return res.json();
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -184,6 +167,7 @@ export function ConversationPanel({
   onSendFailed,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
+  const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const confirm = useConfirm();
@@ -400,7 +384,13 @@ export function ConversationPanel({
   }, [])
 
   const resumeMutation = useMutation({
-    mutationFn: () => resumeConversation(conversation.name, selectedModel, conversation.effort ?? undefined, selectedHarness),
+    mutationFn: () => resumeConversation(
+      conversation.name,
+      selectedModel,
+      conversation.effort ?? undefined,
+      selectedHarness,
+      sendResumeContract,
+    ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
@@ -1030,6 +1020,8 @@ export function ConversationPanel({
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
+              sendResumeContract={onEmbeddedResume ? undefined : sendResumeContract}
+              onSendResumeContractChange={onEmbeddedResume ? undefined : setSendResumeContract}
               hideComposer={hideComposer}
               onSendFailed={onSendFailed}
               roundMarkers={roundMarkers}
@@ -1142,6 +1134,9 @@ interface ConversationViewProps {
   resumePending?: boolean;
   /** Override label for the resume button. Defaults to "Resume Session". */
   resumeLabel?: string;
+  /** Whether to send the resume context message after the runtime starts. */
+  sendResumeContract?: boolean;
+  onSendResumeContractChange?: (send: boolean) => void;
   /** Hide the composer — the parent renders its own way to talk to the agent. */
   hideComposer?: boolean;
   /** Called when a message POST fails. */
@@ -1177,7 +1172,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
@@ -1417,12 +1412,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
             {onResume && (
-              <>
-                {modelPicker}
-                <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
-                  {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
-                </button>
-              </>
+              <ConversationResumeControls
+                modelPicker={modelPicker}
+                sendResumeContract={sendResumeContract}
+                onSendResumeContractChange={onSendResumeContractChange}
+                onResume={onResume}
+                resumePending={resumePending}
+                resumeLabel={resumeLabel}
+                className={styles.conversationResumeControls}
+              />
             )}
             <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
               Archive
@@ -1473,7 +1471,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           banner linking to the sibling that continues the work. The composer/resume bar
           is suppressed because the conversation is permanently ended — interacting here
           would either fail or branch off historical content. */}
-      {conversation.clearedToConvId ? (
+      {isOrphaned ? null : conversation.clearedToConvId ? (
         <button
           type="button"
           className={styles.conversationClearedBanner}
@@ -1488,16 +1486,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <ArrowRight size={14} />
         </button>
       ) : isForking ? null : onResume ? (
-        <div className={styles.conversationResumeBar}>
-          {modelPicker}
-          <button
-            className={styles.conversationResumeBtn}
-            onClick={onResume}
-            disabled={resumePending}
-          >
-            {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
-          </button>
-        </div>
+        <ConversationResumeControls
+          modelPicker={modelPicker}
+          sendResumeContract={sendResumeContract}
+          onSendResumeContractChange={onSendResumeContractChange}
+          onResume={onResume}
+          resumePending={resumePending}
+          resumeLabel={resumeLabel}
+        />
       ) : hideComposer ? null : (
         <ComposerFooter
           conversation={conversation}

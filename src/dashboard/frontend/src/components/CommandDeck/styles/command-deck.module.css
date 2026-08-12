@@ -3369,8 +3369,39 @@
 .conversationResumeBar {
   padding: 12px;
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 12px;
   border-top: 1px solid var(--border);
+}
+
+.conversationResumeControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conversationResumeContractToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  user-select: none;
+}
+
+.conversationResumeContractToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.conversationResumeContractToggle input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .conversationResumeBtn {

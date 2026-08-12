@@ -999,8 +999,7 @@ export async function handleConversationResume(
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', reattached: true });
     }
-    const oldSessionId = conv.claudeSessionId;
-    const resumeCause = conv.status === 'ended' ? 'operator' : 'system';
+    const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false;
     const harness: RuntimeName = conv.harness ?? 'claude-code';
     const modelChanged = !!model && model !== conv.model;
     if (!(await validateCwdContainment(conv.cwd))) return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -1026,6 +1025,7 @@ export async function handleConversationResume(
         `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
         'conversation-resume',
         resolveConversationDeliveryMethod(conv),
+        sendResumeContract,
       );
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });

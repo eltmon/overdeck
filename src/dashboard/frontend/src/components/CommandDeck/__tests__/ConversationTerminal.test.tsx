@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationTerminal } from '../ConversationTerminal';
 import type { Conversation } from '../ConversationList';
@@ -35,6 +35,11 @@ function renderTerminal(conversation: Conversation) {
 }
 
 describe('ConversationTerminal', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
   it('renders context usage in the header', () => {
     renderTerminal({
       ...baseConversation,
@@ -63,5 +68,32 @@ describe('ConversationTerminal', () => {
     });
 
     expect(screen.queryByTestId('context-window-meter')).toBeNull();
+  });
+
+  it('sends the resume message by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ...baseConversation, sessionAlive: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTerminal({ ...baseConversation, status: 'ended', sessionAlive: false });
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Send resume message' });
+    expect(checkbox).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const resumeCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/conversations/test-conv/resume');
+    expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toEqual({ sendResumeContract: true });
+  });
+
+  it('omits the resume message when the checkbox is cleared', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ...baseConversation, sessionAlive: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTerminal({ ...baseConversation, status: 'ended', sessionAlive: false });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Send resume message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const resumeCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/conversations/test-conv/resume');
+    expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toEqual({ sendResumeContract: false });
   });
 });

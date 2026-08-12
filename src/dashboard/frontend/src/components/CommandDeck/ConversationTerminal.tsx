@@ -3,19 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle, Folder, GitFork } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import { ContextWindowMeter } from '../chat/ContextWindowMeter';
+import { ConversationResumeControls } from '../chat/ConversationResumeControls';
+import { resumeConversation } from '../chat/conversationResumeApi';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from './ConversationList';
 import styles from './styles/command-deck.module.css';
-
-// ─── API helpers ──────────────────────────────────────────────────────────────
-
-async function resumeConversation(name: string): Promise<Conversation> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
-    method: 'POST',
-  });
-  if (!res.ok) throw new Error('Failed to resume conversation');
-  return res.json();
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -28,10 +20,11 @@ interface ConversationTerminalProps {
 export function ConversationTerminal({ conversation }: ConversationTerminalProps) {
   // Track whether we've triggered a resume (optimistic: show terminal immediately)
   const [resumed, setResumed] = useState(false);
+  const [sendResumeContract, setSendResumeContract] = useState(true);
   const queryClient = useQueryClient();
 
   const resumeMutation = useMutation({
-    mutationFn: () => resumeConversation(conversation.name),
+    mutationFn: () => resumeConversation(conversation.name, undefined, undefined, undefined, sendResumeContract),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setResumed(true);
@@ -96,13 +89,13 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
         ) : (
           <div className={styles.conversationResumeOverlay}>
             <p>Session ended</p>
-            <button
-              className={styles.conversationResumeBtn}
-              onClick={handleResume}
-              disabled={resumeMutation.isPending}
-            >
-              {resumeMutation.isPending ? 'Resuming…' : 'Resume Session'}
-            </button>
+            <ConversationResumeControls
+              sendResumeContract={sendResumeContract}
+              onSendResumeContractChange={setSendResumeContract}
+              onResume={handleResume}
+              resumePending={resumeMutation.isPending}
+              className={styles.conversationResumeControls}
+            />
             {resumeMutation.isError && (
               <p style={{ color: 'var(--destructive)', fontSize: 12 }}>
                 {(resumeMutation.error as Error).message}

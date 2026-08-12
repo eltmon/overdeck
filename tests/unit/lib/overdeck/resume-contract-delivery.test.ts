@@ -48,6 +48,13 @@ describe('deliverResumeContractUnlessGated', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
+  it('skips pane inspection and delivery when the user opts out', async () => {
+    await expect(deliverResumeContractUnlessGated(SESSION, CONTRACT, CALLER, METHOD, false))
+      .resolves.toBe('skipped-user');
+    expect(capturePaneTextMock).not.toHaveBeenCalled();
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+  });
+
   it('skips delivery when the pane shows a blocking choice menu', async () => {
     capturePaneTextMock.mockResolvedValue(RESUME_GATE_MENU);
 
