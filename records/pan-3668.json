@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:05:33.947Z",
+  "updated": "2026-08-12T18:06:47.655Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "harness-binary-resolution": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2765838,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T18:05:33.946Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Added explicit table-driven Prime provider/model routing for verified API-key and subscription providers; unsupported mappings fail without choosing a fallback model.",
         "releasedAt": "2026-08-12T18:05:22.958Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2765838,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:05:33.946Z",
+        "itemId": "harness-binary-resolution",
+        "outcome": "completed",
+        "reason": "Mapped prime-agent to its executable, honored config.primeAgent.binaryPath, and added actionable missing/non-executable errors that state no terminal was created.",
+        "releasedAt": "2026-08-12T18:06:47.655Z"
       }
     ],
     "statusReasons": {
@@ -170,6 +173,10 @@
       "provider-map": {
         "reason": "Added explicit table-driven Prime provider/model routing for verified API-key and subscription providers; unsupported mappings fail without choosing a fallback model.",
         "updatedAt": "2026-08-12T18:05:22.958Z"
+      },
+      "harness-binary-resolution": {
+        "reason": "Mapped prime-agent to its executable, honored config.primeAgent.binaryPath, and added actionable missing/non-executable errors that state no terminal was created.",
+        "updatedAt": "2026-08-12T18:06:47.655Z"
       }
     }
   },
@@ -197,6 +204,8 @@
     "provider-map.ac1": "completed",
     "provider-map.ac2": "completed",
     "provider-map.ac3": "completed",
-    "harness-binary-resolution": "running"
+    "harness-binary-resolution": "completed",
+    "harness-binary-resolution.ac1": "completed",
+    "harness-binary-resolution.ac2": "completed"
   }
 }
