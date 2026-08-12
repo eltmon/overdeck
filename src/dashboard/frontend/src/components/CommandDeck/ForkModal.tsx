@@ -531,6 +531,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 fork_intent: intent,
                 fork_mode: apiForkMode,
                 fast_summary: localSummaryOnly,
+                launch_harness: (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code',
               });
               onConfirm(
                 conversation,
