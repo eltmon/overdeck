@@ -1365,6 +1365,7 @@ export function CommandDeck({
                     saveStoredModel(modelId);
                   }}
                   harness={sidebarHarness}
+                  followProviderDefault
                   onHarnessChange={(harness) => {
                     setSidebarHarness(harness);
                     saveStoredHarness(harness);

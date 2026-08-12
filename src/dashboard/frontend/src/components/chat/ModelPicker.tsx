@@ -203,9 +203,11 @@ interface ModelPickerProps {
    */
   onComboChange?: (modelId: string, effortLevels: readonly string[], harness: Harness) => void;
   liveConversation?: boolean;
+  /** Keep a pre-launch picker aligned with the selected model provider's configured harness. */
+  followProviderDefault?: boolean;
 }
 
-export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange, liveConversation = false }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange, liveConversation = false, followProviderDefault = false }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
@@ -213,6 +215,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
     anthropic: 'claude-code',
     openai: 'codex',
   });
+  const [providerHarnessesLoaded, setProviderHarnessesLoaded] = useState(false);
   const [showHarnessModelPermutations, setShowHarnessModelPermutations] = useState(false);
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
@@ -269,6 +272,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           }
           setProviderHarnesses((prev) => ({ ...prev, ...nextProviderHarnesses }));
           setShowHarnessModelPermutations(settingsRes.value.experimental?.showHarnessModelPermutations === true);
+          setProviderHarnessesLoaded(true);
         }
         const newGroups: ModelGroup[] = [];
 
@@ -361,11 +365,19 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const selectedModel =
     allModels.find((m) => m.id === value && (m.harness === undefined || m.harness === harness))
     ?? allModels.find((m) => m.id === value);
+  const selectedProviderHarness = selectedModel
+    ? providerDefaultHarness(selectedModel.provider, providerHarnesses)
+    : undefined;
   const effectiveHarness = selectedModel?.harness
-    ?? (showHarnessModelPermutations
-      ? harness
-      : selectedModel ? providerDefaultHarness(selectedModel.provider, providerHarnesses) : harness);
+    ?? (showHarnessModelPermutations ? harness : selectedProviderHarness ?? harness);
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
+
+  useEffect(() => {
+    if (!followProviderDefault || !providerHarnessesLoaded || showHarnessModelPermutations) return;
+    if (!selectedProviderHarness || selectedProviderHarness === harness || !onHarnessChange) return;
+    onHarnessChange(selectedProviderHarness);
+    saveStoredHarness(selectedProviderHarness);
+  }, [followProviderDefault, providerHarnessesLoaded, showHarnessModelPermutations, selectedProviderHarness, harness, onHarnessChange]);
 
   // Show provider sidebar when there are multiple AI providers
   const showProviderSidebar = groups.length > 1;

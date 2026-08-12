@@ -212,6 +212,26 @@ describe('chat ModelPicker live harness labels', () => {
     expect(onHarnessChange).not.toHaveBeenCalled();
   });
 
+  it('replaces a stale stored harness with the selected provider default before launch', async () => {
+    vi.unstubAllGlobals();
+    installFetchMock({ showHarnessModelPermutations: false });
+    localStorage.setItem('conv-composer-harness', 'claude-code');
+    const onHarnessChange = vi.fn();
+
+    render(
+      <ModelPicker
+        value="gpt-5.5"
+        onChange={vi.fn()}
+        harness="claude-code"
+        onHarnessChange={onHarnessChange}
+        followProviderDefault
+      />,
+    );
+
+    await waitFor(() => expect(onHarnessChange).toHaveBeenCalledWith('codex'));
+    expect(localStorage.getItem('conv-composer-harness')).toBe('codex');
+  });
+
   it('re-seeds a stored model after the available model list resolves', async () => {
     localStorage.setItem('conv-composer-model', 'kimi-k2.6-flash');
     const onChange = vi.fn();
