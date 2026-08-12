@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-12T23:35:37.036Z · model: claude-opus-5 · open: 841_
+_Last sequenced: 2026-08-12T23:36:40.634Z · model: claude-opus-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -179,8 +179,8 @@ _Last sequenced: 2026-08-12T23:35:37.036Z · model: claude-opus-5 · open: 841_
 | 172 | PAN-3617 | S | high | ok |  |  | One issue's strike dies instantly on every dispatch with zero output while siblings spawn normally |
 | 173 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent, so operator scope changes force a doctrine violation |
 | 174 | PAN-3633 | S | high | ok |  | PAN-3325 | Strike workspaces spawn with an incomplete dependency tree, so agents abort on a false 'main is red' |
+| 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 176 | PAN-3668 | L | high | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
-| 176 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 177 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -1176,7 +1176,7 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-12T23:35:37.036Z",
+  "generatedAt": "2026-08-12T23:36:40.634Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 841,
@@ -3484,20 +3484,8 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
       "planning": "auto"
     },
     {
-      "issue": "PAN-3668",
-      "rank": 176,
-      "size": "L",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2642",
-      "rank": 176,
+      "rank": 175,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3508,6 +3496,18 @@ New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-3668",
+      "rank": 176,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
