@@ -43,6 +43,7 @@ pan-done
 pan-down
 pan-fly
 pan-flywheel
+pan-gauntlet-loop
 pan-handoff
 pan-help
 pan-hygiene
