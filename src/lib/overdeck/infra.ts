@@ -402,7 +402,14 @@ export function getOverdeckDatabaseSync(
 ): SqliteDatabase {
   // Fresh/test homes still need the writable path to create the cache. A real
   // read-only CLI invocation always targets an existing dashboard-owned DB.
-  if (options.readOnly && existsSync(dbPath)) return getOverdeckDatabaseReadOnlySync(dbPath);
+  if (
+    options.readOnly
+    && overdeckDbSync?.path !== dbPath
+    && existsSync(dbPath)
+    && existsSync(OVERDECK_MIGRATION_PATH)
+  ) {
+    return getOverdeckDatabaseReadOnlySync(dbPath);
+  }
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
   }
