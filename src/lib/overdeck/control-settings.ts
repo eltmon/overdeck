@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, getOverdeckDatabaseReadOnlySync, getOverdeckDatabaseSync } from './infra.js';
+import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 import type { ProjectConfig as RawProjectConfig } from '../projects.js';
 import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
@@ -426,7 +426,7 @@ const BOOT_RECONCILIATION_DECISIONS = new Set<BootReconciliationDecision>([
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
-  const row = getOverdeckDatabaseReadOnlySync()
+  const row = getOverdeckDatabaseSync(undefined, { readOnly: true })
     .prepare('SELECT value FROM app_settings WHERE key = ?')
     .get(key) as { value: string } | undefined;
   return row ? row.value : null;
@@ -641,7 +641,7 @@ export const ConfigApi = HttpApiGroup.make('config')
  * Sync version of SettingsResolver.getFlywheelRuntime().activeRunId.
  */
 export function getFlywheelActiveRunIdSync(): string | null {
-  const db = getOverdeckDatabaseReadOnlySync();
+  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
   const row = db
     .prepare(`SELECT value FROM app_settings WHERE key = 'flywheel.active_run_id'`)
     .get() as { value: string | null } | undefined;

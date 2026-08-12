@@ -396,7 +396,13 @@ function warnSchemaDriftSync(db: SqliteDatabase): void {
   }
 }
 
-export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
+export function getOverdeckDatabaseSync(
+  dbPath = getOverdeckDatabasePath(),
+  options: { readOnly?: boolean } = {},
+): SqliteDatabase {
+  // Fresh/test homes still need the writable path to create the cache. A real
+  // read-only CLI invocation always targets an existing dashboard-owned DB.
+  if (options.readOnly && existsSync(dbPath)) return getOverdeckDatabaseReadOnlySync(dbPath);
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
   }
@@ -422,7 +428,7 @@ export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): Sql
   return db;
 }
 
-export function getOverdeckDatabaseReadOnlySync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
+function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
   if (overdeckReadOnlyDbSync?.path === dbPath) return overdeckReadOnlyDbSync.db;
 
   overdeckReadOnlyDbSync?.db.close();
