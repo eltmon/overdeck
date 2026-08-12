@@ -24,7 +24,9 @@ vi.mock('../../chat/defaultConversationModel', () => ({
 }));
 
 vi.mock('../../shared/ModelPicker', () => ({
-  ModelHarnessPicker: () => <div data-testid="model-harness-picker" />,
+  ModelHarnessPicker: ({ modelLabel, onModelChange }: { modelLabel: string; onModelChange: (model: string) => void }) => (
+    <button type="button" onClick={() => onModelChange('gpt-5.6-sol')}>{modelLabel}</button>
+  ),
   ModelSelect: () => <div data-testid="model-select" />,
   useAvailableModels: () => ({
     groups: [],
@@ -77,14 +79,67 @@ describe('ForkModal ACP source capabilities', () => {
       false,
       false,
       'Summary Fork: ACP source',
-      'acp',
-      'claude-code',
+      undefined,
+      undefined,
       undefined,
       undefined,
       undefined,
       undefined,
       undefined,
     );
+  });
+
+  it('omits hidden harness overrides when the launch model changes', () => {
+    const onConfirm = vi.fn();
+    const claudeConversation: Conversation = {
+      ...ACP_CONVERSATION,
+      name: 'Claude source',
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+    };
+
+    render(
+      <ForkModal
+        conversation={claudeConversation}
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Launch model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm.mock.calls[0][1]).toBe('gpt-5.6-sol');
+    expect(onConfirm.mock.calls[0][7]).toBeUndefined();
+    expect(onConfirm.mock.calls[0][8]).toBeUndefined();
+    expect(onConfirm.mock.calls[0][12]).toBeUndefined();
+  });
+
+  it('keeps the required Claude Code harness for exact-copy forks', () => {
+    const onConfirm = vi.fn();
+    const claudeConversation: Conversation = {
+      ...ACP_CONVERSATION,
+      name: 'Claude source',
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+    };
+
+    render(
+      <ForkModal
+        conversation={claudeConversation}
+        initialMode="plain"
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onConfirm.mock.calls[0][3]).toBe('plain');
+    expect(onConfirm.mock.calls[0][7]).toBe('claude-code');
   });
 
   it('sends the selected registered project yaml key', () => {

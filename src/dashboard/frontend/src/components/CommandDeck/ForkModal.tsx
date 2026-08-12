@@ -142,7 +142,7 @@ interface ForkModalProps {
 }
 
 export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, onClose, isPending }: ForkModalProps) {
-  const { groups, compactionModel, harnessPolicy } = useAvailableModels();
+  const { groups, compactionModel } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const { data: registeredProjects = [] } = useQuery({
     queryKey: ['registered-projects'],
@@ -173,18 +173,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const [fastSummary, setFastSummary] = useState(initialMode === 'fast-summary');
 
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
-  // Plain forks copy Claude JSONL and resume — Pi cannot consume that history,
-  // so plain forks force launchHarness back to claude-code. Summary and handoff
-  // forks inject portable text after spawn, so Pi launch is fine there subject
-  // to the canonical harness policy (ToS gate).
-  const [launchHarness, setLaunchHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
-  const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
-  useEffect(() => {
-    if (intent === 'plain' && launchHarness !== 'claude-code') {
-      setLaunchHarness('claude-code');
-    }
-  }, [intent, launchHarness]);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [handoffFocus, setHandoffFocus] = useState(initialFocus ?? '');
   const [handoffAuthor, setHandoffAuthor] = useState<HandoffAuthor>('external');
@@ -363,11 +352,8 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               <>
                 <ModelHarnessPicker
                   model={launchModel}
-                  harness={launchHarness}
                   onModelChange={setLaunchModel}
-                  onHarnessChange={setLaunchHarness}
                   groups={groups}
-                  harnessPolicy={harnessPolicy}
                   modelLabel="Launch model"
                 />
                 <span className={pickerStyles.fieldHint}>
@@ -438,11 +424,8 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                       <>
                         <ModelHarnessPicker
                           model={summaryModel}
-                          harness={summaryHarness}
                           onModelChange={setSummaryModel}
-                          onHarnessChange={setSummaryHarness}
                           groups={groups}
-                          harnessPolicy={harnessPolicy}
                           modelLabel="Summary model"
                         />
                         <span className={pickerStyles.fieldHint}>
@@ -504,11 +487,8 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                       <>
                         <ModelHarnessPicker
                           model={summaryModel}
-                          harness={summaryHarness}
                           onModelChange={setSummaryModel}
-                          onHarnessChange={setSummaryHarness}
                           groups={groups}
-                          harnessPolicy={harnessPolicy}
                           modelLabel="Authoring model"
                         />
                         <span className={pickerStyles.fieldHint}>
@@ -551,7 +531,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 fork_intent: intent,
                 fork_mode: apiForkMode,
                 fast_summary: localSummaryOnly,
-                launch_harness: launchHarness,
+                launch_harness: (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code',
               });
               onConfirm(
                 conversation,
@@ -561,12 +541,12 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 localSummaryOnly,
                 isSummaryFork && !fastSummary && includeThinkingInSummary,
                 forkTitle.trim() || undefined,
-                launchHarness,
-                summaryHarness,
+                isPlainFork ? 'claude-code' : undefined,
+                undefined,
                 handoffFocusValue,
                 isHandoffFork ? handoffAuthor : undefined,
                 isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
-                isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
+                undefined,
                 projectKey || undefined,
               );
             }}

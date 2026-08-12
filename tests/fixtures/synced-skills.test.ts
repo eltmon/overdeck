@@ -52,4 +52,11 @@ describe('synced skill set fixture', () => {
     const expected = readFileSync(FIXTURE_PATH, 'utf-8');
     expect(actual).toBe(expected);
   });
+
+  it('keeps Claude skill authoring without colliding with harness built-ins', () => {
+    const skillNames = captureSkillSet().trim().split('\n');
+
+    expect(skillNames).toContain('claude-skill-creator');
+    expect(skillNames).not.toContain('skill-creator');
+  });
 });
