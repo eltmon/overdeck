@@ -531,7 +531,6 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 fork_intent: intent,
                 fork_mode: apiForkMode,
                 fast_summary: localSummaryOnly,
-                launch_harness: isPlainFork ? 'claude-code' : undefined,
               });
               onConfirm(
                 conversation,
