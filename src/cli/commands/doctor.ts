@@ -746,13 +746,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
-
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
-
-  // Prime Agent is optional, but an installed build must match the pinned RPC protocol range.
   for (const c of await checkPrimeAgent()) checks.push(c);
-
   // Check Overdeck directories
   const directories = [
     { path: OVERDECK_HOME, name: 'Overdeck Home', fix: 'Run: pan init' },
