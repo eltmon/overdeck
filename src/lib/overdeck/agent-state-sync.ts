@@ -5,7 +5,7 @@ import {
 } from '../agents/agent-state-source.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getWorkspaceForIssue } from '../workspaces/resolver.js';
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabaseReadOnlySync, getOverdeckDatabaseSync } from './infra.js';
 
 type OverdeckAgentRow = {
   id: string;
@@ -240,14 +240,14 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
 }
 
 export function getOverdeckAgentStateSync(agentId: string): AgentState | null {
-  const row = getOverdeckDatabaseSync()
+  const row = getOverdeckDatabaseReadOnlySync()
     .prepare(`${SELECT_AGENT_SQL} WHERE id = ?`)
     .get(agentId) as OverdeckAgentRow | undefined;
   return row ? overdeckRowToAgentState(row) : null;
 }
 
 export function listOverdeckAgentStatesSync(): AgentState[] {
-  const rows = getOverdeckDatabaseSync()
+  const rows = getOverdeckDatabaseReadOnlySync()
     .prepare(SELECT_AGENT_SQL)
     .all() as OverdeckAgentRow[];
   return rows.map(overdeckRowToAgentState);
