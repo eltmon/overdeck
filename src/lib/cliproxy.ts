@@ -364,6 +364,26 @@ async function bridgeGeminiAuthToCliproxyTask(apiKey: string): Promise<boolean> 
   return true;
 }
 
+function getCliproxyConfigExtraPath(): string {
+  return join(getCliproxyDir(), 'config.extra.yaml');
+}
+
+/**
+ * Operator-owned config additions (e.g. oauth-model-alias remap rules).
+ * config.yaml is regenerated on every start, so durable customization lives
+ * in config.extra.yaml and is appended verbatim to the generated config.
+ */
+function readConfigExtra(): string {
+  const extraPath = getCliproxyConfigExtraPath();
+  if (!existsSync(extraPath)) return '';
+  try {
+    const extra = readFileSync(extraPath, 'utf8').trim();
+    return extra ? `${extra}\n` : '';
+  } catch {
+    return '';
+  }
+}
+
 function buildCliproxyConfig(geminiApiKey: string | null): string {
   const authDir = getCliproxyAuthDir();
 
@@ -384,7 +404,8 @@ function buildCliproxyConfig(geminiApiKey: string | null): string {
   }
 
   lines.push(`debug: false`, '');
-  return lines.join('\n');
+  const extra = readConfigExtra();
+  return extra ? `${lines.join('\n')}${extra}` : lines.join('\n');
 }
 
 function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
