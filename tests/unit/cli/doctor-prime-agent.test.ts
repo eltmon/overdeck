@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkPrimeAgent } from '../../../src/cli/commands/doctor.js';
+import { checkPrimeAgent } from '../../../src/cli/commands/doctor-prime-agent.js';
 
 const resolver = async () => '/opt/prime/bin/prime-agent';
 
