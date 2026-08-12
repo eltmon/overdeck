@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:08:41.681Z",
+  "updated": "2026-08-12T18:10:44.653Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "rpc-client": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2808528,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T18:08:41.681Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Added bounded incremental byte framing that splits only on LF, strips one CR, preserves U+2028/U+2029, rejects malformed/oversized/unterminated records, and emits strict JSONL.",
         "releasedAt": "2026-08-12T18:08:30.104Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2808528,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:08:41.681Z",
+        "itemId": "rpc-client",
+        "outcome": "completed",
+        "reason": "Added bounded request correlation, strict JSONL writes, asynchronous event routing, command validation, fake-timer timeouts, backpressure limits, write failures, and process-exit rejection.",
+        "releasedAt": "2026-08-12T18:10:44.652Z"
       }
     ],
     "statusReasons": {
@@ -200,6 +203,10 @@
       "rpc-framing": {
         "reason": "Added bounded incremental byte framing that splits only on LF, strips one CR, preserves U+2028/U+2029, rejects malformed/oversized/unterminated records, and emits strict JSONL.",
         "updatedAt": "2026-08-12T18:08:30.104Z"
+      },
+      "rpc-client": {
+        "reason": "Added bounded request correlation, strict JSONL writes, asynchronous event routing, command validation, fake-timer timeouts, backpressure limits, write failures, and process-exit rejection.",
+        "updatedAt": "2026-08-12T18:10:44.652Z"
       }
     }
   },
@@ -234,6 +241,10 @@
     "rpc-framing.ac1": "completed",
     "rpc-framing.ac2": "completed",
     "rpc-framing.ac3": "completed",
-    "rpc-client": "running"
+    "rpc-client": "completed",
+    "rpc-client.ac1": "completed",
+    "rpc-client.ac2": "completed",
+    "rpc-client.ac3": "completed",
+    "rpc-client.ac4": "completed"
   }
 }
