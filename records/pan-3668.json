@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T18:06:57.529Z",
+  "updated": "2026-08-12T18:08:30.104Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "rpc-framing": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2785539,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T18:06:57.529Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -151,6 +143,17 @@
         "outcome": "completed",
         "reason": "Mapped prime-agent to its executable, honored config.primeAgent.binaryPath, and added actionable missing/non-executable errors that state no terminal was created.",
         "releasedAt": "2026-08-12T18:06:47.655Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2785539,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T18:06:57.529Z",
+        "itemId": "rpc-framing",
+        "outcome": "completed",
+        "reason": "Added bounded incremental byte framing that splits only on LF, strips one CR, preserves U+2028/U+2029, rejects malformed/oversized/unterminated records, and emits strict JSONL.",
+        "releasedAt": "2026-08-12T18:08:30.104Z"
       }
     ],
     "statusReasons": {
@@ -185,6 +188,10 @@
       "harness-binary-resolution": {
         "reason": "Mapped prime-agent to its executable, honored config.primeAgent.binaryPath, and added actionable missing/non-executable errors that state no terminal was created.",
         "updatedAt": "2026-08-12T18:06:47.655Z"
+      },
+      "rpc-framing": {
+        "reason": "Added bounded incremental byte framing that splits only on LF, strips one CR, preserves U+2028/U+2029, rejects malformed/oversized/unterminated records, and emits strict JSONL.",
+        "updatedAt": "2026-08-12T18:08:30.104Z"
       }
     }
   },
@@ -215,6 +222,9 @@
     "harness-binary-resolution": "completed",
     "harness-binary-resolution.ac1": "completed",
     "harness-binary-resolution.ac2": "completed",
-    "rpc-framing": "running"
+    "rpc-framing": "completed",
+    "rpc-framing.ac1": "completed",
+    "rpc-framing.ac2": "completed",
+    "rpc-framing.ac3": "completed"
   }
 }
