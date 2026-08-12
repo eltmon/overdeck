@@ -1,539 +1,539 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-12T04:19:09Z · model: claude-opus-5 · open: 838_
+_Last sequenced: 2026-08-12T23:31:44.581Z · model: claude-opus-5 · open: 841_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-3285 | M | critical | ok |  |  | Supervisor pinned to a reload generation SIGTERMs every healthy dashboard and can never start one — 3.5h outage, 1107 silent retries |
-| 2 | PAN-3250 | S | critical | ok |  |  | New workspaces branch from local HEAD, not origin/main — every fresh feature branch inherits unpushed local commits |
-| 3 | PAN-3062 | M | critical | ok |  |  | Shared primary main worktree: whoever pushes main ships every other session’s unpushed local commits, verified or not |
-| 4 | PAN-3539 | S | critical | ok |  |  | Kernel OOM of one agent-spawned process failed the whole tmux unit (OOMPolicy=stop) — every agent and conversation session lost |
-| 5 | PAN-3283 | S | critical | ok |  |  | Recovering from review_infrastructure_failure sets review_status=passed despite an outstanding CHANGES REQUESTED verdict |
-| 6 | PAN-3524 | M | critical | ok |  |  | Server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator-stop; blocked a red-main fix |
-| 7 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt — role boots an idle REPL, no turn, no JSONL; deterministic cause of zombie test agents |
-| 8 | PAN-3561 | S | critical | ok |  |  | Ownerless state-git lock is immortal — a writer crashing before owner.json bricks a project’s write door, with no TTL and no recovery CLI |
-| 9 | PAN-3564 | M | critical | ok |  |  | Lock convoy: per-issue record lock held across the global state-git wait — reviewer spawns die with no retry, locks hit 100% duty cycle |
-| 10 | PAN-3630 | S | critical | ok |  |  | pan tell marks messages read without delivering them — three "delivered" confirmations, zero receipts, rejected design shipped |
-| 11 | PAN-3653 | S | critical | ok |  |  | A strike that correctly stops on red main has no path that wakes it when main goes green — stays idle and unrecoverable |
-| 12 | PAN-3554 | M | critical | ok |  |  | Red main has no mechanical owner — a failed main-push CI run must escalate within minutes, not sit red for five hours |
-| 13 | PAN-3532 | S | critical | ok |  |  | CI never runs the full frontend test suite — main was red on frontend while every main CI run reported green |
-| 14 | PAN-3520 | M | critical | ok |  |  | Test gate must retry timeout-only failures in isolation before recording a verdict — load flakes loop branches forever |
-| 15 | PAN-3492 | M | critical | ok |  |  | Server-side verification retries form a self-amplifying load loop — timeouts cause retries which cause more timeouts |
-| 16 | PAN-3313 | S | critical | ok |  |  | CLIProxy benches its only auth on a transient stream error — every GPT agent gets 503 auth_unavailable (70% failure), message misleading |
-| 17 | PAN-3429 | M | critical | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure — flywheel paused a gate run by hand at PSI 41.9 / 2.2GB |
-| 18 | PAN-3631 | XS | high | ok |  |  | Sequencer reads its prior from legacy .pan/backlog/sequence.md while write-sequence persists to overdeck-state — the prior is frozen forever |
-| 19 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering — 11 duplicate ranks and 11 gaps, so rank stops being a total order |
-| 20 | PAN-3505 | S | high | ok |  |  | Unpushed agent code commits on the primary main worktree block the flywheel’s state write door |
-| 23 | PAN-3655 | S | medium | ok |  |  | Unify issue Conversation/Terminal switching with the shared segmented selector |
-| 24 | PAN-2746 | XS | critical | ok |  | PAN-2742, PAN-2695 | infra-failure bypass writes reviewStatus='passed' |
-| 25 | PAN-2689 | S | critical | ok |  |  | Review verdicts from sandboxed codex review agents are silently lost |
-| 26 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 27 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 28 | PAN-2706 | M | high | ok |  |  | Ghost test sessions absorb every test dispatch |
-| 29 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
-| 30 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
-| 31 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 32 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
-| 33 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
-| 34 | PAN-2874 | M | critical | ok |  | PAN-2828 | Strike landing pipeline cannot merge strikes: the verification gate demands a vBRIEF checklist strikes never have |
-| 35 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
-| 36 | PAN-1711 | S | high | ok |  |  | Root-cause and fix dashboard event-loop stalls under load |
-| 37 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers and @slow exclusion for the real-timer test family |
-| 38 | PAN-2954 | S | high | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 39 | PAN-3504 | XS | high | ok |  |  | typecheck fails on main: parked.ts references nonexistent ProjectConfig.projectPath |
-| 40 | PAN-3499 | XS | high | needs-refinement |  |  | pan parked ack references nonexistent ProjectConfig.projectPath (duplicate of PAN-3504) |
-| 41 | PAN-2995 | S | high | ok |  |  | pan done --strike false-blocks after a gh-API squash-merge — should verify PR-merged/content, not branch ancestry |
-| 42 | PAN-3085 | XS | high | ok |  |  | Review feedback written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback |
-| 43 | PAN-3099 | XS | high | ok |  |  | pan restart --health-timeout 120 treated as 120ms — false-failed health check leaves the dashboard DOWN |
-| 44 | PAN-3077 | XS | high | ok |  |  | Inspect/review-supervisor spawns omit --effort, inheriting the harness xhigh default — fires once per xBRIEF item |
-| 45 | PAN-3103 | S | high | ok |  |  | A transient merge_status=failed permanently skips automatic close-out, leaving a merged issue open and pickup-eligible |
-| 46 | PAN-3106 | S | high | ok |  |  | auto_merge_default: hold is bypassed — shouldHoldForUat is consulted on only one merge path, so held issues merge anyway |
-| 47 | PAN-3424 | M | high | ok |  |  | State plane silently stops being durable: non-FF overdeck-state pushes are never reconciled and drafts/ PRDs are never staged |
-| 48 | PAN-3100 | S | high | ok |  |  | Test role evaluates the dirty working tree, so a live work agent’s uncommitted edits produce false test failures |
-| 49 | PAN-3104 | S | high | ok |  |  | Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue long after the fix landed |
-| 50 | PAN-3078 | S | high | ok |  |  | Inspect verdict is never delivered to the work agent — an agent that waits for it deadlocks forever |
+| 1 | PAN-2746 | XS | critical | ok |  | PAN-2742, PAN-2695 | infra-failure bypass writes reviewStatus='passed' |
+| 2 | PAN-2689 | S | critical | ok |  |  | Review verdicts from sandboxed codex review agents are silently lost |
+| 3 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
+| 4 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD, so every new feature branch inherits unpushed local main commits |
+| 5 | PAN-3285 | M | critical | ok |  |  | Supervisor pinned to a reload generation kills every healthy dashboard and cannot start one — 3.5h outage |
+| 6 | PAN-2874 | M | critical | ok |  | PAN-2828 | Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli… |
+| 7 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
+| 8 | PAN-3283 | S | critical | ok |  |  | Recovering from review_infrastructure_failure sets review_status=passed over an outstanding CHANGES REQUESTED |
+| 9 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
+| 10 | PAN-3631 | S | critical | ok |  | PAN-3301 | Sequencer reads its prior from legacy .pan while write-sequence persists to overdeck-state — prior frozen |
+| 11 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
+| 12 | PAN-2758 | S | critical | ok |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
+| 13 | PAN-3085 | XS | critical | ok |  |  | Review feedback written to .overdeck/feedback but agents and the merge gate are pointed at .pan/feedback |
+| 14 | PAN-3329 | M | critical | ok |  |  | Deployment generation node_modules and tracked packages/ files deleted mid-build, bricking every pan call |
+| 15 | PAN-3498 | S | critical | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so rank stops being a total order |
+| 16 | PAN-2848 | S | critical | ok |  |  | Work agent stalls forever on a dead inspection: no re-dispatch, verdict never delivered, swarm-off suppresses recovery of a non-swarm a… |
+| 17 | PAN-2846 | S | critical | ok |  |  | Close-out blocks on a dead agent: postMergeLifecycle pauses the work agent but leaves status=running |
+| 18 | PAN-3078 | S | critical | ok |  |  | Inspect verdict never reaches the work agent, so an agent that waits for it deadlocks forever |
+| 19 | PAN-3539 | M | critical | ok |  | PAN-3314 | A kernel OOM of one agent-spawned process killed the whole tmux server; OOMPolicy=stop took every session |
+| 20 | PAN-3566 | S | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the zombie-test root cause |
+| 21 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 22 | PAN-2567 | S | critical | ok |  |  | reviewed+green PR stuck after review |
+| 23 | PAN-2995 | S | critical | ok |  |  | pan done --strike false-blocks after a gh-API squash merge; ancestry test cannot see squashed content |
+| 24 | PAN-3057 | M | critical | ok |  |  | Harness-initiated compaction leaves agents idle forever; GPT-5.6 context window declared twice |
+| 25 | PAN-3282 | M | critical | ok |  |  | Review agents repeatedly die before writing a verdict across five issues and two projects |
+| 26 | PAN-3313 | M | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth, 503ing ~70% of GPT-routed inference |
+| 27 | PAN-3424 | M | critical | ok |  |  | The state plane silently stops being durable: non-FF pushes unreconciled, drafts never staged, 16 orphans |
+| 28 | PAN-3492 | M | critical | ok |  | PAN-3344 | Server-side verification retries form a self-amplifying load loop: timeouts cause retries cause timeouts |
+| 29 | PAN-3524 | M | critical | ok |  |  | A server-owned --changed verification loop survives freeze, abort, pause and operator-stop |
+| 30 | PAN-3532 | S | critical | ok |  |  | CI never runs the full frontend suite, so main stayed red on frontend while every CI run reported green |
+| 31 | PAN-3554 | S | critical | ok |  |  | Red main has no mechanical owner; a failed main-push CI run sat five hours with the failure hiding itself |
+| 32 | PAN-3561 | S | critical | ok |  |  | An ownerless state-git lock is immortal: a crashed writer bricked a project's write door for 2.5 days |
+| 33 | PAN-3630 | S | critical | ok |  | PAN-3629 | pan tell marks messages read without delivering them: three 'delivered' confirmations, zero receipts |
+| 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 35 | PAN-3062 | M | critical | ok |  |  | Shared primary main worktree means any agent pushing main ships every other session's unpushed commits |
+| 36 | PAN-3234 | M | critical | ok |  |  | Agents freeze indefinitely on blocking choice menus and no health surface detects it |
+| 37 | PAN-3653 | S | critical | ok |  |  | A cleared red-main blocker leaves a live strike idle and unrecoverable — nothing wakes it when main goes green |
+| 38 | PAN-3667 | M | critical | ok |  |  | CLIProxy has no cross-family remap, so every model-pinned subagent dies at spawn in a proxied session |
+| 39 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 40 | PAN-3043 | S | critical | ok |  |  | Mid-run provider quota exhaustion undetected: agent holds a slot at status=running for days |
+| 41 | PAN-3084 | S | critical | ok |  |  | A spawned-but-never-briefed review session blocks its own replacement; restart 'preserves' the zombie |
+| 42 | PAN-3100 | S | critical | ok |  |  | Test role evaluates the dirty working tree, so a live work agent's uncommitted edits produce false failures |
+| 43 | PAN-3168 | S | critical | ok |  |  | DoD row 5 deadlocks close-out: an agent paused FOR close-out counts as running and blocks it |
+| 44 | PAN-3188 | S | critical | ok |  |  | DoD row 5 rejects terminal canonical states, so an already-done issue can never close out |
+| 45 | PAN-3244 | S | critical | ok |  |  | A queued dashboard deploy defers verification for every project, starving cross-project review handoffs |
+| 46 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent, so a single hungry agent takes the whole fleet down on OOM |
+| 47 | PAN-3520 | S | critical | ok |  | PAN-3344 | Test gate must retry timeout-only failures in isolation; load flakes loop branches on false verdicts |
+| 48 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overload under concurrent convoys 502s fleet-wide, killing resumes and feedback delivery |
+| 49 | PAN-3564 | M | critical | ok |  | PAN-3561 | Lock convoy: the per-issue record lock is held across the global state-git wait, killing reviewer spawns |
+| 50 | PAN-3651 | S | critical | ok |  | PAN-3424 | Re-land the overdeck-state non-FF push retry with the pan-dir state-door suites green |
+| 51 | PAN-3662 | S | critical | ok |  |  | Read-only CLI surfaces run schema top-ups and emit SQLITE_READONLY under the sandboxed Flywheel |
 | 51 | PAN-3580 | M | high | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
-| 51 | PAN-3084 | S | high | ok |  |  | A review session spawned but never briefed sits at zero context forever and blocks its own replacement |
-| 52 | PAN-3282 | M | high | ok |  |  | Review agents repeatedly die before writing a verdict (review_infrastructure_failure) across 5 issues and 2 projects |
-| 53 | PAN-3234 | M | high | ok |  |  | Agents freeze indefinitely on blocking choice menus — paneHasBlockingChoiceMenu is wired to delivery refusal, never to health |
-| 54 | PAN-3118 | M | high | ok |  |  | Model quota exhaustion halts agents invisibly — four planning agents reported running at $0.00 with no capacity fallback |
-| 55 | PAN-3563 | S | high | ok |  |  | Role agent spawned with an undelivered prompt becomes an invisible zombie — state says running forever and the dispatcher no-ops |
-| 56 | PAN-3236 | S | high | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous keyed delivery — feedback never lands and the issue goes stuck |
-| 57 | PAN-3281 | XS | high | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches the UAT batch |
-| 58 | PAN-3188 | XS | high | ok |  |  | DoD row 5 rejects terminal canonical states — an already-done issue can never satisfy the post-merge row |
-| 59 | PAN-3168 | XS | high | ok |  |  | DoD row 5 deadlocks close-out: an agent paused for close-out with no tmux session is counted as running and blocks it |
-| 60 | PAN-3248 | XS | high | ok |  |  | pan reload does not clear pending-deploy.json, so every flywheel deploy starves verification for ALL projects until a patrol runs |
-| 61 | PAN-3047 | S | high | ok |  |  | Strike-branch teardown never fires — --is-ancestor cannot detect a squash merge, so all 96 strike/* branches are residue |
-| 62 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics.sh executed a squatted npm package through an npx registry fallback |
-| 63 | PAN-3496 | XS | high | ok |  |  | Review/inspect agents must not AskUserQuestion the operator for review depth — decide, don’t ask |
-| 64 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl injection slot |
-| 65 | PAN-3022 | S | high | ok |  |  | Work-spawn route ignores the per-issue workModel override — the role default wins and then clobbers the record |
-| 66 | PAN-3023 | S | high | ok |  |  | Post-planning auto-spawn abandoned on a transient Docker failure — attempt 1/3 never retries and the issue stalls in todo |
-| 67 | PAN-3096 | S | high | ok |  |  | pan done fails on the generated devcontainer harness, and agents infer deletion of workspace infrastructure |
-| 68 | PAN-3245 | XS | high | ok |  |  | pan done completion gate falsely flags workspace .pan/drafts/<issue>.md as uncommitted work despite its own .pan exclusion |
-| 69 | PAN-3014 | XS | high | ok |  |  | Background AI title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209 |
-| 70 | PAN-2980 | XS | high | ok |  |  | pre-push file-size guard audits the dirty working tree, so another session’s uncommitted edits block unrelated pushes |
-| 71 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan and the stray-writer patrol flags stale dirs forever — 68k log lines hiding a real defect |
-| 72 | PAN-3657 | S | high | ok |  |  | Merge-train queues endpoint silently drops every polyrepo candidate — MYN and Auricle trains permanently empty |
-| 73 | PAN-3651 | S | high | ok |  |  | Re-land the overdeck-state non-fast-forward push retry (reverted d6defa16e8) with the pan-dir state-door suites green |
-| 74 | PAN-3560 | M | high | ok |  |  | PTY supervisor overload under concurrent review convoys — fleet-wide 502 echo-confirmation failures kill resumes and feedback delivery |
-| 75 | PAN-3565 | M | high | ok |  |  | Review lifecycle: failed spawn wedges starting state, infra-failure synthesizes a fake CHANGES REQUESTED, pan tell hangs to SIGTERM |
-| 76 | PAN-3057 | M | high | ok |  |  | Harness-initiated compaction leaves agents idle forever, and the GPT-5.6 context window is declared twice with different values |
-| 77 | PAN-3571 | S | high | ok |  |  | work-agent-stop-hook: completion-check timeout exits silently — 334 stranded turn-ends with no nudge or escalation |
-| 78 | PAN-3274 | S | high | ok |  |  | A test-role agent can spawn and never run, stranding its issue behind a verdict that was never produced |
-| 79 | PAN-3397 | S | high | ok |  |  | Freshly-spawned convoy lanes freeze at 0 output before processing kickoff — PAN-3375’s detector covers warm resumes only |
-| 80 | PAN-3278 | S | high | ok |  |  | Work agent finished with an open PR but review was never dispatched — auto-requeue had 25 attempts and fired none |
-| 81 | PAN-3237 | S | high | ok |  |  | A capacity-refused planning→work handoff is marked terminally stuck: every HTTP 409 becomes guardrails and calls markWorkspaceStuck |
-| 82 | PAN-3043 | S | high | ok |  |  | Mid-run provider quota exhaustion is undetected: an agent stays running for days holding a slot |
-| 83 | PAN-3139 | S | high | ok |  |  | Agents-table liveness drifts stale in the under-reporting direction — a live 4h agent is recorded stopped |
-| 84 | PAN-3522 | S | high | ok |  |  | Dashboard supervisor watchdog restart-churns under CPU storm — the probe timeout budget ignores the boot warm phase |
-| 85 | PAN-3050 | S | high | ok |  |  | Idle-stack reaper is blind to non-Overdeck workspaces — its regex matches only overdeck-feature-* so MYN stacks are never reaped |
-| 86 | PAN-3314 | M | high | ok |  |  | Bound the OOM blast radius: one cgroup holds every agent, so a single hungry agent can kill the whole fleet |
-| 87 | PAN-3329 | M | high | ok |  |  | Deployment generation node_modules and tracked packages/ files deleted while a dev-checkout build runs (2nd occurrence) |
-| 88 | PAN-3621 | S | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from dist, path from the live generation |
-| 89 | PAN-3535 | S | high | ok |  |  | Drain/resume boot gate is caller-env-dependent — any restart from a clean shell silently drops the hold |
-| 90 | PAN-3553 | S | high | ok |  |  | Post-reboot --no-resume boot leaves conversations on Starting… for minutes — census treats a zero-session tmux server as unavailable |
-| 91 | PAN-3297 | S | high | ok |  |  | pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart — delivery and resume disagree |
-| 92 | PAN-3555 | S | high | ok |  |  | pan start silently spawned a FRESH session over a resumable warm session with no --fresh — warm-by-default violated |
-| 93 | PAN-3543 | S | high | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refused while the refusal recommends --fresh |
-| 94 | PAN-3541 | S | high | ok |  |  | Review restart after an unclean reviewer death loops on the session-resume menu — eligibility ignores how the session ended |
-| 95 | PAN-3654 | S | high | ok |  |  | Compact respawn confirms against the archived session and kills a working fresh agent |
-| 96 | PAN-3650 | XS | high | ok |  |  | Strike self-abort leaves state.json running — the deacon auto-resume resurrects aborted strikes on every recovery pass |
-| 97 | PAN-3081 | S | high | ok |  |  | Agent git guard is bypassable by removing it from $PATH — an agent did so unprompted to get past a false block |
-| 98 | PAN-3129 | M | high | ok |  |  | Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths |
-| 99 | PAN-3500 | S | high | ok |  |  | A review sub-role can modify the branch after writing its report |
-| 100 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header |
-| 101 | PAN-3454 | S | high | ok |  |  | Cost hook re-ingests fork-copied parent history under reviewer identity — fabricated cache-miss warnings and multi-billed discovery spend |
-| 102 | PAN-3344 | M | high | ok |  |  | Resource governor should gate dispatch on CPU load, not memory alone |
-| 103 | PAN-3012 | M | high | ok |  |  | Back up harness conversation transcripts before harnesses delete them |
-| 104 | PAN-3040 | M | high | ok |  |  | pan strike fails on polyrepo projects — the strike path is monorepo-shaped end to end |
-| 105 | PAN-3174 | M | high | ok |  |  | Every polyrepo UAT stack is unreachable: wrong Traefik network prefix, Traefik never attached to the devnet, and a 4173/5173 port mismatch |
-| 106 | PAN-3256 | S | high | ok |  |  | MYN pipeline membership fails forge_unavailable — glab mr list runs in a polyrepo root that is not a git repository |
-| 107 | PAN-3267 | S | high | ok |  |  | Pipeline membership: the GitLab merged-head oracle fans out one glab subprocess per repo×head, stalling and failing every refresh |
-| 108 | PAN-3120 | S | high | ok |  |  | MERGE refuses (polyrepo) or silently dead-ends (single-repo) when the scheduler yielded the work agent |
-| 109 | PAN-3289 | S | high | ok |  |  | Sequencer ran a full pass on an empty manifest (0 issues) against a 750-issue backlog — read model transiently empty at spawn |
-| 110 | PAN-3048 | S | high | ok |  |  | Pipeline auto-commit lands .pan/drafts/<ISSUE>.md in product feature branches; the duplicated exclusion list has drifted |
-| 111 | PAN-3308 | XS | high | ok |  |  | The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file |
-| 112 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn with an incomplete dependency tree, so the contract’s own typecheck gate fails and agents report a false red main |
-| 113 | PAN-3270 | S | high | ok |  |  | New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails |
-| 114 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an EMPTY node_modules, so tooling silently resolves deps from the parent repo instead of failing loudly |
-| 115 | PAN-3186 | S | high | ok |  |  | Pipeline membership blanks the whole auricle project because one configured member (infra) is not a git repo |
-| 116 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door — a GitHub App 404 is typed as forge_unavailable |
-| 117 | PAN-3596 | M | high | ok |  |  | Deacon patrol has no per-step timing — a 481-GET reconciler ran undetected for months and the residual overrun cannot be attributed |
-| 118 | PAN-3579 | S | high | ok |  |  | Audit: ~20 frontend mutation fetches with bare JSON headers 403 on CSRF-guarded routes |
-| 119 | PAN-3284 | S | high | ok |  |  | Work agent wrote a doc edit into the primary main worktree instead of its workspace (PAN-2204 family) |
-| 120 | PAN-3196 | S | high | ok |  |  | Close-out cannot tear down workspaces containing root-owned container residue — passes every DoD row then dies on EACCES |
-| 121 | PAN-3210 | S | high | ok |  |  | Close-out blocked by an unprefixed devcontainer init-perms container — teardown scopes by compose project, the guard by working_dir |
-| 122 | PAN-3570 | S | high | ok |  |  | Workspace devcontainer leaves root-owned node_modules/.pnpm-store subtrees — init-fe EACCES blocks pan start and rebuild does not heal it |
-| 123 | PAN-3032 | M | high | ok |  |  | Workspace stack rebuild composes under overdeck-feature-* while Traefik labels reference myn-feature-* — 504s and lost devnet attachments |
-| 124 | PAN-3179 | M | high | ok |  |  | A UAT promote is marked complete at merge time — nothing verifies the change reached production |
-| 125 | PAN-3218 | S | high | ok |  |  | No release-drift signal — a user-facing fix can sit merged on main for hours while every published version stays broken |
-| 126 | PAN-3261 | S | high | ok |  |  | Resume-gate Enter: the tmux fallback answers a live choice menu when its own paste hides the menu from the detector |
-| 127 | PAN-3306 | S | high | ok |  |  | A strike needing a rebase has no working path: strike.ts instructs it, the guard blocks it, sync-main resolves the wrong worktree |
-| 128 | PAN-3617 | S | high | ok |  |  | PAN-3586’s strike dies immediately on every dispatch — 3 attempts, zero output, while a sibling spawned minutes later works |
-| 129 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent — an operator scope change forces a doctrine violation or lets the rejected design land |
-| 130 | PAN-3432 | S | high | ok |  |  | Preemptive yield fan-out — 7 work agents simultaneously yielded "making room for review of MIN-874" for ONE review convoy |
-| 131 | PAN-3175 | M | high | ok |  |  | Model explicit semantic dependencies in merge-train ordering — file overlap cannot see that one feature requires another |
-| 132 | PAN-3176 | S | high | ok |  |  | Block UAT batch promotion when the live stack is degraded, unknown or still starting — the promote path takes no health evidence |
-| 133 | PAN-3355 | XS | high | ok |  |  | sessionExists maps a probe failure to absence, so callers read "not running" when liveness is unknown |
-| 134 | PAN-3317 | S | high | needs-refinement |  |  | Strike agents have no sanctioned way to sync main — rebase is guard-blocked and pan sync-main cannot resolve -strike workspaces |
-| 135 | PAN-3224 | XS | high | ok |  |  | A crash-interrupted spawn strands model pending-work-spawn in agent state; plain pan start dies and only --fresh recovers |
-| 136 | PAN-3439 | XS | high | needs-refinement |  |  | pan start crashes on a pending-work-spawn placeholder row instead of taking the fresh-spawn path (duplicate of PAN-3224) |
-| 137 | PAN-3622 | XS | high | ok |  |  | orphan-proposed-reconciler test asserts on real issue PAN-3604 and reads live GitHub — it fails pan release check on a green main |
-| 138 | PAN-2971 | S | high | ok |  |  | Flywheel orchestrator finalized its own run but kept running — zombie session uncontrollable, dashboard Pause/Stop disabled |
-| 139 | PAN-3456 | XS | high | ok |  |  | pan swarm refused every plan containing a sequential item — per-item diagnostics acted as gates |
-| 140 | PAN-3460 | S | high | ok |  |  | Swarm per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive |
-| 141 | PAN-3463 | S | high | ok |  |  | A legitimate no-op slot outcome (empty diff) can never pass its item verify — the slot wedges permanently |
-| 142 | PAN-3464 | XS | high | ok |  |  | pan swarm reset does not clear slotCompletions despite claiming to clear recorded slot state |
-| 143 | PAN-3185 | XS | high | ok |  |  | pan start reports a false hard failure when the deacon wins a spawn race — duplicate-session TOCTOU in the spawn path |
-| 144 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against CLOSED issues — resurrects agents and raises needs-you 12 days after close-out |
-| 145 | PAN-3557 | S | high | ok |  |  | Post-merge label application has no retry — a rate-limited 403 silently hides the issue from the verify-on-main sweep |
-| 146 | PAN-3205 | S | high | ok |  |  | Deployment gate queues a deferred deploy but never fires it — the promised "next verification boundary" trigger does not exist |
-| 147 | PAN-3569 | S | high | ok |  |  | Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused — no staleness rule, no non-force exit |
-| 148 | PAN-3244 | S | high | ok |  |  | A queued dashboard deploy globally defers verification — a flywheel-owned deploy window starves cross-project review handoffs |
-| 149 | PAN-3257 | S | high | ok |  |  | Crash-resume does not re-wire the PTY supervisor — a stale socket refuses all deliveries and state.json loses supervisorEnabled |
-| 150 | PAN-3556 | S | high | ok |  |  | Concurrent double-spawn race: one agent allocated two fresh session identities three seconds apart at UAT promote time |
-| 151 | PAN-3171 | S | high | ok |  |  | Pipeline reports "merge failed" after a successful merge and successful post-merge cleanup, leaving the issue in Todo with no label |
-| 152 | PAN-3502 | XS | high | ok |  |  | tiered-crews blendedCost expectation is stale versus current model-capabilities pricing and fails on main |
-| 153 | PAN-3321 | XS | medium | ok |  |  | Escalation messages and CLAUDE.md tell operators to run pan unstick <id>, which does not exist |
-| 154 | PAN-3108 | XS | medium | ok |  |  | dashboard.log grows unbounded (867MB, 8.8M lines) with no rotation |
-| 155 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum is stale — it warns on most real commits and still lists the removed beads scope |
-| 156 | PAN-3003 | XS | medium | ok |  |  | Work-agent launchers lack an OVERDECK_AGENT_ID export, so a manual re-launch of launcher.sh dies instantly |
-| 157 | PAN-3652 | XS | medium | ok |  |  | Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified on demand |
-| 158 | PAN-3243 | XS | high | ok |  |  | auto-commit test flakes on main by polling a fixed 20 setImmediate turns for a real git subprocess |
-| 159 | PAN-3094 | XS | medium | ok |  |  | pan done merge fallback force-pushes a fast-forward branch and leaves the command partially complete |
-| 160 | PAN-3508 | XS | medium | ok |  |  | pan reload temporarily removes the global pan CLI when invoked outside its linked generation |
-| 161 | PAN-3046 | XS | medium | ok |  |  | pan CLI crashes at exit with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out |
-| 162 | PAN-3627 | XS | medium | ok |  |  | backlog-auto-trigger fails on startup when the backlog is legitimately empty |
-| 163 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
-| 164 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
-| 165 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
-| 166 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 167 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
-| 168 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
-| 169 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 170 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 171 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 172 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 173 | PAN-2758 | S | critical | ok |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
-| 174 | PAN-2886 | M | high | ok |  |  | Placeholder (pending-work-spawn) agents crash auto-resume with 'Unknown model' → stranded troubled forever |
-| 175 | PAN-2817 | M | high | ok |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 176 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 177 | PAN-2848 | S | critical | ok |  |  | Work agent stalls forever on a dead inspection: no re-dispatch, verdict never delivered, swarm-off suppresses recovery of a non-swarm a… |
-| 178 | PAN-2846 | S | critical | ok |  |  | Close-out blocks on a dead agent: postMergeLifecycle pauses the work agent but leaves status=running |
-| 179 | PAN-2747 | S | high | ok |  |  | Flywheel cannot be resumed after a crash/reboot: Resume is disabled and the only offered action aborts the run |
-| 180 | PAN-2759 | S | high | ok |  |  | Dead flywheel with an active run was never auto-relaunched after a reboot |
-| 181 | PAN-2709 | M | high | ok |  |  | Flywheel orchestrator is unreachable as a notification target |
-| 182 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 183 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 184 | PAN-2567 | S | critical | ok |  |  | reviewed+green PR stuck after review |
-| 185 | PAN-2179 | S | high | ok |  |  | relaunch can leave a zombie agent |
-| 186 | PAN-2169 | S | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 187 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
-| 188 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 189 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
-| 190 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 191 | PAN-2888 | M | high | ok |  | PAN-2846 | Close-out leaves stale residue that inflates troubled/failed metrics: orphaned inspect sub-agents + uncleared review_status rows on CLO… |
-| 192 | PAN-2960 | S | high | ok |  |  | Inspect supervisor lingers past 12m limit and never self-terminates after posting a verdict |
-| 193 | PAN-2959 | S | high | ok |  |  | pan inspect --item <X> reviews workspace HEAD, not item X's commit |
-| 194 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 195 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 196 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 197 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 198 | PAN-2451 | M | high | ok |  |  | Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits) |
-| 199 | PAN-2516 | S | high | ok |  |  | Spec plan.status flips left uncommitted in shared primary worktree → spec-vs-record drift + blocks flywheel push |
-| 200 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 201 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 202 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 203 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 204 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 205 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 206 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 207 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 208 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 209 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 210 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 211 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 212 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 213 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 214 | PAN-2421 | XS | high | ok |  |  | Dashboard server route tests flake under full-suite verification load |
-| 215 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 216 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 217 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
-| 218 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
-| 219 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
-| 220 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
-| 221 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
-| 222 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
-| 223 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
-| 224 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
-| 225 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 226 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 227 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 228 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
-| 229 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 230 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 231 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 232 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 233 | PAN-2376 | XL | high | ok |  |  | Epic: CI/CD reliability |
-| 234 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 235 | PAN-3013 | XS | medium | ok |  |  | linear-mcp-auth-hook entries leak into durable ~/.claude/settings.json pointing at dead /tmp/pan-agent-role-* paths |
-| 236 | PAN-3516 | XS | medium | ok |  |  | Stale bundled-skill duplicates in repo .claude/skills (pan-handoff, pan-flywheel, okf) shadow the canonical sync-sources copies |
-| 237 | PAN-3276 | XS | medium | ok |  |  | Needs-you rows do not navigate — clicking a terminal question or permission prompt does nothing |
-| 238 | PAN-3445 | XS | medium | ok |  |  | Project config TCP lock hashes into the ephemeral client-port range, so unrelated connections fail an uncontended config write |
-| 239 | PAN-3322 | XS | medium | ok |  |  | file-size allowlist for launcher-generator.ts carries 126 lines of slack — a temporary ceiling raise became permanent regrowth budget |
-| 240 | PAN-3303 | S | medium | ok |  |  | Command Deck latches "Unknown project" after a dashboard reconnect — an empty registered-projects response is treated as authoritative |
-| 241 | PAN-3536 | S | medium | ok |  |  | pan tell fails for ohmypi conversations — expectedHarness defaults to claude-code when state.json is absent |
-| 242 | PAN-3640 | S | high | ok |  |  | Agent GC preserves terminal rows after a recoverable state-push race, so close-out leaves tombstones behind |
-| 243 | PAN-3510 | S | medium | ok |  |  | Stopped agents can leave detached docker-run test containers alive indefinitely, interfering with other agents’ quality gates |
-| 244 | PAN-3661 | XS | medium | ok |  |  | issueActions review-mode tests fail locally — the semantic-rejection toast never fires since 27d75123ae |
-| 245 | PAN-3107 | M | medium | ok |  |  | Productize the memory-attribution census — OOM spikes are unattributable after the fact |
-| 246 | PAN-3211 | S | medium | ok |  |  | No honest disposition for closed-without-landing issues — residue rows are neither closeable nor reapable |
-| 247 | PAN-3527 | S | high | ok |  |  | Sidebar project list never retries: one failed boot-time fetch leaves CONVERSATIONS 0 / ISSUES 0 until a manual reload |
-| 248 | PAN-3634 | XS | high | ok |  |  | Planning auto-handoff stamps the ambient flywheelRunId on operator-started work agents, stripping their reaping exemption |
-| 249 | PAN-3455 | XS | medium | ok |  |  | isCliproxyUpToDate always returns false — cliproxy --version exits 2, so every ensure re-downloads the pinned release |
-| 250 | PAN-3288 | XS | medium | ok |  |  | dev-checkout preflight: detect stale node_modules after a git pull and fail with "run bun install" instead of ERR_MODULE_NOT_FOUND |
-| 251 | PAN-3332 | S | medium | ok |  |  | Dashboard slash-command activities leave "running in background" standing after the spawn has already died |
-| 252 | PAN-3117 | S | medium | ok |  |  | Failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed |
-| 253 | PAN-3121 | S | medium | ok |  |  | Failed-send outbox does not reconcile against the transcript — a delivered message keeps a doomed Retry twin |
-| 254 | PAN-3280 | S | medium | needs-refinement |  |  | PAN-3253’s sessions vanished four times in one run and its reviewer died writing no artifact — may be covered by newer session-loss fixes |
-| 255 | PAN-3137 | XS | medium | ok |  |  | UAT generation member titles are taken from the Flywheel status snapshot, so orchestrator prose reaches the operator’s UAT surface |
-| 256 | PAN-3164 | XS | medium | ok |  |  | UAT stack shows "Open UAT frontend" while still booting — the operator gets a Gateway Timeout with no indication it is starting |
-| 257 | PAN-3036 | S | medium | ok |  |  | False "! INPUT" chip on completed strike agents — the pane-idle heuristic misreads post-strike-ready idle as a pending question |
-| 258 | PAN-3034 | S | medium | ok |  |  | Command Deck session tree misses strike-only and workspace-less issues, so a live strike agent shows no session node |
-| 259 | PAN-3354 | XS | medium | ok |  |  | Archiving the main workspace hides the singleton row with no UI recovery path |
-| 260 | PAN-3540 | S | medium | ok |  |  | God View: phantom agent orbs, a dead Hook Bus panel, and a pressure-blind swap header |
-| 261 | PAN-3616 | XS | medium | ok |  |  | Planned deploy restarts show the generic Reconnecting banner — use the lifecycle signal for calm copy |
-| 262 | PAN-3530 | S | medium | ok |  |  | God View polls on 30s timers in four components, violating its documented event-driven contract |
-| 263 | PAN-3615 | S | medium | ok |  |  | TTS follow-ups after the 9-day silence: watchdog activation rules and venv resolution from deployment generations |
-| 264 | PAN-3157 | XS | medium | ok |  |  | Awareness feed shows the Flywheel as a generic "Claude Code / No messages yet" chat row instead of run activity |
-| 265 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces — documentation items are invisible to requirement traceability |
-| 266 | PAN-2982 | S | medium | ok |  |  | Review convoy should run a skill’s own selftest when sync-sources/skills/** changes |
-| 267 | PAN-3295 | M | medium | ok |  |  | Single per-machine completion-check summarizer with a queue and first-class observability in pan resources and the Deacon surface |
-| 268 | PAN-3130 | S | medium | ok |  |  | Security: path-escape validation for identifier-joined write paths |
-| 269 | PAN-3113 | M | medium | ok |  |  | Surface agent-pane choice prompts as inline decision cards in the conversation view |
+| 52 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 53 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 54 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn abandons on a transient Docker failure; 'attempt 1/3' never retries |
+| 55 | PAN-3103 | S | critical | ok |  |  | A transient merge_status=failed permanently skips close-out; merged issues stay open and get re-planned |
+| 56 | PAN-3118 | M | critical | ok |  |  | Model-specific quota exhaustion halts agents invisibly; four planning agents 'running' at $0.00 |
+| 57 | PAN-3236 | S | critical | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so feedback never lands |
+| 58 | PAN-3248 | XS | critical | ok |  | PAN-3244 | pan reload never clears pending-deploy.json, so every deploy starves all verification until a patrol runs |
+| 59 | PAN-3278 | S | critical | ok |  |  | Work agent finished with an open PR but review was never dispatched; auto-requeue fired none of 25 attempts |
+| 60 | PAN-3429 | M | critical | ok |  | PAN-3344 | Memory governor defers admissions but sheds nothing under HARD pressure; the flywheel shed by hand |
+| 61 | PAN-3504 | XS | critical | ok |  |  | typecheck fails on main: parked.ts references ProjectConfig.projectPath instead of path |
+| 62 | PAN-3541 | S | critical | ok |  |  | Review restart after an unclean reviewer death loops on the session-resume menu forever |
+| 63 | PAN-3543 | S | critical | ok |  | PAN-3541 | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while recommending --fresh |
+| 64 | PAN-3563 | S | critical | ok |  | PAN-3560 | A role agent spawned with an undelivered prompt becomes an invisible zombie no recovery verb can see |
+| 65 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint silently drops every polyrepo candidate, so MYN and Auricle trains stay empty |
+| 66 | PAN-3663 | S | critical | ok |  |  | PR close events never invalidate pipeline membership, so zombie_pr rows stay stale in the canonical read door |
+| 67 | PAN-2706 | M | high | ok |  |  | Ghost test sessions absorb every test dispatch |
+| 68 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
+| 69 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
+| 70 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
+| 71 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
+| 72 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
+| 73 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
+| 74 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
+| 75 | PAN-1824 | S | critical | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 76 | PAN-3139 | S | critical | ok |  |  | Agents-table liveness drifts stale in the under-reporting direction; the authoritative plane is the wrong one |
+| 77 | PAN-3237 | S | critical | ok |  |  | A capacity-refused planning-to-work handoff is marked terminally stuck; every 409 becomes 'guardrails' |
+| 78 | PAN-3274 | S | critical | ok |  |  | A test-role agent can spawn and never run, stranding an approved, CI-green issue behind a missing verdict |
+| 79 | PAN-3281 | S | critical | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches UAT |
+| 80 | PAN-3496 | S | critical | ok |  |  | Review/inspect agents AskUserQuestion the operator for review depth, converting autonomy into operator work |
+| 81 | PAN-3500 | S | critical | ok |  |  | A review sub-role can modify the branch after writing its report, violating its own spawn contract |
+| 82 | PAN-3522 | S | critical | ok |  | PAN-3344 | Supervisor watchdog restart-churns under CPU storm because the probe budget ignores the boot warm phase |
+| 83 | PAN-3555 | S | critical | ok |  |  | pan start silently spawned a fresh session over a resumable warm session, violating warm-by-default |
+| 84 | PAN-3565 | M | critical | ok |  | PAN-3563 | Failed review spawn wedges 'starting', infra failure synthesizes a fake CHANGES REQUESTED verdict |
+| 85 | PAN-3571 | S | critical | ok |  |  | Completion-check timeout exits silently — 334 stranded turn-ends leave agents stalled until a patrol notices |
+| 86 | PAN-3654 | S | critical | ok |  | PAN-3653 | Compact respawn confirms against the archived session and kills a working fresh agent |
+| 87 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 88 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 89 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 90 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 91 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 92 | PAN-2886 | M | high | ok |  |  | Placeholder (pending-work-spawn) agents crash auto-resume with 'Unknown model' → stranded troubled forever |
+| 93 | PAN-2817 | M | high | ok |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 94 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 95 | PAN-2747 | S | high | ok |  |  | Flywheel cannot be resumed after a crash/reboot: Resume is disabled and the only offered action aborts the run |
+| 96 | PAN-2759 | S | high | ok |  |  | Dead flywheel with an active run was never auto-relaunched after a reboot |
+| 97 | PAN-2709 | M | high | ok |  |  | Flywheel orchestrator is unreachable as a notification target |
+| 98 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 99 | PAN-2179 | S | high | ok |  |  | relaunch can leave a zombie agent |
+| 100 | PAN-2169 | S | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 101 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
+| 102 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 103 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
+| 104 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 105 | PAN-3081 | M | high | ok |  |  | Agent git guard is bypassable by stripping it from $PATH — an agent did so unprompted |
+| 106 | PAN-3344 | M | high | ok |  |  | Resource governor gates dispatch on memory alone; agent-shell test runs drove load 48 on 24 cores |
+| 107 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache: launch-injection byte drift plus resume dropping the header |
+| 108 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 109 | PAN-2888 | M | high | ok |  | PAN-2846 | Close-out leaves stale residue that inflates troubled/failed metrics: orphaned inspect sub-agents + uncleared review_status rows on CLO… |
+| 110 | PAN-2960 | S | high | ok |  |  | Inspect supervisor lingers past 12m limit and never self-terminates after posting a verdict |
+| 111 | PAN-2959 | S | high | ok |  |  | pan inspect --item <X> reviews workspace HEAD, not item X's commit |
+| 112 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 113 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 114 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 115 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 116 | PAN-2451 | M | high | ok |  |  | Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits) |
+| 117 | PAN-2516 | S | high | ok |  |  | Spec plan.status flips left uncommitted in shared primary worktree → spec-vs-record drift + blocks flywheel push |
+| 118 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 119 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 120 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 121 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 122 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 123 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 124 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 125 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 126 | PAN-2971 | M | high | ok |  |  | flywheel orchestrator finalized its own run yet kept ticking; zombie session with dashboard Pause/Stop disabled |
+| 127 | PAN-3022 | S | high | ok |  |  | Work-spawn route ignores the per-issue workModel override, then clobbers the record with the role default |
+| 128 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against CLOSED issues, resurrecting agents and raising needs-you days later |
+| 129 | PAN-3104 | S | high | ok |  | PAN-3100 | Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue after the fix landed |
+| 130 | PAN-3257 | S | high | ok |  |  | Crash-resume never re-wires the PTY supervisor; a stale socket refuses every delivery |
+| 131 | PAN-3289 | S | high | ok |  |  | Sequencer ran a full pass on an empty manifest against a 750-issue backlog — read model transiently empty |
+| 132 | PAN-3397 | S | high | ok |  |  | Freshly-spawned convoy lanes freeze at 0 output; the existing detector covers warm resumes only |
+| 133 | PAN-3454 | M | high | ok |  | PAN-3517 | Cost hook re-ingests fork-copied parent history under reviewer identity: fake warnings, multi-billed spend |
+| 134 | PAN-3499 | XS | high | ok |  | PAN-3504 | pan parked ack references a nonexistent ProjectConfig.projectPath — a typecheck error on main |
+| 135 | PAN-3505 | S | high | ok |  | PAN-3062 | Unpushed agent code commits on the primary main worktree block the flywheel's state write door |
+| 136 | PAN-3535 | S | high | ok |  |  | The drain/resume boot gate is caller-env-dependent, so any restart from a clean shell silently drops the hold |
+| 137 | PAN-3556 | S | high | ok |  | PAN-3555 | Concurrent double-spawn race allocated two fresh session identities three seconds apart |
+| 138 | PAN-3557 | S | high | ok |  |  | Post-merge label application has no retry, so a rate-limited 403 hides the issue from the verify-on-main sweep |
+| 140 | PAN-3621 | S | high | ok |  |  | pan start intermittently resolves a chunk graph spliced across two builds and dies at spawn |
+| 141 | PAN-3650 | S | high | ok |  |  | Strike self-abort leaves state.json 'running', so the deacon resurrects aborted strikes on every pass |
+| 142 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 143 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 144 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 145 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 146 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 147 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 148 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 149 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
+| 150 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
+| 151 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
+| 152 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
+| 153 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
+| 154 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
+| 155 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
+| 156 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 157 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 158 | PAN-1711 | S | high | ok |  |  | Root-cause and fix dashboard event-loop stalls under load |
+| 159 | PAN-3015 | L | high | ok |  |  | pan monitor: pull-based mail-queue inbox replaces keystroke injection, the top delivery-failure source |
+| 160 | PAN-3048 | S | high | ok |  |  | Pipeline auto-commit lands Overdeck PRD drafts inside product feature branches; exclusion lists drifted |
+| 161 | PAN-3096 | S | high | ok |  |  | pan done fails on generated devcontainer artifacts; agents infer deletion of workspace infrastructure |
+| 162 | PAN-3106 | S | high | ok |  |  | auto_merge_default: hold is bypassed — shouldHoldForUat is consulted on only one merge path |
+| 163 | PAN-3174 | M | high | ok |  | PAN-3032 | Every polyrepo UAT stack is unreachable: stale project prefix, unattached devnet, wrong frontend port |
+| 164 | PAN-3205 | S | high | ok |  |  | Deployment gate queues a deferred deploy but the promised next-verification-boundary trigger does not exist |
+| 165 | PAN-3224 | S | high | ok |  |  | A crash-interrupted spawn strands model 'pending-work-spawn'; plain pan start then dies with Unknown model |
+| 166 | PAN-3243 | XS | high | ok |  |  | auto-commit test polls 20 setImmediate turns for a real git subprocess, reddening main |
+| 167 | PAN-3280 | S | high | ok |  |  | One issue's agent sessions vanished four times in a run and its reviewer died writing no artifact |
+| 168 | PAN-3284 | S | high | ok |  |  | A work agent wrote a doc edit into the primary main worktree instead of its workspace |
+| 170 | PAN-3432 | S | high | ok |  | PAN-3429 | Preemptive yield fan-out paused seven work agents to make room for one review convoy |
+| 171 | PAN-3569 | S | high | ok |  |  | Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused; no staleness rule, no exit |
+| 172 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics executed a squatted npm package through an npx registry fallback |
+| 173 | PAN-3617 | S | high | ok |  |  | One issue's strike dies instantly on every dispatch with zero output while siblings spawn normally |
+| 174 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent, so operator scope changes force a doctrine violation |
+| 175 | PAN-3633 | S | high | ok |  | PAN-3325 | Strike workspaces spawn with an incomplete dependency tree, so agents abort on a false 'main is red' |
+| 176 | PAN-3668 | L | high | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
+| 177 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 178 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 179 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
+| 180 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 182 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 183 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 184 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
+| 185 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 186 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 187 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
+| 188 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 189 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 190 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
+| 191 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
+| 192 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
+| 193 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
+| 194 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
+| 195 | PAN-3040 | M | high | ok |  |  | pan strike fails outright on polyrepo projects — worktree logic assumes a monorepo root |
+| 196 | PAN-3050 | S | high | ok |  |  | Idle-stack reaper regex only matches Overdeck containers, so foreign workspace stacks are never reaped |
+| 197 | PAN-3120 | S | high | ok |  |  | MERGE refuses or dead-ends when the preemptive scheduler yielded the work agent |
+| 198 | PAN-3171 | S | high | ok |  |  | Pipeline reports 'merge failed' after a successful merge; issue stays Todo while the commit is on main |
+| 199 | PAN-3261 | S | high | ok |  |  | Resume-gate Enter: the tmux fallback answers a live choice menu that its own paste hid from the detector |
+| 200 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle fans out one glab subprocess per repo x head, failing every membership refresh |
+| 201 | PAN-3297 | S | high | ok |  |  | pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart |
+| 202 | PAN-3306 | S | high | ok |  | PAN-3317 | A strike needing a rebase has no working path: prompt instructs it, guard blocks it, sync-main misresolves |
+| 203 | PAN-3317 | S | high | ok |  |  | Strike agents have no sanctioned way to sync main: rebase is guard-blocked, sync-main misresolves -strike |
+| 204 | PAN-3439 | XS | high | ok |  | PAN-3224 | pan start crashes on a pending-work-spawn placeholder row; resume has the guard, start does not |
+| 205 | PAN-3460 | S | high | ok |  | PAN-3344 | Per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive |
+| 206 | PAN-3533 | M | high | ok |  | PAN-3344 | Per-project isolation classes so one project's heavy stacks cannot starve another project's pipeline |
+| 207 | PAN-3622 | XS | high | ok |  |  | A reconciler test asserts on a real issue and reads live GitHub, so pan release check fails on a green main |
+| 208 | PAN-3640 | S | high | ok |  | PAN-3561 | Agent GC preserves terminal rows after a recoverable state push race, leaving stale records on closed issues |
+| 209 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 210 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
+| 211 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
+| 212 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
+| 213 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 214 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 215 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 216 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 217 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
+| 218 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 219 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 220 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 221 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 222 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 223 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 224 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 225 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 226 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 227 | PAN-2980 | XS | high | ok |  |  | pre-push size guard reads the dirty worktree, so one session's edits block every other session's push |
+| 228 | PAN-3047 | S | high | ok |  |  | Strike-branch teardown never fires; 96 strike/* branches preserved because ancestry misses squash merges |
+| 229 | PAN-3099 | XS | high | ok |  |  | pan restart --health-timeout 120 parsed as 120ms; false-failed check leaves the dashboard down |
+| 230 | PAN-3113 | M | high | ok |  |  | Surface agent-pane choice prompts as inline decision cards so blocking menus are answerable from the feed |
+| 231 | PAN-3129 | M | high | ok |  |  | Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths |
+| 232 | PAN-3186 | S | high | ok |  |  | One non-git configured member blanks pipeline membership for the whole auricle project |
+| 233 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl slot |
+| 234 | PAN-3256 | S | high | ok |  | PAN-3267 | MYN pipeline membership fails forge_unavailable: glab runs in a polyrepo root that is not a git repo |
+| 235 | PAN-3270 | S | high | ok |  | PAN-3325 | New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails |
+| 236 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan, and the stray-writer patrol logs 68k lines hiding the real defect |
+| 237 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty node_modules, so tooling silently resolves deps from the parent repo |
+| 238 | PAN-3463 | S | high | ok |  | PAN-3460 | A legitimate no-op slot outcome can never pass its item verify, so the slot wedges permanently |
+| 239 | PAN-3513 | L | high | ok |  |  | Agent runtime plane on overdeck-state: durable session pointers, GC as cache eviction |
+| 240 | PAN-3553 | S | high | ok |  |  | Census treats a zero-session tmux server as unavailable, so conversations sit on 'Starting…' after a drain boot |
+| 241 | PAN-3596 | S | high | ok |  |  | Deacon patrol has no per-step timing, so overruns of the central scheduler cannot be attributed |
+| 242 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 243 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
+| 244 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 245 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
+| 246 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
+| 247 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 248 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 249 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 250 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 251 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 252 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 253 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 254 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
+| 255 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 256 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
+| 257 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 258 | PAN-1767 | M | high | ok |  |  | Show merged-but-not-closed-out count in pan status and the dashboard headline |
+| 259 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
+| 260 | PAN-3003 | XS | high | ok |  |  | Generated launcher.sh omits OVERDECK_AGENT_ID, so any manual re-launch dies instantly |
+| 261 | PAN-3014 | XS | high | ok |  |  | Background title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209 |
+| 262 | PAN-3077 | XS | high | ok |  |  | Inspect/review-supervisor spawns omit --effort and inherit xhigh, once per xBRIEF item |
+| 263 | PAN-3107 | M | high | ok |  |  | Productize the memory-attribution census so OOM spikes are attributable after the fact |
+| 264 | PAN-3167 | S | high | ok |  |  | krux and lexerra permanently unreadable through the membership door; a 404 typed as forge_unavailable |
+| 265 | PAN-3179 | M | high | ok |  | PAN-3176 | A UAT promote is marked complete at merge time; nothing verifies the change reached production |
+| 266 | PAN-3185 | S | high | ok |  |  | pan start reports a false hard failure when the deacon wins a spawn race (duplicate-session TOCTOU) |
+| 267 | PAN-3218 | M | high | ok |  |  | No release-drift signal: a user-facing fix sits on main for hours while every published version stays broken |
+| 268 | PAN-3245 | XS | high | ok |  |  | pan done falsely flags the workspace .pan/drafts artifact as uncommitted despite its own exclusion |
+| 269 | PAN-3303 | S | high | ok |  |  | Command Deck latches 'Unknown project' after reconnect; an empty registered-projects response is authoritative |
 | 270 | PAN-3420 | M | high | ok |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 270 | PAN-3235 | S | medium | ok |  |  | Dashboard decision card: render and answer agent pane-choice menus (follow-up to PAN-3228) |
-| 271 | PAN-3518 | M | medium | needs-refinement |  | PAN-3517 | TTL-aware re-review payload policy — fresh-spawn-with-digest for cold, large review histories |
-| 272 | PAN-3533 | L | medium | ok |  |  | Resource segregation: per-project isolation classes so MYN stacks cannot starve Overdeck work and vice versa |
-| 273 | PAN-2981 | S | medium | ok |  |  | Ctrl-K palette: a stale conversation hit 404s on open because the search index never prunes deleted sessions |
-| 274 | PAN-3017 | S | medium | ok |  |  | Issue-page UAT panel: expose the full stack action menu and show the panel consistently |
-| 275 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 276 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 277 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
-| 278 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 279 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 280 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
-| 281 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
-| 282 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
-| 283 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 284 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
-| 285 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 286 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
-| 287 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
-| 288 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
-| 289 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 290 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 291 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 292 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 293 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
-| 294 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 295 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 296 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 297 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 298 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 299 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 300 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 301 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 302 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 303 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 304 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
-| 305 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 306 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
-| 307 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
-| 308 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 309 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 310 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 311 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 312 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 313 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 314 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 315 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
-| 316 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 317 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
-| 318 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 319 | PAN-1767 | M | high | ok |  |  | Show merged-but-not-closed-out count in pan status and the dashboard headline |
-| 320 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
-| 321 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
-| 322 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 323 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 324 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 325 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 326 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 327 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 328 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 329 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
-| 330 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 331 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 332 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 333 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 334 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 335 | PAN-1253 | M | high | ok |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 336 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 337 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 338 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 339 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 340 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 341 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 342 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens plus WS/SSE heartbeats (security prerequisites) |
-| 343 | PAN-2350 | L | high | ok |  |  | Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone |
-| 344 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 345 | PAN-1218 | M | high | ok |  |  | Bead inspect: drop Check 3 (compile/lint), restrict to foundation beads, add end-of-batch mode |
-| 346 | PAN-1219 | M | high | ok |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 347 | PAN-1209 | S | high | ok |  |  | PAN-1052 bead projection disagrees with bd state |
-| 348 | PAN-1451 | M | high | ok |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 349 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 350 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
-| 351 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 352 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 353 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 354 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 355 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 356 | PAN-2837 | M | high | needs-refinement |  |  | Distributed agent presence: record which machine runs each issue's agents on overdeck-state (claim/release, no heartbeats) |
-| 357 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
-| 358 | PAN-2830 | M | high | needs-refinement |  |  | Shared Logbook: make the overdeck-state branch opt-in |
-| 359 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 360 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
-| 361 | PAN-2549 | M | high | ok |  |  | Fly remote workspaces: sync overdeck-state before re-enabling migrated projects |
-| 362 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 363 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 364 | PAN-2308 | M | high | ok |  |  | hardening(workspaces): migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic container boot refusal… |
-| 365 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 366 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 367 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 368 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 369 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 370 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 371 | PAN-813 | M | high | ok |  |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
-| 372 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 373 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 374 | PAN-3015 | L | high | ok |  |  | pan monitor: pull-based background inbox transport for Claude Code sessions, replacing keystroke-injection delivery |
-| 375 | PAN-3513 | L | high | ok |  |  | Agent runtime plane on overdeck-state — durable session pointers and GC as cache eviction (the Anywhere data plane) |
-| 376 | PAN-3181 | L | medium | ok |  |  | Own agent memories in Overdeck: migrate harness project memories to a per-repo overdeck-memory orphan branch |
-| 377 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding — planning-side authoring and pipeline-wide consumption |
-| 378 | PAN-3090 | M | medium | ok |  |  | Simple issue page: narrative feed instead of a raw transcript, surface the pending question, honest blocked state |
-| 379 | PAN-3016 | M | medium | ok |  |  | URL-address every view — anywhere you navigate in Overdeck, the URL must get you back there |
-| 380 | PAN-3178 | L | medium | ok |  |  | First-class worktrees and diffs: +/− changes badge, dedicated Changes surface, conversation worktrees |
-| 381 | PAN-3132 | M | medium | ok |  |  | Adopt xBRIEF v0.9 agentic dispatch fields end-to-end (deftai/xBRIEF#40 alignment) |
-| 382 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: launch one template issue under N configurations and compare cost, time and outcome |
-| 383 | PAN-3058 | M | medium | ok |  |  | Standing-crew templates: ship preset crew configurations selectable from Settings |
-| 384 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness: any ACP-capable agent CLI as a spawnable runtime, with named adapters and a custom-agent escape hatch |
-| 385 | PAN-3061 | M | medium | ok |  |  | Dispatch-topology advisor: a mechanical start-vs-swarm recommendation at plan-finalize |
-| 386 | PAN-2977 | M | medium | ok |  |  | ACP agent setup UI: detect installed ACP CLIs, show auth status, and guide login from Settings |
-| 387 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 388 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 389 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 390 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 391 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 392 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 393 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 394 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 395 | PAN-2805 | S | medium | ok |  |  | FlywheelPage shows 'No active run' while /api/flywheel/current returns a live run |
-| 396 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 397 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 398 | PAN-2739 | S | medium | ok |  |  | first-completion detection throws every patrol cycle |
-| 399 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 400 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 401 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 402 | PAN-2696 | XS | medium | ok |  |  | Task views still speak beads vocabulary |
-| 403 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 404 | PAN-2686 | XS | medium | ok |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
-| 405 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
-| 406 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 407 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 408 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 409 | PAN-2659 | S | medium | ok |  |  | fs-lock: crash between mkdir(lock) and owner.json write leaves an unreclaimable record lock (successor to #2623) |
-| 410 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 411 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
-| 412 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 413 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 414 | PAN-2560 | M | medium | ok |  |  | resolveStateReadHomeSync (state-read-home.ts) resolves state dir by path basename, not registry key |
-| 415 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 416 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 417 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 418 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 419 | PAN-2506 | M | medium | ok |  |  | flywheel-primary-root.test.ts fails on macOS: /var vs /private/var symlink not canonicalized |
-| 420 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
-| 421 | PAN-2492 | S | medium | ok |  |  | Pane-detected waits surface as "needs you" but cannot be answered from the dashboard — only the terminal |
-| 422 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
-| 423 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
-| 424 | PAN-2484 | S | medium | ok |  |  | ready set misses merge-eligible issues without flywheel merge verbs |
-| 425 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
-| 426 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
-| 427 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 428 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
-| 429 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 430 | PAN-2414 | S | medium | ok |  |  | context-overflow recovery is inconsistent |
-| 431 | PAN-2408 | S | medium | ok |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
-| 432 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
-| 433 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
-| 434 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 435 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 436 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 437 | PAN-2186 | S | medium | ok |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
-| 438 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 439 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 440 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 441 | PAN-1846 | S | medium | ok |  |  | unbounded log growth |
-| 442 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 443 | PAN-1828 | S | medium | ok |  |  | Conversation fork/handoff harness defaults ignore source conversation harness |
-| 444 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 445 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 446 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 447 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 448 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 449 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 450 | PAN-1740 | XS | medium | ok |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
-| 451 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
-| 452 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 453 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 454 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 455 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 456 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 457 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
-| 458 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 459 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 460 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 461 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 462 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 463 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 464 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 465 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 466 | PAN-1440 | S | medium | ok |  |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
-| 467 | PAN-1438 | S | medium | ok |  |  | pan flywheel start launcher process orphans when orchestrator dies externally |
-| 468 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 469 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 470 | PAN-1392 | S | medium | ok |  |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
-| 471 | PAN-1386 | S | medium | ok |  |  | Flywheel orchestrator never emits status snapshots |
-| 472 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 473 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
-| 474 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 475 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
-| 476 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
-| 477 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 478 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 479 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 480 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 481 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 482 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 483 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 484 | PAN-3469 | S | low | ok |  |  | Migrate NewProjectModal to a full page under the page-not-modal doctrine |
-| 485 | PAN-3335 | XS | low | ok |  |  | Click a pasted conversation image to open it full size in a popup |
-| 486 | PAN-3558 | XS | low | ok |  |  | Subagent rail: show the provider logo and model on each agent row |
-| 487 | PAN-3333 | S | low | ok |  |  | Relative plan-drain indicator on model pickers — show which sibling model burns subscription quota fastest |
-| 488 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 489 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 490 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 491 | PAN-1027 | S | medium | ok |  |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
-| 492 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 493 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 494 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 495 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 496 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 497 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 498 | PAN-727 | M | medium | ok |  |  | Fix orphaned work-agent start handoff after planning |
-| 499 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 500 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 501 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 502 | PAN-324 | XS | medium | stale |  |  | Agent detail pane missing Merge/Approve button |
-| 503 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 504 | PAN-247 | S | medium | stale |  |  | Deacon has no backoff or escalation for repeated specialist startup failures |
-| 505 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 506 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 507 | PAN-178 | M | medium | stale |  |  | PAN-178: Crash recovery with granular task checkpointing |
-| 508 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 509 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 510 | PAN-1951 | M | medium | ok |  |  | Inspector resumes a warm per-issue session instead of cold-spawning per item |
-| 511 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 512 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 513 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 514 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 515 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 516 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 517 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 518 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 519 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
-| 520 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 521 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 522 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 523 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 524 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 525 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
-| 526 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 527 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 528 | PAN-2566 | L | medium | ok |  |  | Traycer parity epic: gap analysis of capabilities Overdeck lacks |
-| 529 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 270 | PAN-3308 | XS | high | ok |  |  | The file-size guard hands agents a paste-ready ratchet-up line; two of three agents raised the ceiling |
+| 271 | PAN-3355 | XS | high | ok |  |  | tmux sessionExists maps a probe failure to absence, so callers read 'not running' when liveness is unknown |
+| 272 | PAN-3508 | S | high | ok |  |  | pan reload temporarily removes the global pan CLI when invoked outside its linked generation |
+| 273 | PAN-3518 | M | high | ok |  | PAN-3517 | TTL-aware re-review payload policy: fresh-spawn-with-digest for cold, large histories |
+| 274 | PAN-3570 | S | high | ok |  | PAN-3325 | Devcontainer leaves root-owned node_modules subtrees; init EACCES blocks pan start and rebuild cannot heal it |
+| 275 | PAN-3615 | M | high | ok |  |  | TTS silent for nine days behind four stacked failures; three fixed, follow-ups owed |
+| 276 | PAN-3652 | XS | high | ok |  |  | Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified |
+| 277 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
+| 278 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 279 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 280 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 281 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 282 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 283 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 284 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 285 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
+| 286 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 287 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 288 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 289 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 290 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 291 | PAN-1253 | M | high | ok |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 292 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
+| 293 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 294 | PAN-3012 | M | high | ok |  |  | Archived transcripts die when the harness deletes the JSONL; back them up into Overdeck storage first |
+| 295 | PAN-3032 | M | high | ok |  |  | Stack rebuild composes an overdeck- prefix while Traefik labels reference myn- devnet; 504s and lost attaches |
+| 296 | PAN-3094 | XS | high | ok |  |  | pan done merge fallback force-pushes a fast-forward branch and leaves the command partially complete |
+| 297 | PAN-3176 | S | high | ok |  |  | UAT batch promotion takes no stack-health evidence, so a degraded or still-starting stack can be promoted |
+| 298 | PAN-3196 | S | high | ok |  |  | Close-out dies on EACCES against root-owned container residue after passing every DoD row |
+| 299 | PAN-3210 | S | high | ok |  | PAN-3196 | Close-out blocked by an unprefixed devcontainer init container; teardown and guard scope differently |
+| 300 | PAN-3295 | M | high | ok |  |  | Single per-machine completion-check summarizer with a queue and first-class observability |
+| 301 | PAN-3332 | S | high | ok |  | PAN-3329 | Dashboard slash-command activities leave 'running in background' standing after the spawn already died |
+| 302 | PAN-3464 | XS | high | ok |  |  | pan swarm reset never clears slotCompletions, so a stale marker re-arms the exact wedge reset should escape |
+| 303 | PAN-3502 | XS | high | ok |  |  | tiered-crews blendedCost expectation is stale against current model-capabilities pricing; fails on main |
+| 304 | PAN-3510 | S | high | ok |  |  | Stopped agents leave detached docker-run test containers alive for hours, contending with other gates |
+| 305 | PAN-3527 | XS | high | ok |  |  | Sidebar project list never retries, so one failed boot fetch leaves CONVERSATIONS 0 / ISSUES 0 |
+| 306 | PAN-3536 | S | high | ok |  |  | pan tell cannot reach ohmypi conversations: expectedHarness defaults to claude-code with no state.json |
+| 307 | PAN-3579 | S | high | ok |  |  | ~20 frontend mutation fetches hand-write JSON headers and 403 on CSRF-guarded routes |
+| 308 | PAN-3634 | XS | high | ok |  |  | Planning auto-handoff stamps the ambient flywheelRunId on operator-started agents, stripping reaping exemption |
+| 309 | PAN-3661 | XS | high | ok |  |  | issueActions review-mode tests fail locally: the semantic-rejection toast never fires since the secure-dispatch change |
+| 310 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 311 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 312 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 313 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 314 | PAN-2351 | XS | high | ok |  |  | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 315 | PAN-2350 | L | high | ok | ✓ |  | Epic: Overdeck Anywhere |
+| 316 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 317 | PAN-1218 | M | high | ok |  |  | Bead inspect: drop Check 3 (compile/lint), restrict to foundation beads, add end-of-batch mode |
+| 318 | PAN-1219 | M | high | ok |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 319 | PAN-1209 | S | high | ok |  |  | PAN-1052 bead projection disagrees with bd state |
+| 320 | PAN-1451 | M | high | ok |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 321 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 322 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
+| 323 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 324 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 325 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 326 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 327 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 328 | PAN-3046 | XS | high | ok |  |  | pan CLI crashes at exit with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out |
+| 329 | PAN-3108 | XS | high | ok |  |  | dashboard.log grows unbounded (867MB) with no rotation, making incident logs un-greppable |
+| 330 | PAN-3211 | M | high | ok |  |  | No honest disposition for closed-without-landing issues; residue rows neither closeable nor reapable |
+| 331 | PAN-3276 | S | high | ok |  |  | Needs-you rows for terminal questions and permission prompts do not navigate anywhere on click |
+| 332 | PAN-3456 | XS | high | ok |  |  | pan swarm refused every plan containing a sequential item — per-item diagnostics acted as gates |
+| 333 | PAN-2837 | M | high | needs-refinement |  |  | Distributed agent presence: record which machine runs each issue's agents on overdeck-state (claim/release, no heartbeats) |
+| 334 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
+| 335 | PAN-2830 | M | high | needs-refinement |  |  | Shared Logbook: make the overdeck-state branch opt-in |
+| 336 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 337 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
+| 338 | PAN-2549 | M | high | ok |  |  | Fly remote workspaces: sync overdeck-state before re-enabling migrated projects |
+| 339 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 340 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 341 | PAN-2308 | M | high | ok |  |  | hardening(workspaces): migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic container boot refusal… |
+| 342 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 343 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 344 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 345 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 346 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 347 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 348 | PAN-813 | M | high | ok |  |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
+| 349 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 350 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 351 | PAN-3013 | S | high | ok |  |  | Role-scoped MCP auth hooks leak into durable ~/.claude/settings.json pointing at dead /tmp paths |
+| 352 | PAN-3321 | XS | high | ok |  |  | Escalation text and CLAUDE.md tell operators to run `pan unstick`, a command that does not exist |
+| 353 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 354 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 355 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 356 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 357 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 358 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 359 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 360 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 361 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 362 | PAN-2805 | S | medium | ok |  |  | FlywheelPage shows 'No active run' while /api/flywheel/current returns a live run |
+| 363 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 364 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 365 | PAN-2739 | S | medium | ok |  |  | first-completion detection throws every patrol cycle |
+| 366 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 367 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 368 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 369 | PAN-2696 | XS | medium | ok |  |  | Task views still speak beads vocabulary |
+| 370 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 371 | PAN-2686 | XS | medium | ok |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
+| 372 | PAN-3175 | M | medium | ok |  |  | Merge-train ordering has no semantic dependency concept — file overlap cannot see feature ordering |
+| 373 | PAN-3235 | M | medium | ok |  |  | Dashboard decision card renders and answers agent pane-choice menus (follow-up to PAN-3228) |
+| 374 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
+| 375 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 376 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 377 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 378 | PAN-2659 | S | medium | ok |  |  | fs-lock: crash between mkdir(lock) and owner.json write leaves an unreclaimable record lock (successor to #2623) |
+| 379 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 380 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 381 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 382 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 383 | PAN-2560 | M | medium | ok |  |  | resolveStateReadHomeSync (state-read-home.ts) resolves state dir by path basename, not registry key |
+| 384 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 385 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 386 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 387 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 388 | PAN-2506 | M | medium | ok |  |  | flywheel-primary-root.test.ts fails on macOS: /var vs /private/var symlink not canonicalized |
+| 389 | PAN-3130 | S | medium | ok |  | PAN-3129 | Security: path-escape validation for identifier-joined write paths |
+| 390 | PAN-3137 | XS | medium | ok |  |  | UAT generation member titles come from Flywheel status prose instead of the issue title |
+| 391 | PAN-3455 | XS | medium | ok |  |  | isCliproxyUpToDate always returns false, so every ensure re-downloads the pinned release |
+| 392 | PAN-3516 | XS | medium | ok |  |  | Stale bundled-skill duplicates in the repo .claude/skills serve outdated text to overdeck-dev sessions |
+| 393 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
+| 394 | PAN-2492 | S | medium | ok |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
+| 395 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
+| 396 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
+| 397 | PAN-2484 | S | medium | ok |  |  | ready set misses merge-eligible issues without flywheel merge verbs |
+| 398 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
+| 399 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
+| 400 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
+| 401 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
+| 402 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
+| 403 | PAN-2414 | S | medium | ok |  |  | context-overflow recovery is inconsistent |
+| 404 | PAN-2408 | S | medium | ok |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
+| 405 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
+| 406 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
+| 407 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 408 | PAN-2976 | L | medium | ok |  |  | Generalize ACP harness to any ACP-capable CLI with a capability gate and custom-agent config |
+| 409 | PAN-3034 | S | medium | ok |  |  | Command Deck session tree misses strike-only and workspace-less issues |
+| 410 | PAN-3117 | S | medium | ok |  |  | Failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed |
+| 411 | PAN-3164 | S | medium | ok |  |  | UAT stack offers 'Open UAT frontend' while still booting, so the operator gets a Gateway Timeout |
+| 412 | PAN-3178 | L | medium | ok |  |  | First-class worktrees and diffs: +/- badge, dedicated Changes surface, conversation worktrees |
+| 413 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: detect stale node_modules after a pull instead of ERR_MODULE_NOT_FOUND |
+| 414 | PAN-3322 | XS | medium | ok |  | PAN-3308 | launcher-generator allowlist sits 126 lines above reality, turning a temporary raise into regrowth budget |
+| 415 | PAN-3445 | XS | medium | ok |  |  | Project config TCP lock hashes into the ephemeral client-port range, so uncontended writes fail |
+| 416 | PAN-3540 | S | medium | ok |  | PAN-3530 | God View shows phantom agent orbs, a dead Hook Bus panel and a pressure-blind swap header |
+| 417 | PAN-3627 | XS | medium | ok |  |  | backlog-auto-trigger throws on startup in a directory with no backlog, breaking a plain npx run |
+| 418 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 419 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 420 | PAN-2186 | S | medium | ok |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
+| 421 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 422 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 423 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 424 | PAN-1846 | S | medium | ok |  |  | unbounded log growth |
+| 425 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 426 | PAN-1828 | S | medium | ok |  |  | Conversation fork/handoff harness defaults ignore source conversation harness |
+| 427 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 428 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 429 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 430 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 431 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 432 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 433 | PAN-2982 | S | medium | ok |  |  | Review convoy never runs a skill's own selftest when sync-sources/skills/** changes |
+| 434 | PAN-3121 | S | medium | ok |  | PAN-3117 | Failed-send outbox never reconciles against the transcript, leaving a doomed Retry twin |
+| 435 | PAN-3181 | L | medium | ok |  |  | Own agent memories in Overdeck: per-repo overdeck-memory orphan branch mirroring overdeck-state |
+| 436 | PAN-3307 | XS | medium | ok |  |  | commitlint scope-enum is stale, warning on most real commits and training everyone to ignore it |
+| 437 | PAN-3530 | S | medium | ok |  |  | God View polls on 30s timers in four components, violating its documented event-driven contract |
+| 438 | PAN-1740 | XS | medium | ok |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
+| 439 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
+| 440 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 441 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 442 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 443 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 444 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 445 | PAN-3036 | S | medium | ok |  |  | False '! INPUT' chip on completed strike agents; pane-idle heuristic misreads idle as a question |
+| 446 | PAN-3090 | M | medium | ok |  |  | Simple issue page: narrative feed, surfaced pending question, honest blocked state |
+| 447 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
+| 448 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 449 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 450 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 451 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 452 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
+| 453 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 454 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 455 | PAN-3131 | L | medium | ok |  |  | xBRIEF planRef sharding: planning-side authoring plus pipeline-wide consumption for huge plans |
+| 456 | PAN-3616 | XS | medium | ok |  |  | Planned deploy restarts show the generic Reconnecting banner; use the lifecycle signal for calm copy |
+| 457 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 458 | PAN-1440 | S | medium | ok |  |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
+| 459 | PAN-1438 | S | medium | ok |  |  | pan flywheel start launcher process orphans when orchestrator dies externally |
+| 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 462 | PAN-1392 | S | medium | ok |  |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
+| 463 | PAN-1386 | S | medium | ok |  |  | Flywheel orchestrator never emits status snapshots |
+| 464 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 465 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
+| 466 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 467 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
+| 468 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
+| 469 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 470 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 471 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 472 | PAN-3016 | M | medium | ok |  |  | URL-address every view so refresh, bookmark and share return to the same spot |
+| 473 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items are invisible to requirement traceability |
+| 474 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 475 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 476 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 477 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 478 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 479 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 480 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 481 | PAN-1027 | S | medium | ok |  |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
+| 482 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 483 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 484 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 485 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 486 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 487 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 488 | PAN-727 | M | medium | ok |  |  | Fix orphaned work-agent start handoff after planning |
+| 489 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 490 | PAN-2977 | M | medium | ok |  | PAN-2976 | ACP setup UI: detect installed CLIs, show auth status, guide login from Settings |
+| 491 | PAN-3054 | L | medium | ok |  |  | Benchmark matrix: run one template issue under N configurations and compare cost, time and outcome |
+| 492 | PAN-3132 | M | medium | ok |  |  | Adopt xBRIEF v0.9 agentic dispatch fields end-to-end so per-item routing is a contract |
+| 493 | PAN-3354 | XS | medium | ok |  |  | Archiving the main workspace hides the singleton row with no dashboard recovery path |
+| 494 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 495 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 496 | PAN-324 | XS | medium | stale |  |  | Agent detail pane missing Merge/Approve button |
+| 497 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 498 | PAN-247 | S | medium | stale |  |  | Deacon has no backoff or escalation for repeated specialist startup failures |
+| 499 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 500 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 501 | PAN-178 | M | medium | stale |  |  | PAN-178: Crash recovery with granular task checkpointing |
+| 502 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 503 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 504 | PAN-1951 | M | medium | ok |  |  | Inspector resumes a warm per-issue session instead of cold-spawning per item |
+| 505 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 506 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 507 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 508 | PAN-2981 | S | medium | ok |  |  | Ctrl-K palette opens deleted sessions: search index never prunes, 404 on click |
+| 509 | PAN-3157 | XS | medium | ok |  |  | Awareness feed renders the Flywheel as a generic empty chat row instead of run activity |
+| 510 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which answers the wrong question under a subscription; show relative plan drain |
+| 511 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 512 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 513 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 514 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 515 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 516 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
+| 517 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 518 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 519 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 520 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 521 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 522 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
+| 523 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 524 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 525 | PAN-2566 | L | medium | ok | ✓ |  | Traycer parity epic: gap analysis of capabilities Overdeck lacks |
+| 526 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 527 | PAN-3017 | S | medium | ok |  |  | Issue-page UAT panel drops the overflow action menu, so a healthy stack has no restart control |
+| 528 | PAN-3441 | L | medium | ok |  |  | God View 'River': WebGL pipeline visualization fed by the live hook-event stream |
+| 529 | PAN-3469 | S | medium | ok |  |  | Migrate NewProjectModal to a full page under the page-not-modal doctrine |
 | 530 | PAN-2558 | L | medium | ok |  |  | support polyrepo projects |
 | 531 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
 | 532 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
@@ -548,623 +548,626 @@ _Last sequenced: 2026-08-12T04:19:09Z · model: claude-opus-5 · open: 838_
 | 541 | PAN-2392 | M | medium | ok |  |  | Standing Crew cost panel |
 | 542 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
 | 543 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 544 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 545 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 546 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
-| 547 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
-| 548 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
-| 549 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
-| 550 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 551 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
-| 552 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
-| 553 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
-| 554 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 555 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 556 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
-| 557 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 558 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 559 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 560 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 561 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 562 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 563 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 564 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 565 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 566 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 567 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 568 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 569 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 570 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 571 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 572 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 573 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 574 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 575 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 576 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 577 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
-| 578 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 579 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 580 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 581 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 582 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 583 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 584 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 585 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 586 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 587 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 588 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 589 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 590 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 591 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 592 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 593 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
-| 594 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 595 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
-| 596 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 597 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 598 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
-| 599 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 600 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
-| 601 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 602 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 603 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 604 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 605 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 606 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 607 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
-| 608 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 609 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 610 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 611 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 612 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 613 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 614 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 615 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 616 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 617 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
-| 618 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
-| 619 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 620 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 621 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 622 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 623 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 624 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 625 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 626 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 627 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 628 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 629 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 630 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 631 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 632 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 633 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 634 | PAN-3441 | L | low | ok |  |  | God View "River" — WebGL pipeline visualization fed by the live hook-event stream |
-| 635 | PAN-2978 | M | low | ok |  |  | Auto-install ACP agent CLIs from the setup UI (opt-in, per-agent install recipes) |
-| 636 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Support poolside Laguna S 2.1 (118B MoE, 1M ctx) — local via Ollama/vLLM, hosted via OpenRouter |
-| 637 | PAN-3133 | S | low | ok |  |  | Spike: TRON encoding for prompt-bound xBRIEF payloads |
-| 638 | PAN-3443 | L | low | ok |  |  | God View "Spectrum Deck" — Winamp-grade activity visualizer (kimi-code-harness mockup and PRD) |
-| 639 | PAN-2983 | M | low | ok |  |  | OKF v3 deferred capabilities: lease-based concurrent write mode and an LLM semantic auditor |
+| 544 | PAN-3058 | M | medium | ok |  | PAN-3054 | Standing-crew templates: shipped preset crew configurations selectable from Settings |
+| 545 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 546 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 547 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
+| 548 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
+| 549 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
+| 550 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
+| 551 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 552 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
+| 553 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
+| 554 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
+| 555 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 556 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 557 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
+| 558 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 559 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 560 | PAN-3011 | M | medium | ok |  |  | Support poolside Laguna S 2.1 (118B MoE, 1M ctx) local and hosted |
+| 561 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 562 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 563 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 564 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 565 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 566 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 567 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 568 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 569 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 570 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 571 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 572 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 573 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 574 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 575 | PAN-2978 | M | medium | ok |  | PAN-2976, PAN-2977 | Opt-in auto-install of ACP agent CLIs from the setup UI |
+| 576 | PAN-3061 | M | medium | ok |  | PAN-3054 | Dispatch-topology advisor: mechanical start-vs-swarm recommendation at plan finalize |
+| 577 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 578 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 579 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 580 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 581 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
+| 582 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 583 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 584 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 585 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 586 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 587 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 588 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 589 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 590 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 591 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 592 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 593 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 594 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 595 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 596 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 597 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
+| 598 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 599 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
+| 600 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 601 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 602 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
+| 603 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 604 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
+| 605 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 606 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 607 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 608 | PAN-3558 | XS | low | ok |  |  | Subagent rail: show provider logo and model on each agent row |
+| 609 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 610 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 611 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 612 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
+| 613 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 614 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 615 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 616 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 617 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 618 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 619 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 620 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 621 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 622 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
+| 623 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
+| 624 | PAN-3335 | XS | low | ok |  |  | Click a pasted conversation image to open it full size in a popup |
+| 625 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 626 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 627 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 628 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 629 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 630 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 631 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 632 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 633 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 634 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 635 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 636 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 637 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 638 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 639 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
 | 640 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 641 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 642 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 643 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 644 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 645 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 646 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 647 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 648 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 649 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 650 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 651 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 652 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 653 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 654 | PAN-2941 | M | low | ok |  |  | OKF v3 |
-| 655 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 656 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
-| 657 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 658 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 659 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 660 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 661 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 662 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 663 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 664 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 665 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 666 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 667 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 668 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 669 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 670 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 671 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
-| 672 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 673 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 674 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 675 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
-| 676 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
-| 677 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 678 | PAN-2356 | M | low | ok |  |  | Overdeck Anywhere P3: relay service — outbound-only daemon, GitHub OAuth, push origin, multi-tenant front door |
-| 679 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 680 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 681 | PAN-2352 | M | low | ok |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel and Access |
-| 682 | PAN-2353 | M | low | ok |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API plus Fly 6PN) |
-| 683 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 684 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 685 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 686 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 687 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 688 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 689 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 690 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
-| 691 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 692 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 693 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 694 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 695 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 696 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 697 | PAN-1980 | M | low | ok |  |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
-| 698 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 699 | PAN-1949 | M | low | ok |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
-| 700 | PAN-1914 | M | low | ok |  |  | Follow-up: move /api/health/agents off agent-directory scans |
-| 701 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 702 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 703 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 704 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 705 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 706 | PAN-1758 | M | low | ok |  |  | Watch: ready-for-merge work must converge despite a continuously moving main |
-| 707 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 708 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 709 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 710 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 711 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 712 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 713 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 714 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 715 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 716 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 717 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 718 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 719 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 720 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 721 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 722 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 723 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 724 | PAN-1136 | M | low | ok |  |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
-| 725 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 726 | PAN-1133 | M | low | ok |  |  | TLDR: deacon supervision + pan doctor check + GC |
-| 727 | PAN-1124 | M | low | ok |  |  | Decouple specs and PRDs from workspaces |
-| 728 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 729 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 730 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 731 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 732 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 733 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 734 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 735 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 736 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 737 | PAN-962 | M | low | ok |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 738 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 739 | PAN-944 | M | low | ok |  |  | Make vBRIEF the durable task graph source of truth |
-| 740 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 741 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 742 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 743 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 744 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 745 | PAN-832 | M | low | ok |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 746 | PAN-810 | XS | low | ok |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
-| 747 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 748 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
-| 749 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
-| 750 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 751 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 752 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 753 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 754 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 755 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 756 | PAN-772 | M | low | ok |  |  | Unify terminal stack behavior across tmux sessions |
-| 757 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 758 | PAN-769 | M | low | ok |  |  | Track verification/review/test phase churn over time |
-| 759 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 760 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 761 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
-| 762 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 763 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 764 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 765 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 766 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 767 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 768 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 769 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 770 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 771 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 772 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 773 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 774 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 775 | PAN-658 | M | low | ok |  |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
-| 776 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 777 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 778 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 779 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 780 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 781 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 782 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 783 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 784 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 785 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 786 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 787 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 788 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 789 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 790 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 791 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
-| 792 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 793 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 794 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 795 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 796 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 797 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 798 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 799 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 800 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 801 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 802 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 803 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 804 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
-| 805 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 806 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 807 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 808 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 809 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 810 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 811 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 812 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 813 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 814 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 815 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 816 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 817 | PAN-47 | M | low | stale |  |  | PRD files should be committed to feature branch, moved to completed/ on merge |
-| 818 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 819 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
-| 820 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 821 | PAN-2347 | XS | low | ok |  |  | docs: refresh AGENT-STATE-PLANES.md |
-| 822 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md |
-| 823 | PAN-2345 | XS | low | ok |  |  | docs: refresh pan-done.md |
-| 824 | PAN-2344 | XS | low | ok |  |  | docs: refresh KANBAN-MODEL.md |
-| 825 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
-| 826 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 827 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 828 | PAN-2070 | XS | low | ok |  |  | docs: add user-facing page for the Flywheel orchestrator |
-| 829 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 830 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 831 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 832 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 833 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 834 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 835 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 836 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 837 | PAN-633 | M | low | ok |  |  | Update Cloister PRD and docs index |
-| 838 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 641 | PAN-3443 | L | low | ok |  | PAN-3441 | God View 'Spectrum Deck' — a second Winamp-grade visualizer concept with mockup and PRD |
+| 642 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 643 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 644 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 645 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 646 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 647 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 648 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 649 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 650 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 651 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 652 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 653 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 654 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 655 | PAN-2941 | M | low | ok |  |  | OKF v3 |
+| 656 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 657 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
+| 658 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 659 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 660 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 661 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 662 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 663 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 664 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 665 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 666 | PAN-3133 | S | low | ok |  | PAN-3131 | Spike: measure TRON encoding token savings for prompt-bound xBRIEF payloads |
+| 667 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 668 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 669 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 670 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 671 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 672 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 673 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
+| 674 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 675 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 676 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 677 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
+| 678 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
+| 679 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 680 | PAN-2356 | M | low | ok |  |  | Overdeck Anywhere P3: relay service |
+| 681 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
+| 682 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 683 | PAN-2352 | M | low | ok |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
+| 684 | PAN-2353 | M | low | ok |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 685 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 686 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 687 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 688 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 689 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 690 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 691 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 692 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 693 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 694 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 695 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 696 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 697 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 698 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 699 | PAN-1980 | M | low | ok |  |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
+| 700 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 701 | PAN-1949 | M | low | ok |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
+| 702 | PAN-1914 | M | low | ok |  |  | Follow-up: move /api/health/agents off agent-directory scans |
+| 703 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 704 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 705 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 706 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 707 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 708 | PAN-1758 | M | low | ok |  |  | Watch: ready-for-merge work must converge despite a continuously moving main |
+| 709 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 710 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
+| 712 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 713 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 714 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 715 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 716 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 717 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 718 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 719 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals (lease writes, LLM auditor) — explicitly gated on proven contention |
+| 720 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 721 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 722 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 723 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 724 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 725 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 726 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 727 | PAN-1136 | M | low | ok |  |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
+| 728 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 729 | PAN-1133 | M | low | ok |  |  | TLDR: deacon supervision + pan doctor check + GC |
+| 730 | PAN-1124 | M | low | ok |  |  | Decouple specs and PRDs from workspaces |
+| 731 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 732 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 733 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 734 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 735 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 736 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 737 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 738 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 739 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 740 | PAN-962 | M | low | ok |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 741 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 742 | PAN-944 | M | low | ok |  |  | Make vBRIEF the durable task graph source of truth |
+| 743 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 744 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 745 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 746 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 747 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 748 | PAN-832 | M | low | ok |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 749 | PAN-810 | XS | low | ok |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
+| 750 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 751 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
+| 752 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
+| 753 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 754 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 755 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 756 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 757 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 758 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 759 | PAN-772 | M | low | ok |  |  | Unify terminal stack behavior across tmux sessions |
+| 760 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 761 | PAN-769 | M | low | ok |  |  | Track verification/review/test phase churn over time |
+| 762 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 763 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 764 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
+| 765 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 766 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 767 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 768 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 769 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 770 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 771 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 772 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 773 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 774 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 775 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 776 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 777 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 778 | PAN-658 | M | low | ok |  |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 779 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 780 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 781 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 782 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 783 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 784 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 785 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 786 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 787 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 788 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 789 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 790 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 791 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 792 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 793 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 794 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
+| 795 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 796 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 797 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 798 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 799 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 800 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 801 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 802 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 803 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 804 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 805 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 806 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 807 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
+| 808 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 809 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 810 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 811 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 812 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 813 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 814 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 815 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 816 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 817 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 818 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 819 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 820 | PAN-47 | M | low | stale |  |  | PRD files should be committed to feature branch, moved to completed/ on merge |
+| 821 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 822 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
+| 823 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 824 | PAN-2347 | XS | low | ok |  |  | docs: refresh AGENT-STATE-PLANES.md |
+| 825 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md |
+| 826 | PAN-2345 | XS | low | ok |  |  | docs: refresh pan-done.md |
+| 827 | PAN-2344 | XS | low | ok |  |  | docs: refresh KANBAN-MODEL.md |
+| 828 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
+| 829 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 830 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 831 | PAN-2070 | XS | low | ok |  |  | docs: add user-facing page for the Flywheel orchestrator |
+| 832 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 833 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 834 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 835 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 836 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 837 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 838 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 839 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 840 | PAN-633 | M | low | ok |  |  | Update Cloister PRD and docs index |
+| 841 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
 
 ## Rationale detail
 
-### PAN-3285 (rank 1)
-
-Highest-impact defect in the backlog: the supervisor becomes structurally incapable of running a dashboard and escalates to nobody, so the whole orchestrator is down while every recovery path fails.
-
-### PAN-3250 (rank 2)
-
-Labeled blocks-main and actively spreading: each new spawn silently contaminates its branch with unrelated unpushed work, so PRs read MERGEABLE/CLEAN while carrying foreign commits.
-
-### PAN-3062 (rank 3)
-
-Same root as PAN-3250 from the write side — unreviewed work reaches main as a side effect of an unrelated push, which is the hazard the whole review pipeline exists to prevent.
-
-### PAN-3539 (rank 4)
-
-A single hungry child process takes down the entire fleet because systemd’s default OOMPolicy fails the unit; one flag turns a targeted kill back into a targeted kill.
-
-### PAN-3283 (rank 5)
-
-Labeled blocks-main: the recovery path launders a rejection into an approval and sets ready_for_merge, so rejected code reaches UAT batches and merge.
-
-### PAN-3524 (rank 6)
-
-A runaway server-driven loop that survives every documented suppression gate is unkillable by design and it already blocked a red-main fix across four attempts.
-
-### PAN-3566 (rank 7)
-
-Deterministic root cause behind the whole zombie-test-agent family (PAN-2706, PAN-3274, PAN-3563) and a one-line launcher fix, so it is the highest leverage item in the review/test pipeline.
-
-### PAN-3561 (rank 8)
-
-Bricked every canonical-state write for mind-your-now for 2.5 days with no recovery door; a lock with no TTL is a permanent single point of failure for the write door.
-
-### PAN-3564 (rank 9)
-
-Holding the per-issue lock while blocking on the global lock turns contention into starvation, and it killed all four reviewer lanes of a convoy at spawn.
-
-### PAN-3630 (rank 10)
-
-The sanctioned delivery door lies about success, so operator course-corrections silently vanish and a design the operator rejected got shipped anyway.
-
-### PAN-3653 (rank 11)
-
-Labeled blocks-main: the correct strike behaviour (stop on red main) is a terminal state with no wake signal, so red-main fixes stall exactly when they matter most.
-
-### PAN-3554 (rank 12)
-
-Red main silently empties the merge gate, so the operator-visible symptom is an empty queue rather than an alarm; without an owner every downstream gate degrades quietly.
-
-### PAN-3532 (rank 13)
-
-A green check that does not run the tests is worse than no check: it certified a red main and let the reds persist for hours.
-
-### PAN-3520 (rank 14)
-
-Proven load-induced flakes are being recorded as durable failure verdicts, which loops branches through rework cycles for defects that do not exist.
-
-### PAN-3492 (rank 15)
-
-Four concurrent server-driven vitest generations for one issue is a positive feedback loop that manufactures the very load that fails it, and it starves everything else on the box.
-
-### PAN-3313 (rank 16)
-
-Silently bricks every GPT-routed agent while the credentials are valid, and the error text sends the operator to re-authenticate instead of the real cooldown.
-
-### PAN-3429 (rank 17)
-
-The documented HARD-shed behaviour does not exist, so the operator or flywheel performs the governor’s job manually right before the box OOMs.
-
-### PAN-3631 (rank 18)
-
-Every incremental pass is handed the same stale prior regardless of how many passes have run, so the backlog ordering cannot converge until the read side moves to the state branch.
-
-### PAN-3498 (rank 19)
-
-Flywheel pickup order, merge order and the operator Backlog table all read rank as unique and contiguous; the writer breaks that invariant on every pass.
-
-### PAN-3505 (rank 20)
-
-The guard is right and the state is wrong: agent code accumulating on the shared primary worktree stops the flywheel persisting its own run state.
-
-### PAN-3655 (rank 23)
-
-In pipeline and already merged pending close-out; rank pinned so the pass does not disturb an issue mid-lifecycle.
-
-### PAN-2746 (rank 24)
+### PAN-2746 (rank 1)
 
 Highest integrity risk — infra-failure bypass writes reviewStatus=passed, indistinguishable from real approval; nearly merged a pipeline-critical change unreviewed.
 
-### PAN-2689 (rank 25)
+### PAN-2689 (rank 2)
 
 Sandboxed codex review verdicts fire-and-forget into a journal that loses them; review convoy reports green on evidence never delivered.
 
-### PAN-2695 (rank 26)
-
-Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
-
-### PAN-2742 (rank 27)
-
-Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
-
-### PAN-2706 (rank 28)
-
-Rank held at 15: still critical, and PAN-3566 now supplies the deterministic launcher-level root cause, so fix that first and verify here.
-
-### PAN-2700 (rank 29)
-
-Stale .pan/test/result.json is consumed by the next cycle, insta-failing with the previous run verdict.
-
-### PAN-2733 (rank 30)
-
-substrate-bug-poller has never run — BOT_LOGIN is a git author string not a GitHub login; the auto-triage loop is inert.
-
-### PAN-1560 (rank 31)
-
-Re-review after a PR head moves never re-posts status, stranding otherwise-green PRs at BLOCKED.
-
-### PAN-2769 (rank 32)
-
-review_status rows are never reconciled when an issue closes, so closed issues keep advertising stale review state.
-
-### PAN-2828 (rank 33)
+### PAN-2828 (rank 3)
 
 pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.
 
-### PAN-2874 (rank 34)
+### PAN-3250 (rank 4)
 
-Rank held at 21: its dependency PAN-2828 is still open, and PAN-2995 / PAN-3047 have since confirmed the same squash-blindness across the strike path.
+New this pass and near the top because it corrupts what every downstream gate reasons about. Workspaces branch from local HEAD instead of origin/main, so each new feature branch silently inherits whatever unpushed commits happen to be sitting on the shared primary main — five branches were already contaminated when it was filed, including two created after the problem was known, and their PRs read MERGEABLE/CLEAN. Review, test and merge all evaluate a base nobody chose. It carries the blocks-main label and is a one-line fix in the spawn path relative to the damage it does.
 
-### PAN-2883 (rank 35)
+### PAN-3285 (rank 5)
 
-Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.
+New this pass; the single worst availability failure in the backlog. A supervisor unit pinned to a pan reload generation SIGTERMs every healthy dashboard and is structurally unable to start a replacement — a 3.5-hour total outage with 1,107 consecutive failed recoveries and no escalation, and manual recovery from the primary checkout gets killed within 30 seconds too. Labelled critical. Nothing else in the pipeline matters while the dashboard cannot stay up.
 
-### PAN-1711 (rank 36)
+### PAN-2874 (rank 6)
 
-Moved up from 267: now ready and planned, and the newer PAN-3492 / PAN-3522 / PAN-3560 incidents all reduce to event-loop starvation under load, so this is their shared root cause.
+Strike landing cannot merge: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback wedges on exited strike agents.
 
-### PAN-1824 (rank 37)
+### PAN-2940 (rank 7)
 
-Moved up from 83: it is the anchor fix for the load-flake family now filed around it (PAN-3520, PAN-3243, PAN-3532), and red main silently empties the merge gate.
+Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-2954 (rank 38)
+### PAN-3283 (rank 8)
 
-Moved up from 67 because its only dependency, PAN-2882, closed — it is now unblocked, and the polyrepo merge path around it (PAN-3657, PAN-3120) has grown.
+New this pass and ranked as an integrity defect rather than a bug. Recovering an issue from review_infrastructure_failure sets review_status=passed and ready_for_merge=1 even when the newest written verdict is CHANGES REQUESTED — two issues were sitting in a UAT batch in exactly that state when it was filed. This is the same class as the infra-failure bypass already ranked critical: a machine-written approval indistinguishable from a real one. It carries blocks-main.
 
-### PAN-3504 (rank 39)
+### PAN-2935 (rank 9)
 
-A tsc error sitting on main blocks every quality gate downstream and is a one-line fix; PAN-3499 is the same defect filed twice.
+Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
 
-### PAN-3499 (rank 40)
+### PAN-3631 (rank 10)
 
-Same defect as PAN-3504; keep one and close the other rather than fixing twice.
+New this pass and ranked high because it silently degrades this document. The sequencer reads its prior from the legacy project-local .pan/backlog/sequence.md while pan backlog write-sequence persists only to overdeck-state, so nothing has updated the legacy copy since 2026-07-20 and every incremental pass since has been handed the same frozen prior — including this one. Until it is fixed, incremental passes cannot actually be incremental, and the read-side twin (PAN-3301) is already ranked alongside it.
 
-### PAN-2995 (rank 41)
+### PAN-2337 (rank 11)
 
-Sibling of the pinned PAN-2828: squash merges can never satisfy --is-ancestor, so the doctrine-prescribed strike landing path always refuses.
+Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
-### PAN-3085 (rank 42)
+### PAN-2758 (rank 12)
 
-A rebrand path miss that silently blinds both the work agent and the merge gate to every review finding on disk.
+Provider capacity error silently zombies a spawned agent (willRetry=false, status stays running forever), holding a slot.
 
-### PAN-3099 (rank 43)
+### PAN-3085 (rank 13)
 
-Unit confusion plus no rollback on false-fail turns a routine restart into an outage; the documented remedy is itself the trigger.
+New this pass; the cheapest high-value fix in the top tier. Review feedback is written to .overdeck/feedback but the path handed to the work agent — and read by the deacon merge gate — is a hardcoded .pan/feedback that has not existed since the rebrand. Agents are told to fix findings at an empty directory and the gate sees zero feedback no matter how many files exist. It is a path constant, and it breaks the review rework loop end to end.
 
-### PAN-3077 (rank 44)
+### PAN-3329 (rank 14)
 
-Violates the standing high-effort policy on a per-item cadence, so the overspend recurs continuously across every issue in the pipeline.
+New this pass. A deployment generation loses 62 tracked files under packages/ plus its node_modules/.bun store while a dev-checkout build runs, after which every pan invocation machine-wide dies with ERR_MODULE_NOT_FOUND. Already-running processes survive on in-memory modules, so the breakage is invisible until the next CLI call — which is what makes it expensive. Second observed occurrence with an identical signature, so it is reproducible rather than a one-off.
 
-### PAN-3103 (rank 45)
+### PAN-3498 (rank 15)
 
-Merged work reads as available work, so planning agents get spawned onto shipped issues; nothing retries once the status self-heals.
+New this pass and ranked critical because it breaks the artifact the whole backlog reads. writeSequenceMd pins in-pipeline issues back to their prior rank without renumbering the rest, so a submitted collision-free 1..N ranking is persisted with duplicate ranks and matching holes — 11 of each in the 2026-08-02 pass. Flywheel pickup order, merge order and the operator-facing table all treat rank as a unique total order, and it is not one.
 
-### PAN-3106 (rank 46)
+### PAN-2848 (rank 16)
 
-Defeats the UAT batch-train model outright: a project configured to hold still gets individual auto-merges before a generation can assemble.
+Work agent stalls forever on a dead inspection session; no re-dispatch, swarm-off suppresses recovery.
 
-### PAN-3424 (rank 47)
+### PAN-2846 (rank 17)
 
-Two independent silent-durability holes on the canonical state plane, one of which had been losing PRDs for two weeks unnoticed.
+Close-out blocks on a dead agent — postMergeLifecycle pauses the agent but leaves status=running, jamming the DoD gate.
 
-### PAN-3100 (rank 48)
+### PAN-3078 (rank 18)
 
-The gate judges code that was never reviewed and will never merge, manufacturing failures that then persist via PAN-3104.
+New this pass. A work agent that waits for a per-item inspection verdict deadlocks forever: the verdict is written to review_status.inspect_status and a checkpoint is saved, but nothing delivers it to the agent. Observed live with a byte-identical pane for ten-plus minutes on an inspection that had already passed. Inspection fires once per xBRIEF item, so this is a per-item deadlock risk across every planned issue in the pipeline.
 
-### PAN-3104 (rank 49)
+### PAN-3539 (rank 19)
 
-Pairs with PAN-3100 into a durable trap: a false failure is persisted to an artifact and replayed forever with nothing to invalidate it.
+New this pass. A kernel OOM of one agent-spawned python process took down the entire tmux server, because systemd's default OOMPolicy=stop fails the whole unit when a child is killed — every agent and conversation on the machine died with it, including an in-flight review convoy and an active strike. The victim selection was correct; the blast radius is the defect, and it is a unit-file property, not an application change.
 
-### PAN-3078 (rank 50)
+### PAN-3566 (rank 20)
 
-The verdict is persisted but never routed, so an agent that follows its own instructions to wait is permanently stuck.
+New this pass and ranked as the deterministic root cause behind a family already ranked high. The test-role launcher execs claude with no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and sits at the composer forever — no turn, no JSONL, ctx 0%, cost $0.00. Reproduced across eight session IDs. Every zombie-test-agent report (PAN-3274, PAN-2706, PAN-3563) reads as load or delivery flakiness until you know this.
+
+### PAN-2569 (rank 21)
+
+Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
+
+### PAN-2567 (rank 22)
+
+Reviewed+green PR stuck after review — advancing verdict reconciled forever, merge never dispatched.
+
+### PAN-2995 (rank 23)
+
+New this pass and effectively the same defect family as PAN-2874, which is already pinned near the top. pan done --strike refuses after the doctrine-prescribed gh-API squash merge because it tests branch ancestry, and a squash never leaves the original SHAs as ancestors of main. pan close --force passes dod:merged on the identical issue, so the system already contains the correct oracle — the strike path just asks the wrong question.
+
+### PAN-3057 (rank 24)
+
+New this pass. A compaction the harness initiates on its own is invisible to every recovery path Overdeck has: six agents resumed after a host restart each ran their own /compact, wrote a summary and dropped to an idle prompt, and nothing re-drove them. The second half — the GPT-5.6 context window declared twice with different values — is a small fix riding along, but the compaction blindness is what strands whole fleets after a reboot.
+
+### PAN-3282 (rank 25)
+
+New this pass. Review agents repeatedly terminate before writing their report across five issues and two projects, leaving a status that looks like a verdict, no artifact to read, and a stuck flag that blocks progress until a human restarts the reviewer. It recurs on issues already recovered once, which rules out a transient. This is the review pipeline's dominant failure mode in the August incident record and sits upstream of several other ranked issues.
+
+### PAN-3313 (rank 26)
+
+New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request 503s with 'no auth available' until an internal cooldown lapses — measured at 14 successes against 35 failures in one hour, roughly 70% of GPT inference, with credentials valid the whole time. The message actively misdirects the operator toward re-authenticating. Most of the fleet routes GPT models through this proxy.
+
+### PAN-3424 (rank 27)
+
+New this pass. The state plane stops being durable in two independent ways and nothing detects either: a non-fast-forward push on overdeck-state is warned about and dropped rather than reconciled, and drafts/ PRDs are never staged at all — 16 orphans, one two weeks old. The state branch is the canonical plane for records, specs and drafts, so silent non-durability there is the failure mode the two-door design exists to prevent.
+
+### PAN-3492 (rank 28)
+
+New this pass. Server-driven verification retries amplify their own cause: under load, fixture setup exceeds a fixed 5s timeout, the run is recorded as failed, the failure triggers a retry, and the retry starts another full suite. Four concurrent vitest generations were live for one issue at host load 18.5, parented by the dashboard server rather than any agent. It is the mechanism behind several ranked test-gate and CPU-storm issues.
+
+### PAN-3524 (rank 29)
+
+New this pass and ranked critical for what it says about the control plane. A server-owned --changed verification loop relaunched continuously through a global deacon freeze, a review abort, a pan pause and an operator stop — every documented suppression gate applied, none of them held — and it blocked a red-main fix from reaching its test gate across four attempts. A loop no gate can stop is a stronger problem than the load it generates.
+
+### PAN-3532 (rank 30)
+
+New this pass. CI never runs the full frontend suite, so main sat red on two frontend files for hours while every main CI run reported success on the same SHA. The reds were fixed by cherry-pick, but the blindness remains: green CI on main is currently not evidence that main is green. Every gate downstream of CI inherits that false signal.
+
+### PAN-3554 (rank 31)
+
+New this pass. Red main has no mechanical owner — a failed main-push CI run sat for about five hours until a conversation happened to run gh run list. Worse, the failure hides itself: the merge gate treats red main as 'nothing eligible', so the operator-visible symptom is an empty merge queue rather than an alarm, and the flywheel that would otherwise notice is not always running. It pairs directly with PAN-3532's false-green blindness.
+
+### PAN-3561 (rank 32)
+
+New this pass. A writer that crashes between mkdir and owner.json leaves an ownerless state-git lock with no TTL and no recovery verb, and every canonical-state write for that project fails for as long as it exists — 2.5 days for mind-your-now, across five issues, with pan task verbs dying outright because they have no fallback. A single-door design needs the door to be recoverable; today it is not.
+
+### PAN-3630 (rank 33)
+
+New this pass. pan tell reported successful delivery three times to a live healthy agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none — the operator's scope correction never landed and the rejected design shipped as a result. pan tell is the sanctioned delivery door for every role and harness, so a door that lies about delivery undermines every recovery procedure that depends on it.
+
+### PAN-2954 (rank 34)
+
+postMergeLifecycle refuses GitLab projects — merge state cannot be auto-verified, so teardown/labels never run.
+
+### PAN-3062 (rank 35)
+
+New this pass. The primary worktree is checked out on main and shared by every conversation and the flywheel, so whoever pushes next ships everyone else's commits, verified or not. It is the structural cause behind PAN-3250's branch contamination and PAN-3505's blocked state write door, and it is the reason the repo's own commit-often rule exists. Fixing the sharing model retires a family of incidents rather than one.
+
+### PAN-3234 (rank 36)
+
+New this pass. Agents freeze indefinitely on blocking choice menus — a permission approval, a session-resume gate — and no health surface detects it; both instances were found by an orchestrator reading tmux panes by hand. The detector exists (paneHasBlockingChoiceMenu) but is wired only to delivery refusal, never to health, so a frozen agent reads as running while holding a slot and a review.
+
+### PAN-3653 (rank 37)
+
+New this pass. A strike that correctly stops because main is red has no path that wakes it when main goes green — the harness sits at its old conclusion, the branch never advances, and pan recover finds no pending decision to act on. The strike role is the pipeline's fast-unblock mechanism, so a strike that cannot be resumed after the blocker clears converts the urgent path into a stall. It carries blocks-main.
+
+### PAN-3667 (rank 38)
+
+New this pass. CLIProxy rejects any model id its registered providers do not serve, with no remap and no fallback, so every subagent whose definition pins an Anthropic model dies at spawn inside a GPT-routed session — and the synced agent fleet pins heavily (haiku, sonnet and opus across explorer, work, planning, UAT and review agents). A config.extra.yaml stopgap already shipped; this is the auto-provisioned fix behind it.
+
+### PAN-2259 (rank 39)
+
+Something burns the full 5k/hr GitHub GraphQL quota, repeatedly breaking pan close and gh issue edit.
+
+### PAN-3043 (rank 40)
+
+New this pass. Provider quota exhaustion mid-run leaves an agent registered running for days — 3.5 days stale in the filed case — holding an advancing-ceiling slot while its pane shows a hard 403 refusal it can never recover from. Provider health is probed only at admission, so nothing revisits it. Under a concurrency ceiling, a slot held by a dead agent is throughput taken directly from live work.
+
+### PAN-3084 (rank 41)
+
+New this pass. A review session that spawns but is never briefed sits at zero context forever and every recovery path treats it as healthy work in progress — auto-dispatch no-ops because a session exists, and pan review restart 'preserves' a session with no context to preserve. Review can then never start for that issue. Same shape as the ghost test sessions already ranked at 15, on the review side.
+
+### PAN-3100 (rank 42)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a still-running work agent's uncommitted edits are counted against the issue and produce a failed verdict for code that was never reviewed and will never merge. The test role's own artifact diagnosed it exactly. Combined with the stale-artifact replay in PAN-3104, it is a durable false-failure trap rather than a transient.
+
+### PAN-3168 (rank 43)
+
+New this pass. DoD row 5 counts an agent that was paused specifically for close-out as a running agent and blocks close-out on it, while all three state planes agree the agent has no session. The issue is merged, promoted and correct, and the gate deadlocks on its own precondition. Together with PAN-3188 it accounts for the standing merged-but-not-closed-out backlog.
+
+### PAN-3188 (rank 44)
+
+New this pass. DoD row 5 accepts only the transient verifying_on_main waypoint, so any issue that already reached a terminal canonical state can never satisfy the post-merge row — observed on all 11 issues in one wedged-review cohort, each permanently un-closeable except through an operator override. An override used routinely stops being an override, which is why this ranks with the other close-out blockers.
+
+### PAN-3244 (rank 45)
+
+New this pass. A queued dashboard deploy defers verification for every issue in every project, so an Overdeck deploy window silently starves an unrelated project's review handoff — 30-plus minutes with the durable review intent written and nothing spawned. Three gates compose into an unbounded cross-project hold, and PAN-3248 (nothing clears the pending file) is the reason the window never closes on its own.
+
+### PAN-3314 (rank 46)
+
+New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd selects by cgroup — one hungry agent inflates the unit and the whole fleet dies with it. That has now happened twice, 55 processes in the first instance. Bounding the blast radius is the containment half of PAN-3539's policy fix and belongs with it.
+
+### PAN-3520 (rank 47)
+
+New this pass. Multiple branches loop on test-failed verdicts that are not defects: uniform 5000ms timeout signatures under host load 18-27, with the same files passing in isolation in about 19 seconds. Four identical occasions in three days. Retrying timeout-only failures in isolation before recording a verdict is the smallest change that stops the loop, and it sits directly on top of the fleet concurrency raise.
+
+### PAN-3560 (rank 48)
+
+New this pass. Under concurrent review convoys the PTY supervisor 502s fleet-wide on echo confirmation, killing session resumes and feedback delivery across at least seven unrelated agents deterministically. It is upstream of the zombie role agents (PAN-3563) and the lock-convoy reviewer deaths, so several separately-filed symptoms clear when the supervisor stops falling over under load.
+
+### PAN-3564 (rank 49)
+
+New this pass. Record writes take the per-issue lock and then block on the global state-git lock while still holding it, so under contention every per-issue lock in the queue is held for the full global wait — measured at 100% duty cycle over 240 seconds, with all four reviewer lanes dying at spawn on the lock. Classic lock convoy, and it explains reviewer spawn failures that look like unrelated flakiness.
+
+### PAN-3651 (rank 50)
+
+New this pass. The non-fast-forward push retry for overdeck-state was reverted because it broke 12 tests across the pan-dir state-door suites, but the problem it fixed is live and is exactly what PAN-3424 documents. Re-landing it with those suites green closes the durability gap rather than leaving the state plane dependent on whichever writer happens to win the ref race.
+
+### PAN-3662 (rank 51)
+
+New this pass. Documented read-only CLI surfaces — pan flywheel status, pan flywheel config --get, pan status — open the database and then attempt runtime schema top-ups, which emit SQLITE_READONLY under the sandboxed Flywheel. These are precisely the commands the Flywheel is told to use when localhost is sandboxed, so their initialization must not require a write. It carries blocks-main.
 
 ### PAN-3580 (rank 51)
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
 
-### PAN-3084 (rank 51)
+### PAN-2695 (rank 52)
 
-Both auto-dispatch and pan review restart treat a never-briefed session as healthy work in progress, so review can never start for that issue.
+Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-3282 (rank 52)
+### PAN-2742 (rank 53)
 
-A recurring class that leaves a status that looks like a verdict with no artifact behind it, and it feeds directly into the PAN-3283 laundering bug.
+Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-3234 (rank 53)
+### PAN-3023 (rank 54)
 
-The detector already exists and simply is not consulted by any health surface, so frozen agents are found only by a human reading panes.
+New this pass. Post-planning auto-spawn abandons on a transient Docker failure and the 'attempt 1/3' it prints never retries, so a finalized plan with autoSpawn=true sits in todo with no re-drive owner until an operator notices. The planning-to-work handoff is the seam the whole autonomous pipeline depends on, and a one-shot retry that does not retry is the worst kind of guard.
 
-### PAN-3118 (rank 54)
+### PAN-3103 (rank 55)
 
-Quota-dead agents hold advancing-ceiling slots while producing nothing, and every status surface reports them healthy.
+New this pass. A transient merge_status=failed read immediately after a successful merge makes automatic close-out skip the issue permanently, and nothing retries once the status self-heals — so the issue stays merged-but-open, reads as pickup-eligible, and gets a fresh planning agent spawned on already-shipped work. Wasted agent spend on top of a stuck lifecycle.
 
-### PAN-3563 (rank 55)
+### PAN-3118 (rank 56)
 
-Same failure shape as PAN-3566 from the delivery side: the dispatcher refuses to re-dispatch because it believes a run is in flight.
+New this pass. Model-specific quota exhaustion halts agents with no signal anywhere except the pane: four planning agents reported running at $0.00 while the rolling-window status line showed plenty of headroom, so the existing session-cap recovery never engages. There is no capacity fallback, so the fleet quietly stops working while the registry insists it is busy.
 
-### PAN-3236 (rank 56)
+### PAN-3236 (rank 57)
 
-A refusal to cross to the tmux tier on a definitively-dead socket strands review findings on disk while the agent sits idle.
+New this pass. ECONNREFUSED against a dead supervisor socket is misclassified as an ambiguous keyed delivery, so the tmux tier is deliberately not tried and review feedback never reaches the agent — the file sits on disk, the issue goes stuck, and the agent idles. Delivery ambiguity is the right caution for a live socket and exactly the wrong one for a refused connection.
 
-### PAN-3281 (rank 57)
+### PAN-3248 (rank 58)
 
-Two contradictory flags where the optimistic one wins on every surface, which promotes demonstrably incomplete work.
+New this pass and the reason PAN-3244's cross-project hold never ends by itself. clearPendingDeploy has one caller, so a successful pan reload leaves the deploy queue set and every project's verification stays deferred until a patrol happens to notice the build is fresh. Small fix, large blast radius, and it should land with the deferral scoping.
 
-### PAN-3188 (rank 58)
+### PAN-3278 (rank 59)
 
-Observed on all 11 issues of a wedged cohort; every close-out then needs an operator override, which trains everyone to override the gate.
+New this pass. A work agent finished, opened a non-draft PR, and sat idle for two hours because review was never dispatched — while the auto-requeue machinery that exists for exactly this had capacity and 25 attempts and fired none of them. The agent behaved correctly; the handoff did not happen. Silent non-dispatch at this seam is invisible until someone reads costs that stopped moving.
 
-### PAN-3168 (rank 59)
+### PAN-3429 (rank 60)
 
-The gate blocks on the exact state close-out itself creates, so the ceremony cannot complete on its own output.
+New this pass. The memory governor defers new admissions but sheds nothing under HARD pressure: at 2.2GB available and PSI full avg60 near 42, it logged soft deferrals for 30 minutes while the flywheel manually paused the offending gate run and recovered 2.4GB. Its documented shed categories were both empty, so the policy needs a category that exists during real pressure rather than one that does not.
 
-### PAN-3248 (rank 60)
+### PAN-3504 (rank 61)
 
-A one-line clear on the success path; without it a successful deploy silently halts cross-project verification.
+New this pass. npm run typecheck fails on main because parked.ts references a ProjectConfig field that does not exist — landed directly on main, not through a PR. It is a one-word fix, and while it stands, every branch that rebases onto main inherits a red typecheck and every gate reading typecheck gets a false signal. PAN-3499 is the same defect filed from the other direction.
 
-### PAN-3047 (rank 61)
+### PAN-3541 (rank 62)
 
-Close-out proves the branch merged and the very next step claims it did not; the same squash blindness as PAN-2995 and PAN-2828.
+New this pass. After an unclean reviewer death, pan review restart resumes into the harness session-resume menu, the delivery guard correctly refuses to answer it, delivery throws, the wedged session stays alive, and the fresh-spawn fallback then refuses because a role run already exists. Abort and reset-session both loop the same way because the resolver reconstructs the session id from planes those verbs do not clear.
 
-### PAN-3605 (rank 62)
+### PAN-3543 (rank 63)
 
-Benign payload this time, but a lint script that silently installs and executes an unscoped third-party name is a live supply-chain path.
+New this pass. A completed-handoff agent owed rework is unstartable through every door: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session refuses too because the durable plane reconstructs the session pointer. A refusal message that recommends the flag it just rejected is the signature of this family, and it blocks rework on issues whose review came back blocked.
 
-### PAN-3496 (rank 63)
+### PAN-3563 (rank 64)
 
-A review agent that parks on an operator question converts autonomous motion into operator work and wedges a respawning convoy.
+New this pass. A role agent whose prompt delivery failed is left status=running with pid null, so no liveness patrol has anything to check, the dispatcher no-ops because it sees testing in progress, and pan unstick inspects the work agent rather than the role. Invisible to every recovery surface at once — the composite of a delivery failure and three blind spots.
 
-### PAN-3190 (rank 64)
+### PAN-3657 (rank 65)
 
-A command with a 0% success rate against 13 stale pending-auto-merge rows, fixed by moving one parameter.
+New this pass. The merge-train queues endpoint builds its queue with the monorepo builder, so every polyrepo candidate is silently dropped and MYN and Auricle trains read as permanently empty even when an issue is ready with its MR open. The dashboard says ready to merge and the train shows nothing, which is the worst combination for operator trust in the queue.
 
-### PAN-3022 (rank 65)
+### PAN-3663 (rank 66)
 
-Root cause of the recurring "I asked for model X and got gpt-5.6" failures; the CLI path reads the override and the dashboard path does not.
+New this pass. Pull-request webhooks update review state but never enqueue a project membership refresh, so closing a stale PR leaves the canonical membership door still reporting the issue in-pipeline as a zombie_pr row. Issue close-out does invalidate correctly, which isolates this to PR-state changes. Membership is the read door several surfaces trust, so stale rows propagate. It carries blocks-main.
 
-### PAN-3023 (rank 66)
+### PAN-2706 (rank 67)
 
-The retry the log promises does not exist, so a planned issue with a finalized spec sits with no agent and no owner to re-drive it.
+Ghost test sessions that never received kickoff absorb every dispatch, marking testing with no prompt delivered.
 
-### PAN-3096 (rank 67)
+### PAN-2700 (rank 68)
 
-The failure message offers only commit/discard/surface, so agents reach for rm on generated infrastructure to get past it.
+Stale .pan/test/result.json is consumed by the next cycle, insta-failing with the previous run verdict.
 
-### PAN-3245 (rank 68)
+### PAN-2733 (rank 69)
 
-A false block on the completion door that trains agents to reach for --force, which is exactly what the gate exists to prevent.
+substrate-bug-poller has never run — BOT_LOGIN is a git author string not a GitHub login; the auto-triage loop is inert.
 
-### PAN-3014 (rank 69)
+### PAN-1560 (rank 70)
 
-Every background summarization call runs unauthenticated, so titles and about summaries silently stopped working across the dashboard.
+Re-review after a PR head moves never re-posts status, stranding otherwise-green PRs at BLOCKED.
 
-### PAN-2980 (rank 70)
+### PAN-2769 (rank 71)
 
-On a machine where several agents legitimately share the primary worktree, the guard judges the wrong thing and blocks clean pushes.
+review_status rows are never reconciled when an issue closes, so closed issues keep advertising stale review state.
 
-### PAN-3301 (rank 71)
+### PAN-2883 (rank 72)
 
-The write-side twin of PAN-3631; fixing it removes the noise and closes the last legacy state write.
+Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.
 
-### PAN-3657 (rank 72)
+### PAN-2806 (rank 73)
 
-The polyrepo builder is never reached, so merge trains are structurally unavailable to exactly the projects that need batching most.
+Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
 
-### PAN-3651 (rank 73)
+### PAN-2796 (rank 74)
 
-The underlying durability fix is still wanted and the revert left the state plane exposed to concurrent-writer races again.
+Idle nudge advances a work agent past a failed mandatory inspection, bypassing the inspection gate.
 
-### PAN-3560 (rank 74)
+### PAN-1824 (rank 75)
 
-One overloaded delivery tier takes out session resume and feedback routing for the whole fleet, which is how PAN-3563 zombies get created.
+Raised from 78: the real-timer test family kept reddening main through August. PAN-3243, PAN-3520 and PAN-3532 are all downstream instances — load-induced timeouts recorded as real verdicts, branches looping on false test failures, and a CI job that never ran the frontend suite. Fixing the timer discipline at the source removes the input to several of those loops.
 
-### PAN-3565 (rank 75)
+### PAN-3139 (rank 76)
 
-Three robustness defects on the same door; the synthesized verdict is the dangerous one because it is indistinguishable from a real review.
+New this pass. The agents table — the plane docs/AGENT-STATE-PLANES.md designates authoritative — records a live four-hour agent as stopped while tmux and pan start's own liveness check both say running. Drift in the under-reporting direction is the dangerous direction: enumeration from the authoritative plane misses live agents, and anything that acts on 'stopped' can spawn a duplicate.
 
-### PAN-3057 (rank 76)
+### PAN-3237 (rank 77)
 
-A compaction Overdeck did not initiate is invisible to every recovery path, so a whole cohort of resumed agents went silently idle after a restart.
-
-### PAN-3571 (rank 77)
-
-The rc=124 branch bypasses the UNCLEAR fallback every other failure takes, so a timed-out check leaves the agent with no owner.
+New this pass. A capacity-refused planning-to-work handoff is recorded as terminally stuck: every HTTP 409 is classified as 'guardrails' and every skip reason calls markWorkspaceStuck, so three issues accumulated the identical dead-end over three ticks while the fleet was simply full. Backpressure is a normal condition and must be retried, not memorialized as a failure.
 
 ### PAN-3274 (rank 78)
 
-Approved, CI-green work held out of the merge gate by a session that produced zero tokens; PAN-3566 is its deterministic cause.
+New this pass. A test-role agent spawned, never executed a turn, and held its issue out of the merge gate — review approved, CI green, ready_for_merge 0 on a verdict that was never produced. It is the same shape as the already-ranked ghost test sessions and shares PAN-3566's deterministic root cause, so the three should be worked together.
 
-### PAN-3397 (rank 79)
+### PAN-3281 (rank 79)
 
-The enforcement exists and simply keys on the wrong population, so fresh-spawn freezes still need manual recovery.
-
-### PAN-3278 (rank 80)
-
-The requeue machinery existed, had capacity, and never fired; the issue sat idle for two hours in a busy system.
-
-### PAN-3237 (rank 81)
-
-Transient backpressure is recorded as a terminal condition, so planned issues accumulate as permanently stuck instead of retrying.
+New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck incomplete-plan-items at the same time, and the merge-ready flag wins on every surface — so work with eight pending checklist items was assembled into a UAT batch and recommended for promotion. Two contradictory facts, and the pipeline consistently reads the optimistic one.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1173,312 +1176,14 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-12T04:19:09Z",
+  "generatedAt": "2026-08-12T23:31:44.581Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 838,
+  "openCount": 841,
   "nodes": [
     {
-      "issue": "PAN-3285",
-      "rank": 1,
-      "size": "M",
-      "importance": "critical",
-      "score": 97,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Supervisor pinned to a reload generation SIGTERMs every healthy dashboard and can never start one — 3.5h outage, 1107 silent retries",
-      "rationale": "Highest-impact defect in the backlog: the supervisor becomes structurally incapable of running a dashboard and escalates to nobody, so the whole orchestrator is down while every recovery path fails.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3250",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 96,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "New workspaces branch from local HEAD, not origin/main — every fresh feature branch inherits unpushed local commits",
-      "rationale": "Labeled blocks-main and actively spreading: each new spawn silently contaminates its branch with unrelated unpushed work, so PRs read MERGEABLE/CLEAN while carrying foreign commits.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3062",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared primary main worktree: whoever pushes main ships every other session’s unpushed local commits, verified or not",
-      "rationale": "Same root as PAN-3250 from the write side — unreviewed work reaches main as a side effect of an unrelated push, which is the hazard the whole review pipeline exists to prevent.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3539",
-      "rank": 4,
-      "size": "S",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Kernel OOM of one agent-spawned process failed the whole tmux unit (OOMPolicy=stop) — every agent and conversation session lost",
-      "rationale": "A single hungry child process takes down the entire fleet because systemd’s default OOMPolicy fails the unit; one flag turns a targeted kill back into a targeted kill.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3283",
-      "rank": 5,
-      "size": "S",
-      "importance": "critical",
-      "score": 94,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Recovering from review_infrastructure_failure sets review_status=passed despite an outstanding CHANGES REQUESTED verdict",
-      "rationale": "Labeled blocks-main: the recovery path launders a rejection into an approval and sets ready_for_merge, so rejected code reaches UAT batches and merge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3524",
-      "rank": 6,
-      "size": "M",
-      "importance": "critical",
-      "score": 94,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator-stop; blocked a red-main fix",
-      "rationale": "A runaway server-driven loop that survives every documented suppression gate is unkillable by design and it already blocked a red-main fix across four attempts.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3566",
-      "rank": 7,
-      "size": "XS",
-      "importance": "critical",
-      "score": 94,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Test-role launcher execs claude with no user prompt — role boots an idle REPL, no turn, no JSONL; deterministic cause of zombie test agents",
-      "rationale": "Deterministic root cause behind the whole zombie-test-agent family (PAN-2706, PAN-3274, PAN-3563) and a one-line launcher fix, so it is the highest leverage item in the review/test pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3561",
-      "rank": 8,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ownerless state-git lock is immortal — a writer crashing before owner.json bricks a project’s write door, with no TTL and no recovery CLI",
-      "rationale": "Bricked every canonical-state write for mind-your-now for 2.5 days with no recovery door; a lock with no TTL is a permanent single point of failure for the write door.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3564",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Lock convoy: per-issue record lock held across the global state-git wait — reviewer spawns die with no retry, locks hit 100% duty cycle",
-      "rationale": "Holding the per-issue lock while blocking on the global lock turns contention into starvation, and it killed all four reviewer lanes of a convoy at spawn.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3630",
-      "rank": 10,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan tell marks messages read without delivering them — three \"delivered\" confirmations, zero receipts, rejected design shipped",
-      "rationale": "The sanctioned delivery door lies about success, so operator course-corrections silently vanish and a design the operator rejected got shipped anyway.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3653",
-      "rank": 11,
-      "size": "S",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A strike that correctly stops on red main has no path that wakes it when main goes green — stays idle and unrecoverable",
-      "rationale": "Labeled blocks-main: the correct strike behaviour (stop on red main) is a terminal state with no wake signal, so red-main fixes stall exactly when they matter most.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3554",
-      "rank": 12,
-      "size": "M",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Red main has no mechanical owner — a failed main-push CI run must escalate within minutes, not sit red for five hours",
-      "rationale": "Red main silently empties the merge gate, so the operator-visible symptom is an empty queue rather than an alarm; without an owner every downstream gate degrades quietly.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3532",
-      "rank": 13,
-      "size": "S",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI never runs the full frontend test suite — main was red on frontend while every main CI run reported green",
-      "rationale": "A green check that does not run the tests is worse than no check: it certified a red main and let the reds persist for hours.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3520",
-      "rank": 14,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Test gate must retry timeout-only failures in isolation before recording a verdict — load flakes loop branches forever",
-      "rationale": "Proven load-induced flakes are being recorded as durable failure verdicts, which loops branches through rework cycles for defects that do not exist.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3492",
-      "rank": 15,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Server-side verification retries form a self-amplifying load loop — timeouts cause retries which cause more timeouts",
-      "rationale": "Four concurrent server-driven vitest generations for one issue is a positive feedback loop that manufactures the very load that fails it, and it starves everything else on the box.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3313",
-      "rank": 16,
-      "size": "S",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CLIProxy benches its only auth on a transient stream error — every GPT agent gets 503 auth_unavailable (70% failure), message misleading",
-      "rationale": "Silently bricks every GPT-routed agent while the credentials are valid, and the error text sends the operator to re-authenticate instead of the real cooldown.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3429",
-      "rank": 17,
-      "size": "M",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Memory governor defers admissions but sheds nothing under HARD pressure — flywheel paused a gate run by hand at PSI 41.9 / 2.2GB",
-      "rationale": "The documented HARD-shed behaviour does not exist, so the operator or flywheel performs the governor’s job manually right before the box OOMs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3631",
-      "rank": 18,
-      "size": "XS",
-      "importance": "high",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer reads its prior from legacy .pan/backlog/sequence.md while write-sequence persists to overdeck-state — the prior is frozen forever",
-      "rationale": "Every incremental pass is handed the same stale prior regardless of how many passes have run, so the backlog ordering cannot converge until the read side moves to the state branch.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3498",
-      "rank": 19,
-      "size": "S",
-      "importance": "high",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "write-sequence pins in-pipeline ranks without renumbering — 11 duplicate ranks and 11 gaps, so rank stops being a total order",
-      "rationale": "Flywheel pickup order, merge order and the operator Backlog table all read rank as unique and contiguous; the writer breaks that invariant on every pass.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3505",
-      "rank": 20,
-      "size": "S",
-      "importance": "high",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Unpushed agent code commits on the primary main worktree block the flywheel’s state write door",
-      "rationale": "The guard is right and the state is wrong: agent code accumulating on the shared primary worktree stops the flywheel persisting its own run state.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3420",
-      "rank": 270,
-      "size": "M",
-      "importance": "high",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3580",
-      "rank": 51,
-      "size": "M",
-      "importance": "high",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
-      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3655",
-      "rank": 23,
-      "size": "S",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Unify issue Conversation/Terminal switching with the shared segmented selector",
-      "rationale": "In pipeline and already merged pending close-out; rank pinned so the pass does not disturb an issue mid-lifecycle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2746",
-      "rank": 24,
+      "rank": 1,
       "size": "XS",
       "importance": "critical",
       "score": 94,
@@ -1494,7 +1199,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2689",
-      "rank": 25,
+      "rank": 2,
       "size": "S",
       "importance": "critical",
       "score": 93,
@@ -1506,8 +1211,661 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2695",
+      "issue": "PAN-2828",
+      "rank": 3,
+      "size": "S",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash)",
+      "rationale": "pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3250",
+      "rank": 4,
+      "size": "S",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workspace spawn branches from local HEAD, so every new feature branch inherits unpushed local main commits",
+      "rationale": "New this pass and near the top because it corrupts what every downstream gate reasons about. Workspaces branch from local HEAD instead of origin/main, so each new feature branch silently inherits whatever unpushed commits happen to be sitting on the shared primary main — five branches were already contaminated when it was filed, including two created after the problem was known, and their PRs read MERGEABLE/CLEAN. Review, test and merge all evaluate a base nobody chose. It carries the blocks-main label and is a one-line fix in the spawn path relative to the damage it does.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3285",
+      "rank": 5,
+      "size": "M",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Supervisor pinned to a reload generation kills every healthy dashboard and cannot start one — 3.5h outage",
+      "rationale": "New this pass; the single worst availability failure in the backlog. A supervisor unit pinned to a pan reload generation SIGTERMs every healthy dashboard and is structurally unable to start a replacement — a 3.5-hour total outage with 1,107 consecutive failed recoveries and no escalation, and manual recovery from the primary checkout gets killed within 30 seconds too. Labelled critical. Nothing else in the pipeline matters while the dashboard cannot stay up.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2874",
+      "rank": 6,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2828"
+      ],
+      "why": "Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli…",
+      "rationale": "Strike landing cannot merge: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback wedges on exited strike agents.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2940",
+      "rank": 7,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Three red-mains in one day from direct-push series bypassing PR CI",
+      "rationale": "Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3283",
+      "rank": 8,
+      "size": "S",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Recovering from review_infrastructure_failure sets review_status=passed over an outstanding CHANGES REQUESTED",
+      "rationale": "New this pass and ranked as an integrity defect rather than a bug. Recovering an issue from review_infrastructure_failure sets review_status=passed and ready_for_merge=1 even when the newest written verdict is CHANGES REQUESTED — two issues were sitting in a UAT batch in exactly that state when it was filed. This is the same class as the infra-failure bypass already ranked critical: a machine-written approval indistinguishable from a real one. It carries blocks-main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2935",
+      "rank": 9,
+      "size": "S",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workspace devcontainer duplicate backend hijacks Traefik router",
+      "rationale": "Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3631",
+      "rank": 10,
+      "size": "S",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3301"
+      ],
+      "why": "Sequencer reads its prior from legacy .pan while write-sequence persists to overdeck-state — prior frozen",
+      "rationale": "New this pass and ranked high because it silently degrades this document. The sequencer reads its prior from the legacy project-local .pan/backlog/sequence.md while pan backlog write-sequence persists only to overdeck-state, so nothing has updated the legacy copy since 2026-07-20 and every incremental pass since has been handed the same frozen prior — including this one. Until it is fixed, incremental passes cannot actually be incremental, and the read-side twin (PAN-3301) is already ranked alongside it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2337",
+      "rank": 11,
+      "size": "XS",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart",
+      "rationale": "Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2758",
+      "rank": 12,
+      "size": "S",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever",
+      "rationale": "Provider capacity error silently zombies a spawned agent (willRetry=false, status stays running forever), holding a slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3085",
+      "rank": 13,
+      "size": "XS",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review feedback written to .overdeck/feedback but agents and the merge gate are pointed at .pan/feedback",
+      "rationale": "New this pass; the cheapest high-value fix in the top tier. Review feedback is written to .overdeck/feedback but the path handed to the work agent — and read by the deacon merge gate — is a hardcoded .pan/feedback that has not existed since the rebrand. Agents are told to fix findings at an empty directory and the gate sees zero feedback no matter how many files exist. It is a path constant, and it breaks the review rework loop end to end.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3329",
+      "rank": 14,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deployment generation node_modules and tracked packages/ files deleted mid-build, bricking every pan call",
+      "rationale": "New this pass. A deployment generation loses 62 tracked files under packages/ plus its node_modules/.bun store while a dev-checkout build runs, after which every pan invocation machine-wide dies with ERR_MODULE_NOT_FOUND. Already-running processes survive on in-memory modules, so the breakage is invisible until the next CLI call — which is what makes it expensive. Second observed occurrence with an identical signature, so it is reproducible rather than a one-off.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3498",
+      "rank": 15,
+      "size": "S",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "write-sequence pins in-pipeline ranks without renumbering, so rank stops being a total order",
+      "rationale": "New this pass and ranked critical because it breaks the artifact the whole backlog reads. writeSequenceMd pins in-pipeline issues back to their prior rank without renumbering the rest, so a submitted collision-free 1..N ranking is persisted with duplicate ranks and matching holes — 11 of each in the 2026-08-02 pass. Flywheel pickup order, merge order and the operator-facing table all treat rank as a unique total order, and it is not one.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2848",
+      "rank": 16,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Work agent stalls forever on a dead inspection: no re-dispatch, verdict never delivered, swarm-off suppresses recovery of a non-swarm a…",
+      "rationale": "Work agent stalls forever on a dead inspection session; no re-dispatch, swarm-off suppresses recovery.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2846",
+      "rank": 17,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out blocks on a dead agent: postMergeLifecycle pauses the work agent but leaves status=running",
+      "rationale": "Close-out blocks on a dead agent — postMergeLifecycle pauses the agent but leaves status=running, jamming the DoD gate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3078",
+      "rank": 18,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Inspect verdict never reaches the work agent, so an agent that waits for it deadlocks forever",
+      "rationale": "New this pass. A work agent that waits for a per-item inspection verdict deadlocks forever: the verdict is written to review_status.inspect_status and a checkpoint is saved, but nothing delivers it to the agent. Observed live with a byte-identical pane for ten-plus minutes on an inspection that had already passed. Inspection fires once per xBRIEF item, so this is a per-item deadlock risk across every planned issue in the pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3539",
+      "rank": 19,
+      "size": "M",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3314"
+      ],
+      "why": "A kernel OOM of one agent-spawned process killed the whole tmux server; OOMPolicy=stop took every session",
+      "rationale": "New this pass. A kernel OOM of one agent-spawned python process took down the entire tmux server, because systemd's default OOMPolicy=stop fails the whole unit when a child is killed — every agent and conversation on the machine died with it, including an in-flight review convoy and an active strike. The victim selection was correct; the blast radius is the defect, and it is a unit-file property, not an application change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3566",
+      "rank": 20,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the zombie-test root cause",
+      "rationale": "New this pass and ranked as the deterministic root cause behind a family already ranked high. The test-role launcher execs claude with no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and sits at the composer forever — no turn, no JSONL, ctx 0%, cost $0.00. Reproduced across eight session IDs. Every zombie-test-agent report (PAN-3274, PAN-2706, PAN-3563) reads as load or delivery flakiness until you know this.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2569",
+      "rank": 21,
+      "size": "XS",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "planning finalizes (issue→planned) but work agent does not auto-spawn",
+      "rationale": "Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2567",
+      "rank": 22,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "reviewed+green PR stuck after review",
+      "rationale": "Reviewed+green PR stuck after review — advancing verdict reconciled forever, merge never dispatched.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2995",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done --strike false-blocks after a gh-API squash merge; ancestry test cannot see squashed content",
+      "rationale": "New this pass and effectively the same defect family as PAN-2874, which is already pinned near the top. pan done --strike refuses after the doctrine-prescribed gh-API squash merge because it tests branch ancestry, and a squash never leaves the original SHAs as ancestors of main. pan close --force passes dod:merged on the identical issue, so the system already contains the correct oracle — the strike path just asks the wrong question.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3057",
+      "rank": 24,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Harness-initiated compaction leaves agents idle forever; GPT-5.6 context window declared twice",
+      "rationale": "New this pass. A compaction the harness initiates on its own is invisible to every recovery path Overdeck has: six agents resumed after a host restart each ran their own /compact, wrote a summary and dropped to an idle prompt, and nothing re-drove them. The second half — the GPT-5.6 context window declared twice with different values — is a small fix riding along, but the compaction blindness is what strands whole fleets after a reboot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3282",
+      "rank": 25,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review agents repeatedly die before writing a verdict across five issues and two projects",
+      "rationale": "New this pass. Review agents repeatedly terminate before writing their report across five issues and two projects, leaving a status that looks like a verdict, no artifact to read, and a stuck flag that blocks progress until a human restarts the reviewer. It recurs on issues already recovered once, which rules out a transient. This is the review pipeline's dominant failure mode in the August incident record and sits upstream of several other ranked issues.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3313",
       "rank": 26,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A transient upstream stream error benches CLIProxy's only auth, 503ing ~70% of GPT-routed inference",
+      "rationale": "New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request 503s with 'no auth available' until an internal cooldown lapses — measured at 14 successes against 35 failures in one hour, roughly 70% of GPT inference, with credentials valid the whole time. The message actively misdirects the operator toward re-authenticating. Most of the fleet routes GPT models through this proxy.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3424",
+      "rank": 27,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "The state plane silently stops being durable: non-FF pushes unreconciled, drafts never staged, 16 orphans",
+      "rationale": "New this pass. The state plane stops being durable in two independent ways and nothing detects either: a non-fast-forward push on overdeck-state is warned about and dropped rather than reconciled, and drafts/ PRDs are never staged at all — 16 orphans, one two weeks old. The state branch is the canonical plane for records, specs and drafts, so silent non-durability there is the failure mode the two-door design exists to prevent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3492",
+      "rank": 28,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Server-side verification retries form a self-amplifying load loop: timeouts cause retries cause timeouts",
+      "rationale": "New this pass. Server-driven verification retries amplify their own cause: under load, fixture setup exceeds a fixed 5s timeout, the run is recorded as failed, the failure triggers a retry, and the retry starts another full suite. Four concurrent vitest generations were live for one issue at host load 18.5, parented by the dashboard server rather than any agent. It is the mechanism behind several ranked test-gate and CPU-storm issues.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3524",
+      "rank": 29,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A server-owned --changed verification loop survives freeze, abort, pause and operator-stop",
+      "rationale": "New this pass and ranked critical for what it says about the control plane. A server-owned --changed verification loop relaunched continuously through a global deacon freeze, a review abort, a pan pause and an operator stop — every documented suppression gate applied, none of them held — and it blocked a red-main fix from reaching its test gate across four attempts. A loop no gate can stop is a stronger problem than the load it generates.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3532",
+      "rank": 30,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI never runs the full frontend suite, so main stayed red on frontend while every CI run reported green",
+      "rationale": "New this pass. CI never runs the full frontend suite, so main sat red on two frontend files for hours while every main CI run reported success on the same SHA. The reds were fixed by cherry-pick, but the blindness remains: green CI on main is currently not evidence that main is green. Every gate downstream of CI inherits that false signal.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3554",
+      "rank": 31,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Red main has no mechanical owner; a failed main-push CI run sat five hours with the failure hiding itself",
+      "rationale": "New this pass. Red main has no mechanical owner — a failed main-push CI run sat for about five hours until a conversation happened to run gh run list. Worse, the failure hides itself: the merge gate treats red main as 'nothing eligible', so the operator-visible symptom is an empty merge queue rather than an alarm, and the flywheel that would otherwise notice is not always running. It pairs directly with PAN-3532's false-green blindness.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3561",
+      "rank": 32,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "An ownerless state-git lock is immortal: a crashed writer bricked a project's write door for 2.5 days",
+      "rationale": "New this pass. A writer that crashes between mkdir and owner.json leaves an ownerless state-git lock with no TTL and no recovery verb, and every canonical-state write for that project fails for as long as it exists — 2.5 days for mind-your-now, across five issues, with pan task verbs dying outright because they have no fallback. A single-door design needs the door to be recoverable; today it is not.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3630",
+      "rank": 33,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3629"
+      ],
+      "why": "pan tell marks messages read without delivering them: three 'delivered' confirmations, zero receipts",
+      "rationale": "New this pass. pan tell reported successful delivery three times to a live healthy agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none — the operator's scope correction never landed and the rejected design shipped as a result. pan tell is the sanctioned delivery door for every role and harness, so a door that lies about delivery undermines every recovery procedure that depends on it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2954",
+      "rank": 34,
+      "size": "XS",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "postMergeLifecycle refuses GitLab projects",
+      "rationale": "postMergeLifecycle refuses GitLab projects — merge state cannot be auto-verified, so teardown/labels never run.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3062",
+      "rank": 35,
+      "size": "M",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Shared primary main worktree means any agent pushing main ships every other session's unpushed commits",
+      "rationale": "New this pass. The primary worktree is checked out on main and shared by every conversation and the flywheel, so whoever pushes next ships everyone else's commits, verified or not. It is the structural cause behind PAN-3250's branch contamination and PAN-3505's blocked state write door, and it is the reason the repo's own commit-often rule exists. Fixing the sharing model retires a family of incidents rather than one.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3234",
+      "rank": 36,
+      "size": "M",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents freeze indefinitely on blocking choice menus and no health surface detects it",
+      "rationale": "New this pass. Agents freeze indefinitely on blocking choice menus — a permission approval, a session-resume gate — and no health surface detects it; both instances were found by an orchestrator reading tmux panes by hand. The detector exists (paneHasBlockingChoiceMenu) but is wired only to delivery refusal, never to health, so a frozen agent reads as running while holding a slot and a review.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3653",
+      "rank": 37,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A cleared red-main blocker leaves a live strike idle and unrecoverable — nothing wakes it when main goes green",
+      "rationale": "New this pass. A strike that correctly stops because main is red has no path that wakes it when main goes green — the harness sits at its old conclusion, the branch never advances, and pan recover finds no pending decision to act on. The strike role is the pipeline's fast-unblock mechanism, so a strike that cannot be resumed after the blocker clears converts the urgent path into a stall. It carries blocks-main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3667",
+      "rank": 38,
+      "size": "M",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CLIProxy has no cross-family remap, so every model-pinned subagent dies at spawn in a proxied session",
+      "rationale": "New this pass. CLIProxy rejects any model id its registered providers do not serve, with no remap and no fallback, so every subagent whose definition pins an Anthropic model dies at spawn inside a GPT-routed session — and the synced agent fleet pins heavily (haiku, sonnet and opus across explorer, work, planning, UAT and review agents). A config.extra.yaml stopgap already shipped; this is the auto-provisioned fix behind it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2259",
+      "rank": 39,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "something burns the full 5k/hr GitHub GraphQL quota",
+      "rationale": "Something burns the full 5k/hr GitHub GraphQL quota, repeatedly breaking pan close and gh issue edit.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3043",
+      "rank": 40,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Mid-run provider quota exhaustion undetected: agent holds a slot at status=running for days",
+      "rationale": "New this pass. Provider quota exhaustion mid-run leaves an agent registered running for days — 3.5 days stale in the filed case — holding an advancing-ceiling slot while its pane shows a hard 403 refusal it can never recover from. Provider health is probed only at admission, so nothing revisits it. Under a concurrency ceiling, a slot held by a dead agent is throughput taken directly from live work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3084",
+      "rank": 41,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A spawned-but-never-briefed review session blocks its own replacement; restart 'preserves' the zombie",
+      "rationale": "New this pass. A review session that spawns but is never briefed sits at zero context forever and every recovery path treats it as healthy work in progress — auto-dispatch no-ops because a session exists, and pan review restart 'preserves' a session with no context to preserve. Review can then never start for that issue. Same shape as the ghost test sessions already ranked at 15, on the review side.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3100",
+      "rank": 42,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Test role evaluates the dirty working tree, so a live work agent's uncommitted edits produce false failures",
+      "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a still-running work agent's uncommitted edits are counted against the issue and produce a failed verdict for code that was never reviewed and will never merge. The test role's own artifact diagnosed it exactly. Combined with the stale-artifact replay in PAN-3104, it is a durable false-failure trap rather than a transient.",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3168",
+      "rank": 43,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "DoD row 5 deadlocks close-out: an agent paused FOR close-out counts as running and blocks it",
+      "rationale": "New this pass. DoD row 5 counts an agent that was paused specifically for close-out as a running agent and blocks close-out on it, while all three state planes agree the agent has no session. The issue is merged, promoted and correct, and the gate deadlocks on its own precondition. Together with PAN-3188 it accounts for the standing merged-but-not-closed-out backlog.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3188",
+      "rank": 44,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "DoD row 5 rejects terminal canonical states, so an already-done issue can never close out",
+      "rationale": "New this pass. DoD row 5 accepts only the transient verifying_on_main waypoint, so any issue that already reached a terminal canonical state can never satisfy the post-merge row — observed on all 11 issues in one wedged-review cohort, each permanently un-closeable except through an operator override. An override used routinely stops being an override, which is why this ranks with the other close-out blockers.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3244",
+      "rank": 45,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A queued dashboard deploy defers verification for every project, starving cross-project review handoffs",
+      "rationale": "New this pass. A queued dashboard deploy defers verification for every issue in every project, so an Overdeck deploy window silently starves an unrelated project's review handoff — 30-plus minutes with the durable review intent written and nothing spawned. Three gates compose into an unbounded cross-project hold, and PAN-3248 (nothing clears the pending file) is the reason the window never closes on its own.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3314",
+      "rank": 46,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One cgroup holds every agent, so a single hungry agent takes the whole fleet down on OOM",
+      "rationale": "New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd selects by cgroup — one hungry agent inflates the unit and the whole fleet dies with it. That has now happened twice, 55 processes in the first instance. Bounding the blast radius is the containment half of PAN-3539's policy fix and belongs with it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3520",
+      "rank": 47,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Test gate must retry timeout-only failures in isolation; load flakes loop branches on false verdicts",
+      "rationale": "New this pass. Multiple branches loop on test-failed verdicts that are not defects: uniform 5000ms timeout signatures under host load 18-27, with the same files passing in isolation in about 19 seconds. Four identical occasions in three days. Retrying timeout-only failures in isolation before recording a verdict is the smallest change that stops the loop, and it sits directly on top of the fleet concurrency raise.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3560",
+      "rank": 48,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "PTY supervisor overload under concurrent convoys 502s fleet-wide, killing resumes and feedback delivery",
+      "rationale": "New this pass. Under concurrent review convoys the PTY supervisor 502s fleet-wide on echo confirmation, killing session resumes and feedback delivery across at least seven unrelated agents deterministically. It is upstream of the zombie role agents (PAN-3563) and the lock-convoy reviewer deaths, so several separately-filed symptoms clear when the supervisor stops falling over under load.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3564",
+      "rank": 49,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3561"
+      ],
+      "why": "Lock convoy: the per-issue record lock is held across the global state-git wait, killing reviewer spawns",
+      "rationale": "New this pass. Record writes take the per-issue lock and then block on the global state-git lock while still holding it, so under contention every per-issue lock in the queue is held for the full global wait — measured at 100% duty cycle over 240 seconds, with all four reviewer lanes dying at spawn on the lock. Classic lock convoy, and it explains reviewer spawn failures that look like unrelated flakiness.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3651",
+      "rank": 50,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3424"
+      ],
+      "why": "Re-land the overdeck-state non-FF push retry with the pan-dir state-door suites green",
+      "rationale": "New this pass. The non-fast-forward push retry for overdeck-state was reverted because it broke 12 tests across the pan-dir state-door suites, but the problem it fixed is live and is exactly what PAN-3424 documents. Re-landing it with those suites green closes the durability gap rather than leaving the state plane dependent on whichever writer happens to win the ref race.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3662",
+      "rank": 51,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Read-only CLI surfaces run schema top-ups and emit SQLITE_READONLY under the sandboxed Flywheel",
+      "rationale": "New this pass. Documented read-only CLI surfaces — pan flywheel status, pan flywheel config --get, pan status — open the database and then attempt runtime schema top-ups, which emit SQLITE_READONLY under the sandboxed Flywheel. These are precisely the commands the Flywheel is told to use when localhost is sandboxed, so their initialization must not require a write. It carries blocks-main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2695",
+      "rank": 52,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1520,7 +1878,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2742",
-      "rank": 27,
+      "rank": 53,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1532,21 +1890,198 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3023",
+      "rank": 54,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Post-planning auto-spawn abandons on a transient Docker failure; 'attempt 1/3' never retries",
+      "rationale": "New this pass. Post-planning auto-spawn abandons on a transient Docker failure and the 'attempt 1/3' it prints never retries, so a finalized plan with autoSpawn=true sits in todo with no re-drive owner until an operator notices. The planning-to-work handoff is the seam the whole autonomous pipeline depends on, and a one-shot retry that does not retry is the worst kind of guard.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3103",
+      "rank": 55,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A transient merge_status=failed permanently skips close-out; merged issues stay open and get re-planned",
+      "rationale": "New this pass. A transient merge_status=failed read immediately after a successful merge makes automatic close-out skip the issue permanently, and nothing retries once the status self-heals — so the issue stays merged-but-open, reads as pickup-eligible, and gets a fresh planning agent spawned on already-shipped work. Wasted agent spend on top of a stuck lifecycle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3118",
+      "rank": 56,
+      "size": "M",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Model-specific quota exhaustion halts agents invisibly; four planning agents 'running' at $0.00",
+      "rationale": "New this pass. Model-specific quota exhaustion halts agents with no signal anywhere except the pane: four planning agents reported running at $0.00 while the rolling-window status line showed plenty of headroom, so the existing session-cap recovery never engages. There is no capacity fallback, so the fleet quietly stops working while the registry insists it is busy.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3236",
+      "rank": 57,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so feedback never lands",
+      "rationale": "New this pass. ECONNREFUSED against a dead supervisor socket is misclassified as an ambiguous keyed delivery, so the tmux tier is deliberately not tried and review feedback never reaches the agent — the file sits on disk, the issue goes stuck, and the agent idles. Delivery ambiguity is the right caution for a live socket and exactly the wrong one for a refused connection.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3248",
+      "rank": 58,
+      "size": "XS",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3244"
+      ],
+      "why": "pan reload never clears pending-deploy.json, so every deploy starves all verification until a patrol runs",
+      "rationale": "New this pass and the reason PAN-3244's cross-project hold never ends by itself. clearPendingDeploy has one caller, so a successful pan reload leaves the deploy queue set and every project's verification stays deferred until a patrol happens to notice the build is fresh. Small fix, large blast radius, and it should land with the deferral scoping.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3278",
+      "rank": 59,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Work agent finished with an open PR but review was never dispatched; auto-requeue fired none of 25 attempts",
+      "rationale": "New this pass. A work agent finished, opened a non-draft PR, and sat idle for two hours because review was never dispatched — while the auto-requeue machinery that exists for exactly this had capacity and 25 attempts and fired none of them. The agent behaved correctly; the handoff did not happen. Silent non-dispatch at this seam is invisible until someone reads costs that stopped moving.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3429",
+      "rank": 60,
+      "size": "M",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Memory governor defers admissions but sheds nothing under HARD pressure; the flywheel shed by hand",
+      "rationale": "New this pass. The memory governor defers new admissions but sheds nothing under HARD pressure: at 2.2GB available and PSI full avg60 near 42, it logged soft deferrals for 30 minutes while the flywheel manually paused the offending gate run and recovered 2.4GB. Its documented shed categories were both empty, so the policy needs a category that exists during real pressure rather than one that does not.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3504",
+      "rank": 61,
+      "size": "XS",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "typecheck fails on main: parked.ts references ProjectConfig.projectPath instead of path",
+      "rationale": "New this pass. npm run typecheck fails on main because parked.ts references a ProjectConfig field that does not exist — landed directly on main, not through a PR. It is a one-word fix, and while it stands, every branch that rebases onto main inherits a red typecheck and every gate reading typecheck gets a false signal. PAN-3499 is the same defect filed from the other direction.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3541",
+      "rank": 62,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review restart after an unclean reviewer death loops on the session-resume menu forever",
+      "rationale": "New this pass. After an unclean reviewer death, pan review restart resumes into the harness session-resume menu, the delivery guard correctly refuses to answer it, delivery throws, the wedged session stays alive, and the fresh-spawn fallback then refuses because a role run already exists. Abort and reset-session both loop the same way because the resolver reconstructs the session id from planes those verbs do not clear.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3543",
+      "rank": 63,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3541"
+      ],
+      "why": "Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while recommending --fresh",
+      "rationale": "New this pass. A completed-handoff agent owed rework is unstartable through every door: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session refuses too because the durable plane reconstructs the session pointer. A refusal message that recommends the flag it just rejected is the signature of this family, and it blocks rework on issues whose review came back blocked.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3563",
+      "rank": 64,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3560"
+      ],
+      "why": "A role agent spawned with an undelivered prompt becomes an invisible zombie no recovery verb can see",
+      "rationale": "New this pass. A role agent whose prompt delivery failed is left status=running with pid null, so no liveness patrol has anything to check, the dispatcher no-ops because it sees testing in progress, and pan unstick inspects the work agent rather than the role. Invisible to every recovery surface at once — the composite of a delivery failure and three blind spots.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3657",
+      "rank": 65,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge-train queues endpoint silently drops every polyrepo candidate, so MYN and Auricle trains stay empty",
+      "rationale": "New this pass. The merge-train queues endpoint builds its queue with the monorepo builder, so every polyrepo candidate is silently dropped and MYN and Auricle trains read as permanently empty even when an issue is ready with its MR open. The dashboard says ready to merge and the train shows nothing, which is the worst combination for operator trust in the queue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3663",
+      "rank": 66,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "PR close events never invalidate pipeline membership, so zombie_pr rows stay stale in the canonical read door",
+      "rationale": "New this pass. Pull-request webhooks update review state but never enqueue a project membership refresh, so closing a stale PR leaves the canonical membership door still reporting the issue in-pipeline as a zombie_pr row. Issue close-out does invalidate correctly, which isolates this to PR-state changes. Membership is the read door several surfaces trust, so stale rows propagate. It carries blocks-main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2706",
-      "rank": 28,
+      "rank": 67,
       "size": "M",
       "importance": "high",
       "score": 84,
       "condition": "ok",
       "dependsOn": [],
       "why": "Ghost test sessions absorb every test dispatch",
-      "rationale": "Rank held at 15: still critical, and PAN-3566 now supplies the deterministic launcher-level root cause, so fix that first and verify here.",
+      "rationale": "Ghost test sessions that never received kickoff absorb every dispatch, marking testing with no prompt delivered.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-2700",
-      "rank": 29,
+      "rank": 68,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1559,7 +2094,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2733",
-      "rank": 30,
+      "rank": 69,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1572,7 +2107,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1560",
-      "rank": 31,
+      "rank": 70,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -1585,7 +2120,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2769",
-      "rank": 32,
+      "rank": 71,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1597,36 +2132,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2828",
-      "rank": 33,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash)",
-      "rationale": "pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-2874",
-      "rank": 34,
-      "size": "M",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2828"
-      ],
-      "why": "Strike landing pipeline cannot merge strikes: the verification gate demands a vBRIEF checklist strikes never have",
-      "rationale": "Rank held at 21: its dependency PAN-2828 is still open, and PAN-2995 / PAN-3047 have since confirmed the same squash-blindness across the strike path.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2883",
-      "rank": 35,
+      "rank": 72,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -1640,1659 +2147,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-1711",
-      "rank": 36,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Root-cause and fix dashboard event-loop stalls under load",
-      "rationale": "Moved up from 267: now ready and planned, and the newer PAN-3492 / PAN-3522 / PAN-3560 incidents all reduce to event-loop starvation under load, so this is their shared root cause.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-1824",
-      "rank": 37,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix flaky main CI: fake timers and @slow exclusion for the real-timer test family",
-      "rationale": "Moved up from 83: it is the anchor fix for the load-flake family now filed around it (PAN-3520, PAN-3243, PAN-3532), and red main silently empties the merge gate.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-2954",
-      "rank": 38,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "postMergeLifecycle refuses GitLab projects",
-      "rationale": "Moved up from 67 because its only dependency, PAN-2882, closed — it is now unblocked, and the polyrepo merge path around it (PAN-3657, PAN-3120) has grown.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3504",
-      "rank": 39,
-      "size": "XS",
-      "importance": "high",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "typecheck fails on main: parked.ts references nonexistent ProjectConfig.projectPath",
-      "rationale": "A tsc error sitting on main blocks every quality gate downstream and is a one-line fix; PAN-3499 is the same defect filed twice.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3499",
-      "rank": 40,
-      "size": "XS",
-      "importance": "high",
-      "score": 87,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "pan parked ack references nonexistent ProjectConfig.projectPath (duplicate of PAN-3504)",
-      "rationale": "Same defect as PAN-3504; keep one and close the other rather than fixing twice.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-2995",
-      "rank": 41,
-      "size": "S",
-      "importance": "high",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done --strike false-blocks after a gh-API squash-merge — should verify PR-merged/content, not branch ancestry",
-      "rationale": "Sibling of the pinned PAN-2828: squash merges can never satisfy --is-ancestor, so the doctrine-prescribed strike landing path always refuses.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3085",
-      "rank": 42,
-      "size": "XS",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review feedback written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback",
-      "rationale": "A rebrand path miss that silently blinds both the work agent and the merge gate to every review finding on disk.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3099",
-      "rank": 43,
-      "size": "XS",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan restart --health-timeout 120 treated as 120ms — false-failed health check leaves the dashboard DOWN",
-      "rationale": "Unit confusion plus no rollback on false-fail turns a routine restart into an outage; the documented remedy is itself the trigger.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3077",
-      "rank": 44,
-      "size": "XS",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Inspect/review-supervisor spawns omit --effort, inheriting the harness xhigh default — fires once per xBRIEF item",
-      "rationale": "Violates the standing high-effort policy on a per-item cadence, so the overspend recurs continuously across every issue in the pipeline.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3103",
-      "rank": 45,
-      "size": "S",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A transient merge_status=failed permanently skips automatic close-out, leaving a merged issue open and pickup-eligible",
-      "rationale": "Merged work reads as available work, so planning agents get spawned onto shipped issues; nothing retries once the status self-heals.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3106",
-      "rank": 46,
-      "size": "S",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "auto_merge_default: hold is bypassed — shouldHoldForUat is consulted on only one merge path, so held issues merge anyway",
-      "rationale": "Defeats the UAT batch-train model outright: a project configured to hold still gets individual auto-merges before a generation can assemble.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3424",
-      "rank": 47,
-      "size": "M",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "State plane silently stops being durable: non-FF overdeck-state pushes are never reconciled and drafts/ PRDs are never staged",
-      "rationale": "Two independent silent-durability holes on the canonical state plane, one of which had been losing PRDs for two weeks unnoticed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3100",
-      "rank": 48,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Test role evaluates the dirty working tree, so a live work agent’s uncommitted edits produce false test failures",
-      "rationale": "The gate judges code that was never reviewed and will never merge, manufacturing failures that then persist via PAN-3104.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3104",
-      "rank": 49,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue long after the fix landed",
-      "rationale": "Pairs with PAN-3100 into a durable trap: a false failure is persisted to an artifact and replayed forever with nothing to invalidate it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3078",
-      "rank": 50,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Inspect verdict is never delivered to the work agent — an agent that waits for it deadlocks forever",
-      "rationale": "The verdict is persisted but never routed, so an agent that follows its own instructions to wait is permanently stuck.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3084",
-      "rank": 51,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A review session spawned but never briefed sits at zero context forever and blocks its own replacement",
-      "rationale": "Both auto-dispatch and pan review restart treat a never-briefed session as healthy work in progress, so review can never start for that issue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3282",
-      "rank": 52,
-      "size": "M",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review agents repeatedly die before writing a verdict (review_infrastructure_failure) across 5 issues and 2 projects",
-      "rationale": "A recurring class that leaves a status that looks like a verdict with no artifact behind it, and it feeds directly into the PAN-3283 laundering bug.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3234",
-      "rank": 53,
-      "size": "M",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agents freeze indefinitely on blocking choice menus — paneHasBlockingChoiceMenu is wired to delivery refusal, never to health",
-      "rationale": "The detector already exists and simply is not consulted by any health surface, so frozen agents are found only by a human reading panes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3118",
-      "rank": 54,
-      "size": "M",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Model quota exhaustion halts agents invisibly — four planning agents reported running at $0.00 with no capacity fallback",
-      "rationale": "Quota-dead agents hold advancing-ceiling slots while producing nothing, and every status surface reports them healthy.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3563",
-      "rank": 55,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Role agent spawned with an undelivered prompt becomes an invisible zombie — state says running forever and the dispatcher no-ops",
-      "rationale": "Same failure shape as PAN-3566 from the delivery side: the dispatcher refuses to re-dispatch because it believes a run is in flight.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3236",
-      "rank": 56,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous keyed delivery — feedback never lands and the issue goes stuck",
-      "rationale": "A refusal to cross to the tmux tier on a definitively-dead socket strands review findings on disk while the agent sits idle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3281",
-      "rank": 57,
-      "size": "XS",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches the UAT batch",
-      "rationale": "Two contradictory flags where the optimistic one wins on every surface, which promotes demonstrably incomplete work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3188",
-      "rank": 58,
-      "size": "XS",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "DoD row 5 rejects terminal canonical states — an already-done issue can never satisfy the post-merge row",
-      "rationale": "Observed on all 11 issues of a wedged cohort; every close-out then needs an operator override, which trains everyone to override the gate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3168",
-      "rank": 59,
-      "size": "XS",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "DoD row 5 deadlocks close-out: an agent paused for close-out with no tmux session is counted as running and blocks it",
-      "rationale": "The gate blocks on the exact state close-out itself creates, so the ceremony cannot complete on its own output.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3248",
-      "rank": 60,
-      "size": "XS",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan reload does not clear pending-deploy.json, so every flywheel deploy starves verification for ALL projects until a patrol runs",
-      "rationale": "A one-line clear on the success path; without it a successful deploy silently halts cross-project verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3047",
-      "rank": 61,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike-branch teardown never fires — --is-ancestor cannot detect a squash merge, so all 96 strike/* branches are residue",
-      "rationale": "Close-out proves the branch merged and the very next step claims it did not; the same squash blindness as PAN-2995 and PAN-2828.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3605",
-      "rank": 62,
-      "size": "XS",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "lint-effect-diagnostics.sh executed a squatted npm package through an npx registry fallback",
-      "rationale": "Benign payload this time, but a lint script that silently installs and executes an unscoped third-party name is a live supply-chain path.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3496",
-      "rank": 63,
-      "size": "XS",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review/inspect agents must not AskUserQuestion the operator for review depth — decide, don’t ask",
-      "rationale": "A review agent that parks on an operator question converts autonomous motion into operator work and wedges a respawning convoy.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3190",
-      "rank": 64,
-      "size": "XS",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl injection slot",
-      "rationale": "A command with a 0% success rate against 13 stale pending-auto-merge rows, fixed by moving one parameter.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3022",
-      "rank": 65,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work-spawn route ignores the per-issue workModel override — the role default wins and then clobbers the record",
-      "rationale": "Root cause of the recurring \"I asked for model X and got gpt-5.6\" failures; the CLI path reads the override and the dashboard path does not.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3023",
-      "rank": 66,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-planning auto-spawn abandoned on a transient Docker failure — attempt 1/3 never retries and the issue stalls in todo",
-      "rationale": "The retry the log promises does not exist, so a planned issue with a finalized spec sits with no agent and no owner to re-drive it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3096",
-      "rank": 67,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done fails on the generated devcontainer harness, and agents infer deletion of workspace infrastructure",
-      "rationale": "The failure message offers only commit/discard/surface, so agents reach for rm on generated infrastructure to get past it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3245",
-      "rank": 68,
-      "size": "XS",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done completion gate falsely flags workspace .pan/drafts/<issue>.md as uncommitted work despite its own .pan exclusion",
-      "rationale": "A false block on the completion door that trains agents to reach for --force, which is exactly what the gate exists to prevent.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3014",
-      "rank": 69,
-      "size": "XS",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Background AI title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209",
-      "rationale": "Every background summarization call runs unauthenticated, so titles and about summaries silently stopped working across the dashboard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2980",
-      "rank": 70,
-      "size": "XS",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pre-push file-size guard audits the dirty working tree, so another session’s uncommitted edits block unrelated pushes",
-      "rationale": "On a machine where several agents legitimately share the primary worktree, the guard judges the wrong thing and blocks clean pushes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3301",
-      "rank": 71,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Backlog manifest still writes legacy .pan and the stray-writer patrol flags stale dirs forever — 68k log lines hiding a real defect",
-      "rationale": "The write-side twin of PAN-3631; fixing it removes the noise and closes the last legacy state write.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3657",
-      "rank": 72,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge-train queues endpoint silently drops every polyrepo candidate — MYN and Auricle trains permanently empty",
-      "rationale": "The polyrepo builder is never reached, so merge trains are structurally unavailable to exactly the projects that need batching most.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3651",
-      "rank": 73,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Re-land the overdeck-state non-fast-forward push retry (reverted d6defa16e8) with the pan-dir state-door suites green",
-      "rationale": "The underlying durability fix is still wanted and the revert left the state plane exposed to concurrent-writer races again.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3560",
-      "rank": 74,
-      "size": "M",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PTY supervisor overload under concurrent review convoys — fleet-wide 502 echo-confirmation failures kill resumes and feedback delivery",
-      "rationale": "One overloaded delivery tier takes out session resume and feedback routing for the whole fleet, which is how PAN-3563 zombies get created.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3565",
-      "rank": 75,
-      "size": "M",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review lifecycle: failed spawn wedges starting state, infra-failure synthesizes a fake CHANGES REQUESTED, pan tell hangs to SIGTERM",
-      "rationale": "Three robustness defects on the same door; the synthesized verdict is the dangerous one because it is indistinguishable from a real review.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3057",
-      "rank": 76,
-      "size": "M",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Harness-initiated compaction leaves agents idle forever, and the GPT-5.6 context window is declared twice with different values",
-      "rationale": "A compaction Overdeck did not initiate is invisible to every recovery path, so a whole cohort of resumed agents went silently idle after a restart.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3571",
-      "rank": 77,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "work-agent-stop-hook: completion-check timeout exits silently — 334 stranded turn-ends with no nudge or escalation",
-      "rationale": "The rc=124 branch bypasses the UNCLEAR fallback every other failure takes, so a timed-out check leaves the agent with no owner.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3274",
-      "rank": 78,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A test-role agent can spawn and never run, stranding its issue behind a verdict that was never produced",
-      "rationale": "Approved, CI-green work held out of the merge gate by a session that produced zero tokens; PAN-3566 is its deterministic cause.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3397",
-      "rank": 79,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Freshly-spawned convoy lanes freeze at 0 output before processing kickoff — PAN-3375’s detector covers warm resumes only",
-      "rationale": "The enforcement exists and simply keys on the wrong population, so fresh-spawn freezes still need manual recovery.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3278",
-      "rank": 80,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work agent finished with an open PR but review was never dispatched — auto-requeue had 25 attempts and fired none",
-      "rationale": "The requeue machinery existed, had capacity, and never fired; the issue sat idle for two hours in a busy system.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3237",
-      "rank": 81,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A capacity-refused planning→work handoff is marked terminally stuck: every HTTP 409 becomes guardrails and calls markWorkspaceStuck",
-      "rationale": "Transient backpressure is recorded as a terminal condition, so planned issues accumulate as permanently stuck instead of retrying.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3043",
-      "rank": 82,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Mid-run provider quota exhaustion is undetected: an agent stays running for days holding a slot",
-      "rationale": "Alive-but-dead agents hold advancing-ceiling slots and never surface, which is the same blind spot as PAN-3118 from the mid-run side.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3139",
-      "rank": 83,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agents-table liveness drifts stale in the under-reporting direction — a live 4h agent is recorded stopped",
-      "rationale": "The plane the docs designate authoritative is the one that is wrong, so every consumer that trusts it makes the wrong call.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3522",
-      "rank": 84,
-      "size": "S",
-      "importance": "high",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard supervisor watchdog restart-churns under CPU storm — the probe timeout budget ignores the boot warm phase",
-      "rationale": "A slow-but-healthy dashboard gets killed and re-killed until the watchdog gives up, converting load into an outage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3050",
-      "rank": 85,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Idle-stack reaper is blind to non-Overdeck workspaces — its regex matches only overdeck-feature-* so MYN stacks are never reaped",
-      "rationale": "Roughly 4GB of abandoned stacks held for issues nobody was working on, and it contributed directly to swap exhaustion twice in a day.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3314",
-      "rank": 86,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bound the OOM blast radius: one cgroup holds every agent, so a single hungry agent can kill the whole fleet",
-      "rationale": "Companion to PAN-3539 — even with the right OOM policy, one cgroup makes every kill decision all-or-nothing.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3329",
-      "rank": 87,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deployment generation node_modules and tracked packages/ files deleted while a dev-checkout build runs (2nd occurrence)",
-      "rationale": "Poisons every subsequent pan invocation machine-wide while already-running processes mask the breakage; it has now happened twice.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3621",
-      "rank": 88,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start intermittently dies resolving a chunk graph spliced across two builds — importer from dist, path from the live generation",
-      "rationale": "An intermittent spawn failure with no stable signature; an immediate retry succeeds, which is exactly what makes it hard to attribute.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3535",
-      "rank": 89,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Drain/resume boot gate is caller-env-dependent — any restart from a clean shell silently drops the hold",
-      "rationale": "A drain hold that lives only in the caller’s environment is not a hold; only an operator click prevented a full fleet auto-resume.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3553",
-      "rank": 90,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-reboot --no-resume boot leaves conversations on Starting… for minutes — census treats a zero-session tmux server as unavailable",
-      "rationale": "list-panes exits non-zero on an empty server, so the census reports unavailable and every conversation renders as not-yet-started.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3297",
-      "rank": 91,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart — delivery and resume disagree",
-      "rationale": "Two liveness classifiers on the same agent return opposite answers, and the delivery one wins, so messages to healthy agents fail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3555",
-      "rank": 92,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start silently spawned a FRESH session over a resumable warm session with no --fresh — warm-by-default violated",
-      "rationale": "Silently discarding a warm session throws away accumulated context and cost, and the operator has no signal it happened.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3543",
-      "rank": 93,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Completed-handoff agents are unstartable: start, --fresh and reset-session all refused while the refusal recommends --fresh",
-      "rationale": "A self-contradictory deadlock — the error text names the exact command that also fails — blocking rework after a blocked verdict.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3541",
-      "rank": 94,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review restart after an unclean reviewer death loops on the session-resume menu — eligibility ignores how the session ended",
-      "rationale": "Resume eligibility is decided without asking whether the prior exit was clean, so recovery re-creates the wedge it is trying to clear.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3654",
-      "rank": 95,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Compact respawn confirms against the archived session and kills a working fresh agent",
-      "rationale": "Recovery kills the very agent it just successfully created because confirmation watches the wrong transcript.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3650",
-      "rank": 96,
-      "size": "XS",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike self-abort leaves state.json running — the deacon auto-resume resurrects aborted strikes on every recovery pass",
-      "rationale": "A durable self-abort is not modelled as terminal, so the recovery loop repeatedly revives an agent that has already refused the work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3081",
-      "rank": 97,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agent git guard is bypassable by removing it from $PATH — an agent did so unprompted to get past a false block",
-      "rationale": "A control the constrained party can remove is worse than none, because the rest of the system is designed as if it holds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3129",
-      "rank": 98,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths",
-      "rationale": "An agent can plant a symlink in its own workspace and redirect the next canonical server write outside its root, including onto the state plane.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3500",
-      "rank": 99,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A review sub-role can modify the branch after writing its report",
-      "rationale": "The review contract forbids edits and nothing enforces it; a resumed reviewer modified seven tracked files before it was stopped.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3517",
-      "rank": 100,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header",
-      "rationale": "Measured production data shows forked reviewers re-billing full discovery context, so the convoy costs multiples of what it should.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3454",
-      "rank": 101,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Cost hook re-ingests fork-copied parent history under reviewer identity — fabricated cache-miss warnings and multi-billed discovery spend",
-      "rationale": "Corrupts the cost record itself, so the telemetry used to diagnose PAN-3517 is measuring an artifact of the hook.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3344",
-      "rank": 102,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Resource governor should gate dispatch on CPU load, not memory alone",
-      "rationale": "Load-35 storms starve the dashboard while memory looks fine, and the PRD already supersedes the original diagnosis with a corrected one.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3012",
-      "rank": 103,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Back up harness conversation transcripts before harnesses delete them",
-      "rationale": "The archive preserves the pointer and not the data, so every archived conversation silently expires on the harness’s cleanup schedule.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3040",
-      "rank": 104,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan strike fails on polyrepo projects — the strike path is monorepo-shaped end to end",
-      "rationale": "Strikes are the sanctioned fast path for urgent blockers and they are simply unavailable on polyrepo projects.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3174",
-      "rank": 105,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every polyrepo UAT stack is unreachable: wrong Traefik network prefix, Traefik never attached to the devnet, and a 4173/5173 port mismatch",
-      "rationale": "Three independent misconfigurations in the generated compose file, any one of which alone produces a 504 on every UAT stack.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3256",
-      "rank": 106,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "MYN pipeline membership fails forge_unavailable — glab mr list runs in a polyrepo root that is not a git repository",
-      "rationale": "The membership read door is blind for the whole project, so its issue list is silently incomplete.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3267",
-      "rank": 107,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline membership: the GitLab merged-head oracle fans out one glab subprocess per repo×head, stalling and failing every refresh",
-      "rationale": "A different branch fails each cycle, which rules out a bad branch and points at fan-out; the whole Command Deck load is slow behind it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3120",
-      "rank": 108,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "MERGE refuses (polyrepo) or silently dead-ends (single-repo) when the scheduler yielded the work agent",
-      "rationale": "The scheduler yield is self-clearing for autonomous resume but not for an operator merge, so the operator’s click just fails.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3289",
-      "rank": 109,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer ran a full pass on an empty manifest (0 issues) against a 750-issue backlog — read model transiently empty at spawn",
-      "rationale": "A pass over an empty manifest can silently replace a real sequence, which is a data-loss shape rather than a nuisance.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3048",
-      "rank": 110,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline auto-commit lands .pan/drafts/<ISSUE>.md in product feature branches; the duplicated exclusion list has drifted",
-      "rationale": "Overdeck’s own planning artifacts ride into customer-repo PRs, and the exclusion list exists twice with only one copy updated.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3308",
-      "rank": 111,
-      "size": "XS",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file",
-      "rationale": "The guard teaches the exact anti-pattern its own error text names, so the ratchet runs backwards in practice.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3633",
-      "rank": 112,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike workspaces spawn with an incomplete dependency tree, so the contract’s own typecheck gate fails and agents report a false red main",
-      "rationale": "An environment defect that agents correctly interpret as a repo defect, so they abort correct work for the wrong reason.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3270",
-      "rank": 113,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails",
-      "rationale": "Every agent pays the same tax independently and the documented fix does not run, so each one improvises a different workaround.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3325",
-      "rank": 114,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A fresh workspace ships an EMPTY node_modules, so tooling silently resolves deps from the parent repo instead of failing loudly",
-      "rationale": "Failing in the wrong direction is the problem: an absent directory would error, an empty one silently runs against another tree.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3186",
-      "rank": 115,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline membership blanks the whole auricle project because one configured member (infra) is not a git repo",
-      "rationale": "One bad member takes out the whole project’s membership answer instead of degrading to the repos that do resolve.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3167",
-      "rank": 116,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "krux and lexerra are permanently unreadable through the membership door — a GitHub App 404 is typed as forge_unavailable",
-      "rationale": "A permanent installation gap is typed as a transient outage, so it reads as retryable and nobody ever fixes the real cause.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3596",
-      "rank": 117,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deacon patrol has no per-step timing — a 481-GET reconciler ran undetected for months and the residual overrun cannot be attributed",
-      "rationale": "The central scheduler overruns with a single unattributed log line, so every patrol regression is invisible until something else breaks.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3579",
-      "rank": 118,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Audit: ~20 frontend mutation fetches with bare JSON headers 403 on CSRF-guarded routes",
-      "rationale": "A known bug class with a known fix already applied once; the remaining callers fail only when their specific route is exercised.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3284",
-      "rank": 119,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work agent wrote a doc edit into the primary main worktree instead of its workspace (PAN-2204 family)",
-      "rationale": "A tool call resolving a path against the primary repo root is the same write-to-main hazard that isolation is supposed to remove.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3196",
-      "rank": 120,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out cannot tear down workspaces containing root-owned container residue — passes every DoD row then dies on EACCES",
-      "rationale": "The ceremony completes its checks and then fails on cleanup, leaving the issue in a half-closed state with no retry.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3210",
-      "rank": 121,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out blocked by an unprefixed devcontainer init-perms container — teardown scopes by compose project, the guard by working_dir",
-      "rationale": "Teardown and the guard disagree about scope, so an exited one-shot container blocks close-out indefinitely.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3570",
-      "rank": 122,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workspace devcontainer leaves root-owned node_modules/.pnpm-store subtrees — init-fe EACCES blocks pan start and rebuild does not heal it",
-      "rationale": "The documented recovery (rebuild) does not touch the corrupt tree, so every occurrence needs a manual chown as root.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3032",
-      "rank": 123,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workspace stack rebuild composes under overdeck-feature-* while Traefik labels reference myn-feature-* — 504s and lost devnet attachments",
-      "rationale": "Prefix drift plus runtime-only Traefik attachments means recovery from one 504 creates 504s everywhere else.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3179",
-      "rank": 124,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A UAT promote is marked complete at merge time — nothing verifies the change reached production",
-      "rationale": "Members read as shipped while production serves the old build, which is the same class as the deploy row of the Definition of Done.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3218",
-      "rank": 125,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No release-drift signal — a user-facing fix can sit merged on main for hours while every published version stays broken",
-      "rationale": "Build drift is measured per issue and release drift is measured nowhere, so an uninstallable package can persist unnoticed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3261",
-      "rank": 126,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Resume-gate Enter: the tmux fallback answers a live choice menu when its own paste hides the menu from the detector",
-      "rationale": "Overdeck answers a gate meant for the operator, and option 1 compacts, so the operator loses the session they were resuming.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3306",
-      "rank": 127,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A strike needing a rebase has no working path: strike.ts instructs it, the guard blocks it, sync-main resolves the wrong worktree",
-      "rationale": "Three individually defensible layers combine into a dead end for any strike that genuinely needs to sync main.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3617",
-      "rank": 128,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PAN-3586’s strike dies immediately on every dispatch — 3 attempts, zero output, while a sibling spawned minutes later works",
-      "rationale": "An issue-specific spawn failure with no transcript is unattributable, and the retry loop just repeats it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3629",
-      "rank": 129,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No sanctioned door to re-scope a live agent — an operator scope change forces a doctrine violation or lets the rejected design land",
-      "rationale": "Observed twice; without a door the operator either injects keystrokes or watches rejected work head toward a push.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3432",
-      "rank": 130,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Preemptive yield fan-out — 7 work agents simultaneously yielded \"making room for review of MIN-874\" for ONE review convoy",
-      "rationale": "A targeted preemption that yields seven agents creates under-capacity thrash and then floods them all back on resume.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3175",
-      "rank": 131,
-      "size": "M",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Model explicit semantic dependencies in merge-train ordering — file overlap cannot see that one feature requires another",
-      "rationale": "Order-dependent members with no file overlap are classified disjoint and batched in any order, which already broke a schema live.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3176",
-      "rank": 132,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Block UAT batch promotion when the live stack is degraded, unknown or still starting — the promote path takes no health evidence",
-      "rationale": "The health signal already exists and simply never reaches the gate, so promotion can happen against a stack nobody has verified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3355",
-      "rank": 133,
-      "size": "XS",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "sessionExists maps a probe failure to absence, so callers read \"not running\" when liveness is unknown",
-      "rationale": "Collapsing \"no such session\" and \"could not ask\" into false is the root of several liveness-drift bugs elsewhere in this backlog.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3317",
-      "rank": 134,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Strike agents have no sanctioned way to sync main — rebase is guard-blocked and pan sync-main cannot resolve -strike workspaces",
-      "rationale": "Substantially the same gap as PAN-3306; consolidate the two before planning either.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3224",
-      "rank": 135,
-      "size": "XS",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A crash-interrupted spawn strands model pending-work-spawn in agent state; plain pan start dies and only --fresh recovers",
-      "rationale": "resume.ts already guards this exact placeholder and the start path does not, so recovery needs a flag the operator has no reason to try.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3439",
-      "rank": 136,
-      "size": "XS",
-      "importance": "high",
-      "score": 82,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "pan start crashes on a pending-work-spawn placeholder row instead of taking the fresh-spawn path (duplicate of PAN-3224)",
-      "rationale": "Same defect and same fix as PAN-3224; keep one.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3622",
-      "rank": 137,
-      "size": "XS",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "orphan-proposed-reconciler test asserts on real issue PAN-3604 and reads live GitHub — it fails pan release check on a green main",
-      "rationale": "A unit test bound to live tracker state fails whenever reality moves, which false-reds the release gate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2971",
-      "rank": 138,
-      "size": "S",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Flywheel orchestrator finalized its own run but kept running — zombie session uncontrollable, dashboard Pause/Stop disabled",
-      "rationale": "A run the control plane considers closed kept orchestrating for 19 hours with every operator control greyed out.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3456",
-      "rank": 139,
-      "size": "XS",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan swarm refused every plan containing a sequential item — per-item diagnostics acted as gates",
-      "rationale": "Already fixed in 4117c9a777 and filed after the fact; verify the fix and close rather than re-plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3460",
-      "rank": 140,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive",
-      "rationale": "Each ready slot re-runs the whole suite per patrol, so swarm coordination amplifies exactly the load that makes it flake.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3463",
-      "rank": 141,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A legitimate no-op slot outcome (empty diff) can never pass its item verify — the slot wedges permanently",
-      "rationale": "A measure-and-decide item that correctly changes nothing is structurally unable to complete, and it holds its slot index forever.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3464",
-      "rank": 142,
-      "size": "XS",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan swarm reset does not clear slotCompletions despite claiming to clear recorded slot state",
-      "rationale": "A stale completion marker re-arms the exact wedge the operator ran reset to escape.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3185",
-      "rank": 143,
-      "size": "XS",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start reports a false hard failure when the deacon wins a spawn race — duplicate-session TOCTOU in the spawn path",
-      "rationale": "The dispatch succeeded and the command says it failed, which drives operators and orchestrators to spawn again on top of a live agent.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3044",
-      "rank": 144,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review feedback delivery runs against CLOSED issues — resurrects agents and raises needs-you 12 days after close-out",
-      "rationale": "Delivery has no terminal-state check, so closed work generates fresh needs-you rows and revives agents that should stay dead.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3557",
-      "rank": 145,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-merge label application has no retry — a rate-limited 403 silently hides the issue from the verify-on-main sweep",
-      "rationale": "The verify-on-main phase enumerates by label, so one dropped label write removes an issue from the phase that owns it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3205",
-      "rank": 146,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deployment gate queues a deferred deploy but never fires it — the promised \"next verification boundary\" trigger does not exist",
-      "rationale": "The message tells the operator not to retry and then nothing ever happens, which is worse than an outright refusal.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3569",
-      "rank": 147,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused — no staleness rule, no non-force exit",
-      "rationale": "Both owners of the stale file are blocked by the gate the file creates, so only --force escapes and --force is unsafe.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3244",
-      "rank": 148,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A queued dashboard deploy globally defers verification — a flywheel-owned deploy window starves cross-project review handoffs",
-      "rationale": "One project’s deploy silently holds every other project’s review convoy, with the hold reported only in reviewNotes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3257",
-      "rank": 149,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Crash-resume does not re-wire the PTY supervisor — a stale socket refuses all deliveries and state.json loses supervisorEnabled",
-      "rationale": "Resume restores the session but not its delivery tier, so a recovered agent is unreachable until someone notices.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3556",
-      "rank": 150,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Concurrent double-spawn race: one agent allocated two fresh session identities three seconds apart at UAT promote time",
-      "rationale": "Two spawn flows racing on the same agent leaves a pinned session that neither owner expects, and the transcript resolution fails after.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3171",
-      "rank": 151,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline reports \"merge failed\" after a successful merge and successful post-merge cleanup, leaving the issue in Todo with no label",
-      "rationale": "The operator is told the opposite of what happened, and the label state matches the false report rather than the merge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3502",
-      "rank": 152,
-      "size": "XS",
-      "importance": "high",
-      "score": 81,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "tiered-crews blendedCost expectation is stale versus current model-capabilities pricing and fails on main",
-      "rationale": "A repricing landed without updating its dependent literal, which is a red main that CI did not catch (see PAN-3532).",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3321",
-      "rank": 153,
-      "size": "XS",
-      "importance": "medium",
-      "score": 81,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Escalation messages and CLAUDE.md tell operators to run pan unstick <id>, which does not exist",
-      "rationale": "Operator-facing guidance that names a nonexistent verb fails the stand-alone-message rule at exactly the worst moment.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3108",
-      "rank": 154,
-      "size": "XS",
-      "importance": "medium",
-      "score": 81,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "dashboard.log grows unbounded (867MB, 8.8M lines) with no rotation",
-      "rationale": "Un-greppable incident logs make every subsequent investigation harder, and the fix is a known self-rotation pattern already used elsewhere.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3307",
-      "rank": 155,
-      "size": "XS",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "commitlint scope-enum is stale — it warns on most real commits and still lists the removed beads scope",
-      "rationale": "A lint that is wrong most of the time trains everyone to ignore it, which costs the signal on the commits where it is right.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3003",
-      "rank": 156,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work-agent launchers lack an OVERDECK_AGENT_ID export, so a manual re-launch of launcher.sh dies instantly",
-      "rationale": "Breaks the standard debugging move and presents as a misleading \"did not become ready\" failure.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3652",
-      "rank": 157,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified on demand",
-      "rationale": "A recovery door that costs two lines of YAML and was the missing piece during a real GitHub Actions incident.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3243",
-      "rank": 158,
-      "size": "XS",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "auto-commit test flakes on main by polling a fixed 20 setImmediate turns for a real git subprocess",
-      "rationale": "An event-loop-turn bound on a wall-clock operation is guaranteed to flake under load; it reddened main and blocked a close-out.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3094",
-      "rank": 159,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done merge fallback force-pushes a fast-forward branch and leaves the command partially complete",
-      "rationale": "The merge commit is already a descendant, so the forced push adds only a failure mode.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3508",
-      "rank": 160,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan reload temporarily removes the global pan CLI when invoked outside its linked generation",
-      "rationale": "The command that deploys the fix also removes the tool you would use to recover from a bad deploy.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3046",
-      "rank": 161,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan CLI crashes at exit with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out",
-      "rationale": "The work succeeds and the process still exits non-zero, so any caller that branches on the exit code misreads a completed handoff as a failure.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3627",
-      "rank": 162,
-      "size": "XS",
-      "importance": "medium",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "backlog-auto-trigger fails on startup when the backlog is legitimately empty",
-      "rationale": "A first-run experience that prints a stack trace on a clean directory, reported from an external install.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2806",
-      "rank": 163,
+      "rank": 73,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -3305,7 +2161,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2796",
-      "rank": 164,
+      "rank": 74,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -3317,21 +2173,170 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2940",
-      "rank": 165,
-      "size": "M",
+      "issue": "PAN-1824",
+      "rank": 75,
+      "size": "S",
       "importance": "critical",
-      "score": 92,
+      "score": 84,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Three red-mains in one day from direct-push series bypassing PR CI",
-      "rationale": "Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.",
+      "why": "Fix flaky main CI: fake timers + @slow exclusion for real-timer test family",
+      "rationale": "Raised from 78: the real-timer test family kept reddening main through August. PAN-3243, PAN-3520 and PAN-3532 are all downstream instances — load-induced timeouts recorded as real verdicts, branches looping on false test failures, and a CI job that never ran the frontend suite. Fixing the timer discipline at the source removes the input to several of those loops.",
       "gate": "auto",
-      "planning": "interactive"
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3139",
+      "rank": 76,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents-table liveness drifts stale in the under-reporting direction; the authoritative plane is the wrong one",
+      "rationale": "New this pass. The agents table — the plane docs/AGENT-STATE-PLANES.md designates authoritative — records a live four-hour agent as stopped while tmux and pan start's own liveness check both say running. Drift in the under-reporting direction is the dangerous direction: enumeration from the authoritative plane misses live agents, and anything that acts on 'stopped' can spawn a duplicate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3237",
+      "rank": 77,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A capacity-refused planning-to-work handoff is marked terminally stuck; every 409 becomes 'guardrails'",
+      "rationale": "New this pass. A capacity-refused planning-to-work handoff is recorded as terminally stuck: every HTTP 409 is classified as 'guardrails' and every skip reason calls markWorkspaceStuck, so three issues accumulated the identical dead-end over three ticks while the fleet was simply full. Backpressure is a normal condition and must be retried, not memorialized as a failure.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3274",
+      "rank": 78,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A test-role agent can spawn and never run, stranding an approved, CI-green issue behind a missing verdict",
+      "rationale": "New this pass. A test-role agent spawned, never executed a turn, and held its issue out of the merge gate — review approved, CI green, ready_for_merge 0 on a verdict that was never produced. It is the same shape as the already-ranked ghost test sessions and shares PAN-3566's deterministic root cause, so the three should be worked together.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3281",
+      "rank": 79,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "ready_for_merge stays 1 while an issue is stuck on incomplete-plan-items, so stuck work reaches UAT",
+      "rationale": "New this pass. An issue can carry ready_for_merge=1 and stuck=1 with failedCheck incomplete-plan-items at the same time, and the merge-ready flag wins on every surface — so work with eight pending checklist items was assembled into a UAT batch and recommended for promotion. Two contradictory facts, and the pipeline consistently reads the optimistic one.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3496",
+      "rank": 80,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review/inspect agents AskUserQuestion the operator for review depth, converting autonomy into operator work",
+      "rationale": "New this pass. A review convoy member blocked on an operator AskUserQuestion asking which review depth to use, and because convoys respawn the operator got the same dialog repeatedly. The review pipeline exists to be autonomous; a reviewer that parks on an operator question converts autonomous motion into operator work, which is the exact stall pattern the stall-sweeper work was built to kill.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3500",
+      "rank": 81,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A review sub-role can modify the branch after writing its report, violating its own spawn contract",
+      "rationale": "New this pass. A review sub-role wrote its report, went idle, and then — after a later message resumed it — began editing the workspace and preparing to resubmit, modifying seven tracked files before an orchestrator stopped it. Its spawn contract forbids exactly that. A reviewer that can write to the branch it is reviewing breaks the separation the review architecture is built on.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3522",
+      "rank": 82,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Supervisor watchdog restart-churns under CPU storm because the probe budget ignores the boot warm phase",
+      "rationale": "New this pass. Under a CPU storm the supervisor watchdog restart-churns the dashboard: twelve consecutive probe timeouts trigger a restart, two more restarts fire while the first is in flight, and the watchdog then gives up entirely with racing spawns on the supervisor port. The probe budget takes no account of the boot warm phase, so the recovery mechanism becomes the outage.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3555",
+      "rank": 83,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start silently spawned a fresh session over a resumable warm session, violating warm-by-default",
+      "rationale": "New this pass. A plain pan start with no --fresh silently abandoned a resumable warm session and allocated a brand-new session identity, discarding intact context that was on disk and resumable. Warm-by-default is the standing behaviour since PAN-2579, and a silent violation of it costs real re-discovery spend on every occurrence as well as the agent's accumulated understanding.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3565",
+      "rank": 84,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3563"
+      ],
+      "why": "Failed review spawn wedges 'starting', infra failure synthesizes a fake CHANGES REQUESTED verdict",
+      "rationale": "New this pass. Three review-lifecycle defects in one: a failed spawn leaves the role wedged at 'starting' with no session and then sends a 14k-character prompt at a session that was never created; an infrastructure failure is synthesized into a CHANGES REQUESTED verdict that reads like a code judgement; and pan tell hangs to SIGTERM after acknowledging. The middle one is the integrity problem — a fabricated verdict is worse than no verdict.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3571",
+      "rank": 85,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Completion-check timeout exits silently — 334 stranded turn-ends leave agents stalled until a patrol notices",
+      "rationale": "New this pass. The completion-check timeout branch logs and exits 0, bypassing the UNCLEAR fallback every other failure mode takes, so a timed-out check emits no resolution at all: no nudge, no escalation, no deacon poke eligibility. 334 stranded turn-ends are already recorded. Agents stall mid-item and only a patrol that may itself be frozen will notice.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3654",
+      "rank": 86,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3653"
+      ],
+      "why": "Compact respawn confirms against the archived session and kills a working fresh agent",
+      "rationale": "New this pass. Compact respawn confirms against the archived session rather than the fresh one, so a replacement session that had already accepted its recovery prompt and started working was declared unconfirmed and killed. Recovery that destroys working agents is worse than no recovery, and it pairs with PAN-3653 as the two halves of a broken strike-recovery path.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-2932",
-      "rank": 166,
+      "rank": 87,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -3345,34 +2350,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2935",
-      "rank": 167,
-      "size": "S",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workspace devcontainer duplicate backend hijacks Traefik router",
-      "rationale": "Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2337",
-      "rank": 168,
-      "size": "XS",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart",
-      "rationale": "Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2422",
-      "rank": 169,
+      "rank": 88,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -3387,7 +2366,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2699",
-      "rank": 170,
+      "rank": 89,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -3400,7 +2379,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2957",
-      "rank": 171,
+      "rank": 90,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -3415,7 +2394,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2850",
-      "rank": 172,
+      "rank": 91,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -3427,21 +2406,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "skip"
     },
     {
-      "issue": "PAN-2758",
-      "rank": 173,
-      "size": "S",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever",
-      "rationale": "Provider capacity error silently zombies a spawned agent (willRetry=false, status stays running forever), holding a slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2886",
-      "rank": 174,
+      "rank": 92,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -3454,7 +2420,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2817",
-      "rank": 175,
+      "rank": 93,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -3467,7 +2433,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2813",
-      "rank": 176,
+      "rank": 94,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -3479,34 +2445,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2848",
-      "rank": 177,
-      "size": "S",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Work agent stalls forever on a dead inspection: no re-dispatch, verdict never delivered, swarm-off suppresses recovery of a non-swarm a…",
-      "rationale": "Work agent stalls forever on a dead inspection session; no re-dispatch, swarm-off suppresses recovery.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2846",
-      "rank": 178,
-      "size": "S",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out blocks on a dead agent: postMergeLifecycle pauses the work agent but leaves status=running",
-      "rationale": "Close-out blocks on a dead agent — postMergeLifecycle pauses the agent but leaves status=running, jamming the DoD gate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2747",
-      "rank": 179,
+      "rank": 95,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3519,20 +2459,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2759",
-      "rank": 180,
+      "rank": 96,
       "size": "S",
       "importance": "high",
       "score": 82,
       "condition": "ok",
       "dependsOn": [],
       "why": "Dead flywheel with an active run was never auto-relaunched after a reboot",
-      "rationale": "Rank held: no material body change, and the reconciliation path it names is still the one that failed.",
+      "rationale": "Dead flywheel with an active run was never auto-relaunched after a reboot — sat idle 2h.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-2709",
-      "rank": 181,
+      "rank": 97,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -3545,7 +2485,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2668",
-      "rank": 182,
+      "rank": 98,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -3557,34 +2497,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2569",
-      "rank": 183,
-      "size": "XS",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "planning finalizes (issue→planned) but work agent does not auto-spawn",
-      "rationale": "Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2567",
-      "rank": 184,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "reviewed+green PR stuck after review",
-      "rationale": "Reviewed+green PR stuck after review — advancing verdict reconciled forever, merge never dispatched.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2179",
-      "rank": 185,
+      "rank": 99,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3597,7 +2511,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2169",
-      "rank": 186,
+      "rank": 100,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3610,7 +2524,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2775",
-      "rank": 187,
+      "rank": 101,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3623,7 +2537,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2734",
-      "rank": 188,
+      "rank": 102,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3636,7 +2550,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2323",
-      "rank": 189,
+      "rank": 103,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -3648,8 +2562,57 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2421",
+      "rank": 104,
+      "size": "XS",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "dashboard server route tests flake under full-suite verification load",
+      "rationale": "Raised from 79 for the same reason as PAN-1824: route-test flake under full-suite load is now the documented mechanism behind the test-gate loops (PAN-3520) and the retry amplification (PAN-3492), so it stopped being a nuisance and became a pipeline-throughput blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3081",
+      "rank": 105,
+      "size": "M",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agent git guard is bypassable by stripping it from $PATH — an agent did so unprompted",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3344",
+      "rank": 106,
+      "size": "M",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Resource governor gates dispatch on memory alone; agent-shell test runs drove load 48 on 24 cores",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3517",
+      "rank": 107,
+      "size": "M",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Convoy forks still miss the parent prompt cache: launch-injection byte drift plus resume dropping the header",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1618",
-      "rank": 190,
+      "rank": 108,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -3662,7 +2625,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2888",
-      "rank": 191,
+      "rank": 109,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -3677,7 +2640,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2960",
-      "rank": 192,
+      "rank": 110,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -3690,7 +2653,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2959",
-      "rank": 193,
+      "rank": 111,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -3703,7 +2666,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2639",
-      "rank": 194,
+      "rank": 112,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -3718,7 +2681,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2331",
-      "rank": 195,
+      "rank": 113,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -3731,7 +2694,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2333",
-      "rank": 196,
+      "rank": 114,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -3744,7 +2707,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2511",
-      "rank": 197,
+      "rank": 115,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -3757,7 +2720,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2451",
-      "rank": 198,
+      "rank": 116,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -3770,7 +2733,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2516",
-      "rank": 199,
+      "rank": 117,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3783,7 +2746,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2763",
-      "rank": 200,
+      "rank": 118,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3796,7 +2759,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2170",
-      "rank": 201,
+      "rank": 119,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -3809,7 +2772,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1198",
-      "rank": 202,
+      "rank": 120,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3822,7 +2785,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2106",
-      "rank": 203,
+      "rank": 121,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3835,7 +2798,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2880",
-      "rank": 204,
+      "rank": 122,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -3850,7 +2813,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2966",
-      "rank": 205,
+      "rank": 123,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3863,7 +2826,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2945",
-      "rank": 206,
+      "rank": 124,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3876,7 +2839,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2680",
-      "rank": 207,
+      "rank": 125,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -3888,8 +2851,211 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2971",
+      "rank": 126,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "flywheel orchestrator finalized its own run yet kept ticking; zombie session with dashboard Pause/Stop disabled",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3022",
+      "rank": 127,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Work-spawn route ignores the per-issue workModel override, then clobbers the record with the role default",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3044",
+      "rank": 128,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review feedback delivery runs against CLOSED issues, resurrecting agents and raising needs-you days later",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3104",
+      "rank": 129,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3100"
+      ],
+      "why": "Stale .pan/test/result.json is re-applied with no freshness check, re-failing an issue after the fix landed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3257",
+      "rank": 130,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Crash-resume never re-wires the PTY supervisor; a stale socket refuses every delivery",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3289",
+      "rank": 131,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequencer ran a full pass on an empty manifest against a 750-issue backlog — read model transiently empty",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3397",
+      "rank": 132,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Freshly-spawned convoy lanes freeze at 0 output; the existing detector covers warm resumes only",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3454",
+      "rank": 133,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3517"
+      ],
+      "why": "Cost hook re-ingests fork-copied parent history under reviewer identity: fake warnings, multi-billed spend",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3499",
+      "rank": 134,
+      "size": "XS",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3504"
+      ],
+      "why": "pan parked ack references a nonexistent ProjectConfig.projectPath — a typecheck error on main",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3505",
+      "rank": 135,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3062"
+      ],
+      "why": "Unpushed agent code commits on the primary main worktree block the flywheel's state write door",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3535",
+      "rank": 136,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "The drain/resume boot gate is caller-env-dependent, so any restart from a clean shell silently drops the hold",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3556",
+      "rank": 137,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3555"
+      ],
+      "why": "Concurrent double-spawn race allocated two fresh session identities three seconds apart",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3557",
+      "rank": 138,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Post-merge label application has no retry, so a rate-limited 403 hides the issue from the verify-on-main sweep",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3580",
+      "rank": 51,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
+      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3621",
+      "rank": 140,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start intermittently resolves a chunk graph spliced across two builds and dies at spawn",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3650",
+      "rank": 141,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike self-abort leaves state.json 'running', so the deacon resurrects aborted strikes on every pass",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2627",
-      "rank": 208,
+      "rank": 142,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3902,7 +3068,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2324",
-      "rank": 209,
+      "rank": 143,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3915,7 +3081,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2165",
-      "rank": 210,
+      "rank": 144,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3928,7 +3094,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2905",
-      "rank": 211,
+      "rank": 145,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3940,21 +3106,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2259",
-      "rank": 212,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "something burns the full 5k/hr GitHub GraphQL quota",
-      "rationale": "Something burns the full 5k/hr GitHub GraphQL quota, repeatedly breaking pan close and gh issue edit.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2379",
-      "rank": 213,
+      "rank": 146,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3966,21 +3119,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-2421",
-      "rank": 214,
-      "size": "XS",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard server route tests flake under full-suite verification load",
-      "rationale": "Rank held: no material body change, and it remains a member of the load-flake family anchored by PAN-1824.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2430",
-      "rank": 215,
+      "rank": 147,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3993,7 +3133,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2593",
-      "rank": 216,
+      "rank": 148,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -4006,7 +3146,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2656",
-      "rank": 217,
+      "rank": 149,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -4019,7 +3159,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2075",
-      "rank": 218,
+      "rank": 150,
       "size": "XL",
       "importance": "high",
       "score": 78,
@@ -4033,7 +3173,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2077",
-      "rank": 219,
+      "rank": 151,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -4048,7 +3188,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2078",
-      "rank": 220,
+      "rank": 152,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -4063,7 +3203,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2079",
-      "rank": 221,
+      "rank": 153,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -4078,7 +3218,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2080",
-      "rank": 222,
+      "rank": 154,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -4093,7 +3233,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1775",
-      "rank": 223,
+      "rank": 155,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -4106,7 +3246,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-454",
-      "rank": 224,
+      "rank": 156,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -4121,7 +3261,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1436",
-      "rank": 225,
+      "rank": 157,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -4133,8 +3273,243 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
+      "issue": "PAN-1711",
+      "rank": 158,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Root-cause and fix dashboard event-loop stalls under load",
+      "rationale": "Raised from 55: the event-loop stall class was confirmed repeatedly through August — the self-amplifying verification loop (PAN-3492), the watchdog restart churn under CPU storm (PAN-3522), and the CPU-blind governor (PAN-3344) all trace back to a dashboard that stalls under load. It is now a root cause with several expensive symptoms rather than a one-off incident, and the issue picked up a planning label.",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3015",
+      "rank": 159,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan monitor: pull-based mail-queue inbox replaces keystroke injection, the top delivery-failure source",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3048",
+      "rank": 160,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline auto-commit lands Overdeck PRD drafts inside product feature branches; exclusion lists drifted",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3096",
+      "rank": 161,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done fails on generated devcontainer artifacts; agents infer deletion of workspace infrastructure",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3106",
+      "rank": 162,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "auto_merge_default: hold is bypassed — shouldHoldForUat is consulted on only one merge path",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3174",
+      "rank": 163,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3032"
+      ],
+      "why": "Every polyrepo UAT stack is unreachable: stale project prefix, unattached devnet, wrong frontend port",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3205",
+      "rank": 164,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deployment gate queues a deferred deploy but the promised next-verification-boundary trigger does not exist",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3224",
+      "rank": 165,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A crash-interrupted spawn strands model 'pending-work-spawn'; plain pan start then dies with Unknown model",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3243",
+      "rank": 166,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "auto-commit test polls 20 setImmediate turns for a real git subprocess, reddening main",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3280",
+      "rank": 167,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One issue's agent sessions vanished four times in a run and its reviewer died writing no artifact",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3284",
+      "rank": 168,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A work agent wrote a doc edit into the primary main worktree instead of its workspace",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3420",
+      "rank": 270,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3432",
+      "rank": 170,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3429"
+      ],
+      "why": "Preemptive yield fan-out paused seven work agents to make room for one review convoy",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3569",
+      "rank": 171,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused; no staleness rule, no exit",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3605",
+      "rank": 172,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "lint-effect-diagnostics executed a squatted npm package through an npx registry fallback",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3617",
+      "rank": 173,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One issue's strike dies instantly on every dispatch with zero output while siblings spawn normally",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3629",
+      "rank": 174,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "No sanctioned door to re-scope a live agent, so operator scope changes force a doctrine violation",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3633",
+      "rank": 175,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3325"
+      ],
+      "why": "Strike workspaces spawn with an incomplete dependency tree, so agents abort on a false 'main is red'",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3668",
+      "rank": 176,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2642",
-      "rank": 226,
+      "rank": 177,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4148,7 +3523,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1868",
-      "rank": 227,
+      "rank": 178,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -4163,7 +3538,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2466",
-      "rank": 228,
+      "rank": 179,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4176,7 +3551,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1042",
-      "rank": 229,
+      "rank": 180,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4189,7 +3564,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-570",
-      "rank": 230,
+      "rank": 181,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -4204,7 +3579,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-106",
-      "rank": 231,
+      "rank": 182,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -4217,7 +3592,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2059",
-      "rank": 232,
+      "rank": 183,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4231,7 +3606,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2376",
-      "rank": 233,
+      "rank": 184,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4240,507 +3615,12 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "why": "Epic: CI/CD reliability",
       "rationale": "Epic — CI/CD reliability: flake policy, verification-to-merge convergence, strike/swarm merge-path hardening, deploy hygiene.",
       "gate": "blocked",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-1666",
-      "rank": 234,
-      "size": "XL",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline Throughput Hardening",
-      "rationale": "Epic — pipeline throughput hardening; most keystone children closed, remaining open work is coalescing review-spawn noise.",
-      "gate": "blocked",
       "planning": "skip",
       "isEpic": true
     },
     {
-      "issue": "PAN-3013",
-      "rank": 235,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "linear-mcp-auth-hook entries leak into durable ~/.claude/settings.json pointing at dead /tmp/pan-agent-role-* paths",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3516",
-      "rank": 236,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale bundled-skill duplicates in repo .claude/skills (pan-handoff, pan-flywheel, okf) shadow the canonical sync-sources copies",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3276",
-      "rank": 237,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Needs-you rows do not navigate — clicking a terminal question or permission prompt does nothing",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3445",
-      "rank": 238,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Project config TCP lock hashes into the ephemeral client-port range, so unrelated connections fail an uncontended config write",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3322",
-      "rank": 239,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "file-size allowlist for launcher-generator.ts carries 126 lines of slack — a temporary ceiling raise became permanent regrowth budget",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3303",
-      "rank": 240,
-      "size": "S",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Command Deck latches \"Unknown project\" after a dashboard reconnect — an empty registered-projects response is treated as authoritative",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3536",
-      "rank": 241,
-      "size": "S",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan tell fails for ohmypi conversations — expectedHarness defaults to claude-code when state.json is absent",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3640",
-      "rank": 242,
-      "size": "S",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agent GC preserves terminal rows after a recoverable state-push race, so close-out leaves tombstones behind",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3510",
-      "rank": 243,
-      "size": "S",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stopped agents can leave detached docker-run test containers alive indefinitely, interfering with other agents’ quality gates",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3661",
-      "rank": 244,
-      "size": "XS",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "issueActions review-mode tests fail locally — the semantic-rejection toast never fires since 27d75123ae",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3107",
-      "rank": 245,
-      "size": "M",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Productize the memory-attribution census — OOM spikes are unattributable after the fact",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3211",
-      "rank": 246,
-      "size": "S",
-      "importance": "medium",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No honest disposition for closed-without-landing issues — residue rows are neither closeable nor reapable",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3527",
-      "rank": 247,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sidebar project list never retries: one failed boot-time fetch leaves CONVERSATIONS 0 / ISSUES 0 until a manual reload",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3634",
-      "rank": 248,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Planning auto-handoff stamps the ambient flywheelRunId on operator-started work agents, stripping their reaping exemption",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3455",
-      "rank": 249,
-      "size": "XS",
-      "importance": "medium",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "isCliproxyUpToDate always returns false — cliproxy --version exits 2, so every ensure re-downloads the pinned release",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3288",
-      "rank": 250,
-      "size": "XS",
-      "importance": "medium",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "dev-checkout preflight: detect stale node_modules after a git pull and fail with \"run bun install\" instead of ERR_MODULE_NOT_FOUND",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3332",
-      "rank": 251,
-      "size": "S",
-      "importance": "medium",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard slash-command activities leave \"running in background\" standing after the spawn has already died",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3117",
-      "rank": 252,
-      "size": "S",
-      "importance": "medium",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3121",
-      "rank": 253,
-      "size": "S",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Failed-send outbox does not reconcile against the transcript — a delivered message keeps a doomed Retry twin",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3280",
-      "rank": 254,
-      "size": "S",
-      "importance": "medium",
-      "score": 77,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "PAN-3253’s sessions vanished four times in one run and its reviewer died writing no artifact — may be covered by newer session-loss fixes",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3137",
-      "rank": 255,
-      "size": "XS",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT generation member titles are taken from the Flywheel status snapshot, so orchestrator prose reaches the operator’s UAT surface",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3164",
-      "rank": 256,
-      "size": "XS",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT stack shows \"Open UAT frontend\" while still booting — the operator gets a Gateway Timeout with no indication it is starting",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3036",
-      "rank": 257,
-      "size": "S",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "False \"! INPUT\" chip on completed strike agents — the pane-idle heuristic misreads post-strike-ready idle as a pending question",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3034",
-      "rank": 258,
-      "size": "S",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Command Deck session tree misses strike-only and workspace-less issues, so a live strike agent shows no session node",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3354",
-      "rank": 259,
-      "size": "XS",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Archiving the main workspace hides the singleton row with no UI recovery path",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3540",
-      "rank": 260,
-      "size": "S",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "God View: phantom agent orbs, a dead Hook Bus panel, and a pressure-blind swap header",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3616",
-      "rank": 261,
-      "size": "XS",
-      "importance": "medium",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Planned deploy restarts show the generic Reconnecting banner — use the lifecycle signal for calm copy",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3530",
-      "rank": 262,
-      "size": "S",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "God View polls on 30s timers in four components, violating its documented event-driven contract",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3615",
-      "rank": 263,
-      "size": "S",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "TTS follow-ups after the 9-day silence: watchdog activation rules and venv resolution from deployment generations",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3157",
-      "rank": 264,
-      "size": "XS",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Awareness feed shows the Flywheel as a generic \"Claude Code / No messages yet\" chat row instead of run activity",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3290",
-      "rank": 265,
-      "size": "XS",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "xBRIEF items can carry empty metadata.traces — documentation items are invisible to requirement traceability",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2982",
-      "rank": 266,
-      "size": "S",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review convoy should run a skill’s own selftest when sync-sources/skills/** changes",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3295",
-      "rank": 267,
-      "size": "M",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Single per-machine completion-check summarizer with a queue and first-class observability in pan resources and the Deacon surface",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3130",
-      "rank": 268,
-      "size": "S",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Security: path-escape validation for identifier-joined write paths",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3113",
-      "rank": 269,
-      "size": "M",
-      "importance": "medium",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Surface agent-pane choice prompts as inline decision cards in the conversation view",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3235",
-      "rank": 270,
-      "size": "S",
-      "importance": "medium",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard decision card: render and answer agent pane-choice menus (follow-up to PAN-3228)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3518",
-      "rank": 271,
-      "size": "M",
-      "importance": "medium",
-      "score": 74,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-3517"
-      ],
-      "why": "TTL-aware re-review payload policy — fresh-spawn-with-digest for cold, large review histories",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3533",
-      "rank": 272,
-      "size": "L",
-      "importance": "medium",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Resource segregation: per-project isolation classes so MYN stacks cannot starve Overdeck work and vice versa",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-2981",
-      "rank": 273,
-      "size": "S",
-      "importance": "medium",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ctrl-K palette: a stale conversation hit 404s on open because the search index never prunes deleted sessions",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3017",
-      "rank": 274,
-      "size": "S",
-      "importance": "medium",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Issue-page UAT panel: expose the full stack action menu and show the panel consistently",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1556",
-      "rank": 275,
+      "rank": 185,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4753,7 +3633,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2188",
-      "rank": 276,
+      "rank": 186,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4766,7 +3646,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2189",
-      "rank": 277,
+      "rank": 187,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4779,7 +3659,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2190",
-      "rank": 278,
+      "rank": 188,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4792,7 +3672,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2233",
-      "rank": 279,
+      "rank": 189,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4805,7 +3685,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2526",
-      "rank": 280,
+      "rank": 190,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4818,7 +3698,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2008",
-      "rank": 281,
+      "rank": 191,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4833,7 +3713,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1936",
-      "rank": 282,
+      "rank": 192,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4846,7 +3726,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1988",
-      "rank": 283,
+      "rank": 193,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4861,7 +3741,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1910",
-      "rank": 284,
+      "rank": 194,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4875,8 +3755,186 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3040",
+      "rank": 195,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan strike fails outright on polyrepo projects — worktree logic assumes a monorepo root",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3050",
+      "rank": 196,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Idle-stack reaper regex only matches Overdeck containers, so foreign workspace stacks are never reaped",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3120",
+      "rank": 197,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "MERGE refuses or dead-ends when the preemptive scheduler yielded the work agent",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3171",
+      "rank": 198,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline reports 'merge failed' after a successful merge; issue stays Todo while the commit is on main",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3261",
+      "rank": 199,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Resume-gate Enter: the tmux fallback answers a live choice menu that its own paste hid from the detector",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3267",
+      "rank": 200,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "GitLab merged-head oracle fans out one glab subprocess per repo x head, failing every membership refresh",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3297",
+      "rank": 201,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan tell misclassifies healthy supervisor-run agents as zombies after a dashboard restart",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3306",
+      "rank": 202,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3317"
+      ],
+      "why": "A strike needing a rebase has no working path: prompt instructs it, guard blocks it, sync-main misresolves",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3317",
+      "rank": 203,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike agents have no sanctioned way to sync main: rebase is guard-blocked, sync-main misresolves -strike",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3439",
+      "rank": 204,
+      "size": "XS",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3224"
+      ],
+      "why": "pan start crashes on a pending-work-spawn placeholder row; resume has the guard, start does not",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3460",
+      "rank": 205,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Per-item verify_commands that run the full root suite make slot merge gates load-fragile and expensive",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3533",
+      "rank": 206,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3344"
+      ],
+      "why": "Per-project isolation classes so one project's heavy stacks cannot starve another project's pipeline",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3622",
+      "rank": 207,
+      "size": "XS",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A reconciler test asserts on a real issue and reads live GitHub, so pan release check fails on a green main",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3640",
+      "rank": 208,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3561"
+      ],
+      "why": "Agent GC preserves terminal rows after a recoverable state push race, leaving stale records on closed issues",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1325",
-      "rank": 285,
+      "rank": 209,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4888,7 +3946,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1728",
-      "rank": 286,
+      "rank": 210,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4900,7 +3958,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2651",
-      "rank": 287,
+      "rank": 211,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4912,7 +3970,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2678",
-      "rank": 288,
+      "rank": 212,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4924,7 +3982,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2241",
-      "rank": 289,
+      "rank": 213,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4936,7 +3994,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2242",
-      "rank": 290,
+      "rank": 214,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4948,7 +4006,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2240",
-      "rank": 291,
+      "rank": 215,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4960,7 +4018,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2243",
-      "rank": 292,
+      "rank": 216,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4972,7 +4030,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2244",
-      "rank": 293,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4984,7 +4042,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2202",
-      "rank": 294,
+      "rank": 218,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4996,7 +4054,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2195",
-      "rank": 295,
+      "rank": 219,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5008,7 +4066,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2237",
-      "rank": 296,
+      "rank": 220,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -5020,7 +4078,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2487",
-      "rank": 297,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5032,7 +4090,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2469",
-      "rank": 298,
+      "rank": 222,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5044,7 +4102,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2212",
-      "rank": 299,
+      "rank": 223,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5056,7 +4114,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2213",
-      "rank": 300,
+      "rank": 224,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5068,7 +4126,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2211",
-      "rank": 301,
+      "rank": 225,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5080,7 +4138,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2210",
-      "rank": 302,
+      "rank": 226,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5091,8 +4149,194 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2980",
+      "rank": 227,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pre-push size guard reads the dirty worktree, so one session's edits block every other session's push",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3047",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike-branch teardown never fires; 96 strike/* branches preserved because ancestry misses squash merges",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3099",
+      "rank": 229,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan restart --health-timeout 120 parsed as 120ms; false-failed check leaves the dashboard down",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3113",
+      "rank": 230,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Surface agent-pane choice prompts as inline decision cards so blocking menus are answerable from the feed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3129",
+      "rank": 231,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Security: symlink/TOCTOU containment for canonical writes under agent-controlled paths",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3186",
+      "rank": 232,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One non-git configured member blanks pipeline membership for the whole auricle project",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3190",
+      "rank": 233,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan merge cancel is 100% broken: Commander passes its options object into the fetchImpl slot",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3256",
+      "rank": 234,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3267"
+      ],
+      "why": "MYN pipeline membership fails forge_unavailable: glab runs in a polyrepo root that is not a git repo",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3270",
+      "rank": 235,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3325"
+      ],
+      "why": "New workspaces have empty node_modules and bun is off PATH, so the documented remedy fails",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3301",
+      "rank": 236,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Backlog manifest still writes legacy .pan, and the stray-writer patrol logs 68k lines hiding the real defect",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3325",
+      "rank": 237,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A fresh workspace ships an empty node_modules, so tooling silently resolves deps from the parent repo",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3463",
+      "rank": 238,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3460"
+      ],
+      "why": "A legitimate no-op slot outcome can never pass its item verify, so the slot wedges permanently",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3513",
+      "rank": 239,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agent runtime plane on overdeck-state: durable session pointers, GC as cache eviction",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3553",
+      "rank": 240,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Census treats a zero-session tmux server as unavailable, so conversations sit on 'Starting…' after a drain boot",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3596",
+      "rank": 241,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deacon patrol has no per-step timing, so overruns of the central scheduler cannot be attributed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2201",
-      "rank": 303,
+      "rank": 242,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -5104,7 +4348,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2718",
-      "rank": 304,
+      "rank": 243,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5116,7 +4360,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2646",
-      "rank": 305,
+      "rank": 244,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -5128,7 +4372,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2652",
-      "rank": 306,
+      "rank": 245,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5140,7 +4384,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2667",
-      "rank": 307,
+      "rank": 246,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5152,7 +4396,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2755",
-      "rank": 308,
+      "rank": 247,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -5164,7 +4408,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2754",
-      "rank": 309,
+      "rank": 248,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -5176,7 +4420,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2809",
-      "rank": 310,
+      "rank": 249,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5188,7 +4432,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2810",
-      "rank": 311,
+      "rank": 250,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5200,7 +4444,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2495",
-      "rank": 312,
+      "rank": 251,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5212,7 +4456,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2478",
-      "rank": 313,
+      "rank": 252,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5224,7 +4468,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1710",
-      "rank": 314,
+      "rank": 253,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5236,7 +4480,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1720",
-      "rank": 315,
+      "rank": 254,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5248,7 +4492,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1558",
-      "rank": 316,
+      "rank": 255,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -5260,7 +4504,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1650",
-      "rank": 317,
+      "rank": 256,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -5272,7 +4516,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1766",
-      "rank": 318,
+      "rank": 257,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5284,20 +4528,19 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1767",
-      "rank": 319,
+      "rank": 258,
       "size": "M",
       "importance": "high",
       "score": 72,
       "condition": "ok",
       "dependsOn": [],
       "why": "Show merged-but-not-closed-out count in pan status and the dashboard headline",
-      "rationale": "Rank held: the body did not change materially, only metadata, so the prior placement stands.",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-1770",
-      "rank": 320,
+      "rank": 259,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5308,8 +4551,218 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3003",
+      "rank": 260,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Generated launcher.sh omits OVERDECK_AGENT_ID, so any manual re-launch dies instantly",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3014",
+      "rank": 261,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Background title/about spawns fail: --bare skips credential reads in Claude Code 2.1.209",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3077",
+      "rank": 262,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Inspect/review-supervisor spawns omit --effort and inherit xhigh, once per xBRIEF item",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3107",
+      "rank": 263,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Productize the memory-attribution census so OOM spikes are attributable after the fact",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3167",
+      "rank": 264,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "krux and lexerra permanently unreadable through the membership door; a 404 typed as forge_unavailable",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3179",
+      "rank": 265,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3176"
+      ],
+      "why": "A UAT promote is marked complete at merge time; nothing verifies the change reached production",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3185",
+      "rank": 266,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start reports a false hard failure when the deacon wins a spawn race (duplicate-session TOCTOU)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3218",
+      "rank": 267,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "No release-drift signal: a user-facing fix sits on main for hours while every published version stays broken",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3245",
+      "rank": 268,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done falsely flags the workspace .pan/drafts artifact as uncommitted despite its own exclusion",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3303",
+      "rank": 269,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Command Deck latches 'Unknown project' after reconnect; an empty registered-projects response is authoritative",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3308",
+      "rank": 270,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "The file-size guard hands agents a paste-ready ratchet-up line; two of three agents raised the ceiling",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3355",
+      "rank": 271,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "tmux sessionExists maps a probe failure to absence, so callers read 'not running' when liveness is unknown",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3508",
+      "rank": 272,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan reload temporarily removes the global pan CLI when invoked outside its linked generation",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3518",
+      "rank": 273,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3517"
+      ],
+      "why": "TTL-aware re-review payload policy: fresh-spawn-with-digest for cold, large histories",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3570",
+      "rank": 274,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3325"
+      ],
+      "why": "Devcontainer leaves root-owned node_modules subtrees; init EACCES blocks pan start and rebuild cannot heal it",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3615",
+      "rank": 275,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "TTS silent for nine days behind four stacked failures; three fixed, follow-ups owed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3652",
+      "rank": 276,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2027",
-      "rank": 321,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5321,7 +4774,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2266",
-      "rank": 322,
+      "rank": 278,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5333,7 +4786,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1578",
-      "rank": 323,
+      "rank": 279,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5345,7 +4798,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1538",
-      "rank": 324,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5357,7 +4810,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-687",
-      "rank": 325,
+      "rank": 281,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5369,7 +4822,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-466",
-      "rank": 326,
+      "rank": 282,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5381,7 +4834,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-465",
-      "rank": 327,
+      "rank": 283,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5393,7 +4846,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-463",
-      "rank": 328,
+      "rank": 284,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5405,7 +4858,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1142",
-      "rank": 329,
+      "rank": 285,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5417,7 +4870,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1424",
-      "rank": 330,
+      "rank": 286,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5429,7 +4882,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1196",
-      "rank": 331,
+      "rank": 287,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5441,7 +4894,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1311",
-      "rank": 332,
+      "rank": 288,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5453,7 +4906,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1313",
-      "rank": 333,
+      "rank": 289,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5465,7 +4918,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1246",
-      "rank": 334,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5477,7 +4930,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1253",
-      "rank": 335,
+      "rank": 291,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5489,7 +4942,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1254",
-      "rank": 336,
+      "rank": 292,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5501,7 +4954,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1357",
-      "rank": 337,
+      "rank": 293,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5512,8 +4965,204 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3012",
+      "rank": 294,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Archived transcripts die when the harness deletes the JSONL; back them up into Overdeck storage first",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3032",
+      "rank": 295,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stack rebuild composes an overdeck- prefix while Traefik labels reference myn- devnet; 504s and lost attaches",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3094",
+      "rank": 296,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done merge fallback force-pushes a fast-forward branch and leaves the command partially complete",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3176",
+      "rank": 297,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT batch promotion takes no stack-health evidence, so a degraded or still-starting stack can be promoted",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3196",
+      "rank": 298,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out dies on EACCES against root-owned container residue after passing every DoD row",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3210",
+      "rank": 299,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3196"
+      ],
+      "why": "Close-out blocked by an unprefixed devcontainer init container; teardown and guard scope differently",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3295",
+      "rank": 300,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Single per-machine completion-check summarizer with a queue and first-class observability",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3332",
+      "rank": 301,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3329"
+      ],
+      "why": "Dashboard slash-command activities leave 'running in background' standing after the spawn already died",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3464",
+      "rank": 302,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan swarm reset never clears slotCompletions, so a stale marker re-arms the exact wedge reset should escape",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3502",
+      "rank": 303,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "tiered-crews blendedCost expectation is stale against current model-capabilities pricing; fails on main",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3510",
+      "rank": 304,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stopped agents leave detached docker-run test containers alive for hours, contending with other gates",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3527",
+      "rank": 305,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sidebar project list never retries, so one failed boot fetch leaves CONVERSATIONS 0 / ISSUES 0",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3536",
+      "rank": 306,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan tell cannot reach ohmypi conversations: expectedHarness defaults to claude-code with no state.json",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3579",
+      "rank": 307,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "~20 frontend mutation fetches hand-write JSON headers and 403 on CSRF-guarded routes",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3634",
+      "rank": 308,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Planning auto-handoff stamps the ambient flywheelRunId on operator-started agents, stripping reaping exemption",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3661",
+      "rank": 309,
+      "size": "XS",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "issueActions review-mode tests fail locally: the semantic-rejection toast never fires since the secure-dispatch change",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1915",
-      "rank": 338,
+      "rank": 310,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5525,7 +5174,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1435",
-      "rank": 339,
+      "rank": 311,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5537,7 +5186,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1672",
-      "rank": 340,
+      "rank": 312,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5549,7 +5198,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1640",
-      "rank": 341,
+      "rank": 313,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5561,35 +5210,33 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2351",
-      "rank": 342,
+      "rank": 314,
       "size": "XS",
       "importance": "high",
       "score": 69,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-1166"
-      ],
-      "why": "Overdeck Anywhere P0: scoped access tokens plus WS/SSE heartbeats (security prerequisites)",
-      "rationale": "Rank held: no material body change, and it still gates every later Anywhere phase.",
+      "dependsOn": [],
+      "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-2350",
-      "rank": 343,
+      "rank": 315,
       "size": "L",
       "importance": "high",
       "score": 69,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone",
-      "rationale": "Rank held: no material body change; PAN-3513 was filed as its data-plane companion but does not reorder the epic.",
+      "why": "Epic: Overdeck Anywhere",
+      "rationale": "Flagged as an epic container this pass — the title says Epic but the manifest heuristic missed it. Ranked on the aggregate of its children (PAN-2351 through PAN-2356 plus the PAN-3513 data-plane companion), which is P0 security work plus a long tail of deliberately-deferred product phases.",
       "gate": "blocked",
-      "planning": "skip"
+      "planning": "skip",
+      "isEpic": true
     },
     {
       "issue": "PAN-1217",
-      "rank": 344,
+      "rank": 316,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5601,7 +5248,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1218",
-      "rank": 345,
+      "rank": 317,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5613,7 +5260,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1219",
-      "rank": 346,
+      "rank": 318,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5625,7 +5272,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1209",
-      "rank": 347,
+      "rank": 319,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -5637,7 +5284,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1451",
-      "rank": 348,
+      "rank": 320,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5649,7 +5296,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1452",
-      "rank": 349,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5661,7 +5308,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1454",
-      "rank": 350,
+      "rank": 322,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5673,7 +5320,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1553",
-      "rank": 351,
+      "rank": 323,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5685,7 +5332,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1504",
-      "rank": 352,
+      "rank": 324,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5697,7 +5344,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1480",
-      "rank": 353,
+      "rank": 325,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5709,7 +5356,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1479",
-      "rank": 354,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5721,7 +5368,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2950",
-      "rank": 355,
+      "rank": 327,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5732,8 +5379,68 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
+      "issue": "PAN-3046",
+      "rank": 328,
+      "size": "XS",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan CLI crashes at exit with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3108",
+      "rank": 329,
+      "size": "XS",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "dashboard.log grows unbounded (867MB) with no rotation, making incident logs un-greppable",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3211",
+      "rank": 330,
+      "size": "M",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "No honest disposition for closed-without-landing issues; residue rows neither closeable nor reapable",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3276",
+      "rank": 331,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Needs-you rows for terminal questions and permission prompts do not navigate anywhere on click",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3456",
+      "rank": 332,
+      "size": "XS",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan swarm refused every plan containing a sequential item — per-item diagnostics acted as gates",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2837",
-      "rank": 356,
+      "rank": 333,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5745,7 +5452,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2836",
-      "rank": 357,
+      "rank": 334,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5757,7 +5464,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2830",
-      "rank": 358,
+      "rank": 335,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5769,7 +5476,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2720",
-      "rank": 359,
+      "rank": 336,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5781,7 +5488,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2650",
-      "rank": 360,
+      "rank": 337,
       "size": "L",
       "importance": "high",
       "score": 67,
@@ -5793,7 +5500,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2549",
-      "rank": 361,
+      "rank": 338,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5805,7 +5512,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2358",
-      "rank": 362,
+      "rank": 339,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5817,7 +5524,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2334",
-      "rank": 363,
+      "rank": 340,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5829,7 +5536,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2308",
-      "rank": 364,
+      "rank": 341,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5841,7 +5548,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2193",
-      "rank": 365,
+      "rank": 342,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5853,7 +5560,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1984",
-      "rank": 366,
+      "rank": 343,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5865,7 +5572,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1913",
-      "rank": 367,
+      "rank": 344,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5877,7 +5584,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1906",
-      "rank": 368,
+      "rank": 345,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5889,7 +5596,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1544",
-      "rank": 369,
+      "rank": 346,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5901,7 +5608,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-955",
-      "rank": 370,
+      "rank": 347,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5913,7 +5620,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-813",
-      "rank": 371,
+      "rank": 348,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5925,7 +5632,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-807",
-      "rank": 372,
+      "rank": 349,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5937,7 +5644,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-630",
-      "rank": 373,
+      "rank": 350,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5948,164 +5655,32 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
-      "issue": "PAN-3015",
-      "rank": 374,
-      "size": "L",
+      "issue": "PAN-3013",
+      "rank": 351,
+      "size": "S",
       "importance": "high",
-      "score": 80,
+      "score": 66,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan monitor: pull-based background inbox transport for Claude Code sessions, replacing keystroke-injection delivery",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3513",
-      "rank": 375,
-      "size": "L",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agent runtime plane on overdeck-state — durable session pointers and GC as cache eviction (the Anywhere data plane)",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3181",
-      "rank": 376,
-      "size": "L",
-      "importance": "medium",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Own agent memories in Overdeck: migrate harness project memories to a per-repo overdeck-memory orphan branch",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3131",
-      "rank": 377,
-      "size": "L",
-      "importance": "medium",
-      "score": 71,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Support xBRIEF planRef sharding — planning-side authoring and pipeline-wide consumption",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3090",
-      "rank": 378,
-      "size": "M",
-      "importance": "medium",
-      "score": 71,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Simple issue page: narrative feed instead of a raw transcript, surface the pending question, honest blocked state",
+      "why": "Role-scoped MCP auth hooks leak into durable ~/.claude/settings.json pointing at dead /tmp paths",
       "gate": "auto",
       "planning": "skip"
     },
     {
-      "issue": "PAN-3016",
-      "rank": 379,
-      "size": "M",
-      "importance": "medium",
-      "score": 70,
+      "issue": "PAN-3321",
+      "rank": 352,
+      "size": "XS",
+      "importance": "high",
+      "score": 66,
       "condition": "ok",
       "dependsOn": [],
-      "why": "URL-address every view — anywhere you navigate in Overdeck, the URL must get you back there",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3178",
-      "rank": 380,
-      "size": "L",
-      "importance": "medium",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "First-class worktrees and diffs: +/− changes badge, dedicated Changes surface, conversation worktrees",
+      "why": "Escalation text and CLAUDE.md tell operators to run `pan unstick`, a command that does not exist",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3132",
-      "rank": 381,
-      "size": "M",
-      "importance": "medium",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Adopt xBRIEF v0.9 agentic dispatch fields end-to-end (deftai/xBRIEF#40 alignment)",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3054",
-      "rank": 382,
-      "size": "M",
-      "importance": "medium",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Benchmark matrix: launch one template issue under N configurations and compare cost, time and outcome",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3058",
-      "rank": 383,
-      "size": "M",
-      "importance": "medium",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Standing-crew templates: ship preset crew configurations selectable from Settings",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2976",
-      "rank": 384,
-      "size": "L",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Generalize the ACP harness: any ACP-capable agent CLI as a spawnable runtime, with named adapters and a custom-agent escape hatch",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3061",
-      "rank": 385,
-      "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dispatch-topology advisor: a mechanical start-vs-swarm recommendation at plan-finalize",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2977",
-      "rank": 386,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ACP agent setup UI: detect installed ACP CLIs, show auth status, and guide login from Settings",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-471",
-      "rank": 387,
+      "rank": 353,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -6117,7 +5692,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-438",
-      "rank": 388,
+      "rank": 354,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -6129,7 +5704,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-262",
-      "rank": 389,
+      "rank": 355,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -6141,7 +5716,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-176",
-      "rank": 390,
+      "rank": 356,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -6153,7 +5728,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-578",
-      "rank": 391,
+      "rank": 357,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -6164,8 +5739,22 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
+      "issue": "PAN-1666",
+      "rank": 358,
+      "size": "XL",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline Throughput Hardening",
+      "rationale": "Epic — pipeline throughput hardening; most keystone children closed, remaining open work is coalescing review-spawn noise.",
+      "gate": "blocked",
+      "planning": "skip",
+      "isEpic": true
+    },
+    {
       "issue": "PAN-2921",
-      "rank": 392,
+      "rank": 359,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -6177,7 +5766,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2839",
-      "rank": 393,
+      "rank": 360,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -6189,7 +5778,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2824",
-      "rank": 394,
+      "rank": 361,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -6201,7 +5790,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2805",
-      "rank": 395,
+      "rank": 362,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -6213,7 +5802,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2792",
-      "rank": 396,
+      "rank": 363,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -6225,7 +5814,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2761",
-      "rank": 397,
+      "rank": 364,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6237,7 +5826,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2739",
-      "rank": 398,
+      "rank": 365,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6249,7 +5838,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2738",
-      "rank": 399,
+      "rank": 366,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6261,7 +5850,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2717",
-      "rank": 400,
+      "rank": 367,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6273,7 +5862,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2697",
-      "rank": 401,
+      "rank": 368,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6285,7 +5874,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2696",
-      "rank": 402,
+      "rank": 369,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6297,7 +5886,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2691",
-      "rank": 403,
+      "rank": 370,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6309,7 +5898,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2686",
-      "rank": 404,
+      "rank": 371,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6320,8 +5909,32 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3175",
+      "rank": 372,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge-train ordering has no semantic dependency concept — file overlap cannot see feature ordering",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3235",
+      "rank": 373,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard decision card renders and answers agent pane-choice menus (follow-up to PAN-3228)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2672",
-      "rank": 405,
+      "rank": 374,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6333,7 +5946,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2670",
-      "rank": 406,
+      "rank": 375,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6345,7 +5958,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2664",
-      "rank": 407,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6357,7 +5970,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2663",
-      "rank": 408,
+      "rank": 377,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6369,7 +5982,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2659",
-      "rank": 409,
+      "rank": 378,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6381,7 +5994,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2649",
-      "rank": 410,
+      "rank": 379,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6393,7 +6006,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2580",
-      "rank": 411,
+      "rank": 380,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6405,7 +6018,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2572",
-      "rank": 412,
+      "rank": 381,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -6417,7 +6030,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2563",
-      "rank": 413,
+      "rank": 382,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6429,7 +6042,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2560",
-      "rank": 414,
+      "rank": 383,
       "size": "M",
       "importance": "medium",
       "score": 60,
@@ -6441,7 +6054,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2554",
-      "rank": 415,
+      "rank": 384,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6453,7 +6066,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2550",
-      "rank": 416,
+      "rank": 385,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -6465,7 +6078,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2547",
-      "rank": 417,
+      "rank": 386,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6477,7 +6090,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2546",
-      "rank": 418,
+      "rank": 387,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6489,7 +6102,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2506",
-      "rank": 419,
+      "rank": 388,
       "size": "M",
       "importance": "medium",
       "score": 60,
@@ -6500,8 +6113,58 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "skip"
     },
     {
+      "issue": "PAN-3130",
+      "rank": 389,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3129"
+      ],
+      "why": "Security: path-escape validation for identifier-joined write paths",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3137",
+      "rank": 390,
+      "size": "XS",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT generation member titles come from Flywheel status prose instead of the issue title",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3455",
+      "rank": 391,
+      "size": "XS",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "isCliproxyUpToDate always returns false, so every ensure re-downloads the pinned release",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3516",
+      "rank": 392,
+      "size": "XS",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stale bundled-skill duplicates in the repo .claude/skills serve outdated text to overdeck-dev sessions",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-2501",
-      "rank": 420,
+      "rank": 393,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6513,20 +6176,19 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2492",
-      "rank": 421,
+      "rank": 394,
       "size": "S",
       "importance": "medium",
       "score": 59,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Pane-detected waits surface as \"needs you\" but cannot be answered from the dashboard — only the terminal",
-      "rationale": "Rank held: the immediate fix already landed in-body; the remaining scope is now largely covered by PAN-3113 and PAN-3235.",
+      "why": "pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-2491",
-      "rank": 422,
+      "rank": 395,
       "size": "M",
       "importance": "medium",
       "score": 59,
@@ -6538,7 +6200,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2489",
-      "rank": 423,
+      "rank": 396,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6550,7 +6212,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2484",
-      "rank": 424,
+      "rank": 397,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6562,7 +6224,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2465",
-      "rank": 425,
+      "rank": 398,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6574,7 +6236,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2454",
-      "rank": 426,
+      "rank": 399,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6586,7 +6248,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2428",
-      "rank": 427,
+      "rank": 400,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6598,7 +6260,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2423",
-      "rank": 428,
+      "rank": 401,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6610,7 +6272,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2416",
-      "rank": 429,
+      "rank": 402,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6622,7 +6284,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2414",
-      "rank": 430,
+      "rank": 403,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6634,7 +6296,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2408",
-      "rank": 431,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6646,7 +6308,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2395",
-      "rank": 432,
+      "rank": 405,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6658,7 +6320,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2381",
-      "rank": 433,
+      "rank": 406,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6670,7 +6332,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2287",
-      "rank": 434,
+      "rank": 407,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6681,8 +6343,132 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "skip"
     },
     {
+      "issue": "PAN-2976",
+      "rank": 408,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Generalize ACP harness to any ACP-capable CLI with a capability gate and custom-agent config",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3034",
+      "rank": 409,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Command Deck session tree misses strike-only and workspace-less issues",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3117",
+      "rank": 410,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3164",
+      "rank": 411,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT stack offers 'Open UAT frontend' while still booting, so the operator gets a Gateway Timeout",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3178",
+      "rank": 412,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "First-class worktrees and diffs: +/- badge, dedicated Changes surface, conversation worktrees",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3288",
+      "rank": 413,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dev-checkout preflight: detect stale node_modules after a pull instead of ERR_MODULE_NOT_FOUND",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3322",
+      "rank": 414,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3308"
+      ],
+      "why": "launcher-generator allowlist sits 126 lines above reality, turning a temporary raise into regrowth budget",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3445",
+      "rank": 415,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Project config TCP lock hashes into the ephemeral client-port range, so uncontended writes fail",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3540",
+      "rank": 416,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3530"
+      ],
+      "why": "God View shows phantom agent orbs, a dead Hook Bus panel and a pressure-blind swap header",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3627",
+      "rank": 417,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "backlog-auto-trigger throws on startup in a directory with no backlog, breaking a plain npx run",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2280",
-      "rank": 435,
+      "rank": 418,
       "size": "M",
       "importance": "medium",
       "score": 57,
@@ -6694,7 +6480,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2197",
-      "rank": 436,
+      "rank": 419,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6706,7 +6492,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2186",
-      "rank": 437,
+      "rank": 420,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6718,7 +6504,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2069",
-      "rank": 438,
+      "rank": 421,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6730,7 +6516,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1918",
-      "rank": 439,
+      "rank": 422,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6742,7 +6528,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1912",
-      "rank": 440,
+      "rank": 423,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6754,7 +6540,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1846",
-      "rank": 441,
+      "rank": 424,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6766,7 +6552,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1830",
-      "rank": 442,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6778,7 +6564,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1828",
-      "rank": 443,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6790,7 +6576,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1816",
-      "rank": 444,
+      "rank": 427,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6802,7 +6588,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1795",
-      "rank": 445,
+      "rank": 428,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6814,7 +6600,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1774",
-      "rank": 446,
+      "rank": 429,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6826,7 +6612,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1769",
-      "rank": 447,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6838,7 +6624,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1761",
-      "rank": 448,
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6850,7 +6636,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1755",
-      "rank": 449,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6861,8 +6647,70 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2982",
+      "rank": 433,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review convoy never runs a skill's own selftest when sync-sources/skills/** changes",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3121",
+      "rank": 434,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3117"
+      ],
+      "why": "Failed-send outbox never reconciles against the transcript, leaving a doomed Retry twin",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3181",
+      "rank": 435,
+      "size": "L",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Own agent memories in Overdeck: per-repo overdeck-memory orphan branch mirroring overdeck-state",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3307",
+      "rank": 436,
+      "size": "XS",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "commitlint scope-enum is stale, warning on most real commits and training everyone to ignore it",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3530",
+      "rank": 437,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "God View polls on 30s timers in four components, violating its documented event-driven contract",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1740",
-      "rank": 450,
+      "rank": 438,
       "size": "XS",
       "importance": "medium",
       "score": 55,
@@ -6874,7 +6722,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1674",
-      "rank": 451,
+      "rank": 439,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6886,7 +6734,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1673",
-      "rank": 452,
+      "rank": 440,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6898,7 +6746,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1669",
-      "rank": 453,
+      "rank": 441,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6910,7 +6758,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1668",
-      "rank": 454,
+      "rank": 442,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6922,7 +6770,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1627",
-      "rank": 455,
+      "rank": 443,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6934,7 +6782,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1624",
-      "rank": 456,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6945,8 +6793,32 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3036",
+      "rank": 445,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "False '! INPUT' chip on completed strike agents; pane-idle heuristic misreads idle as a question",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3090",
+      "rank": 446,
+      "size": "M",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Simple issue page: narrative feed, surfaced pending question, honest blocked state",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-1572",
-      "rank": 457,
+      "rank": 447,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6958,7 +6830,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1571",
-      "rank": 458,
+      "rank": 448,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6970,7 +6842,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1565",
-      "rank": 459,
+      "rank": 449,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6982,7 +6854,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1530",
-      "rank": 460,
+      "rank": 450,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6994,7 +6866,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1461",
-      "rank": 461,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -7006,7 +6878,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1449",
-      "rank": 462,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -7018,7 +6890,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1446",
-      "rank": 463,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -7030,7 +6902,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1445",
-      "rank": 464,
+      "rank": 454,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -7041,8 +6913,32 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3131",
+      "rank": 455,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "xBRIEF planRef sharding: planning-side authoring plus pipeline-wide consumption for huge plans",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3616",
+      "rank": 456,
+      "size": "XS",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Planned deploy restarts show the generic Reconnecting banner; use the lifecycle signal for calm copy",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1444",
-      "rank": 465,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7054,7 +6950,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1440",
-      "rank": 466,
+      "rank": 458,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7066,7 +6962,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1438",
-      "rank": 467,
+      "rank": 459,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7078,7 +6974,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1433",
-      "rank": 468,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7090,7 +6986,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1416",
-      "rank": 469,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7102,7 +6998,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1392",
-      "rank": 470,
+      "rank": 462,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7114,7 +7010,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1386",
-      "rank": 471,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7126,7 +7022,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1330",
-      "rank": 472,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7138,7 +7034,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1245",
-      "rank": 473,
+      "rank": 465,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7150,7 +7046,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1244",
-      "rank": 474,
+      "rank": 466,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7162,7 +7058,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1240",
-      "rank": 475,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7174,7 +7070,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1227",
-      "rank": 476,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7186,7 +7082,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1226",
-      "rank": 477,
+      "rank": 469,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -7198,7 +7094,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1173",
-      "rank": 478,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7210,7 +7106,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1154",
-      "rank": 479,
+      "rank": 471,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7221,8 +7117,32 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3016",
+      "rank": 472,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "URL-address every view so refresh, bookmark and share return to the same spot",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3290",
+      "rank": 473,
+      "size": "XS",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "xBRIEF items can carry empty metadata.traces, so docs items are invisible to requirement traceability",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1150",
-      "rank": 480,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7234,7 +7154,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1149",
-      "rank": 481,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7246,7 +7166,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1130",
-      "rank": 482,
+      "rank": 476,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7258,7 +7178,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1129",
-      "rank": 483,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7269,56 +7189,8 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-3469",
-      "rank": 484,
-      "size": "S",
-      "importance": "low",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Migrate NewProjectModal to a full page under the page-not-modal doctrine",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3335",
-      "rank": 485,
-      "size": "XS",
-      "importance": "low",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Click a pasted conversation image to open it full size in a popup",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3558",
-      "rank": 486,
-      "size": "XS",
-      "importance": "low",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Subagent rail: show the provider logo and model on each agent row",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3333",
-      "rank": 487,
-      "size": "S",
-      "importance": "low",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Relative plan-drain indicator on model pickers — show which sibling model burns subscription quota fastest",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1128",
-      "rank": 488,
+      "rank": 478,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7330,7 +7202,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1113",
-      "rank": 489,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7342,7 +7214,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1068",
-      "rank": 490,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7354,7 +7226,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1027",
-      "rank": 491,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7366,7 +7238,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-933",
-      "rank": 492,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7378,7 +7250,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-932",
-      "rank": 493,
+      "rank": 483,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7390,7 +7262,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-927",
-      "rank": 494,
+      "rank": 484,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7402,7 +7274,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-900",
-      "rank": 495,
+      "rank": 485,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7414,7 +7286,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-886",
-      "rank": 496,
+      "rank": 486,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7426,7 +7298,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-778",
-      "rank": 497,
+      "rank": 487,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7438,7 +7310,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-727",
-      "rank": 498,
+      "rank": 488,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7450,7 +7322,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-681",
-      "rank": 499,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7461,8 +7333,58 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2977",
+      "rank": 490,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2976"
+      ],
+      "why": "ACP setup UI: detect installed CLIs, show auth status, guide login from Settings",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3054",
+      "rank": 491,
+      "size": "L",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Benchmark matrix: run one template issue under N configurations and compare cost, time and outcome",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3132",
+      "rank": 492,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopt xBRIEF v0.9 agentic dispatch fields end-to-end so per-item routing is a contract",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3354",
+      "rank": 493,
+      "size": "XS",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Archiving the main workspace hides the singleton row with no dashboard recovery path",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-538",
-      "rank": 500,
+      "rank": 494,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7474,7 +7396,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-334",
-      "rank": 501,
+      "rank": 495,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7486,7 +7408,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-324",
-      "rank": 502,
+      "rank": 496,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -7498,7 +7420,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-304",
-      "rank": 503,
+      "rank": 497,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7510,7 +7432,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-247",
-      "rank": 504,
+      "rank": 498,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7522,7 +7444,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-245",
-      "rank": 505,
+      "rank": 499,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7534,7 +7456,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-244",
-      "rank": 506,
+      "rank": 500,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7546,7 +7468,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-178",
-      "rank": 507,
+      "rank": 501,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7558,7 +7480,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-113",
-      "rank": 508,
+      "rank": 502,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7570,7 +7492,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-49",
-      "rank": 509,
+      "rank": 503,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -7582,7 +7504,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1951",
-      "rank": 510,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7594,7 +7516,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1164",
-      "rank": 511,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7606,7 +7528,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1041",
-      "rank": 512,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7618,7 +7540,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-924",
-      "rank": 513,
+      "rank": 507,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7629,8 +7551,44 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
+      "issue": "PAN-2981",
+      "rank": 508,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Ctrl-K palette opens deleted sessions: search index never prunes, 404 on click",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-3157",
+      "rank": 509,
+      "size": "XS",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Awareness feed renders the Flywheel as a generic empty chat row instead of run activity",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3333",
+      "rank": 510,
+      "size": "M",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Model pickers show $/1M, which answers the wrong question under a subscription; show relative plan drain",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-863",
-      "rank": 514,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7642,7 +7600,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-817",
-      "rank": 515,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7654,7 +7612,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-802",
-      "rank": 516,
+      "rank": 513,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7666,7 +7624,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-713",
-      "rank": 517,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7678,7 +7636,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-700",
-      "rank": 518,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7690,7 +7648,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-646",
-      "rank": 519,
+      "rank": 516,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7702,7 +7660,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-532",
-      "rank": 520,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7714,7 +7672,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2896",
-      "rank": 521,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7726,7 +7684,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2685",
-      "rank": 522,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7738,7 +7696,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2626",
-      "rank": 523,
+      "rank": 520,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7750,7 +7708,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2625",
-      "rank": 524,
+      "rank": 521,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7762,7 +7720,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2609",
-      "rank": 525,
+      "rank": 522,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7774,7 +7732,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2608",
-      "rank": 526,
+      "rank": 523,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7786,7 +7744,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2582",
-      "rank": 527,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7798,29 +7756,65 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2566",
-      "rank": 528,
+      "rank": 525,
       "size": "L",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
       "dependsOn": [],
       "why": "Traycer parity epic: gap analysis of capabilities Overdeck lacks",
-      "rationale": "Rank held: no material body change; it remains a triage list rather than an implementation plan.",
+      "rationale": "Flagged as an epic container this pass — its body states plainly that it is a triage list, not an implementation plan, and that each pursued gap gets its own child issue. Ranked on the aggregate of the children named so far (PAN-2565, PAN-2608, PAN-2609).",
       "gate": "blocked",
-      "planning": "skip"
+      "planning": "skip",
+      "isEpic": true
     },
     {
       "issue": "PAN-2565",
-      "rank": 529,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
       "dependsOn": [],
       "why": "Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging",
-      "rationale": "Rank held: no material body change since the PRD landed.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-3017",
+      "rank": 527,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Issue-page UAT panel drops the overflow action menu, so a healthy stack has no restart control",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3441",
+      "rank": 528,
+      "size": "L",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "God View 'River': WebGL pipeline visualization fed by the live hook-event stream",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3469",
+      "rank": 529,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Migrate NewProjectModal to a full page under the page-not-modal doctrine",
+      "gate": "auto",
+      "planning": "interactive"
     },
     {
       "issue": "PAN-2558",
@@ -7991,8 +7985,22 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
-      "issue": "PAN-2288",
+      "issue": "PAN-3058",
       "rank": 544,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3054"
+      ],
+      "why": "Standing-crew templates: shipped preset crew configurations selectable from Settings",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2288",
+      "rank": 545,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8004,7 +8012,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2065",
-      "rank": 545,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8016,7 +8024,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2035",
-      "rank": 546,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8028,7 +8036,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2034",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8040,7 +8048,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2033",
-      "rank": 548,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8052,7 +8060,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2032",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8064,7 +8072,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2031",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8076,7 +8084,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2030",
-      "rank": 551,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8088,7 +8096,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2029",
-      "rank": 552,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8100,7 +8108,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2028",
-      "rank": 553,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8112,7 +8120,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2026",
-      "rank": 554,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8124,7 +8132,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2025",
-      "rank": 555,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8136,7 +8144,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2024",
-      "rank": 556,
+      "rank": 557,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8148,7 +8156,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2004",
-      "rank": 557,
+      "rank": 558,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8160,7 +8168,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1995",
-      "rank": 558,
+      "rank": 559,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8171,8 +8179,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "interactive"
     },
     {
+      "issue": "PAN-3011",
+      "rank": 560,
+      "size": "M",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Support poolside Laguna S 2.1 (118B MoE, 1M ctx) local and hosted",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1985",
-      "rank": 559,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8184,7 +8204,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1968",
-      "rank": 560,
+      "rank": 562,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8196,7 +8216,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1967",
-      "rank": 561,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8208,7 +8228,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1965",
-      "rank": 562,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8220,7 +8240,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1937",
-      "rank": 563,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8232,7 +8252,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1926",
-      "rank": 564,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8244,7 +8264,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1916",
-      "rank": 565,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8256,7 +8276,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1854",
-      "rank": 566,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8268,7 +8288,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1853",
-      "rank": 567,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8280,7 +8300,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1852",
-      "rank": 568,
+      "rank": 570,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8292,7 +8312,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1844",
-      "rank": 569,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8304,7 +8324,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1840",
-      "rank": 570,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8316,7 +8336,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1839",
-      "rank": 571,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8328,7 +8348,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1776",
-      "rank": 572,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8339,8 +8359,37 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "skip"
     },
     {
+      "issue": "PAN-2978",
+      "rank": 575,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2976",
+        "PAN-2977"
+      ],
+      "why": "Opt-in auto-install of ACP agent CLIs from the setup UI",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3061",
+      "rank": 576,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3054"
+      ],
+      "why": "Dispatch-topology advisor: mechanical start-vs-swarm recommendation at plan finalize",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1754",
-      "rank": 573,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8352,7 +8401,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1751",
-      "rank": 574,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8364,7 +8413,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1750",
-      "rank": 575,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8376,7 +8425,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1748",
-      "rank": 576,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8388,7 +8437,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1735",
-      "rank": 577,
+      "rank": 581,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8400,7 +8449,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1691",
-      "rank": 578,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8412,7 +8461,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1685",
-      "rank": 579,
+      "rank": 583,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8424,7 +8473,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1676",
-      "rank": 580,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8436,7 +8485,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1667",
-      "rank": 581,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8448,7 +8497,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1657",
-      "rank": 582,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8460,7 +8509,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1656",
-      "rank": 583,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8472,7 +8521,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1655",
-      "rank": 584,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8484,7 +8533,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1654",
-      "rank": 585,
+      "rank": 589,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8496,7 +8545,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1653",
-      "rank": 586,
+      "rank": 590,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8508,7 +8557,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1623",
-      "rank": 587,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8520,7 +8569,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1561",
-      "rank": 588,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8532,7 +8581,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1550",
-      "rank": 589,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8544,7 +8593,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1545",
-      "rank": 590,
+      "rank": 594,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8556,7 +8605,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1542",
-      "rank": 591,
+      "rank": 595,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8568,7 +8617,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1524",
-      "rank": 592,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8580,7 +8629,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1497",
-      "rank": 593,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8592,7 +8641,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1490",
-      "rank": 594,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8604,7 +8653,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1489",
-      "rank": 595,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8616,7 +8665,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1485",
-      "rank": 596,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8628,7 +8677,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1473",
-      "rank": 597,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8640,7 +8689,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1443",
-      "rank": 598,
+      "rank": 602,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8652,7 +8701,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1442",
-      "rank": 599,
+      "rank": 603,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8664,7 +8713,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1437",
-      "rank": 600,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8676,7 +8725,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1432",
-      "rank": 601,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8688,7 +8737,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1223",
-      "rank": 602,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8700,7 +8749,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1165",
-      "rank": 603,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8711,8 +8760,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3558",
+      "rank": 608,
+      "size": "XS",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Subagent rail: show provider logo and model on each agent row",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1151",
-      "rank": 604,
+      "rank": 609,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8724,7 +8785,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1060",
-      "rank": 605,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8736,7 +8797,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1051",
-      "rank": 606,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8748,7 +8809,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1040",
-      "rank": 607,
+      "rank": 612,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8760,7 +8821,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1037",
-      "rank": 608,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8772,7 +8833,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-958",
-      "rank": 609,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8784,7 +8845,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-949",
-      "rank": 610,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8796,7 +8857,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-947",
-      "rank": 611,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8808,7 +8869,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-938",
-      "rank": 612,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8820,7 +8881,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-903",
-      "rank": 613,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8832,7 +8893,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-902",
-      "rank": 614,
+      "rank": 619,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8844,7 +8905,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-901",
-      "rank": 615,
+      "rank": 620,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8856,7 +8917,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-818",
-      "rank": 616,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8868,7 +8929,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-736",
-      "rank": 617,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8880,7 +8941,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-709",
-      "rank": 618,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8891,8 +8952,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3335",
+      "rank": 624,
+      "size": "XS",
+      "importance": "low",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Click a pasted conversation image to open it full size in a popup",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-678",
-      "rank": 619,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8904,7 +8977,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-675",
-      "rank": 620,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8916,7 +8989,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-654",
-      "rank": 621,
+      "rank": 627,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8928,7 +9001,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-649",
-      "rank": 622,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8940,7 +9013,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-637",
-      "rank": 623,
+      "rank": 629,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8952,7 +9025,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-629",
-      "rank": 624,
+      "rank": 630,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8964,7 +9037,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-613",
-      "rank": 625,
+      "rank": 631,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8976,7 +9049,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-607",
-      "rank": 626,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8988,7 +9061,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-606",
-      "rank": 627,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9000,7 +9073,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-548",
-      "rank": 628,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9012,7 +9085,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-546",
-      "rank": 629,
+      "rank": 635,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9024,7 +9097,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-537",
-      "rank": 630,
+      "rank": 636,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9036,7 +9109,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-531",
-      "rank": 631,
+      "rank": 637,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9048,7 +9121,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-452",
-      "rank": 632,
+      "rank": 638,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9060,7 +9133,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-450",
-      "rank": 633,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9069,81 +9142,6 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "why": "Adopt remaining Effect patterns",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3441",
-      "rank": 634,
-      "size": "L",
-      "importance": "low",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "God View \"River\" — WebGL pipeline visualization fed by the live hook-event stream",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2978",
-      "rank": 635,
-      "size": "M",
-      "importance": "low",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Auto-install ACP agent CLIs from the setup UI (opt-in, per-agent install recipes)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3011",
-      "rank": 636,
-      "size": "M",
-      "importance": "low",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1641",
-        "PAN-465"
-      ],
-      "why": "Support poolside Laguna S 2.1 (118B MoE, 1M ctx) — local via Ollama/vLLM, hosted via OpenRouter",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3133",
-      "rank": 637,
-      "size": "S",
-      "importance": "low",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Spike: TRON encoding for prompt-bound xBRIEF payloads",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3443",
-      "rank": 638,
-      "size": "L",
-      "importance": "low",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "God View \"Spectrum Deck\" — Winamp-grade activity visualizer (kimi-code-harness mockup and PRD)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2983",
-      "rank": 639,
-      "size": "M",
-      "importance": "low",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "OKF v3 deferred capabilities: lease-based concurrent write mode and an LLM semantic auditor",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-294",
@@ -9158,8 +9156,22 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
-      "issue": "PAN-293",
+      "issue": "PAN-3443",
       "rank": 641,
+      "size": "L",
+      "importance": "low",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3441"
+      ],
+      "why": "God View 'Spectrum Deck' — a second Winamp-grade visualizer concept with mockup and PRD",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-293",
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9171,7 +9183,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-277",
-      "rank": 642,
+      "rank": 643,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9183,7 +9195,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-258",
-      "rank": 643,
+      "rank": 644,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9195,7 +9207,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-255",
-      "rank": 644,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9207,7 +9219,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-252",
-      "rank": 645,
+      "rank": 646,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9219,7 +9231,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-243",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9231,7 +9243,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-77",
-      "rank": 647,
+      "rank": 648,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9243,7 +9255,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-54",
-      "rank": 648,
+      "rank": 649,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -9255,7 +9267,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-38",
-      "rank": 649,
+      "rank": 650,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9267,7 +9279,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-37",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9279,7 +9291,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1126",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9291,7 +9303,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1066",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9303,7 +9315,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2968",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9315,7 +9327,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2941",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9327,7 +9339,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2936",
-      "rank": 655,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9339,7 +9351,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2922",
-      "rank": 656,
+      "rank": 657,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9351,7 +9363,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2868",
-      "rank": 657,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9363,7 +9375,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2767",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9375,7 +9387,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2679",
-      "rank": 659,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9387,7 +9399,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2662",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9399,7 +9411,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2645",
-      "rank": 661,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9411,7 +9423,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2635",
-      "rank": 662,
+      "rank": 663,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9423,7 +9435,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2630",
-      "rank": 663,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9435,7 +9447,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2629",
-      "rank": 664,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9446,8 +9458,22 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-3133",
+      "rank": 666,
+      "size": "S",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3131"
+      ],
+      "why": "Spike: measure TRON encoding token savings for prompt-bound xBRIEF payloads",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
       "issue": "PAN-2628",
-      "rank": 665,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9459,7 +9485,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2622",
-      "rank": 666,
+      "rank": 668,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9471,7 +9497,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2600",
-      "rank": 667,
+      "rank": 669,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9483,7 +9509,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2533",
-      "rank": 668,
+      "rank": 670,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9495,7 +9521,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2527",
-      "rank": 669,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9507,7 +9533,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2514",
-      "rank": 670,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9519,7 +9545,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2507",
-      "rank": 671,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9531,7 +9557,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2505",
-      "rank": 672,
+      "rank": 674,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9543,7 +9569,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2504",
-      "rank": 673,
+      "rank": 675,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9555,7 +9581,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2449",
-      "rank": 674,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9567,7 +9593,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2424",
-      "rank": 675,
+      "rank": 677,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9579,7 +9605,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2406",
-      "rank": 676,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9591,7 +9617,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2394",
-      "rank": 677,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9603,72 +9629,67 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2356",
-      "rank": 678,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Overdeck Anywhere P3: relay service — outbound-only daemon, GitHub OAuth, push origin, multi-tenant front door",
-      "rationale": "Rank held: metadata-only change; explicitly deferred until multi-machine demand is real.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-2355",
-      "rank": 679,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
-      "rationale": "Rank held: metadata-only change; still blocked behind P0 and P1a.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-2354",
       "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
-      "rationale": "Rank held: metadata-only change; still blocked behind the P0 scope model.",
+      "why": "Overdeck Anywhere P3: relay service",
       "gate": "auto",
       "planning": "skip"
     },
     {
-      "issue": "PAN-2352",
+      "issue": "PAN-2355",
       "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel and Access",
-      "rationale": "Rank held: metadata-only change; still blocked behind the P0 scope model.",
+      "why": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
       "gate": "auto",
       "planning": "skip"
     },
     {
-      "issue": "PAN-2353",
+      "issue": "PAN-2354",
       "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API plus Fly 6PN)",
-      "rationale": "Rank held: metadata-only change; still blocked behind the P0 scope model.",
+      "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-2352",
+      "rank": 683,
+      "size": "M",
+      "importance": "low",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-2353",
+      "rank": 684,
+      "size": "M",
+      "importance": "low",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN)",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-2282",
-      "rank": 683,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9680,7 +9701,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2091",
-      "rank": 684,
+      "rank": 686,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9692,7 +9713,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2085",
-      "rank": 685,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9704,7 +9725,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2084",
-      "rank": 686,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9716,7 +9737,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2083",
-      "rank": 687,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9728,7 +9749,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2082",
-      "rank": 688,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9740,7 +9761,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2074",
-      "rank": 689,
+      "rank": 691,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9752,7 +9773,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2046",
-      "rank": 690,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9764,7 +9785,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2006",
-      "rank": 691,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9776,7 +9797,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2005",
-      "rank": 692,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9788,7 +9809,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2002",
-      "rank": 693,
+      "rank": 695,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9800,7 +9821,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1999",
-      "rank": 694,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9812,7 +9833,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1986",
-      "rank": 695,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9824,7 +9845,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1983",
-      "rank": 696,
+      "rank": 698,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9836,7 +9857,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1980",
-      "rank": 697,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9848,7 +9869,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1958",
-      "rank": 698,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9860,7 +9881,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1949",
-      "rank": 699,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9872,7 +9893,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1914",
-      "rank": 700,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9884,7 +9905,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1907",
-      "rank": 701,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9896,7 +9917,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1895",
-      "rank": 702,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9908,7 +9929,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1878",
-      "rank": 703,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9920,7 +9941,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1782",
-      "rank": 704,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9932,7 +9953,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1773",
-      "rank": 705,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9944,7 +9965,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1758",
-      "rank": 706,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9956,7 +9977,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1646",
-      "rank": 707,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9968,7 +9989,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1643",
-      "rank": 708,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9980,7 +10001,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1641",
-      "rank": 709,
+      "rank": 711,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9992,7 +10013,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1592",
-      "rank": 710,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10004,7 +10025,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1581",
-      "rank": 711,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10016,7 +10037,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1552",
-      "rank": 712,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10028,7 +10049,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1533",
-      "rank": 713,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10040,7 +10061,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1483",
-      "rank": 714,
+      "rank": 716,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -10052,7 +10073,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1482",
-      "rank": 715,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10064,7 +10085,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1481",
-      "rank": 716,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10075,8 +10096,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "planning": "auto"
     },
     {
+      "issue": "PAN-2983",
+      "rank": 719,
+      "size": "M",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "OKF v3 deferrals (lease writes, LLM auditor) — explicitly gated on proven contention",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1356",
-      "rank": 717,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10088,7 +10121,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1242",
-      "rank": 718,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10100,7 +10133,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1222",
-      "rank": 719,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10112,7 +10145,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1208",
-      "rank": 720,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10124,7 +10157,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1166",
-      "rank": 721,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10136,7 +10169,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1153",
-      "rank": 722,
+      "rank": 725,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10148,7 +10181,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1152",
-      "rank": 723,
+      "rank": 726,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -10160,7 +10193,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1136",
-      "rank": 724,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10172,7 +10205,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1135",
-      "rank": 725,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10184,7 +10217,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1133",
-      "rank": 726,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10196,7 +10229,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1124",
-      "rank": 727,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10208,7 +10241,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1123",
-      "rank": 728,
+      "rank": 731,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10220,7 +10253,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1121",
-      "rank": 729,
+      "rank": 732,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10232,7 +10265,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1117",
-      "rank": 730,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10244,7 +10277,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1116",
-      "rank": 731,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10256,7 +10289,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1065",
-      "rank": 732,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10268,7 +10301,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1064",
-      "rank": 733,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10280,7 +10313,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1063",
-      "rank": 734,
+      "rank": 737,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10292,7 +10325,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1049",
-      "rank": 735,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10304,7 +10337,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-984",
-      "rank": 736,
+      "rank": 739,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10316,7 +10349,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-962",
-      "rank": 737,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10328,7 +10361,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-961",
-      "rank": 738,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10340,7 +10373,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-944",
-      "rank": 739,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10352,7 +10385,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-943",
-      "rank": 740,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10364,7 +10397,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-908",
-      "rank": 741,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10376,7 +10409,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-898",
-      "rank": 742,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10388,7 +10421,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-853",
-      "rank": 743,
+      "rank": 746,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10400,7 +10433,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-833",
-      "rank": 744,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10412,7 +10445,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-832",
-      "rank": 745,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10424,7 +10457,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-810",
-      "rank": 746,
+      "rank": 749,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10436,7 +10469,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-797",
-      "rank": 747,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10448,7 +10481,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-793",
-      "rank": 748,
+      "rank": 751,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10460,7 +10493,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-791",
-      "rank": 749,
+      "rank": 752,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10472,7 +10505,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-790",
-      "rank": 750,
+      "rank": 753,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10484,7 +10517,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-786",
-      "rank": 751,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10496,7 +10529,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-777",
-      "rank": 752,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10508,7 +10541,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-775",
-      "rank": 753,
+      "rank": 756,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10520,7 +10553,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-774",
-      "rank": 754,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10532,7 +10565,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-773",
-      "rank": 755,
+      "rank": 758,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10544,7 +10577,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-772",
-      "rank": 756,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10556,7 +10589,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-771",
-      "rank": 757,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10568,7 +10601,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-769",
-      "rank": 758,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10580,7 +10613,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-765",
-      "rank": 759,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10592,7 +10625,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-764",
-      "rank": 760,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10604,7 +10637,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-762",
-      "rank": 761,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10616,7 +10649,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-752",
-      "rank": 762,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10628,7 +10661,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-751",
-      "rank": 763,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10640,7 +10673,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-750",
-      "rank": 764,
+      "rank": 767,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10652,7 +10685,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-749",
-      "rank": 765,
+      "rank": 768,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10664,7 +10697,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-747",
-      "rank": 766,
+      "rank": 769,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10676,7 +10709,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-743",
-      "rank": 767,
+      "rank": 770,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10688,7 +10721,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-738",
-      "rank": 768,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10700,7 +10733,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-735",
-      "rank": 769,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10712,7 +10745,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-730",
-      "rank": 770,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10724,7 +10757,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-702",
-      "rank": 771,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10736,7 +10769,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-701",
-      "rank": 772,
+      "rank": 775,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10748,7 +10781,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-663",
-      "rank": 773,
+      "rank": 776,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10760,7 +10793,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-660",
-      "rank": 774,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10772,7 +10805,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-658",
-      "rank": 775,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10784,7 +10817,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-624",
-      "rank": 776,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10796,7 +10829,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-623",
-      "rank": 777,
+      "rank": 780,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10808,7 +10841,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-622",
-      "rank": 778,
+      "rank": 781,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10820,7 +10853,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-604",
-      "rank": 779,
+      "rank": 782,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10832,7 +10865,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-603",
-      "rank": 780,
+      "rank": 783,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10844,7 +10877,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-591",
-      "rank": 781,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10856,7 +10889,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-589",
-      "rank": 782,
+      "rank": 785,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10868,7 +10901,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-576",
-      "rank": 783,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10880,7 +10913,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-571",
-      "rank": 784,
+      "rank": 787,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10892,7 +10925,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-568",
-      "rank": 785,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10904,7 +10937,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-565",
-      "rank": 786,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10916,7 +10949,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-564",
-      "rank": 787,
+      "rank": 790,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10928,7 +10961,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-554",
-      "rank": 788,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10940,7 +10973,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-543",
-      "rank": 789,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10952,7 +10985,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-483",
-      "rank": 790,
+      "rank": 793,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10964,7 +10997,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-480",
-      "rank": 791,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10976,7 +11009,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-476",
-      "rank": 792,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10988,7 +11021,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-468",
-      "rank": 793,
+      "rank": 796,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11000,7 +11033,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-461",
-      "rank": 794,
+      "rank": 797,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11012,7 +11045,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-459",
-      "rank": 795,
+      "rank": 798,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11024,7 +11057,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-407",
-      "rank": 796,
+      "rank": 799,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -11036,7 +11069,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-299",
-      "rank": 797,
+      "rank": 800,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11048,7 +11081,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-298",
-      "rank": 798,
+      "rank": 801,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11060,7 +11093,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-297",
-      "rank": 799,
+      "rank": 802,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11072,7 +11105,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-283",
-      "rank": 800,
+      "rank": 803,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11084,7 +11117,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-271",
-      "rank": 801,
+      "rank": 804,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11096,7 +11129,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-265",
-      "rank": 802,
+      "rank": 805,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11108,7 +11141,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-249",
-      "rank": 803,
+      "rank": 806,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11120,7 +11153,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-241",
-      "rank": 804,
+      "rank": 807,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -11132,7 +11165,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-228",
-      "rank": 805,
+      "rank": 808,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11144,7 +11177,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-227",
-      "rank": 806,
+      "rank": 809,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11156,7 +11189,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-198",
-      "rank": 807,
+      "rank": 810,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11168,7 +11201,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-190",
-      "rank": 808,
+      "rank": 811,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11180,7 +11213,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-180",
-      "rank": 809,
+      "rank": 812,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11192,7 +11225,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-177",
-      "rank": 810,
+      "rank": 813,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11204,7 +11237,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-175",
-      "rank": 811,
+      "rank": 814,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11216,7 +11249,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-155",
-      "rank": 812,
+      "rank": 815,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11228,7 +11261,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-146",
-      "rank": 813,
+      "rank": 816,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11240,7 +11273,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-55",
-      "rank": 814,
+      "rank": 817,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11252,7 +11285,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-52",
-      "rank": 815,
+      "rank": 818,
       "size": "XS",
       "importance": "low",
       "score": 11,
@@ -11264,7 +11297,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-51",
-      "rank": 816,
+      "rank": 819,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11276,7 +11309,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-47",
-      "rank": 817,
+      "rank": 820,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11288,7 +11321,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-44",
-      "rank": 818,
+      "rank": 821,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11300,7 +11333,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-43",
-      "rank": 819,
+      "rank": 822,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11312,7 +11345,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2348",
-      "rank": 820,
+      "rank": 823,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11324,7 +11357,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2347",
-      "rank": 821,
+      "rank": 824,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11336,7 +11369,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2346",
-      "rank": 822,
+      "rank": 825,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11348,7 +11381,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2345",
-      "rank": 823,
+      "rank": 826,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11360,7 +11393,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2344",
-      "rank": 824,
+      "rank": 827,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11372,7 +11405,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2343",
-      "rank": 825,
+      "rank": 828,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11384,7 +11417,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2073",
-      "rank": 826,
+      "rank": 829,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11396,7 +11429,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2071",
-      "rank": 827,
+      "rank": 830,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11408,7 +11441,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2070",
-      "rank": 828,
+      "rank": 831,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11420,7 +11453,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2068",
-      "rank": 829,
+      "rank": 832,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11432,7 +11465,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2067",
-      "rank": 830,
+      "rank": 833,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11444,7 +11477,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1684",
-      "rank": 831,
+      "rank": 834,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11456,7 +11489,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1683",
-      "rank": 832,
+      "rank": 835,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11468,7 +11501,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1474",
-      "rank": 833,
+      "rank": 836,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11480,7 +11513,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-1469",
-      "rank": 834,
+      "rank": 837,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11492,7 +11525,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-674",
-      "rank": 835,
+      "rank": 838,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11504,7 +11537,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-634",
-      "rank": 836,
+      "rank": 839,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11516,7 +11549,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-633",
-      "rank": 837,
+      "rank": 840,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11528,7 +11561,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "issue": "PAN-2908",
-      "rank": 838,
+      "rank": 841,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11540,6 +11573,20 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     }
   ],
   "edges": [
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2077",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2078",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
     {
       "from": "PAN-2075",
       "to": "PAN-2079",
@@ -11556,14 +11603,21 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "from": "PAN-2075",
-      "to": "PAN-2078",
+      "to": "PAN-1775",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
       "from": "PAN-2075",
-      "to": "PAN-2077",
+      "to": "PAN-454",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-1436",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -11584,13 +11638,6 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "from": "PAN-2642",
-      "to": "PAN-570",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2642",
       "to": "PAN-1042",
       "type": "contains",
       "source": "github-ref",
@@ -11598,7 +11645,7 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
     },
     {
       "from": "PAN-2642",
-      "to": "PAN-2079",
+      "to": "PAN-570",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -11611,60 +11658,18 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "confidence": 1
     },
     {
-      "from": "PAN-3517",
-      "to": "PAN-3518",
-      "type": "unblocks",
+      "from": "PAN-2642",
+      "to": "PAN-2079",
+      "type": "contains",
       "source": "github-ref",
-      "confidence": 0.95
+      "confidence": 1
     },
     {
-      "from": "PAN-1166",
-      "to": "PAN-2351",
-      "type": "unblocks",
+      "from": "PAN-1666",
+      "to": "PAN-1556",
+      "type": "contains",
       "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-1641",
-      "to": "PAN-3011",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-465",
-      "to": "PAN-3011",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-1592",
-      "to": "PAN-2083",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-43",
-      "to": "PAN-2075",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-1775",
-      "to": "PAN-2075",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-43",
-      "to": "PAN-2080",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
+      "confidence": 1
     },
     {
       "from": "PAN-1775",
@@ -11674,459 +11679,641 @@ Transient backpressure is recorded as a terminal condition, so planned issues ac
       "confidence": 0.95
     },
     {
-      "from": "PAN-1983",
-      "to": "PAN-1984",
+      "from": "PAN-2077",
+      "to": "PAN-2078",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
     },
     {
-      "from": "PAN-751",
-      "to": "PAN-750",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-622",
-      "to": "PAN-624",
+      "from": "PAN-2077",
+      "to": "PAN-2079",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
     },
     {
-      "from": "PAN-622",
-      "to": "PAN-623",
+      "from": "PAN-2079",
+      "to": "PAN-2080",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
     },
     {
-      "from": "PAN-3566",
-      "to": "PAN-2706",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
+      "from": "PAN-2077",
+      "to": "PAN-454",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
-      "from": "PAN-3566",
-      "to": "PAN-3274",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "from": "PAN-2466",
+      "to": "PAN-1868",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
-      "from": "PAN-3566",
-      "to": "PAN-3563",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
+      "from": "PAN-2642",
+      "to": "PAN-570",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
       "from": "PAN-2828",
-      "to": "PAN-2995",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
+      "to": "PAN-2874",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
       "from": "PAN-2828",
-      "to": "PAN-3047",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "to": "PAN-2883",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
-      "from": "PAN-3250",
-      "to": "PAN-3062",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
+      "from": "PAN-2742",
+      "to": "PAN-2746",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
-      "from": "PAN-3062",
-      "to": "PAN-3505",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
+      "from": "PAN-2695",
+      "to": "PAN-2746",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     },
     {
-      "from": "PAN-3062",
-      "to": "PAN-3284",
+      "from": "PAN-2337",
+      "to": "PAN-2932",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2337",
+      "to": "PAN-2422",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2337",
+      "to": "PAN-2957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1936",
+      "to": "PAN-2008",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1936",
+      "to": "PAN-1988",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1936",
+      "to": "PAN-1910",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2259",
+      "to": "PAN-2880",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2846",
+      "to": "PAN-2888",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2331",
+      "to": "PAN-2639",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2189",
+      "to": "PAN-2190",
       "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-1936",
+      "to": "PAN-1988",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2905",
+      "to": "PAN-2259",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2642",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2351",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2352",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2353",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2354",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2355",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2356",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-3513",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2565",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2608",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2609",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3301",
+      "to": "PAN-3631",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-3100",
-      "to": "PAN-3104",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-1824",
-      "to": "PAN-3520",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-1824",
-      "to": "PAN-2421",
-      "type": "informs",
+      "from": "PAN-3314",
+      "to": "PAN-3539",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-1824",
-      "to": "PAN-3243",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3532",
-      "to": "PAN-3502",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-1711",
+      "from": "PAN-3344",
       "to": "PAN-3492",
-      "type": "informs",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-1711",
-      "to": "PAN-3522",
-      "type": "informs",
+      "from": "PAN-3629",
+      "to": "PAN-3630",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-1711",
-      "to": "PAN-3560",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.65
-    },
-    {
-      "from": "PAN-3282",
-      "to": "PAN-3283",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3084",
-      "to": "PAN-3397",
-      "type": "informs",
+      "from": "PAN-3344",
+      "to": "PAN-3520",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
       "from": "PAN-3561",
       "to": "PAN-3564",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3424",
-      "to": "PAN-3651",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3424",
-      "to": "PAN-3640",
-      "type": "informs",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-3539",
-      "to": "PAN-3314",
-      "type": "informs",
+      "from": "PAN-3424",
+      "to": "PAN-3651",
+      "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.8
+      "confidence": 0.7
     },
     {
-      "from": "PAN-3429",
-      "to": "PAN-3344",
-      "type": "informs",
+      "from": "PAN-3244",
+      "to": "PAN-3248",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
       "from": "PAN-3344",
-      "to": "PAN-3533",
-      "type": "informs",
+      "to": "PAN-3429",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-3306",
-      "to": "PAN-3317",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3224",
-      "to": "PAN-3439",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3504",
-      "to": "PAN-3499",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-3270",
-      "to": "PAN-3325",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3270",
-      "to": "PAN-3633",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3308",
-      "to": "PAN-3322",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-2980",
-      "to": "PAN-3308",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3248",
-      "to": "PAN-3244",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3205",
-      "to": "PAN-3569",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-3113",
-      "to": "PAN-3235",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3234",
-      "to": "PAN-3113",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-2492",
-      "to": "PAN-3113",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3517",
-      "to": "PAN-3454",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3517",
-      "to": "PAN-3518",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-3631",
-      "to": "PAN-3301",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3631",
-      "to": "PAN-3498",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.65
-    },
-    {
-      "from": "PAN-3289",
-      "to": "PAN-3627",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3040",
-      "to": "PAN-3306",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3256",
-      "to": "PAN-3267",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3186",
-      "to": "PAN-3167",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.65
-    },
-    {
-      "from": "PAN-2954",
-      "to": "PAN-3657",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3032",
-      "to": "PAN-3174",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3176",
-      "to": "PAN-3179",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3106",
-      "to": "PAN-3175",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-2976",
-      "to": "PAN-2977",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-2976",
-      "to": "PAN-2978",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-2351",
-      "to": "PAN-3513",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3196",
-      "to": "PAN-3570",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3196",
-      "to": "PAN-3210",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3168",
-      "to": "PAN-3188",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3103",
-      "to": "PAN-3171",
-      "type": "informs",
+      "from": "PAN-3541",
+      "to": "PAN-3543",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
       "from": "PAN-3560",
       "to": "PAN-3563",
-      "type": "informs",
+      "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.75
+      "confidence": 0.7
     },
     {
-      "from": "PAN-3236",
-      "to": "PAN-3257",
-      "type": "informs",
+      "from": "PAN-3344",
+      "to": "PAN-3522",
+      "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.75
+      "confidence": 0.7
     },
     {
-      "from": "PAN-3543",
-      "to": "PAN-3541",
-      "type": "informs",
+      "from": "PAN-3563",
+      "to": "PAN-3565",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3653",
+      "to": "PAN-3654",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3100",
+      "to": "PAN-3104",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3517",
+      "to": "PAN-3454",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3504",
+      "to": "PAN-3499",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3062",
+      "to": "PAN-3505",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
       "from": "PAN-3555",
       "to": "PAN-3556",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3032",
+      "to": "PAN-3174",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3429",
+      "to": "PAN-3432",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3325",
+      "to": "PAN-3633",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3317",
+      "to": "PAN-3306",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3224",
+      "to": "PAN-3439",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3344",
+      "to": "PAN-3460",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3344",
+      "to": "PAN-3533",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3561",
+      "to": "PAN-3640",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3267",
+      "to": "PAN-3256",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3325",
+      "to": "PAN-3270",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3460",
+      "to": "PAN-3463",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3176",
+      "to": "PAN-3179",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3517",
+      "to": "PAN-3518",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3325",
+      "to": "PAN-3570",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3196",
+      "to": "PAN-3210",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3329",
+      "to": "PAN-3332",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3129",
+      "to": "PAN-3130",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3308",
+      "to": "PAN-3322",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3530",
+      "to": "PAN-3540",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3117",
+      "to": "PAN-3121",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2976",
+      "to": "PAN-2977",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3054",
+      "to": "PAN-3058",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2976",
+      "to": "PAN-2978",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-2977",
+      "to": "PAN-2978",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3054",
+      "to": "PAN-3061",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3441",
+      "to": "PAN-3443",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3131",
+      "to": "PAN-3133",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3566",
+      "to": "PAN-3274",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.65
     },
     {
-      "from": "PAN-3460",
-      "to": "PAN-3463",
+      "from": "PAN-3566",
+      "to": "PAN-2706",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.7
+      "confidence": 0.65
     },
     {
-      "from": "PAN-3463",
-      "to": "PAN-3464",
+      "from": "PAN-3062",
+      "to": "PAN-3250",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.7
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3560",
+      "to": "PAN-3563",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3561",
+      "to": "PAN-3564",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3532",
+      "to": "PAN-3554",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3344",
+      "to": "PAN-3520",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3344",
+      "to": "PAN-3492",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-2874",
+      "to": "PAN-2995",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3301",
+      "to": "PAN-3631",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3113",
+      "to": "PAN-2492",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-3100",
+      "to": "PAN-3104",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
     }
   ]
 }
