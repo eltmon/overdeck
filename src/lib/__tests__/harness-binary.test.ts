@@ -225,12 +225,25 @@ describe('prepareHarnessLaunch', () => {
       'Kimi Code CLI configured executable "/configured/missing-kimi" was not found or is not executable',
     );
   });
+
+  it('returns an actionable Prime Agent error before creating a terminal session', async () => {
+    await expect(prepareHarnessLaunch('prime-agent', {
+      executablePath: '/configured/missing-prime-agent',
+      accessExecutable: executableAccess([]),
+    })).rejects.toThrow(
+      'Prime Agent configured executable "/configured/missing-prime-agent" was not found or is not executable. Fix its configured path, then restart Overdeck. No terminal session was created.',
+    );
+  });
 });
 
 describe('harnessBinaryName', () => {
   it("maps 'kimi-code' to the 'kimi' binary, same as 'acp'", () => {
     expect(harnessBinaryName('kimi-code')).toBe('kimi');
     expect(harnessBinaryName('acp')).toBe('kimi');
+  });
+
+  it("maps 'prime-agent' to the 'prime-agent' binary", () => {
+    expect(harnessBinaryName('prime-agent')).toBe('prime-agent');
   });
 });
 
@@ -248,6 +261,11 @@ describe('configuredHarnessBinaryPath', () => {
   it("still reads config.acp.kimi.binaryPath for 'acp', unaffected by kimiCode", () => {
     configMock.loadConfigSync.mockReturnValueOnce({ config: { acp: { kimi: { binaryPath: '/opt/acp/bin/kimi' } } } });
     expect(configuredHarnessBinaryPath('acp')).toBe('/opt/acp/bin/kimi');
+  });
+
+  it("reads config.primeAgent.binaryPath for 'prime-agent'", () => {
+    configMock.loadConfigSync.mockReturnValueOnce({ config: { primeAgent: { binaryPath: '/opt/prime/bin/prime-agent' } } });
+    expect(configuredHarnessBinaryPath('prime-agent')).toBe('/opt/prime/bin/prime-agent');
   });
 
   it('returns undefined for harnesses with no configured binary path', () => {
