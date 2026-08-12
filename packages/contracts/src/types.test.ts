@@ -15,6 +15,10 @@ describe("getHarness", () => {
     expect(getHarness({ runtime: "kimi-code" })).toBe("kimi-code")
   })
 
+  it("preserves the canonical prime-agent runtime literal", () => {
+    expect(getHarness({ runtime: "prime-agent" })).toBe("prime-agent")
+  })
+
   it("returns the existing target for every legacy harness string", () => {
     expect(getHarness({ runtime: "claude-code" })).toBe("claude-code")
     expect(getHarness({ runtime: "ohmypi" })).toBe("ohmypi")
