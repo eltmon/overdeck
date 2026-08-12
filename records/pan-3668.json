@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T23:56:05.260Z",
+  "updated": "2026-08-12T23:59:40.944Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -58,16 +58,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "doctor-prime-checks": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 207752,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T23:56:05.259Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -178,6 +170,17 @@
         "outcome": "completed",
         "reason": "Added bounded request correlation, strict JSONL writes, asynchronous event routing, command validation, fake-timer timeouts, backpressure limits, write failures, and process-exit rejection.",
         "releasedAt": "2026-08-12T18:10:44.652Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 207752,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T23:56:05.259Z",
+        "itemId": "doctor-prime-checks",
+        "outcome": "completed",
+        "reason": "Added configured-binary prerequisite discovery, named compatible version bounds, RPC capability probing, install guidance, and focused doctor tests; extracted checks to keep the doctor command within its size guard.",
+        "releasedAt": "2026-08-12T23:59:40.943Z"
       }
     ],
     "statusReasons": {
@@ -220,6 +223,10 @@
       "rpc-client": {
         "reason": "Added bounded request correlation, strict JSONL writes, asynchronous event routing, command validation, fake-timer timeouts, backpressure limits, write failures, and process-exit rejection.",
         "updatedAt": "2026-08-12T18:10:44.652Z"
+      },
+      "doctor-prime-checks": {
+        "reason": "Added configured-binary prerequisite discovery, named compatible version bounds, RPC capability probing, install guidance, and focused doctor tests; extracted checks to keep the doctor command within its size guard.",
+        "updatedAt": "2026-08-12T23:59:40.943Z"
       }
     }
   },
@@ -259,6 +266,8 @@
     "rpc-client.ac2": "completed",
     "rpc-client.ac3": "completed",
     "rpc-client.ac4": "completed",
-    "doctor-prime-checks": "running"
+    "doctor-prime-checks": "completed",
+    "doctor-prime-checks.ac1": "completed",
+    "doctor-prime-checks.ac2": "completed"
   }
 }
