@@ -1,0 +1,1788 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-12T17:50:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3668: Add Prime Agent as a managed harness",
+    "updated": "2026-08-12T17:50:33.700Z"
+  },
+  "plan": {
+    "id": "pan-3668",
+    "title": "Add Prime Agent as a managed harness",
+    "status": "proposed",
+    "uid": "218466dd-dd16-459a-be27-a9b263aa30c6",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-12T17:50:00.000Z",
+    "updated": "2026-08-12T17:50:33.700Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3668",
+        "label": "PAN-3668",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3668.md",
+        "label": "Canonical PRD (drafts/pan-3668.md on overdeck-state)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/rpc.md",
+        "label": "Prime Agent RPC protocol",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "harness",
+      "prime-agent",
+      "rpc",
+      "cloister",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Overdeck cannot launch or supervise Prime Agent as a harness. Prime Agent publishes a persistent JSONL RPC mode (prompt, steer, follow_up, abort, get_state, get_messages, get_session_stats) plus durable sessions, but Overdeck has no canonical literal, behavior record, transport, runtime adapter, delivery mapping, transcript adapter, cost projection, context rendering, or dashboard support for it. A shallow integration would leave gaps in delivery, recovery, costs, transcripts, context, and dashboard status.",
+      "Proposal": "Full managed-harness parity per the canonical PRD (drafts/pan-3668.md on overdeck-state): add the prime-agent literal and PRIME_AGENT_BEHAVIOR to contracts; a strict LF-delimited JSONL framing module plus a persistent RPC client (never Node readline — U+2028/U+2029 are valid JSON string content); a registered runtime adapter with verified session resume; work/conversation launch and prompt/steer/follow_up delivery mapping; transcript, cost, health, and dashboard projections; a prime-agent-global.md context artifact injected at spawn without touching ~/.prime/agent; doctor diagnostics and table-driven provider mapping; a mechanical no-loss audit; and full operator documentation. Cloister remains the only lifecycle authority: Prime schedules, heartbeats, autonomous continuation, cross-agent messaging, and retained RLM children are disabled by injected policy and adapter-side rejection, with a conversations-only fallback if the pinned release cannot enforce this.",
+      "NonGoals": "- Training or evaluating models through Prime Intellect Lab or verifiers\n- Installing or managing Prime Intellect GPU compute\n- Importing Prime Agent continual-harness refinements into bundled, machine, project, or workspace context layers\n- Exposing Prime schedules, autonomous mode, or heartbeat scheduling as Overdeck pipeline controls in the first release\n- Treating Prime worker and kernel processes as a security sandbox\n- Registering arbitrary Prime RLM children as first-class Overdeck work agents in the first release\n- Adding a hardcoded default model or changing existing provider-to-harness defaults"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Used the canonical PRD at drafts/pan-3668.md verbatim instead of authoring a new one",
+        "rationale": "The issue comment names it implementation-ready; every code reference in it re-verified against the codebase on 2026-08-12, so rewriting would add risk, not information."
+      },
+      {
+        "summary": "One xBRIEF with plan.metadata.sizeJustification instead of sibling-issue decomposition",
+        "rationale": "The operator scoped this as a single issue with a single PRD; no intermediate slice passes review/test/UAT independently because the acceptance criteria are end-to-end (select, message, observe, stop, recover)."
+      },
+      {
+        "summary": "Split the RPC transport into a pure framing module and a stateful client",
+        "rationale": "Pure LF framing is exhaustively unit-testable without a process, and the split keeps the inspection-worthy stateful client small."
+      },
+      {
+        "summary": "Recorded the conversations-only fallback as a decision/hazard instead of asking the operator",
+        "rationale": "The PRD already prescribes exactly this fallback when the pinned Prime release cannot mechanically disable autonomous features; auto mode must choose documented defaults."
+      },
+      {
+        "summary": "Scheduled the no-loss audit near the end of the DAG",
+        "rationale": "The audit asserts the finished harness-facing surface; landing it early would force it to assert a surface that does not exist yet."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single coherent harness integration scoped by the operator as one issue with one implementation-ready PRD (drafts/pan-3668.md). Every slice depends on the canonical literal/behavior contract and the RPC transport, and the issue acceptance criteria (operator can select, message, observe, stop, and recover a Prime session) only hold end-to-end — intermediate slices such as contracts-only or transport-only ship dead code that cannot pass review/test/UAT on their own.",
+      "canonicalFilename": "2026-08-12-PAN-3668-add-prime-agent-as-a-managed-harness.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contracts-harness-literal",
+        "title": "Add prime-agent to the canonical Harness and RuntimeName unions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/lib/runtimes/types.ts",
+            "packages/contracts/src/types.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run packages/contracts/src/types.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "types.test.ts passes including a prime-agent getHarness round-trip assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'prime-agent' to the Harness union and KNOWN_HARNESSES in packages/contracts/src/types.ts (line 87-89) and to the RuntimeName union in src/lib/runtimes/types.ts (line 44). Extend types.test.ts with a prime-agent case mirroring the existing kimi-code literal test. Do not touch getHarness() fallback logic."
+        },
+        "items": [
+          {
+            "id": "contracts-harness-literal.ac1",
+            "title": "getHarness({ runtime: 'prime-agent' }) returns 'prime-agent' and KNOWN_HARNESSES accepts the literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness-literal.ac2",
+            "title": "RuntimeName in src/lib/runtimes/types.ts accepts 'prime-agent' and npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-behavior-discriminators",
+        "title": "Add Prime discriminator literals to the harness-behavior unions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/harness-behavior.ts (unions at lines 6-24 and 51), add the Prime discriminator literals from the PRD: launch/delivery 'prime-agent-rpc', readiness 'prime-agent-ready', transcript 'prime-agent-jsonl', session-ID source 'prime-agent-session-id', context layer 'prime-agent', feed 'prime_agent', and workAgentMode 'prime-agent-rpc'. Add literals only — the behavior record lands in contracts-prime-behavior-record."
+        },
+        "items": [
+          {
+            "id": "contracts-behavior-discriminators.ac1",
+            "title": "Every harness-behavior discriminator union accepts its Prime literal (prime-agent-rpc, prime-agent-ready, prime-agent-jsonl, prime-agent-session-id, prime-agent, prime_agent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-behavior-discriminators.ac2",
+            "title": "npm run build:contracts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-prime-behavior-record",
+        "title": "Define PRIME_AGENT_BEHAVIOR and register it in the behavior map and lookup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "runtime-adapter",
+            "work-agent-launch",
+            "conversation-launch",
+            "message-delivery",
+            "transcript-adapter-prime",
+            "context-renderer-prime"
+          ],
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run packages/contracts/src"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "contracts tests pass with getHarnessBehavior('prime-agent') returning PRIME_AGENT_BEHAVIOR"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Define PRIME_AGENT_BEHAVIOR in packages/contracts/src/harness-behavior.ts using the new Prime discriminators (executableName 'prime-agent', launchCommandKind/deliveryKind/workAgentMode 'prime-agent-rpc', readinessKind 'prime-agent-ready', transcriptKind 'prime-agent-jsonl', sessionIdSource 'prime-agent-session-id', contextLayerKind 'prime-agent', feedKind 'prime_agent'), following the shape of ACP_BEHAVIOR/KIMI_CODE_BEHAVIOR (lines 136-176). Register it in the HARNESS_BEHAVIORS map (line ~183) and the getHarnessBehavior lookup (line ~190). Never fall back to Claude Code semantics for Prime."
+        },
+        "items": [
+          {
+            "id": "contracts-prime-behavior-record.ac1",
+            "title": "getHarnessBehavior('prime-agent') returns PRIME_AGENT_BEHAVIOR with only Prime discriminator values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-prime-behavior-record.ac2",
+            "title": "HARNESS_BEHAVIORS contains a prime-agent entry and the exhaustive map check accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-prime-behavior-record.ac3",
+            "title": "PRIME_AGENT_BEHAVIOR contains only Prime discriminator literals — no claude-code or ohmypi values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-enumerations",
+        "title": "Add prime-agent to flywheel, artifacts, telemetry, and context-preview enumerations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/artifacts.ts",
+            "packages/contracts/src/telemetry.ts",
+            "packages/contracts/src/context-layers.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run packages/contracts/src/artifacts.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "artifacts.test.ts FR-1 enumeration assertion passes with prime-agent included"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'prime-agent' to FlywheelHarness (packages/contracts/src/flywheel.ts:9), ArtifactAgentHarness (packages/contracts/src/artifacts.ts:15), TELEMETRY_HARNESSES (packages/contracts/src/telemetry.ts:85), and CONTEXT_PREVIEW_HARNESSES (packages/contracts/src/context-layers.ts:5). Keep every existing literal; this is purely additive."
+        },
+        "items": [
+          {
+            "id": "contracts-enumerations.ac1",
+            "title": "FlywheelHarness, ArtifactAgentHarness, TELEMETRY_HARNESSES, and CONTEXT_PREVIEW_HARNESSES each contains 'prime-agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-enumerations.ac2",
+            "title": "Every enumeration preserves its pre-existing harness literals (no-loss)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-harness-flag-help",
+        "title": "Add prime-agent to CLI --harness option help and regenerate the composer manifest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/generate-slash-commands.mjs",
+            "bash scripts/lint-slash-commands.sh"
+          ],
+          "expected_outputs": [
+            "generated composer-commands manifest lists prime-agent in every --harness description",
+            "lint-slash-commands reports no drift"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the --harness option description strings in src/cli/index.ts (currently 'claude-code | pi | codex | acp | kimi-code') to include prime-agent, then run node scripts/generate-slash-commands.mjs to regenerate packages/contracts/src/composer-commands.generated.ts. Verify with scripts/lint-slash-commands.sh."
+        },
+        "items": [
+          {
+            "id": "cli-harness-flag-help.ac1",
+            "title": "pan plan/start/strike --help output shows prime-agent as a harness choice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-harness-flag-help.ac2",
+            "title": "scripts/lint-slash-commands.sh passes with no manifest drift after regeneration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-schema-prime-agent",
+        "title": "Add the prime-agent harness literal and primeAgent section to the config schema",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/config-yaml"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml tests pass with prime-agent accepted and unknown harnesses still rejected"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml/schema.ts, add 'prime-agent' to every configured-harness literal (RoleConfig.harness at line ~382 and any provider harness literal), and add an optional primeAgent config section with binaryPath (absolute path), rpcStartupTimeoutMs, and supportedVersion fields. Do not add any model field or default model to the section. Add or extend schema tests covering acceptance of prime-agent, rejection of unknown literals, and parsing of the primeAgent section."
+        },
+        "items": [
+          {
+            "id": "config-schema-prime-agent.ac1",
+            "title": "Config validation accepts harness: prime-agent in role and provider positions and rejects unknown harness literals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema-prime-agent.ac2",
+            "title": "The primeAgent section parses binaryPath, rpcStartupTimeoutMs, and supportedVersion, and contains no model field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-map",
+        "title": "Add the table-driven Overdeck-to-Prime provider and model mapping module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prime-agent/provider-map.ts",
+            "tests/unit/lib/prime-agent/provider-map.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/provider-map.test.ts"
+          ],
+          "expected_outputs": [
+            "provider-map tests pass for mapped providers, unmapped providers, and missing credentials"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/prime-agent/provider-map.ts: a table-driven mapping from Overdeck provider names to Prime --provider IDs, covering at minimum OpenAI API key, Anthropic API key, Prime Inference API key, and one subscription-auth path. Resolve credentials through the existing provider environment resolver (OPENAI_API_KEY, ANTHROPIC_API_KEY, PRIME_API_KEY, …) or Prime's user-owned ~/.prime/agent/auth.json; never copy credentials into state files or launcher scripts. Unmapped providers or models return a typed unsupported-mapping error — never a fallback model. Tests cover each mapped provider, an unmapped provider, an unsupported model, and a missing-credential error that names what the operator must configure."
+        },
+        "items": [
+          {
+            "id": "provider-map.ac1",
+            "title": "Each documented Overdeck provider maps to an explicit Prime provider ID, and an unmapped provider returns a typed unsupported-mapping error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-map.ac2",
+            "title": "A missing credential produces an error naming the missing variable or auth file and the command to configure it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-map.ac3",
+            "title": "No code path in the module selects a fallback or default model when a mapping is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-binary-resolution",
+        "title": "Resolve the prime-agent executable with actionable missing-binary errors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-binary.ts",
+            "tests/unit/lib/harness-binary.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/harness-binary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "binary resolution tests pass for PATH discovery, configured path, and failure cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/harness-binary.ts, add prime-agent to the runtime-to-executable map (lines 14-20, executable name 'prime-agent'), honor an optional absolute config.primeAgent.binaryPath alongside the existing acp/kimi-code configured-path branches (lines 152-153), and add the display-name branch (lines 184-190). Missing or non-executable binaries must produce the existing actionable error format before any terminal session is created. Add tests for PATH discovery, configured path, and both failure modes. If tests/unit/lib/harness-binary.test.ts does not exist, create it or extend the existing binary-resolution test file."
+        },
+        "items": [
+          {
+            "id": "harness-binary-resolution.ac1",
+            "title": "Resolving the prime-agent runtime returns a prime-agent executable from PATH or the configured absolute binaryPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-binary-resolution.ac2",
+            "title": "A missing or non-executable binary produces a standalone actionable error and no terminal session is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-prime-checks",
+        "title": "Add Prime Agent doctor checks for binary, version, RPC capability, and credentials",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/doctor"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor tests pass for missing binary, unsupported version, and missing credential cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-14",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a checkPrimeAgent function to src/cli/commands/doctor.ts following the checkKimi/checkOhmypi pattern (lines 50-129): resolve the binary via harness-binary, verify the version falls inside a named supported-range constant tied to the protocol tests (never 'latest'), probe RPC capability, and report missing provider credentials. Each failure returns a standalone actionable message. The supported range constant must live in one named export the protocol tests import. Follow the doctor-hooks-drift.ts split-out module pattern if doctor.ts size requires it."
+        },
+        "items": [
+          {
+            "id": "doctor-prime-checks.ac1",
+            "title": "pan doctor accepts the pinned compatible Prime release and rejects an out-of-range version with a message naming the supported range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-prime-checks.ac2",
+            "title": "pan doctor returns standalone errors for a missing binary, a bad configured path, and a missing provider credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-framing",
+        "title": "Implement strict LF-delimited JSONL framing for the Prime RPC protocol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prime-agent/jsonl-framing.ts",
+            "tests/unit/lib/prime-agent/jsonl-framing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/jsonl-framing.test.ts"
+          ],
+          "expected_outputs": [
+            "framing tests pass for U+2028/U+2029 payloads, CRLF, split records, combined records, oversized records, and malformed JSON"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/prime-agent/jsonl-framing.ts as a pure, incremental byte-buffer framing module: split only on LF (never Node readline — Prime documents U+2028/U+2029 as valid JSON string content), strip one trailing CR before JSON.parse, reject records over a named size bound with a typed error, and isolate malformed JSON to a per-record error without killing the stream. Expose a push(chunk) → records/errors API. Tests must cover U+2028 and U+2029 inside JSON strings, CRLF input, records split across chunks, multiple records in one chunk, oversized records, and malformed JSON."
+        },
+        "items": [
+          {
+            "id": "rpc-framing.ac1",
+            "title": "The framer preserves U+2028 and U+2029 inside JSON strings and returns the record intact as one record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-framing.ac2",
+            "title": "Records split across chunks and multiple records in one chunk both produce exactly the original records, and CRLF input strips exactly one trailing CR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-framing.ac3",
+            "title": "An oversized record is rejected with a typed error and a malformed JSON record yields a per-record error while later records still parse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-client",
+        "title": "Implement the persistent Prime RPC client: spawn, correlation, events, timeouts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "runtime-adapter",
+            "session-resume-recovery",
+            "message-delivery",
+            "cost-usage-mapping"
+          ],
+          "files_scope": [
+            "src/lib/prime-agent/rpc-client.ts",
+            "tests/unit/lib/prime-agent/rpc-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/rpc-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rpc-client tests pass using fake timers for startup and command timeouts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Touches only new files under src/lib/prime-agent/ and tests/unit/lib/prime-agent/; no other item shares them."
+        },
+        "narrative": {
+          "Action": "Create src/lib/prime-agent/rpc-client.ts on top of jsonl-framing: spawn prime-agent --mode rpc with argument arrays (never shell interpolation), assign request IDs and correlate responses by id, publish asynchronous events on a separate subscription channel, bound the pending-request map and the event queue, reject all pending calls when the process exits, capture bounded stderr for standalone startup errors, and implement startup and command timeouts. Async primitives only — no execSync anywhere in the module. Tests use vi.useFakeTimers() for startup timeout, command timeout, delayed response, and abort; plus process exit, malformed record, and backpressure cases with a fake child process."
+        },
+        "items": [
+          {
+            "id": "rpc-client.ac1",
+            "title": "The client correlates requests by id: each response resolves only its own pending promise, and events arrive on a separate channel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac2",
+            "title": "When the child process exits, every pending request rejects with a process-exit error and bounded stderr content is attached to startup failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac3",
+            "title": "Startup and command timeouts fire under vi.useFakeTimers() without real waits, and the client rejects requests beyond the named pending-map and queue bounds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-client.ac4",
+            "title": "The module spawns with an argument array and contains no execSync or shell-interpolated command strings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-adapter",
+        "title": "Add the Prime runtime adapter and register it in the global runtime registry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/prime-agent.ts",
+            "src/lib/runtimes/index.ts",
+            "src/lib/runtimes/__tests__/prime-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/prime-agent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prime-agent runtime tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-9",
+            "FR-10",
+            "FR-12",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Its new adapter file and __tests__ entry are exclusive; runtimes/index.ts is touched by no other item."
+        },
+        "narrative": {
+          "Action": "Create src/lib/runtimes/prime-agent.ts implementing AgentRuntimeSync over the RPC client, following the ohmypi.ts adapter shape (getHarnessBehavior, getSessionPath, getLastActivity, getHeartbeat, getTokenUsage, getSessionCost, listSessions, sendMessage, killAgent, spawnAgent, isRunning). Heartbeat uses live RPC events while attached, the durable session JSONL mtime while detached, and leaves the existing git fallback as the low-confidence last resort. Register createPrimeAgentRuntimeSync() in src/lib/runtimes/index.ts beside the other register calls (lines 140-144) so persisted 'prime-agent' state routes explicitly. Persist only the Prime session ID and canonical session path through the existing agent/conversation state fields."
+        },
+        "items": [
+          {
+            "id": "runtime-adapter.ac1",
+            "title": "The global runtime registry returns the Prime adapter for persisted prime-agent agent state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-adapter.ac2",
+            "title": "getHeartbeat returns RPC-event-derived activity while the client is live and session-file mtime while detached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-adapter.ac3",
+            "title": "getSessionPath returns the recorded Prime session JSONL path and killAgent aborts generation before terminating the process tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-resume-recovery",
+        "title": "Resume Prime sessions by verified session ID and fail loudly on mismatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prime-agent/session-resume.ts",
+            "tests/unit/lib/prime-agent/session-resume.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/session-resume.test.ts"
+          ],
+          "expected_outputs": [
+            "session-resume tests pass for happy-path resume, missing session file, and mismatched session ID"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ],
+          "parallelSafeReason": "New module and test file only; runtime wiring is a one-line call inside the already-serialized adapter."
+        },
+        "narrative": {
+          "Action": "Create src/lib/prime-agent/session-resume.ts (wired into the Prime runtime adapter): on resume, verify the persisted session file path exists, start the RPC client with the pinned release's supported resume argument, call get_state, and compare the returned session ID to the persisted one. On a missing path or mismatched ID, stop the process and return a standalone recovery error — never silently start a fresh session. Tests cover the happy path, missing file, mismatched ID, and process exit during resume."
+        },
+        "items": [
+          {
+            "id": "session-resume-recovery.ac1",
+            "title": "A stopped managed session resumes with the same Prime session ID that get_state returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-resume-recovery.ac2",
+            "title": "A missing session file or mismatched session ID stops the new process and returns a standalone recovery error without creating a fresh session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "managed-session-policy",
+        "title": "Enforce the managed-session policy that keeps Cloister the lifecycle authority",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "work-agent-launch",
+            "conversation-launch"
+          ],
+          "files_scope": [
+            "src/lib/prime-agent/policy.ts",
+            "tests/unit/lib/prime-agent/policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/policy.test.ts"
+          ],
+          "expected_outputs": [
+            "policy tests pass for injected policy content and rejected RPC management commands"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-17",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New module and test file only; injection wiring lands in downstream items via blocks edges."
+        },
+        "narrative": {
+          "Action": "Create src/lib/prime-agent/policy.ts: the supplemental system instruction injected at session creation that defines Overdeck message provenance, workspace boundaries, pan lifecycle rules, the no-hidden-work-agents rule, and the state write door; plus adapter-side rejection of Prime schedule, heartbeat, autonomous-continuation, and cross-agent messaging RPC commands with a standalone explanation. Includes the PRD's implementation checkpoint: verify against the pinned Prime release that the policy prevents invisible descendants; if it cannot, restrict the first release to supervised conversations and make managed work fail with the fallback explanation. Prime RLM children may exist only as internal tool execution attributable to the root session; they must never call pan done or alter pipeline records."
+        },
+        "items": [
+          {
+            "id": "managed-session-policy.ac1",
+            "title": "The injected policy text contains the message-provenance, workspace-boundary, pan-lifecycle, no-hidden-agents, and state-write-door rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "managed-session-policy.ac2",
+            "title": "The adapter rejects schedule, heartbeat, autonomous-continuation, and cross-agent messaging RPC commands with a standalone explanation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "managed-session-policy.ac3",
+            "title": "The implementation checkpoint outcome is recorded: either policy enforcement is proven against the pinned release, or managed work returns the conversations-only fallback error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-agent-launch",
+        "title": "Launch managed work agents through the Prime RPC runtime",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/runtime-command.ts",
+            "tests/unit/lib/agents/spawn-prime-agent.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/spawn-prime-agent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn tests pass for prime-agent launch field assembly and readiness",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-16"
+          ],
+          "parallelSafeReason": "Shares runtime-command.ts only with context-renderer-prime, which is serialized behind it by a blocks edge."
+        },
+        "narrative": {
+          "Action": "Update src/lib/agents/spawn.ts (harness resolution at lines 196-255) and the shared runtime-command builder src/lib/agents/runtime-command.ts so a resolved prime-agent harness starts a persistent RPC client in the assigned workspace with explicit --provider, --model, and session directory, the managed-session policy injected, and prime-agent-ready readiness semantics. Launcher fields go in the shared builder — do not duplicate shell construction in the work and conversation paths. No claude-code fallback on Prime startup failure. Integration tests cover initial launch and prompt acceptance."
+        },
+        "items": [
+          {
+            "id": "work-agent-launch.ac1",
+            "title": "Spawning a work agent with harness prime-agent spawns the RPC client in the assigned workspace with explicit provider, model, and session directory arguments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-launch.ac2",
+            "title": "A Prime startup failure surfaces its standalone error and never falls back to a claude-code launch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-launch",
+        "title": "Launch supervised conversations through the Prime RPC runtime",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-runtime tests pass with prime-agent accepted by resolveAllowedHarness"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Update src/lib/overdeck/conversation-runtime.ts: add 'prime-agent' to the explicit-literal check in resolveAllowedHarness (lines 195-202 — a hardcoded literal list that silently drops unknown harnesses) and assemble Prime conversation launch fields in the per-harness launch assembly (lines 544-710) through the shared runtime-command builder. Conversation integration tests cover launch with a prime-agent harness selection."
+        },
+        "items": [
+          {
+            "id": "conversation-launch.ac1",
+            "title": "resolveAllowedHarness accepts 'prime-agent' and routes it through resolveHarness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launch.ac2",
+            "title": "A conversation configured with the prime-agent harness opens a persistent RPC session with the managed-session policy injected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-delivery",
+        "title": "Map Overdeck delivery, steering, abort, and kill to Prime RPC commands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/delivery.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "tests/unit/lib/prime-agent/delivery.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent/delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "delivery tests pass for prompt, steer, follow_up, abort, kill, and crash cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ],
+          "parallelSafeReason": "delivery.ts and conversation-delivery.ts are exclusive to this item."
+        },
+        "narrative": {
+          "Action": "Update src/lib/agents/delivery.ts and src/lib/overdeck/conversation-delivery.ts so pan tell, dashboard messaging, and conversation steering route through one shared Prime RPC controller keyed by the Overdeck agent or conversation ID. Delivery consults cached or live get_state: idle sends prompt, streaming sends steer for urgent guidance and follow_up for deferred guidance. Receipts report accepted versus rejected commands accurately and preserve transcript echo semantics. Kill issues abort, waits a bounded grace period, then terminates the owned process tree through the existing process primitive. Tests cover initial prompt, streaming steer, deferred follow-up, kill, pause, detached recovery, mismatched resume, and process crash."
+        },
+        "items": [
+          {
+            "id": "message-delivery.ac1",
+            "title": "Delivery to an idle Prime session sends prompt; delivery to a streaming session sends steer or follow_up per urgency, chosen from get_state.isStreaming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-delivery.ac2",
+            "title": "Each delivery receipt records whether the command was accepted or rejected and keeps transcript echo semantics intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-delivery.ac3",
+            "title": "Kill issues abort, waits the bounded grace period, then terminates the owned process tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-adapter-prime",
+        "title": "Add the Prime transcript adapter and register it in the transcript registry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/transcript-adapter.ts",
+            "tests/unit/lib/conversations/transcript-adapter-prime.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/conversations/transcript-adapter-prime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fixture-based transcript tests pass for every Prime event kind",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "transcript-adapter.ts is exclusive to this item; fixtures are new files."
+        },
+        "narrative": {
+          "Action": "Add a primeAgentAdapter to src/lib/conversations/transcript-adapter.ts beside kimiCodeAdapter (lines 425-482) and register it under 'prime-agent' in REGISTRY. Normalize Prime event/message shapes (user, assistant, thinking, tool-call, tool-result, compaction, error) from get_messages plus the durable session JSONL into existing conversation feed records. Only the adapter reads Prime's store — routes must not parse Prime files directly. Fixture-based tests cover text, thinking, Python/tool execution, errors, compaction, and large bounded output."
+        },
+        "items": [
+          {
+            "id": "transcript-adapter-prime.ac1",
+            "title": "getTranscriptAdapter('prime-agent') returns the Prime adapter, not the Claude Code default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-adapter-prime.ac2",
+            "title": "The adapter renders user, assistant, thinking, tool-call, tool-result, compaction, and error entries from fixture sessions in the conversation viewer format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-usage-mapping",
+        "title": "Map Prime session statistics into Overdeck cost and activity schemas",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "src/lib/cost-parsers/prime-agent-parser.ts",
+            "tests/unit/lib/cost-parsers/prime-agent-parser.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cost-parsers/prime-agent-parser.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cost parser tests pass for full stats, missing usage fields, and cache token variants",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cost-parsers/prime-agent-parser.ts following the ohmypi-parser pattern and wire a 'prime_agent' source into the cost source union in src/lib/overdeck/cost.ts (lines 511/600). Map get_session_stats and durable assistant usage records into input, output, cache-read, cache-write, and total tokens, cost, context window, and percent. Missing upstream fields remain absent — the adapter never invents values. Fixture tests cover full stats, missing usage, cache usage, and large bounded outputs."
+        },
+        "items": [
+          {
+            "id": "cost-usage-mapping.ac1",
+            "title": "A Prime session's get_session_stats data produces cost and activity records with mapped token, cost, and context-window fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-usage-mapping.ac2",
+            "title": "When upstream omits a usage field, the emitted record leaves that field absent rather than substituting a value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-api-projection",
+        "title": "Project Prime sessions through dashboard contracts, routes, and the read model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/server/routes/projects.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dashboard tests pass with prime-agent sessions present in session-tree and activity payloads"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-18"
+          ],
+          "parallelSafeReason": "Server-side route/service files are exclusive to this item."
+        },
+        "narrative": {
+          "Action": "Extend the dashboard server surfaces that enumerate or branch on harness — session-tree builders (routes/projects.ts, routes/command-deck.ts), resource discovery (services/resource-discovery.ts), census, health, and activity — so Prime sessions carry their harness identity, live activity, and usage. The Prime runtime adapter is the only read door for Prime runtime data: routes must not parse Prime session files directly. Re-verify the exact harness-branch sites at implementation time; the named files are the known enumeration points."
+        },
+        "items": [
+          {
+            "id": "dashboard-api-projection.ac1",
+            "title": "Each session-tree and activity API payload contains prime-agent sessions with correct harness identity and activity state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api-projection.ac2",
+            "title": "Every dashboard route respects the runtime-adapter read door; none parses Prime session files directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-frontend",
+        "title": "Render Prime Agent in dashboard selection, badges, filters, and conversation views",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/harnessRows.ts",
+            "src/dashboard/frontend/src/types.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend tests pass for prime-agent selection, badge, filter, and cost display"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ],
+          "parallelSafeReason": "Frontend files are exclusive to this item; blocked behind dashboard-api-projection."
+        },
+        "narrative": {
+          "Action": "Add prime-agent everywhere the frontend enumerates harnesses: the model picker harness rows (harnessRows.ts), frontend harness types (types.ts, Settings/types.ts), harness badges and filters, the conversation viewer's transcript rendering and tool display, streaming status, and cost display. Follow the style guide (color = signal only; running is not green). Frontend tests cover selection, badge, filters, status, tools, and cost display. Grep for 'kimi-code' under src/dashboard/frontend/src at implementation time to catch every enumeration site; the files listed are the known ones."
+        },
+        "items": [
+          {
+            "id": "dashboard-frontend.ac1",
+            "title": "The model picker shows prime-agent with a correct harness badge and conversation creation accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-frontend.ac2",
+            "title": "Harness filters include prime-agent and the conversation viewer renders Prime transcript entries including tool display and streaming status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-frontend.ac3",
+            "title": "The dashboard renders Prime token, context-use, and cost figures in the same surfaces that show them for other harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-renderer-prime",
+        "title": "Render and inject the prime-agent-global.md context artifact",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/context-layers/layers.ts",
+            "src/lib/context-layers/harness.ts",
+            "src/lib/sync.ts",
+            "src/lib/agents/runtime-command.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/context-layers"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "context-layer tests pass for prime-agent rendering, block validation, and ~/.prime/agent immutability"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-16",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the context layer system for Prime: add the ~/.overdeck/context/prime-agent-global.md artifact path in src/lib/context-layers/layers.ts (beside pi-global at lines 97-99), accept harness:prime-agent Mustache blocks in src/lib/context-layers/harness.ts, render the artifact in src/lib/sync.ts beside the pi-global write (lines 633-644), and inject the artifact content at spawn through the shared runtime-command builder using the pinned Prime release's supported supplemental prompt mechanism. Never write to ~/.prime/agent. Tests cover global/project/workspace layer order, Prime-only blocks, exclusion from other harnesses' artifacts, preview API output, and proof that no file under ~/.prime/agent changed."
+        },
+        "items": [
+          {
+            "id": "context-renderer-prime.ac1",
+            "title": "pan sync renders ~/.overdeck/context/prime-agent-global.md with layers in canonical order and harness:prime-agent blocks included only for Prime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-renderer-prime.ac2",
+            "title": "The context preview API returns the prime-agent preview now that CONTEXT_PREVIEW_HARNESSES includes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-renderer-prime.ac3",
+            "title": "Spawn injection sends the artifact content to the Prime session, and tests show no file under ~/.prime/agent was created or modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-setup-reference",
+        "title": "Document Prime Agent setup, security boundary, and operational limits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "configuration/context-layers.mdx",
+            "docs/HARNESSES.md",
+            "docs/MODEL_ROUTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "docs lint passes with the new Prime sections present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update configuration/harnesses.mdx with a Prime Agent section (pinned supported version, installation command, binaryPath, provider authentication, model mapping, RPC lifecycle ownership, recovery, security boundary — worker/kernel isolation is not a sandbox, disabled Prime-owned automation, child attribution, uninstall), configuration/context-layers.mdx with the prime-agent-global.md artifact and harness:prime-agent blocks, docs/HARNESSES.md with the architecture-level entry, and docs/MODEL_ROUTING.md with provider-to-Prime mapping rules including the subscription-billing caveat. Operators must be able to install, authenticate, and configure from these docs alone."
+        },
+        "items": [
+          {
+            "id": "docs-setup-reference.ac1",
+            "title": "configuration/harnesses.mdx contains install, version pinning, binaryPath, authentication, provider mapping, recovery, security boundary, disabled-automation, and uninstall instructions for Prime Agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-setup-reference.ac2",
+            "title": "configuration/context-layers.mdx contains the prime-agent-global.md artifact documentation and harness:prime-agent block syntax",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-setup-reference.ac3",
+            "title": "docs/MODEL_ROUTING.md contains the caveat that Claude Pro/Max subscription use through Prime bills as extra usage, not plan quota",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "Add the mechanical Prime Agent no-loss audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/prime-agent-no-loss-audit.test.ts",
+            "docs/prime-agent-no-loss-audit.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent-no-loss-audit.test.ts",
+            "npx vitest run tests/unit/lib/ohmypi-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "the prime-agent no-loss audit passes",
+            "the existing ohmypi no-loss audit still passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New audit test and inventory doc only; runs after the surface items via blocks edges."
+        },
+        "narrative": {
+          "Action": "Create docs/prime-agent-no-loss-audit.md enumerating every harness-facing surface — CLI help, contracts unions and enumerations, config schemas, provider resolution, runtime registry, context previews, artifacts, telemetry, transcript adapters, dashboard selectors and filters, lifecycle routes, cost sources, recovery paths, and docs — with a verified disposition for each existing harness and for prime-agent. Create tests/unit/lib/prime-agent-no-loss-audit.test.ts following the ohmypi audit pattern (grep-based mechanical gate): every inventory row verified, and the audit fails when any canonical harness enumeration omits prime-agent or drops an existing harness."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "Every row in docs/prime-agent-no-loss-audit.md carries a verified disposition and the test fails on any unverified row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The audit fails when a canonical enumeration (Harness union, behavior map, config literal, transcript registry, telemetry, artifacts, flywheel, context previews) omits prime-agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "The audit fails when any pre-existing harness literal disappears from a canonical enumeration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-gauntlet",
+        "title": "Run full quality gates, throwaway dashboard boot, and the live Prime smoke test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-12T17:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-3668",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/prime-agent-smoke.test.ts",
+            "docs/prime-agent-verification.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npm run typecheck",
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "full build, typecheck, lint, and test suite pass with no reduced fork count and no real retry delays",
+            "docs/prime-agent-verification.md records the boot test, smoke test, and Playwright evidence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-18",
+            "NFR-6",
+            "NFR-7",
+            "NFR-8"
+          ],
+          "parallelSafeReason": "Runs last by construction; its files are new evidence/test artifacts."
+        },
+        "narrative": {
+          "Action": "Final verification per PRD work item 9: run the contract build, typecheck, lint, focused suites, and the full default test suite with no reduced fork count. Boot a throwaway built dashboard under Node 22 (this change touches boot-reachable runtime registration) and verify its health endpoint and Prime diagnostics. Install the pinned Prime Agent release in an isolated environment and run one disposable repository session through launch, prompt, tool execution, steer, cost read, stop, and resume — scripted as tests/integration/prime-agent-smoke.test.ts where automatable, otherwise recorded step-by-step. Capture Playwright screenshots of every Prime harness UI state, inspect them, and preserve the images plus results in docs/prime-agent-verification.md. Never restart the live server into an untested boot-path change."
+        },
+        "items": [
+          {
+            "id": "verification-gauntlet.ac1",
+            "title": "The full gate suite (npm run build, npm run typecheck, npm run lint, npm test) passes with default worker concurrency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gauntlet.ac2",
+            "title": "A throwaway Node 22 dashboard build boots and its health endpoint returns healthy with Prime diagnostics available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gauntlet.ac3",
+            "title": "The isolated live Prime session completes launch through resume, and docs/prime-agent-verification.md preserves the Playwright screenshots and smoke-test evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-behavior-discriminators",
+        "to": "contracts-prime-behavior-record",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness-literal",
+        "to": "contracts-enumerations",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness-literal",
+        "to": "harness-binary-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema-prime-agent",
+        "to": "harness-binary-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-binary-resolution",
+        "to": "doctor-prime-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-map",
+        "to": "doctor-prime-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-map",
+        "to": "work-agent-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-framing",
+        "to": "rpc-client",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prime-behavior-record",
+        "to": "runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-adapter",
+        "to": "session-resume-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-adapter",
+        "to": "managed-session-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-adapter",
+        "to": "work-agent-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "managed-session-policy",
+        "to": "work-agent-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-adapter",
+        "to": "conversation-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "managed-session-policy",
+        "to": "conversation-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "message-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-launch",
+        "to": "message-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-launch",
+        "to": "message-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness-literal",
+        "to": "transcript-adapter-prime",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness-literal",
+        "to": "cost-usage-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-client",
+        "to": "cost-usage-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-adapter",
+        "to": "dashboard-api-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-api-projection",
+        "to": "dashboard-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness-literal",
+        "to": "context-renderer-prime",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-enumerations",
+        "to": "context-renderer-prime",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-launch",
+        "to": "context-renderer-prime",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema-prime-agent",
+        "to": "docs-setup-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-prime-checks",
+        "to": "docs-setup-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "managed-session-policy",
+        "to": "docs-setup-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "message-delivery",
+        "to": "docs-setup-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "context-renderer-prime",
+        "to": "docs-setup-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prime-behavior-record",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-enumerations",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-harness-flag-help",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema-prime-agent",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-prime-checks",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "message-delivery",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-adapter-prime",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-api-projection",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "session-resume-recovery",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-frontend",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "context-renderer-prime",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-setup-reference",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit",
+        "to": "verification-gauntlet",
+        "type": "blocks"
+      },
+      {
+        "from": "session-resume-recovery",
+        "to": "verification-gauntlet",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-usage-mapping",
+        "to": "verification-gauntlet",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
