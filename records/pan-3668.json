@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T17:54:05.517Z",
+  "updated": "2026-08-12T17:56:04.813Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "contracts-behavior-discriminators": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 2609401,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T17:54:05.516Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added prime-agent to canonical Harness, KNOWN_HARNESSES, and RuntimeName; added normalization coverage. Targeted contracts tests pass; whole typecheck now exposes the planned downstream enum sites.",
         "releasedAt": "2026-08-12T17:53:51.570Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 2609401,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T17:54:05.516Z",
+        "itemId": "contracts-behavior-discriminators",
+        "outcome": "completed",
+        "reason": "Added Prime-specific launch, delivery, readiness, transcript, session, context, feed, and work-mode discriminators plus the exhaustive behavior registry entry and contract tests.",
+        "releasedAt": "2026-08-12T17:56:04.813Z"
       }
     ],
     "statusReasons": {
       "contracts-harness-literal": {
         "reason": "Added prime-agent to canonical Harness, KNOWN_HARNESSES, and RuntimeName; added normalization coverage. Targeted contracts tests pass; whole typecheck now exposes the planned downstream enum sites.",
         "updatedAt": "2026-08-12T17:53:51.570Z"
+      },
+      "contracts-behavior-discriminators": {
+        "reason": "Added Prime-specific launch, delivery, readiness, transcript, session, context, feed, and work-mode discriminators plus the exhaustive behavior registry entry and contract tests.",
+        "updatedAt": "2026-08-12T17:56:04.813Z"
       }
     }
   },
@@ -87,6 +94,8 @@
     "contracts-harness-literal": "completed",
     "contracts-harness-literal.ac1": "completed",
     "contracts-harness-literal.ac2": "completed",
-    "contracts-behavior-discriminators": "running"
+    "contracts-behavior-discriminators": "completed",
+    "contracts-behavior-discriminators.ac1": "completed",
+    "contracts-behavior-discriminators.ac2": "completed"
   }
 }
