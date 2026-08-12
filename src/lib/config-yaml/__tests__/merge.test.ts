@@ -45,3 +45,29 @@ describe('ACP config merge', () => {
     expect(PROVIDERS.kimi.defaultHarness).toBe('kimi-code');
   });
 });
+
+describe('Prime Agent config merge', () => {
+  it('defaults the RPC startup timeout without selecting a model', () => {
+    expect(mergeConfigs().config.primeAgent).toEqual({ rpcStartupTimeoutMs: 30_000 });
+  });
+
+  it('merges binary and startup timeout overrides', () => {
+    const { config } = mergeConfigs({
+      primeAgent: {
+        binaryPath: '/opt/prime/bin/prime-agent',
+        rpcStartupTimeoutMs: 45_000,
+      },
+    });
+
+    expect(config.primeAgent).toEqual({
+      binaryPath: '/opt/prime/bin/prime-agent',
+      rpcStartupTimeoutMs: 45_000,
+    });
+  });
+
+  it('rejects a non-positive RPC startup timeout', () => {
+    expect(() => mergeConfigs({ primeAgent: { rpcStartupTimeoutMs: 0 } })).toThrow(
+      'primeAgent.rpcStartupTimeoutMs must be a positive integer',
+    );
+  });
+});
