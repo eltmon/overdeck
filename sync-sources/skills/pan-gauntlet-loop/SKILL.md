@@ -1,6 +1,13 @@
 ---
 name: pan-gauntlet-loop
-description: Run a Gauntlet Loop — fan out builder sub-agents per area, judge each with a SEPARATE harsh critic in a blind A/B against a named reference bar, keep looping until every area wins, and track it all on a live progress page. Use when the user wants to take any project, feature, or domain to an extreme quality tier ("make it AAA", "at the level of <reference>", "utterly perfect", "run the gauntlet", "gauntlet loop"). Works for any domain: games, UI, CLIs, APIs, libraries, docs, performance, writing.
+description: >-
+  Run a Gauntlet Loop — fan out builder sub-agents per area, judge each with
+  a SEPARATE harsh critic in a blind A/B against a named reference bar, keep
+  looping until every area wins, and track it all on a live progress page.
+  Use when the user wants to take any project, feature, or domain to an
+  extreme quality tier ("make it AAA", "at the level of <reference>",
+  "utterly perfect", "run the gauntlet", "gauntlet loop"). Works for any
+  domain — games, UI, CLIs, APIs, libraries, docs, performance, writing.
 triggers:
   - gauntlet loop
   - run the gauntlet
