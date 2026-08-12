@@ -4,17 +4,17 @@
     "created": "2026-08-12T17:50:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3668: Add Prime Agent as a managed harness",
-    "updated": "2026-08-12T17:50:33.700Z"
+    "updated": "2026-08-12T17:51:16.013Z"
   },
   "plan": {
     "id": "pan-3668",
     "title": "Add Prime Agent as a managed harness",
-    "status": "proposed",
+    "status": "running",
     "uid": "218466dd-dd16-459a-be27-a9b263aa30c6",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-12T17:50:00.000Z",
-    "updated": "2026-08-12T17:50:33.700Z",
+    "updated": "2026-08-12T17:51:16.013Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3668",
@@ -1784,5 +1784,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
