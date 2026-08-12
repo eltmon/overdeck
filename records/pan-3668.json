@@ -2,7 +2,7 @@
   "issueId": "PAN-3668",
   "schemaVersion": 2,
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T17:28:11.492Z",
+  "updated": "2026-08-12T17:28:13.336Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3668: Add Prime Agent as a managed harness",
       "timestamp": "2026-08-12T17:28:11.491Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
