@@ -126,7 +126,7 @@ Overdeck comes with a suite of skills to guide AI assistants:
 
 ### Utilities
 - `/session-health` - Detect and clean up stuck sessions
-- `/skill-creator` - Guide for creating new skills
+- `/claude-skill-creator` - Guide for creating Claude Code skills
 - `/web-design-guidelines` - UI/UX best practices
 - `/work-complete` - Checklist for completing work
 

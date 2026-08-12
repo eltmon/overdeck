@@ -2,6 +2,7 @@ all-up
 benchmark
 bug-fix
 check-merged
+claude-skill-creator
 clear-writing
 cliproxy
 code-review-performance
@@ -102,7 +103,6 @@ refactor-radar
 release
 send-feedback-to-agent
 session-health
-skill-creator
 spec-readiness
 spec-readiness-setup
 stitch-design-md

@@ -1,5 +1,5 @@
 ---
-name: skill-creator
+name: claude-skill-creator
 description: Guide for creating effective Claude Code skills. Use when users want to create a new skill, update an existing skill, or need guidance on skill best practices. Triggers on requests like "create a skill", "make a new skill", "help me build a skill", "skill development", or "extend Claude's capabilities".
 license: Apache 2.0 (based on Anthropic's skills repo)
 ---
