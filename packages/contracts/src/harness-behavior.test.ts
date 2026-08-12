@@ -4,6 +4,9 @@ import { getHarnessBehavior, getRuntimeBehavior, PRIME_AGENT_BEHAVIOR } from "./
 describe("Prime Agent harness behavior", () => {
   it("uses Prime-specific protocol discriminators", () => {
     expect(PRIME_AGENT_BEHAVIOR).toMatchObject({
+      displayName: "Prime Agent",
+      executableName: "prime-agent",
+      processNames: ["prime-agent"],
       launchCommandKind: "prime-agent-rpc",
       deliveryKind: "prime-agent-rpc",
       readinessKind: "prime-agent-ready",
@@ -12,6 +15,14 @@ describe("Prime Agent harness behavior", () => {
       contextLayerKind: "prime-agent",
       feedKind: "prime_agent",
       workAgentMode: "prime-agent-rpc",
+      supportsPtySupervisor: false,
+      supportsChannelsBridge: false,
+      supportsConversationStreaming: true,
+      supportsPatchProjection: false,
+      usesRpcFifo: false,
+      usesCodexHome: false,
+      injectsPromptTimeMemory: true,
+      readyTimeoutSeconds: 120,
     })
   })
 
