@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T17:52:10.438Z",
+  "updated": "2026-08-12T17:53:51.570Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -53,18 +53,31 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "contracts-harness-literal": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3668",
         "agentId": "agent-pan-3668",
         "pid": 2583876,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T17:52:10.438Z"
+        "claimedAt": "2026-08-12T17:52:10.438Z",
+        "itemId": "contracts-harness-literal",
+        "outcome": "completed",
+        "reason": "Added prime-agent to canonical Harness, KNOWN_HARNESSES, and RuntimeName; added normalization coverage. Targeted contracts tests pass; whole typecheck now exposes the planned downstream enum sites.",
+        "releasedAt": "2026-08-12T17:53:51.570Z"
+      }
+    ],
+    "statusReasons": {
+      "contracts-harness-literal": {
+        "reason": "Added prime-agent to canonical Harness, KNOWN_HARNESSES, and RuntimeName; added normalization coverage. Targeted contracts tests pass; whole typecheck now exposes the planned downstream enum sites.",
+        "updatedAt": "2026-08-12T17:53:51.570Z"
       }
     }
   },
   "statusOverrides": {
-    "contracts-harness-literal": "running"
+    "contracts-harness-literal": "completed",
+    "contracts-harness-literal.ac1": "completed",
+    "contracts-harness-literal.ac2": "completed"
   }
 }
