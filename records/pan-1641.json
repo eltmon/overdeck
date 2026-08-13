@@ -131,7 +131,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T13:47:16.815Z",
+  "updated": "2026-08-13T14:02:11.095Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -240,16 +240,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "pi-openai-env": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 623780,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T13:47:16.815Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -294,6 +286,17 @@
         "outcome": "released",
         "reason": "stale claim released (conv-20260813-8bf9 dead)",
         "releasedAt": "2026-08-13T13:43:50.947Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 623780,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T13:47:16.815Z",
+        "itemId": "pi-openai-env",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1641 dead)",
+        "releasedAt": "2026-08-13T14:02:11.089Z"
       }
     ],
     "statusReasons": {
@@ -307,8 +310,8 @@
         "forced": true
       },
       "pi-openai-env": {
-        "reason": "stale claim released (conv-20260813-8bf9 dead)",
-        "updatedAt": "2026-08-13T13:43:50.947Z"
+        "reason": "stale claim released (agent-pan-1641 dead)",
+        "updatedAt": "2026-08-13T14:02:11.089Z"
       }
     }
   },
@@ -329,6 +332,6 @@
     "config-ollama-base-url.ac1": "completed",
     "config-ollama-base-url.ac2": "completed",
     "config-ollama-base-url.ac3": "completed",
-    "pi-openai-env": "running"
+    "pi-openai-env": "pending"
   }
 }
