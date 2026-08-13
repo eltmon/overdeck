@@ -1,25 +1,13 @@
 {
   "issueId": "PAN-3689",
   "schemaVersion": 2,
-  "created": "2026-08-13T21:16:30.023Z",
-  "updated": "2026-08-13T21:29:27.769Z",
-  "pipeline": {
-    "issueId": "PAN-3689",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-13T21:16:30.023Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "k3[1m]",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T21:29Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-08-13T21:29:27.769Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 1,
@@ -29,11 +17,51 @@
       "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3689 needs operator attention after 1 cycle(s).\n1. strike f76adbcfa91e1a562f87b90cbe98be7ebfc81c1d; main 454a6544712526b005cf9d92354c3b74323b4679; failed: Failed to create PR: Command failed: gh pr create --head strike/pan-3689 --base main --title PAN-3689 --body-file /tmp/pan-pr-body-PAN-3689-1786656566592.md\npull request create failed: GraphQL: No commits between main and strike/pan-3689 (createPullRequest)\n; recovery not delivered: agent was stopped by the operator"
     }
   ],
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-13T21:29Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-13T21:29:27.769Z"
-    }
-  ]
+  "created": "2026-08-13T21:16:30.023Z",
+  "updated": "2026-08-13T21:34:53.099Z",
+  "pipeline": {
+    "issueId": "PAN-3689",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T21:29:25.957Z",
+    "strikeReadyHead": "f76adbcfa91e1a562f87b90cbe98be7ebfc81c1d",
+    "strikeReadyAt": "2026-08-13T21:29:25.051Z",
+    "strikeLandingState": "landing",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 1574,
+            "output": 242,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 1574,
+          "output": 242,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.002784,
+        "pricingAsOf": "2026-08-13T21:34:53.090Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
