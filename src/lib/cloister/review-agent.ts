@@ -57,6 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
+import { isReviewSessionForIssue } from './review-session-classifier.js';
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,
@@ -727,21 +728,9 @@ async function spawnReviewRoleForIssuePromise(
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
  */
-export function isReviewSessionForIssue(sessionName: string, projectKey: string | undefined, issueId: string): boolean {
-  const session = sessionName.toLowerCase();
-  const issue = issueId.toLowerCase();
-  const project = projectKey?.toLowerCase();
+export { isReviewSessionForIssue } from './review-session-classifier.js';
 
-  // Belt-and-suspenders: a user conversation session (`conv-*`) must never be
-  // classified as a reviewer session and swept into reviewer cleanup/kill.
-  if (session.startsWith('conv-')) return false;
-
-  if (session === `agent-${issue}-review` || session.startsWith(`agent-${issue}-review-`)) return true;
-  if (session.startsWith(`review-${issue}-`) || session.startsWith(`review-coordinator-${issue}-`)) return true;
-  if (!project) return false;
-  if (session === `specialist-${project}-${issue}-review-agent`) return true;
-  return session.startsWith(`specialist-${project}-${issue}-review-`);
-}async function killAllReviewerSessionsPromise(
+async function killAllReviewerSessionsPromise(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; failed: string[] }> {
