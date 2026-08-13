@@ -107,6 +107,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-13T13:51:17.394Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T13:51:19.830Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T13:51:19.872Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T13:51:19.889Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T13:51:19.908Z"
     }
   ],
   "feedback": [],
@@ -362,7 +382,7 @@
     "recordedAt": "2026-08-13T13:46:44.006Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T13:51:17.394Z",
+  "updated": "2026-08-13T13:51:20.665Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "reviewing",
@@ -680,7 +700,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.8318683,
-        "pricingAsOf": "2026-08-13T13:51:17.259Z"
+        "pricingAsOf": "2026-08-13T13:51:20.488Z"
       }
     },
     "merges": [
