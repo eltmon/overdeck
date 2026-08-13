@@ -59,3 +59,4 @@
 1386 src/lib/tmux.ts # PAN-3671
 1358 src/cli/index.ts # PAN-3673
 1141 src/lib/review-status.ts # PAN-3674
+1170 src/lib/cloister/deacon-swarm.ts # PAN-3690
