@@ -118,18 +118,17 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:55:09.547Z",
+  "updated": "2026-08-13T14:55:11.457Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:55:08.512Z",
-    "reviewNotes": "Approved: no PR-scoped blockers; automatic tmux socket mismatch predates the branch.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-13T14:55:08.567Z",
+    "testNotes": "npm run typecheck: clean (dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). npm run lint: clean (circular-deps 56 baselined/0 new, file-size guard clean, effect-diagnostics 308 known/0 new, ratchet-audit clean). npm test: 1446 test files passed / 3 skipped (1449 total), 13638 tests passed / 50 skipped (13695 total), 0 failures, plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Issue is backend/CLI/API-only (sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs) — no frontend files in diff and ConversationPanel.tsx is an explicit NonGoal, so UAT is not required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "1d742dfa2e21502d68e00a6444babff84a7a595d",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
@@ -197,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 37.414856,
-        "pricingAsOf": "2026-08-13T14:55:08.627Z"
+        "pricingAsOf": "2026-08-13T14:55:11.444Z"
       }
     },
     "merges": [
@@ -205,8 +204,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3671",
