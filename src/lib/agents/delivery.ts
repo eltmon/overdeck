@@ -31,7 +31,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'prime-agent';
   failure?: string;
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
@@ -297,6 +297,7 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
+  if (state?.harness === 'prime-agent' || await import('../prime-agent/session-controller.js').then(({ hasPrimeAgentSession }) => hasPrimeAgentSession(normalizedId))) return import('../prime-agent/session-controller.js').then(({ deliverPrimeAgentMessage }) => deliverPrimeAgentMessage(normalizedId, message)).then(() => ({ ok: true, path: 'prime-agent' as const }));
   const isAcpTarget = state?.harness === 'acp';
   if (isAcpTarget && resolvedMethod !== 'auto') {
     throw new Error(
@@ -475,7 +476,6 @@ export async function deliverAgentMessage(
   await Effect.runPromise(sendKeys(normalizedId, message));
   return { ok: true, path: 'tmux' };
 }
-
 /**
  * Keyed delivery cascade (PAN-2997). Only two tiers may carry a keyed
  * message, because only their crash-independent components enforce the key
