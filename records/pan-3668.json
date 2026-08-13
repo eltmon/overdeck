@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:10:12.184Z",
+  "updated": "2026-08-13T00:14:29.261Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -102,16 +102,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "work-agent-launch": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 285387,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:10:12.184Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -266,6 +258,17 @@
         "outcome": "completed",
         "reason": "Injected explicit provenance/workspace/lifecycle/child/state-door policy, denied all documented Prime daemon coordination commands in the RPC client, and recorded the pinned-protocol enforcement checkpoint and conversations-only fallback.",
         "releasedAt": "2026-08-13T00:05:01.959Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 285387,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:10:12.184Z",
+        "itemId": "work-agent-launch",
+        "outcome": "completed",
+        "reason": "Implemented, tested, committed, and pushed in b5d9ba1d0a",
+        "releasedAt": "2026-08-13T00:14:29.261Z"
       }
     ],
     "statusReasons": {
@@ -324,6 +327,10 @@
       "managed-session-policy": {
         "reason": "Injected explicit provenance/workspace/lifecycle/child/state-door policy, denied all documented Prime daemon coordination commands in the RPC client, and recorded the pinned-protocol enforcement checkpoint and conversations-only fallback.",
         "updatedAt": "2026-08-13T00:05:01.959Z"
+      },
+      "work-agent-launch": {
+        "reason": "Implemented, tested, committed, and pushed in b5d9ba1d0a",
+        "updatedAt": "2026-08-13T00:14:29.261Z"
       }
     }
   },
@@ -377,6 +384,8 @@
     "managed-session-policy.ac1": "completed",
     "managed-session-policy.ac2": "completed",
     "managed-session-policy.ac3": "completed",
-    "work-agent-launch": "running"
+    "work-agent-launch": "completed",
+    "work-agent-launch.ac1": "completed",
+    "work-agent-launch.ac2": "completed"
   }
 }
