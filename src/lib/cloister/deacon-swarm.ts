@@ -64,12 +64,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
-import {
-  clearSwarmSlotCompletion,
-  clearSwarmSlotOwnership,
-  createMinimalIssueRecord,
-  writeSwarmFinalizedAt,
-} from './deacon-swarm-record.js';
+import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
