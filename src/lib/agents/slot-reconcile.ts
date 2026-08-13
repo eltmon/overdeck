@@ -101,13 +101,17 @@ export async function reconcileSlotState(
     const agent = agentsBySlot.get(slotItem.slotIndex);
     const completed = options.statusOverrides?.[slotItem.itemId] === 'completed'
       || itemStatuses.get(slotItem.itemId) === 'completed';
-    const merged = completed || branch?.merged === true;
+    // Branch ancestry is only supporting evidence. A polyrepo workspace root
+    // can be unchanged while its member repositories still contain live slot
+    // work, which makes the wrapper slot branch appear merged immediately.
+    // The task write door records completion only after the merge door succeeds.
+    const merged = completed;
     const entry: ReconciledSlotItem = {
       ...slotItem,
       status: merged ? 'merged' : agent || branch ? 'in_flight' : 'pending',
       branch: branch?.branch,
       agentId: agent?.agentId,
-      ...(merged ? { mergedVia: completed ? 'completed-status' : 'branch-ancestry' } : {}),
+      ...(merged ? { mergedVia: 'completed-status' as const } : {}),
     };
 
     if (entry.status === 'merged') result.merged.push(entry);

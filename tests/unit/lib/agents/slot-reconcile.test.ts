@@ -107,6 +107,23 @@ describe('reconcileSlotState', () => {
     });
   });
 
+  it('does not mark a live polyrepo slot merged from wrapper branch ancestry', async () => {
+    const plan = makeDoc(['a']);
+    plan.plan.items[0].status = 'running';
+
+    const result = await reconcileSlotState('PAN-1762', '/workspace', plan, {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'running', slotItemId: 'a' }],
+      ),
+    });
+
+    expect(result.merged).toEqual([]);
+    expect(result.inFlight).toEqual([
+      expect.objectContaining({ itemId: 'a', status: 'in_flight' }),
+    ]);
+  });
+
   it('returns a clean initial state when no durable slot ownership exists', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
       deps: deps([], []),
