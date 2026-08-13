@@ -1,9 +1,24 @@
 {
   "issueId": "PAN-3677",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T16:09Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-08-13T16:09:12.241Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "merge-agent",
+      "outcome": "needs-you",
+      "timestamp": "2026-08-13T16:09:12Z",
+      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3677 needs operator attention after 1 cycle(s).\n1. strike 6f30cc6f4adbcb53068ed09b8ded4a0ca71e2237; main 90579cba021c8791e118cbd7efd2bc1cd9ba2b6f; failed: Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent is paused (Operator paused all Panopticon issue agents)"
+    }
+  ],
   "created": "2026-08-13T12:30:11.070Z",
-  "updated": "2026-08-13T15:59:42.690Z",
+  "updated": "2026-08-13T16:09:20.540Z",
   "pipeline": {
     "issueId": "PAN-3677",
     "reviewStatus": "pending",
@@ -12,8 +27,8 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T15:59:38.409Z",
-    "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3677 --base main --title PAN-3677 --body-file /tmp/pan-pr-body-PAN-3677-1786636777364.md\npull request create failed: GraphQL: No commits between main and strike/pan-3677 (createPullRequest)\n",
+    "updatedAt": "2026-08-13T16:09:12.202Z",
+    "mergeNotes": "Could not validate strike branch: spawn git ENOENT",
     "strikeReadyHead": "6f30cc6f4adbcb53068ed09b8ded4a0ca71e2237",
     "strikeReadyAt": "2026-08-13T14:38:51.830Z",
     "strikeLandingState": "landing",
@@ -42,7 +57,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0012720000000000001,
-        "pricingAsOf": "2026-08-13T15:59:42.607Z"
+        "pricingAsOf": "2026-08-13T16:09:20.426Z"
       }
     },
     "merges": [],
