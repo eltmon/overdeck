@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3691",
+  "schemaVersion": 2,
+  "created": "2026-08-13T22:26:54.990Z",
+  "updated": "2026-08-13T22:26:54.990Z",
+  "pipeline": {
+    "issueId": "PAN-3691",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T22:26:54.990Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
+}
