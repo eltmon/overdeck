@@ -93,16 +93,17 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:01:00.939Z",
+  "updated": "2026-08-13T14:16:24.970Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:00:51.769Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-13T14:16:24.866Z",
+    "testNotes": "typecheck clean; lint clean; npm test: 1446 files/13638 tests passed, 3 files/50 tests skipped, 0 failures. Backend/CLI/API-only change (no frontend files touched; ConversationPanel.tsx is an explicit NonGoal) — UAT not required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
@@ -179,18 +180,18 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 42199,
-            "output": 958,
+            "input": 44094,
+            "output": 1239,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 22,
-            "output": 2821,
-            "cacheRead": 1469062,
-            "cacheWrite": 48908
+            "input": 52,
+            "output": 6253,
+            "cacheRead": 3965404,
+            "cacheWrite": 60803
           }
         }
       },
@@ -208,21 +209,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 42199,
-          "output": 958,
+          "input": 44094,
+          "output": 1239,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 22,
-          "output": 2821,
-          "cacheRead": 1469062,
-          "cacheWrite": 48908
+          "input": 52,
+          "output": 6253,
+          "cacheRead": 3965404,
+          "cacheWrite": 60803
         }
       },
       "costAtCloseOut": {
-        "usd": 28.340107,
-        "pricingAsOf": "2026-08-13T14:00:51.800Z"
+        "usd": 28.906794,
+        "pricingAsOf": "2026-08-13T14:16:24.956Z"
       }
     },
     "merges": [
