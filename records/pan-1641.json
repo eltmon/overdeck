@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:39:16.188Z",
+  "updated": "2026-08-13T14:39:19.420Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "doctor-ollama-check": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 1792191,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:39:16.188Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -394,7 +386,6 @@
     "install-ollama-step.ac1": "completed",
     "install-ollama-step.ac2": "completed",
     "install-ollama-step.ac3": "completed",
-    "install-ollama-step.ac4": "completed",
-    "doctor-ollama-check": "running"
+    "install-ollama-step.ac4": "completed"
   }
 }
