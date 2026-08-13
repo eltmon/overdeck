@@ -15,10 +15,11 @@ export { MessageDeliveryFailed } from './errors.js';
 import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
-import { deliveryVerifyLine } from './pane-composer.js';
+import { deliveryVerifyLine, type PaneViewport } from './pane-composer.js';
 
 export { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 export { deliveryVerifyLine } from './pane-composer.js';
+export type { PaneViewport } from './pane-composer.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -733,6 +734,26 @@ export async function capturePaneText(
     return String(stdout);
   } catch {
     return '';
+  }
+}
+
+/**
+ * Capture the visible pane plus its cursor row as a PaneViewport for
+ * cursor-anchored composer detection (pane-composer.ts). Returns null when
+ * the pane or cursor position is unreadable.
+ */
+export async function capturePaneViewport(sessionName: string): Promise<PaneViewport | null> {
+  try {
+    const target = exactPaneTarget(sessionName);
+    const [pane, cursor] = await Promise.all([
+      tmuxExecAsync(['capture-pane', '-t', target, '-p'], { encoding: 'utf-8' }),
+      tmuxExecAsync(['display-message', '-p', '-t', target, '#{cursor_y}'], { encoding: 'utf-8' }),
+    ]);
+    const cursorY = Number.parseInt(String(cursor.stdout).trim(), 10);
+    if (!Number.isInteger(cursorY)) return null;
+    return { text: String(pane.stdout), cursorY };
+  } catch {
+    return null;
   }
 }
 

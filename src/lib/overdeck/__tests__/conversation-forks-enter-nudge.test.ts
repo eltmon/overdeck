@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 const mocks = vi.hoisted(() => ({
   capturePaneText: vi.fn(),
+  capturePaneViewport: vi.fn(),
   deliverAgentMessage: vi.fn(),
   sendKeysAsync: vi.fn(),
 }));
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../tmux.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../tmux.js')>(),
   capturePaneText: mocks.capturePaneText,
+  capturePaneViewport: mocks.capturePaneViewport,
   sendKeysAsync: mocks.sendKeysAsync,
 }));
 
@@ -41,6 +43,7 @@ describe('injectForkSummary standalone Enter recovery', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mocks.capturePaneText.mockReset();
+    mocks.capturePaneViewport.mockReset().mockResolvedValue(null);
     mocks.deliverAgentMessage.mockReset().mockResolvedValue(undefined);
     mocks.sendKeysAsync.mockReset().mockResolvedValue(undefined);
   });
@@ -133,6 +136,47 @@ describe('injectForkSummary standalone Enter recovery', () => {
 
     expect(mocks.sendKeysAsync).toHaveBeenCalledTimes(2);
     expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+  });
+
+  it('ignores the delivered summary sitting in transcript scrollback when the composer is empty', async () => {
+    // Codex TUIs keep the submitted prompt as a scrollback bubble above the
+    // turn markers; a whole-pane substring match would stay positive forever
+    // and strand a healthy fork. The cursor row sits in the empty composer
+    // below the transcript, so the composer region must win over scrollback.
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
+    mocks.capturePaneViewport.mockResolvedValue({
+      text: [
+        'previous assistant output',
+        'summary verify line',
+        '[turn] started',
+        '[turn] completed',
+        '',
+        '',
+      ].join('\n'),
+      cursorY: 5,
+    });
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('submitted');
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    expect(mocks.sendKeysAsync).not.toHaveBeenCalled();
+    expect(mocks.capturePaneText).not.toHaveBeenCalled();
+  });
+
+  it('still nudges when the payload tail genuinely sits at the composer cursor row', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
+    mocks.capturePaneViewport.mockResolvedValue({
+      text: ['[turn] completed', '', 'summary verify line'].join('\n'),
+      cursorY: 2,
+    });
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('stranded');
+
+    expect(mocks.sendKeysAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    expect(mocks.capturePaneText).not.toHaveBeenCalled();
   });
 });
 

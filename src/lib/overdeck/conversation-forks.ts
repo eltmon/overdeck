@@ -63,7 +63,8 @@ import { sessionFilePath } from '../paths.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
-import { capturePaneText, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
+import { activeComposerRegion } from '../pane-composer.js';
+import { capturePaneText, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -362,10 +363,24 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
     .replace(/[─-╿]/g, '')
     .replace(/\s+/g, '');
   const verify = normalizePaneVerification(deliveryVerifyLine(summary).slice(0, 40));
+
+  // Match only the cursor-anchored active composer, never the whole pane:
+  // TUIs (notably codex) keep the submitted prompt as transcript scrollback,
+  // so a whole-pane substring match stays positive forever after submission
+  // and stranded perfectly healthy forks. Fall back to the legacy whole-pane
+  // evidence only when the composer cannot be anchored at all.
+  const composerStillHoldsPayload = async (): Promise<boolean> => {
+    if (verify.length < 3) return false;
+    const viewport = await capturePaneViewport(conv.tmuxSession);
+    if (viewport) {
+      const composer = activeComposerRegion(viewport);
+      if (composer !== null) return normalizePaneVerification(composer).includes(verify);
+    }
+    return normalizePaneVerification(await capturePaneText(conv.tmuxSession, 40)).includes(verify);
+  };
+
   for (let nudge = 1; nudge <= 2; nudge++) {
-    const pane = await capturePaneText(conv.tmuxSession, 40);
-    const composerStillFull = verify.length >= 3 && normalizePaneVerification(pane).includes(verify);
-    if (!composerStillFull) {
+    if (!(await composerStillHoldsPayload())) {
       // `still-idle` is affirmative evidence that the first turn did not land;
       // without independent acceptance evidence, surface the ambiguity rather
       // than re-delivering or silently declaring success. `unknown` can mean a
@@ -377,8 +392,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
     await sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`);
     if (await self.confirmForkPromptAccepted(conv.tmuxSession, 8000) === 'accepted') return 'submitted';
 
-    const paneAfterNudge = await capturePaneText(conv.tmuxSession, 40);
-    if (!normalizePaneVerification(paneAfterNudge).includes(verify)) return 'submitted';
+    if (!(await composerStillHoldsPayload())) return 'submitted';
   }
   return 'stranded';
 }
