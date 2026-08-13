@@ -118,17 +118,17 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:55:23.223Z",
+  "updated": "2026-08-13T15:25:24.248Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:55:23.164Z",
-    "testNotes": "npm run typecheck: clean (dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). npm run lint: clean (circular-deps 56 baselined/0 new, file-size guard clean, effect-diagnostics 308 known/0 new, ratchet-audit clean). npm test: 1446 test files passed / 3 skipped (1449 total), 13638 tests passed / 50 skipped (13695 total), 0 failures, plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Issue is backend/CLI/API-only (sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs) — no frontend files in diff and ConversationPanel.tsx is an explicit NonGoal, so UAT is not required.",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-13T15:25:24.158Z",
+    "testNotes": "typecheck clean (dashboard-types 30 known/0 new, frontend-types 0 known/0 new); lint clean (circular-deps 56 baselined/0 new, ratchet-audit clean, quarantine-audit 12 validated, effect-diagnostics 308 known/0 new); backend vitest full suite run twice, 11 distinct files timed out (5000ms hook/setup timeouts, no overlap between runs, none in PAN-3671 scope) all confirmed passing in isolation = CPU-load flakiness not regression; frontend issueActions/fr7 suite 4 files/64 tests passed; net 0 genuine failures across 1449 backend files/13695 tests + 64 frontend tests. UAT not required: PAN-3671 scope is entirely backend/CLI/API/docs with explicit NonGoal excluding frontend/ConversationPanel.tsx changes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "1d742dfa2e21502d68e00a6444babff84a7a595d",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
@@ -145,9 +145,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 52462872,
-            "output": 76664,
-            "cacheRead": 50646784,
+            "input": 52607849,
+            "output": 76788,
+            "cacheRead": 50788608,
             "cacheWrite": 0
           }
         },
@@ -161,10 +161,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 54,
-            "output": 6514,
-            "cacheRead": 4137006,
-            "cacheWrite": 61289
+            "input": 144,
+            "output": 18394,
+            "cacheRead": 11439368,
+            "cacheWrite": 262180
           }
         }
       },
@@ -176,9 +176,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 52462872,
-          "output": 76664,
-          "cacheRead": 50646784,
+          "input": 52607849,
+          "output": 76788,
+          "cacheRead": 50788608,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -188,15 +188,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 54,
-          "output": 6514,
-          "cacheRead": 4137006,
-          "cacheWrite": 61289
+          "input": 144,
+          "output": 18394,
+          "cacheRead": 11439368,
+          "cacheWrite": 262180
         }
       },
       "costAtCloseOut": {
-        "usd": 37.803673,
-        "pricingAsOf": "2026-08-13T14:55:23.206Z"
+        "usd": 39.975756000000004,
+        "pricingAsOf": "2026-08-13T15:25:24.207Z"
       }
     },
     "merges": [
