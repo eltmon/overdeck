@@ -4,6 +4,8 @@ import type { AuthMode } from '../subscription-types.js';
 import { getAgentDir } from '../agents/agent-state.js';
 import { PRIME_AGENT_MANAGED_POLICY } from './policy.js';
 import { resolvePrimeAgentModelRoute } from './provider-map.js';
+import { primeAgentGlobalContextFile, resolveWorkspaceContextFile } from '../context-layers/layers.js';
+import { existsSync, readFileSync } from 'fs';
 
 function quoteShell(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -20,11 +22,15 @@ export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchComman
   const route = resolvePrimeAgentModelRoute(options.model, options.authMode);
   const sessionDir = join(getAgentDir(options.agentId), 'prime-sessions');
   await mkdir(sessionDir, { recursive: true, mode: 0o700 });
+  const context = [primeAgentGlobalContextFile(), resolveWorkspaceContextFile(options.workspace)]
+    .filter(existsSync)
+    .map(file => readFileSync(file, 'utf8'))
+    .join('\n\n');
   return [
     'prime-agent --mode rpc',
     `--provider ${quoteShell(route.provider)}`,
     `--model ${quoteShell(route.model)}`,
     `--session-dir ${quoteShell(sessionDir)}`,
-    `--append-system-prompt ${quoteShell(PRIME_AGENT_MANAGED_POLICY)}`,
+    `--append-system-prompt ${quoteShell([PRIME_AGENT_MANAGED_POLICY, context].filter(Boolean).join('\n\n'))}`,
   ].join(' ');
 }
