@@ -68,4 +68,14 @@ describe('Ollama config merge', () => {
       models: { providers: { ollama: { enabled: true, base_url: 'https://ollama.example.com' } } },
     })).toThrow('Ollama baseUrl must be a localhost address');
   });
+
+  it('preserves an inherited Ollama endpoint when a higher layer configures another provider', () => {
+    const { config } = mergeConfigs(
+      { models: { providers: { openai: { enabled: true } } } },
+      { models: { providers: { ollama: { enabled: true, base_url: 'http://127.0.0.1:22434' } } } },
+    );
+
+    expect(config.providerBaseUrls.ollama).toBe('http://127.0.0.1:22434');
+    expect(config.enabledProviders.has('ollama')).toBe(true);
+  });
 });

@@ -47,9 +47,7 @@ describe('Ollama provider environment', () => {
       OPENAI_BASE_URL: 'http://localhost:11434/v1',
       OPENAI_API_KEY: 'ollama',
     });
-    expect(ollamaMock.ensureOllamaServeRunning).toHaveBeenCalledWith({
-      baseUrl: 'http://127.0.0.1:22434',
-    });
+    expect(ollamaMock.ensureOllamaServeRunning).not.toHaveBeenCalled();
     expect(ollamaMock.checkOllamaHealth).toHaveBeenCalledWith(
       'ollama:gemma4:12b',
       'http://127.0.0.1:22434',
@@ -57,6 +55,10 @@ describe('Ollama provider environment', () => {
   });
 
   it('surfaces a distinct endpoint error before returning spawn environment', async () => {
+    ollamaMock.checkOllamaHealth.mockResolvedValueOnce({
+      endpointReachable: false,
+      modelPresent: false,
+    });
     ollamaMock.ensureOllamaServeRunning.mockRejectedValueOnce(
       new Error('Ollama did not become reachable at http://127.0.0.1:22434 after starting `ollama serve`.'),
     );
@@ -64,7 +66,20 @@ describe('Ollama provider environment', () => {
     await expect(getProviderEnvForModel('ollama:gemma4:12b', 'ohmypi')).rejects.toThrow(
       'Ollama did not become reachable at http://127.0.0.1:22434 after starting `ollama serve`.',
     );
-    expect(ollamaMock.checkOllamaHealth).not.toHaveBeenCalled();
+    expect(ollamaMock.checkOllamaHealth).toHaveBeenCalledOnce();
+  });
+
+  it('starts an unreachable endpoint and rechecks the model after startup', async () => {
+    ollamaMock.checkOllamaHealth
+      .mockResolvedValueOnce({ endpointReachable: false, modelPresent: false })
+      .mockResolvedValueOnce({ endpointReachable: true, modelPresent: true });
+
+    await getProviderEnvForModel('ollama:gemma4:12b', 'ohmypi');
+
+    expect(ollamaMock.ensureOllamaServeRunning).toHaveBeenCalledWith({
+      baseUrl: 'http://127.0.0.1:22434',
+    });
+    expect(ollamaMock.checkOllamaHealth).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces the pull command when the requested model is absent', async () => {

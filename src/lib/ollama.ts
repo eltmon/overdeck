@@ -5,7 +5,11 @@ export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
 export const DEFAULT_OLLAMA_AGENT_MODEL = 'gemma4:12b';
 
-export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
+const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)';
+export const SAFE_OLLAMA_HOST_RE = new RegExp(
+  `^https?://(?:localhost|127(?:\\.${IPV4_OCTET}){3}|\\[::1\\]|::1)(?::\\d+)?/?$`,
+);
+const OLLAMA_PROBE_TIMEOUT_MS = 5_000;
 
 export type OllamaErrorCode =
   | 'invalid-base-url'
@@ -94,7 +98,7 @@ export async function checkOllamaHealth(
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
   let response: Response;
   try {
-    response = await fetchImpl(`${normalizedBaseUrl}/api/tags`, { method: 'GET' });
+    response = await fetchOllamaTags(normalizedBaseUrl, fetchImpl);
   } catch {
     return {
       endpointReachable: false,
@@ -103,6 +107,7 @@ export async function checkOllamaHealth(
     };
   }
   if (!response.ok) {
+    await response.body?.cancel();
     return {
       endpointReachable: false,
       modelPresent: false,
@@ -110,7 +115,16 @@ export async function checkOllamaHealth(
     };
   }
 
-  const data = await response.json() as { models?: Array<{ name?: string; model?: string }> };
+  let data: { models?: Array<{ name?: string; model?: string }> };
+  try {
+    data = await response.json() as { models?: Array<{ name?: string; model?: string }> };
+  } catch (cause) {
+    throw new OllamaError(
+      'endpoint-unreachable',
+      `Ollama returned an invalid /api/tags response from ${normalizedBaseUrl}.`,
+      cause,
+    );
+  }
   const bareModel = model.replace(/^ollama:/, '');
   const modelPresent = data.models?.some((entry) => entry.name === bareModel || entry.model === bareModel) ?? false;
   return modelPresent
@@ -189,10 +203,24 @@ async function hasOllamaBinary(runCommand: CommandRunner): Promise<boolean> {
 
 async function isOllamaHealthy(baseUrl: string, fetchImpl: typeof fetch): Promise<boolean> {
   try {
-    const response = await fetchImpl(`${baseUrl}/api/tags`, { method: 'GET' });
-    return response.ok;
+    const response = await fetchOllamaTags(baseUrl, fetchImpl);
+    try {
+      return response.ok;
+    } finally {
+      await response.body?.cancel();
+    }
   } catch {
     return false;
+  }
+}
+
+async function fetchOllamaTags(baseUrl: string, fetchImpl: typeof fetch): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OLLAMA_PROBE_TIMEOUT_MS);
+  try {
+    return await fetchImpl(`${baseUrl}/api/tags`, { method: 'GET', signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

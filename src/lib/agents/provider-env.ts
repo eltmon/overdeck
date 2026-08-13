@@ -44,8 +44,11 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
 
   if (provider.name === 'ollama') {
     const baseUrl = config.providerBaseUrls.ollama ?? 'http://localhost:11434';
-    await ensureOllamaServeRunning({ baseUrl });
-    const health = await checkOllamaHealth(model, baseUrl);
+    let health = await checkOllamaHealth(model, baseUrl);
+    if (!health.endpointReachable) {
+      await ensureOllamaServeRunning({ baseUrl });
+      health = await checkOllamaHealth(model, baseUrl);
+    }
     if (!health.endpointReachable || !health.modelPresent) {
       throw new Error(health.message ?? `Ollama model ${model.replace(/^ollama:/, '')} is unavailable.`);
     }

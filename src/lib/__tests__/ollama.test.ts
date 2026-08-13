@@ -34,7 +34,10 @@ describe('ensureOllama', () => {
       baseUrl: 'http://localhost:11434',
       model: DEFAULT_OLLAMA_MODEL,
     });
-    expect(fetchImpl).toHaveBeenCalledWith('http://localhost:11434/api/tags', { method: 'GET' });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://localhost:11434/api/tags',
+      expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }),
+    );
     expect(runCommand).toHaveBeenCalledWith('ollama', ['pull', DEFAULT_OLLAMA_MODEL]);
     expect(startServer).not.toHaveBeenCalled();
     expect(installOllama).not.toHaveBeenCalled();
@@ -152,6 +155,35 @@ describe('Pi harness Ollama lifecycle', () => {
       .toBe('http://127.0.0.1:22434');
     expect(() => resolveOllamaBaseUrl({ providers: { ollama: { base_url: 'https://ollama.example.com' } } }))
       .toThrow(OllamaError);
+    expect(() => resolveOllamaBaseUrl({ providers: { ollama: { base_url: 'http://127.999.888.777:11434' } } }))
+      .toThrow(OllamaError);
+  });
+
+  it('cancels readiness response bodies after each probe', async () => {
+    const cancel = vi.fn(async () => {});
+    const fetchImpl = vi.fn(async () => ({ ok: true, body: { cancel } }) as unknown as Response);
+
+    await ensureOllamaServeRunning({ fetchImpl });
+
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('aborts a readiness probe that does not respond', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      }));
+      const runCommand = vi.fn(async () => { throw new Error('missing'); });
+
+      const result = ensureOllamaServeRunning({ fetchImpl, runCommand });
+      const rejection = expect(result).rejects.toMatchObject({ code: 'not-installed' });
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not spawn ollama serve when the endpoint already responds', async () => {
@@ -211,5 +243,21 @@ describe('Pi harness Ollama lifecycle', () => {
     );
     expect(missing).toMatchObject({ endpointReachable: true, modelPresent: false });
     expect(missing.message).toContain('ollama pull gemma3:12b');
+  });
+
+  it('wraps malformed tag responses in a typed Ollama error', async () => {
+    const result = checkOllamaHealth(
+      'ollama:gemma3:12b',
+      undefined,
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => { throw new SyntaxError('bad json'); },
+      }) as Response),
+    );
+
+    await expect(result).rejects.toMatchObject({
+      name: 'OllamaError',
+      code: 'endpoint-unreachable',
+    });
   });
 });

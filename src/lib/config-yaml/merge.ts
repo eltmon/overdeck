@@ -246,16 +246,18 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       const legacyKeys = config.api_keys || {};
 
       // Ollama (no API key; endpoint must remain local)
-      const ollama = normalizeProviderConfig(providers.ollama, undefined);
-      applyProviderHarness(result, 'ollama', ollama.harness);
-      result.providerBaseUrls.ollama = resolveOllamaBaseUrl({
-        providers: { ollama: { base_url: ollama.base_url } },
-      });
-      if (ollama.enabled) {
-        result.enabledProviders.add('ollama');
-      } else if (providers.ollama !== undefined) {
-        explicitlyDisabled.add('ollama');
-        result.enabledProviders.delete('ollama');
+      if (providers.ollama !== undefined) {
+        const ollama = normalizeProviderConfig(providers.ollama, undefined);
+        applyProviderHarness(result, 'ollama', ollama.harness);
+        result.providerBaseUrls.ollama = resolveOllamaBaseUrl({
+          providers: { ollama: { base_url: ollama.base_url } },
+        });
+        if (ollama.enabled) {
+          result.enabledProviders.add('ollama');
+        } else {
+          explicitlyDisabled.add('ollama');
+          result.enabledProviders.delete('ollama');
+        }
       }
 
       // Anthropic
