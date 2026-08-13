@@ -88,24 +88,26 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:56:18.415Z",
+  "updated": "2026-08-13T12:56:19.459Z",
   "pipeline": {
     "issueId": "PAN-3671",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:24:43.058Z",
+    "updatedAt": "2026-08-13T12:56:19.456Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (170432ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3671/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        "packages/contracts/src/composer-commands.generated.ts",
         "scripts/file-size-allowlist.txt",
         "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
-        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -128,6 +130,7 @@
       ],
       "actualChangedFiles": [
         "docs/AGENT-MESSAGE-DELIVERY.md",
+        "packages/contracts/src/composer-commands.generated.ts",
         "scripts/file-size-allowlist.txt",
         "src/cli/commands/conversations/__tests__/heal.test.ts",
         "src/cli/commands/conversations/heal.ts",
@@ -145,10 +148,12 @@
         "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
         "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
         "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts"
+        "tests/unit/lib/overdeck/conversations.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
-      "recordedAt": "2026-08-13T12:17:15.974Z"
-    }
+      "recordedAt": "2026-08-13T12:56:18.413Z"
+    },
+    "reviewRequestedAt": "2026-08-13T12:56:19.456Z"
   },
   "closeOut": {
     "usage": {
