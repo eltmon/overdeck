@@ -308,7 +308,7 @@ describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regressi
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 3 }));
   });
 
-  it('durable slot assignments and merged branches occupy their indexes even when the registry is empty', async () => {
+  it('durable assignments occupy their indexes while a merged branch-only orphan does not (PAN-3689)', async () => {
     const plan = doc([item('wi-a', ['src/a.ts'])]);
     const fakeDeps = deps({
       listSlotAssignments: vi.fn(() => [{ slotIndex: 1 }]),
@@ -323,7 +323,25 @@ describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regressi
       fakeDeps,
     );
 
-    expect(actions).toEqual(['[swarm] dispatched implementation slot 3 (item wi-a) for PAN-2203']);
+    expect(actions).toEqual(['[swarm] dispatched implementation slot 2 (item wi-a) for PAN-2203']);
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 2 }));
+  });
+
+  it('an unmerged branch-only orphan still protects its slot index (PAN-3689)', async () => {
+    const plan = doc([item('wi-a', ['src/a.ts'])]);
+    const fakeDeps = deps();
+
+    const actions = await dispatchNextWave(
+      'PAN-2203',
+      '/repo/workspaces/feature-pan-2203',
+      plan,
+      reconciled({ branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }] }),
+      analyzeSwarmReadiness(plan),
+      fakeDeps,
+    );
+
+    expect(actions).toEqual(['[swarm] dispatched implementation slot 2 (item wi-a) for PAN-2203']);
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 2 }));
   });
 
   it('never spawns or assigns an index above the bound even under an inconsistent registry', async () => {
