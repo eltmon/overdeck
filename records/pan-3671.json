@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:09:34.265Z",
+  "updated": "2026-08-13T12:12:17.749Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-delivery-home-resolution": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2921514,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T12:09:34.265Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -166,6 +158,17 @@
         "outcome": "completed",
         "reason": "Added pan conversations heal with exact/fuzzy resolution, live-session repair endpoint POST, clear success output, and non-zero dead/unknown guidance.",
         "releasedAt": "2026-08-13T12:09:13.597Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2921514,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T12:09:34.265Z",
+        "itemId": "docs-delivery-home-resolution",
+        "outcome": "completed",
+        "reason": "Documented explicit OVERDECK_HOME resolution, shared and isolated socket behavior, live-session supervisor degradation, automatic healing, and the operator endpoint/CLI repair door. No Mintlify page covers supervisor sockets, so no user-doc change was needed.",
+        "releasedAt": "2026-08-13T12:12:17.749Z"
       }
     ],
     "statusReasons": {
@@ -196,6 +199,10 @@
       "conversations-heal-cli": {
         "reason": "Added pan conversations heal with exact/fuzzy resolution, live-session repair endpoint POST, clear success output, and non-zero dead/unknown guidance.",
         "updatedAt": "2026-08-13T12:09:13.597Z"
+      },
+      "docs-delivery-home-resolution": {
+        "reason": "Documented explicit OVERDECK_HOME resolution, shared and isolated socket behavior, live-session supervisor degradation, automatic healing, and the operator endpoint/CLI repair door. No Mintlify page covers supervisor sockets, so no user-doc change was needed.",
+        "updatedAt": "2026-08-13T12:12:17.749Z"
       }
     }
   },
@@ -227,6 +234,9 @@
     "conversations-heal-cli.ac1": "completed",
     "conversations-heal-cli.ac2": "completed",
     "conversations-heal-cli.ac3": "completed",
-    "docs-delivery-home-resolution": "running"
+    "docs-delivery-home-resolution": "completed",
+    "docs-delivery-home-resolution.ac1": "completed",
+    "docs-delivery-home-resolution.ac2": "completed",
+    "docs-delivery-home-resolution.ac3": "completed"
   }
 }
