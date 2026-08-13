@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:56:25.004Z",
+  "updated": "2026-08-13T12:56:31.723Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -102,9 +102,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:56:24.932Z",
+    "updatedAt": "2026-08-13T12:56:29.206Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at lint (170432ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3671/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewRequestedAt": "2026-08-13T12:56:19.456Z",
     "scopeDrift": {
@@ -171,9 +170,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 30658998,
-            "output": 41033,
-            "cacheRead": 29804544,
+            "input": 30744386,
+            "output": 41421,
+            "cacheRead": 29889280,
             "cacheWrite": 0
           }
         },
@@ -194,9 +193,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30658998,
-          "output": 41033,
-          "cacheRead": 29804544,
+          "input": 30744386,
+          "output": 41421,
+          "cacheRead": 29889280,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -207,8 +206,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 20.432608000000002,
-        "pricingAsOf": "2026-08-13T12:56:24.965Z"
+        "usd": 20.489876,
+        "pricingAsOf": "2026-08-13T12:56:29.341Z"
       }
     },
     "merges": [
