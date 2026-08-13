@@ -37,6 +37,11 @@
       "timestamp": "2026-08-13T12:56:24.937Z",
       "reason": "end",
       "note": "Anomalies: full lint is blocked by four circular dependencies in untouched Cloister review files that are identical to origin/main; every other lint lane passes. The first full-test run exposed two missing integration artifacts: the repository-wide no-loss entry and generated composer command manifest; both were corrected, committed, pushed, and the full suite then passed. Initial sandboxed sync-main could not reach the dashboard, while later canonical task operations succeeded. Deviation: PAN-3673 already isolated noncanonical homes onto derived sockets, so sanitizer behavior keys off the actual shared socket and preserves isolated sockets. Delivered canonical home pinning, launcher home export, accurate and degraded supervisor handling, automatic and operator healing, CLI repair, tests, and delivery documentation. No applicable Mintlify page covers supervisor sockets."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T14:49:26.536Z"
     }
   ],
   "feedback": [],
@@ -93,19 +98,19 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:49:24.887Z",
+  "updated": "2026-08-13T14:49:27.788Z",
   "pipeline": {
     "issueId": "PAN-3671",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:49:24.316Z",
+    "updatedAt": "2026-08-13T14:49:24.925Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
-    "reviewSpawnedAt": "2026-08-13T13:51:24.686Z"
+    "reviewSpawnedAt": "2026-08-13T14:49:24.924Z"
   },
   "closeOut": {
     "usage": {
@@ -169,7 +174,7 @@
       },
       "costAtCloseOut": {
         "usd": 33.58448,
-        "pricingAsOf": "2026-08-13T14:49:24.427Z"
+        "pricingAsOf": "2026-08-13T14:49:27.776Z"
       }
     },
     "merges": [
