@@ -106,9 +106,13 @@ export function ReviewSummary({ session, reviewers, roundData, cwd }: ReviewSumm
   const allDone = reviewers.length > 0 && reviewers.every(r => r.status === 'stopped');
   const anyRunning = reviewers.some(r => r.status === 'running');
   const anyError = reviewers.some(r => r.status === 'error');
+  // PAN-3675: zero reviewers with an errored parent session means the dispatch
+  // itself died — say that, not 'Pending'.
+  const dispatchFailed = reviewers.length === 0 && roundData.length === 0 && session.status === 'error';
 
-  const overallVerdict = allDone ? 'completed' : anyError ? 'issues' : anyRunning ? 'running' : 'pending';
-  const verdictLabel = overallVerdict === 'completed' ? 'Review Complete'
+  const overallVerdict = dispatchFailed ? 'issues' : allDone ? 'completed' : anyError ? 'issues' : anyRunning ? 'running' : 'pending';
+  const verdictLabel = dispatchFailed ? 'Dispatch Failed'
+    : overallVerdict === 'completed' ? 'Review Complete'
     : overallVerdict === 'issues' ? 'Issues Detected'
     : overallVerdict === 'running' ? 'Review In Progress'
     : 'Pending';
@@ -209,7 +213,11 @@ export function ReviewSummary({ session, reviewers, roundData, cwd }: ReviewSumm
       {/* Empty state */}
       {reviewers.length === 0 && roundData.length === 0 && (
         <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted-foreground)', fontSize: 13 }}>
-          No review data yet. Reviewers will appear here once the review starts.
+          {/* PAN-3675: a dispatch that died before any reviewer ran must say so —
+              a benign 'Pending' over a dead run hid the PAN-3668 strand. */}
+          {session.status === 'error'
+            ? 'Review dispatch failed before any reviewer ran. Re-run the review from the issue menu — the review agent’s session is resumed when possible.'
+            : 'No review data yet. Reviewers will appear here once the review starts.'}
         </div>
       )}
     </div>

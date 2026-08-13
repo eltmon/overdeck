@@ -357,6 +357,10 @@ export async function buildReviewerNodes(
       const sessionId = getReviewerSessionName(role, opts.projectKey, opts.issueId);
       const isLive = opts.tmuxSessionNames.has(sessionId);
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
+      // A state row is evidence the reviewer was at least spawned (it is written
+      // at spawn start, before tmux readiness). Read it from agentsRoot directly —
+      // getAgentStateSync would escape the agentsDirOverride test seam.
+      const hasStateRow = existsSync(join(agentsRoot, sessionId, 'state.json'));
       // Reviewers run inside the workspace (pan review run sets cwd to workspace),
       // so JSONL files land in the workspace-encoded Claude projects dir.
       // Fall back to projectPath only if workspacePath is unavailable.
@@ -370,6 +374,14 @@ export async function buildReviewerNodes(
       const latestRunOutputExists = latestReviewRunDir
         ? existsSync(join(latestReviewRunDir, `${role}.md`))
         : false;
+
+      // PAN-3675: a lane with no session, no state row, no round artifact, no
+      // transcript, and no output this round never existed. Rendering it
+      // fabricates a phantom reviewer — the PAN-3668 tree showed
+      // "4 reviewers · clean" for a run that died before any reviewer launched.
+      const everExisted = isLive || hasStateRow || roundMetadata !== undefined
+        || jsonlPath !== null || latestRunOutputExists;
+      if (!everExisted) return null;
       const inProgressThisRound = isLive && latestReviewRunDir !== null && !latestRunOutputExists;
 
       // PAN-2690 — codex reviewers stay alive at their prompt after the notify
@@ -468,5 +480,5 @@ export async function buildReviewerNodes(
     }),
   );
 
-  return nodes;
+  return nodes.filter((node): node is ReviewerNode => node !== null);
 }
