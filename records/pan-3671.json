@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:00:49.998Z",
+  "updated": "2026-08-13T14:01:00.939Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
@@ -102,9 +102,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:00:49.927Z",
-    "reviewNotes": "Approved: no PR-scoped blockers; derived tmux socket risk is pre-existing and advisory.",
+    "updatedAt": "2026-08-13T14:00:51.769Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
+    "reviewedAtCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
     "reviewSpawnedAt": "2026-08-13T13:51:24.686Z",
     "scopeDrift": {
@@ -222,7 +222,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.340107,
-        "pricingAsOf": "2026-08-13T14:00:49.971Z"
+        "pricingAsOf": "2026-08-13T14:00:51.800Z"
       }
     },
     "merges": [
