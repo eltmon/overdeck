@@ -50,7 +50,6 @@ import { writeBridgeTokenSync } from '../bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
 import { canUseHarnessSync } from '../harness-policy.js';
-import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
@@ -71,6 +70,8 @@ import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachme
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import { deliverResumeContractUnlessGated } from './resume-contract-delivery.js';
+import { preparePrimeAgentConversationLaunch, resolveAllowedHarness } from './conversation-harness.js';
+export { preparePrimeAgentConversationLaunch, resolveAllowedHarness } from './conversation-harness.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -192,14 +193,6 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
   "A message marked source:'extension' was injected by the Overdeck orchestrator or another agent, not typed by the human operator.",
   'Treat it as coordination guidance; do not attribute it to the human operator.',
 ].join(' ');
-export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  if (!model) return 'claude-code';
-  const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code'
-      ? requested
-      : undefined;
-  return resolveHarness({ model, explicit });
-}
 export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
   try {
     const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: dir, encoding: 'utf-8' });
@@ -577,6 +570,7 @@ export async function spawnConversationSession(
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
   let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; resumeSessionId?: string } | undefined;
+  let primeAgentFields: { harness: 'prime-agent' } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -595,10 +589,16 @@ export async function spawnConversationSession(
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
-    runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
-    const mode = resolvePermissionModeSync();
-    if (!runtimeCommand.includes('--permission-mode')) {
-      runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
+    if (behavior.launchCommandKind === 'prime-agent-rpc') {
+      const primeLaunch = await preparePrimeAgentConversationLaunch(tmuxSession, cwd, model);
+      runtimeCommand = primeLaunch.runtimeCommand;
+      primeAgentFields = primeLaunch.fields;
+    } else {
+      runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
+      const mode = resolvePermissionModeSync();
+      if (!runtimeCommand.includes('--permission-mode')) {
+        runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
+      }
     }
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
@@ -749,7 +749,7 @@ export async function spawnConversationSession(
         workingDir: cwd,
         setTerminalEnv: true,
         unsetProviderEnv: true,
-        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || primeAgentFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -759,15 +759,15 @@ export async function spawnConversationSession(
         baseCommand: runtimeCommand,
         appendSystemPromptFiles: piFields
           ? await piConversationSystemPromptFiles(cwd)
-          : codexFields || acpFields || kimiCodeFields
+          : codexFields || acpFields || kimiCodeFields || primeAgentFields
             ? []
             : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
-        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
+        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? primeAgentFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !kimiCodeFields && !primeAgentFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: true,
         fileMode: 0o700,
         channelsBridgeMcpConfig,
