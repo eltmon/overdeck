@@ -81,6 +81,12 @@ function enumerateConversationRoutes(): Set<string> {
 }
 
 describe('PAN-2145 conversations route no-loss audit', () => {
+  it('does not import the conversations route graph during the Vitest worker lifecycle', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+
+    expect(source).not.toMatch(/from\s+['"][^'"]*routes\/conversations(?:\.js)?['"]/);
+  });
+
   it('keeps the legacy conversationsRouteLayer export available', () => {
     const source = readFileSync(CONVERSATIONS_ROUTE_FILE, 'utf8');
 
