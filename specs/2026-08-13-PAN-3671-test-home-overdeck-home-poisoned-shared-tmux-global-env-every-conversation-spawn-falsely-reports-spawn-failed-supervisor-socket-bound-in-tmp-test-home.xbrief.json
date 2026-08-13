@@ -1,0 +1,586 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-13T11:27:11Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3671: Test-home OVERDECK_HOME poisoned shared tmux global env — every conversation spawn falsely reports 'Spawn failed'",
+    "updated": "2026-08-13T11:36:49.563Z"
+  },
+  "plan": {
+    "id": "pan-3671",
+    "title": "Test-home OVERDECK_HOME poisoned shared tmux global env — every conversation spawn falsely reports 'Spawn failed' (supervisor socket bound in /tmp test home)",
+    "status": "proposed",
+    "uid": "fd5aac13-0fe1-4d70-b874-0c37dfcfe528",
+    "author": "agent:claude",
+    "sequence": 2,
+    "created": "2026-08-13T11:27:11Z",
+    "updated": "2026-08-13T11:36:49.563Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3671",
+        "label": "PAN-3671",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tmux",
+      "conversations",
+      "pty-supervisor",
+      "fork-pipeline",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "A throwaway test dashboard running with OVERDECK_HOME=/tmp on the shared managed tmux socket stamped its home into the server's global env via the PAN-1798 sanitizer. Every PTY supervisor then resolved getOverdeckHome() from that polluted env and bound its socket under the dead /tmp home, so the real dashboard's 30s socket wait timed out and recorded fork_status='failed' / spawn_error / markConversationEnded on conversations that were alive and working. The lifecycle heal resurrected status but never cleared the failure fields, no operator door existed to clear them, and the timeout error quoted a healthy harness statusline as the 'supervisor output' failure.",
+      "Proposal": "Four independent fixes plus heal, door, and docs: (1) the sanitizer pins canonical HOME/OVERDECK_HOME (from os.homedir()) on the default managed socket — always, never the caller's env — and warns when a non-canonical-home process uses the shared socket; custom sockets keep caller-env pinning. (2) Every non-remote launcher script exports OVERDECK_HOME from the spawning process's resolved home. (3) A supervisor-socket timeout with a live tmux session degrades to a warn-log + fallback delivery instead of recording spawn/fork failure; extractSupervisorFailure returns null on a healthy pane so the error says 'no error output' instead of quoting the statusline. (4) markConversationRunning clears spawn_error always and fork_status/fork_error when 'failed', so both heal sites self-repair. (5) New operator door POST /api/conversations/:name/clear-fork-state guarded on session liveness, plus `pan conversations heal <name>`. (6) docs/AGENT-MESSAGE-DELIVERY.md documents the invariant, degrade, and door. PRD: .pan/drafts/PAN-3671.md.",
+      "NonGoals": "- Janitor sweep of 619 stale pty-conv-*.sock files (separate concern per the issue; file a sibling issue)\n- Mechanically forcing test/throwaway dashboards onto their own tmux socket (warning advises OVERDECK_TMUX_SOCKET_NAME instead)\n- Frontend changes to ConversationPanel.tsx (clearing spawn_error fixes the 'Failed to start' screen)\n- Changing the delivery fallback ordering (supervisor → channels → tmux-paste)\n- Healing rows whose tmux session is genuinely dead (their failure state is truthful)\n- Retroactive repair of tonight's already-cleared rows beyond the heal and the operator door"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sanitizer refusal + canonical pinning instead of forcing test dashboards onto their own socket",
+        "rationale": "No mechanical test-dashboard launch path exists to enforce socket isolation (the PAN-3668 dashboard was launched ad hoc); pinning canonical values on the shared socket is always safe and repairs pollution from any clean-env process."
+      },
+      {
+        "summary": "Heal implemented inside markConversationRunning rather than at each heal site",
+        "rationale": "Both heal sites (conversation-lifecycle.ts:172, conversation-list.ts:111) call this one writer; one change fixes both and preserves the single write door."
+      },
+      {
+        "summary": "Heal clears fork_status only when 'failed'; in-flight fork states preserved",
+        "rationale": "getStuckForks() recovery keys off fork_status NOT NULL AND != 'failed'; clearing 'spawning'/'injecting' would orphan fork-request recovery."
+      },
+      {
+        "summary": "Degrade keeps delivery_method='auto' rather than storing a forced fallback",
+        "rationale": "deliverAgentMessage already falls back supervisor → channels → tmux-paste at delivery time; no stored state change is needed for delivery to work."
+      },
+      {
+        "summary": "Operator door is REST endpoint + thin CLI client, no direct-DB CLI",
+        "rationale": "Matches the pan conversations move pattern (resolve locally, POST to dashboard) and the single write door tenet."
+      },
+      {
+        "summary": "Stale socket janitor sweep deferred to a sibling issue",
+        "rationale": "The issue body itself calls it 'a separate concern'; it is a one-line hygiene fix unrelated to the failure chain."
+      }
+    ],
+    "items": [
+      {
+        "id": "sanitizer-canonical-home-pin",
+        "title": "Sanitizer pins canonical HOME/OVERDECK_HOME on the default managed socket",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tmux.ts",
+            "src/lib/paths.ts",
+            "src/lib/__tests__/tmux-server.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/tmux-server.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sanitizer test cases pass: /tmp caller home never stamped on default socket, unset vars still pinned, custom socket keeps caller home",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add getCanonicalOverdeckHome() to src/lib/paths.ts (join(homedir(), '.overdeck')). Rewrite sanitizeManagedServerGlobalEnvSync in src/lib/tmux.ts (currently lines 233-253): on the default managed socket (OVERDECK_TMUX_SOCKET_NAME unset) pin HOME=homedir() and OVERDECK_HOME=getCanonicalOverdeckHome() ALWAYS (remove the `if (!value) continue` skip), never the caller's env; when getOverdeckHome() differs from canonical on the default socket, console.warn advising OVERDECK_TMUX_SOCKET_NAME. On a custom socket keep pinning the caller's resolved values (cleanEnv.HOME ?? homedir(), getOverdeckHome()). Update the PAN-1798 doc comment above the function. Export the sanitizer for tests via the @internal pattern (precedent: _resetWarnedManagedServerDirtyForTest, tmux.ts:260). Exact before/after snippets are in PRD WI-1 (.pan/drafts/PAN-3671.md). Tests (mock execFileSync): (a) OVERDECK_HOME=/tmp/fake on default socket → canonical pinned, /tmp never stamped, warning logged; (b) caller env lacking HOME/OVERDECK_HOME → both still pinned; (c) OVERDECK_TMUX_SOCKET_NAME=custom + /tmp home → caller home pinned on custom socket."
+        },
+        "items": [
+          {
+            "id": "sanitizer-canonical-home-pin.ac1",
+            "title": "Given caller env OVERDECK_HOME=/tmp/fake on the default socket, when the sanitizer runs, then set-environment -g receives the canonical home and never /tmp/fake, and a warning is logged naming the non-canonical home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sanitizer-canonical-home-pin.ac2",
+            "title": "Given a caller env lacking HOME and OVERDECK_HOME, the sanitizer still pins both canonical values (repair path; no skip-on-unset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sanitizer-canonical-home-pin.ac3",
+            "title": "Given OVERDECK_TMUX_SOCKET_NAME=custom and OVERDECK_HOME=/tmp/fake, the sanitizer pins the caller's home on the custom socket (isolation preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-export-overdeck-home",
+        "title": "Launcher scripts export OVERDECK_HOME for non-remote spawns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launcher-generator tests pass including the three new OVERDECK_HOME cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In generateLauncherScriptSync (src/lib/launcher-generator.ts:244), immediately after the `unset TMUX TMUX_PANE STY` line (line 266), add `export OVERDECK_HOME=${shellQuote(getOverdeckHome())}` guarded by `config.spawnMode !== 'remote'` (remote launchers run on Fly VMs where the local home path is meaningless). Import getOverdeckHome from ./paths.js. Exact snippet and comment text in PRD WI-2. Tests in src/lib/__tests__/launcher-generator.test.ts: (a) default config → script contains export OVERDECK_HOME with getOverdeckHome()'s value; (b) spawnMode 'remote' → script omits it; (c) process.env.OVERDECK_HOME set to a temp dir → export carries that value."
+        },
+        "items": [
+          {
+            "id": "launcher-export-overdeck-home.ac1",
+            "title": "A generated non-remote launcher script contains `export OVERDECK_HOME=` with the spawning process's resolved home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-export-overdeck-home.ac2",
+            "title": "Given spawnMode 'remote', generateLauncherScriptSync produces a script without any `export OVERDECK_HOME` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-export-overdeck-home.ac3",
+            "title": "With process.env.OVERDECK_HOME set to a temp dir, the generated script contains `export OVERDECK_HOME=<temp dir>` (spawning-process resolution, not tmux global env)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-timeout-degrade",
+        "title": "Supervisor-socket timeout with live tmux session degrades to fallback delivery instead of recording failure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "degrade tests pass: live-session timeout resolves without failure writes; dead-session timeout propagates",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnConversationSession (src/lib/overdeck/conversation-runtime.ts), wrap the `await waitForPtySupervisorSocket(tmuxSession)` call (lines 804-806) in try/catch: on error, if `await tmuxSessionExists(tmuxSession)` (already defined at line 292) then console.warn a '[conversations] PTY supervisor socket unavailable … continuing with fallback delivery' message carrying the original error text and CONTINUE; otherwise rethrow. Exact snippet in PRD WI-3. This covers both the create path (handleConversationCreate catch at lines 945-954) and the fork path (handleForkPipelineFailure, conversation-forks.ts:400-405) because both flow through spawnConversationSession. New test tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts mocking the socket stat and tmuxSessionExists, using vi.useFakeTimers() for the 30s PTY_SUPERVISOR_SOCKET_WAIT_MS wait: (a) timeout + session alive → spawn resolves, updateSpawnError/updateForkStatus/markConversationEnded never called, warn logged; (b) timeout + session gone → error propagates and existing failure recording fires."
+        },
+        "items": [
+          {
+            "id": "supervisor-timeout-degrade.ac1",
+            "title": "Given a supervisor-socket timeout with a live tmux session, spawnConversationSession resolves without writing spawn_error, without fork_status='failed', and without markConversationEnded, and logs the fallback-delivery warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-timeout-degrade.ac2",
+            "title": "Given a supervisor-socket timeout with a dead tmux session, the error propagates and the existing failure recording (spawn_error / fork failure) still fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-failure-message-accuracy",
+        "title": "extractSupervisorFailure returns null on a healthy pane; timeout error stops quoting the statusline as failure output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "failure-message tests pass: healthy pane → null + 'no error output' message; error pane → error lines",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversation-runtime.ts change extractSupervisorFailure (lines 416-422): when no error-shaped lines match, return null instead of falling back to the last 3 pane lines. Then in waitForPtySupervisorSocket (lines 435-439), when the extract returns null append a fixed explanation — 'the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME' — instead of the '— supervisor output:' suffix. Exact snippet in PRD WI-4. Tests: (a) pane with only a harness statusline → null; (b) pane with ERR_MODULE_NOT_FOUND → error lines returned; (c) thrown timeout message in case (a) contains 'no error output' and does not contain the statusline text."
+        },
+        "items": [
+          {
+            "id": "supervisor-failure-message-accuracy.ac1",
+            "title": "Given pane text containing only a healthy harness statusline, extractSupervisorFailure returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-failure-message-accuracy.ac2",
+            "title": "Given pane text containing ERR_MODULE_NOT_FOUND, extractSupervisorFailure returns the matching error lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-failure-message-accuracy.ac3",
+            "title": "The socket-timeout error for a healthy pane contains 'no error output' and does not quote the statusline text as supervisor output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heal-clears-stale-failure-state",
+        "title": "markConversationRunning clears spawn_error and failed fork state on resurrect",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "tests/unit/lib/overdeck/conversations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversations writer tests pass: failed fork state + spawn_error cleared on resurrect, in-flight fork_status preserved, active-row no-op intact",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend markConversationRunning (src/lib/overdeck/conversations.ts:1294-1298) so its UPDATE also sets spawn_error = NULL always, and fork_status = NULL + fork_error = NULL via CASE WHEN fork_status = 'failed' (in-flight 'spawning'/'injecting' preserved for getStuckForks recovery). Keep the WHERE name = ? AND status != 'active' guard. Update the PAN-1972 comment above the function to document the PAN-3671 clearing contract. Exact SQL in PRD WI-5. Both heal sites (src/dashboard/server/services/conversation-lifecycle.ts:172 and src/lib/overdeck/conversation-list.ts:111) call this writer and need no changes. Tests in tests/unit/lib/overdeck/conversations.test.ts: (a) ended row with fork_status='failed' + fork_error + spawn_error → after call, all three NULL and status active; (b) ended row with fork_status='injecting' + spawn_error → fork_status preserved, spawn_error cleared; (c) already-active row → no write."
+        },
+        "items": [
+          {
+            "id": "heal-clears-stale-failure-state.ac1",
+            "title": "Given an ended row with fork_status='failed', fork_error, and spawn_error, markConversationRunning sets status='active' and NULLs all three fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-clears-stale-failure-state.ac2",
+            "title": "Given an ended row with fork_status='injecting', markConversationRunning preserves fork_status but clears spawn_error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heal-clears-stale-failure-state.ac3",
+            "title": "Given an already-active row, markConversationRunning performs no write (existing status guard intact)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clear-fork-state-endpoint",
+        "title": "POST /api/conversations/:name/clear-fork-state operator door guarded on session liveness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "endpoint tests pass: 404 unknown, 409 dead session with no write, 200 live session with cleared fields",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 1: add clearConversationFailureState(name) writer to src/lib/overdeck/conversations.ts next to updateForkStatus (line 1411) — one UPDATE setting fork_status/fork_error/spawn_error to NULL (exact SQL in PRD WI-6). Step 2: add handleConversationClearForkState(name) to src/lib/overdeck/conversation-runtime.ts following handleConversationStop (lines 969-985): 404 when getConversationByName misses; 409 with an explanatory error when `await tmuxSessionExists(conv.tmuxSession)` is false (stored failure state is truthful for a dead session); otherwise call the writer and return the updated conversation with sessionAlive: true. Step 3: wire HttpRouter.add('POST', '/api/conversations/:name/clear-fork-state', …) in src/dashboard/server/routes/conversations.ts with the same validateOrigin guard as postConversationStopRoute (lines 327-342) and register the route constant in the module's router aggregation exactly like the other postConversation*Route constants. Tests mock getConversationByName and tmuxSessionExists for the 404/409/200 paths and assert the writer is not called on 409."
+        },
+        "items": [
+          {
+            "id": "clear-fork-state-endpoint.ac1",
+            "title": "POST /api/conversations/:name/clear-fork-state returns 404 when the conversation does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-fork-state-endpoint.ac2",
+            "title": "Returns 409 with an explanatory error when the tmux session is not alive, and clearConversationFailureState is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-fork-state-endpoint.ac3",
+            "title": "Returns 200 with sessionAlive: true and clears fork_status, fork_error, and spawn_error when the tmux session is alive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-heal-cli",
+        "title": "pan conversations heal <name> CLI verb via the clear-fork-state endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/heal.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/cli/commands/conversations/__tests__/heal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/heal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "heal CLI tests pass: 200 prints cleared line, 409 exits non-zero with guidance, unknown name exits non-zero",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/conversations/heal.ts following move.ts exactly: resolve the conversation by exact name via getConversationByName() (non-zero exit listing candidates on no match), then POST to `${getDashboardApiUrlSync()}/api/conversations/<name>/clear-fork-state`. On 200 print `Cleared fork/spawn failure state for <name> (session alive)`. On 409 print the server error plus guidance: `The tmux session is not alive; the stored failure state is truthful. Use pan conversations show <name> to inspect it.` and exit non-zero. Register the subcommand in registerConversationsCommands() in src/cli/commands/conversations/index.ts alongside the other subcommands. Test in src/cli/commands/conversations/__tests__/heal.test.ts with mocked fetch for the 200/409/unknown paths."
+        },
+        "items": [
+          {
+            "id": "conversations-heal-cli.ac1",
+            "title": "pan conversations heal <name> on a live-session conversation POSTs to the endpoint and prints the cleared confirmation line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-heal-cli.ac2",
+            "title": "On a 409 response the CLI prints the dead-session guidance and exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-heal-cli.ac3",
+            "title": "On an unknown conversation name the CLI exits non-zero listing candidates, matching move.ts behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-delivery-home-resolution",
+        "title": "Document the OVERDECK_HOME resolution invariant, degraded-supervisor behavior, and operator door in AGENT-MESSAGE-DELIVERY.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-13T11:27:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3671",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-MESSAGE-DELIVERY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'OVERDECK_HOME' docs/AGENT-MESSAGE-DELIVERY.md"
+          ],
+          "expected_outputs": [
+            "docs/AGENT-MESSAGE-DELIVERY.md contains a PAN-3671 section covering the home-resolution invariant, degraded supervisor, and operator door",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a short PAN-3671 section to docs/AGENT-MESSAGE-DELIVERY.md (the supervisor socket is already documented at line 14) covering: (1) home-resolution invariant — launcher scripts export OVERDECK_HOME explicitly; the supervisor and in-session pan calls never resolve home from tmux global env; the shared-socket sanitizer pins canonical values and refuses caller-override homes; OVERDECK_TMUX_SOCKET_NAME isolates test instances. (2) Degraded supervisor — a missing socket with a live tmux session is not a spawn failure; delivery proceeds via the channels → tmux-paste fallback with a logged warning. (3) Operator door — POST /api/conversations/:name/clear-fork-state and `pan conversations heal <name>` clear stale fork_status/fork_error/spawn_error when the session is alive; the lifecycle heal clears them automatically on resurrect. Note in the completion that no Mintlify .mdx page covers supervisor sockets, so no user-docs change is needed."
+        },
+        "items": [
+          {
+            "id": "docs-delivery-home-resolution.ac1",
+            "title": "docs/AGENT-MESSAGE-DELIVERY.md states the home-resolution invariant: launchers export OVERDECK_HOME and the supervisor never resolves home from tmux global env",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delivery-home-resolution.ac2",
+            "title": "docs/AGENT-MESSAGE-DELIVERY.md covers the degraded-supervisor behavior: a missing socket with a live session falls back to channels/tmux delivery instead of failing the spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delivery-home-resolution.ac3",
+            "title": "docs/AGENT-MESSAGE-DELIVERY.md covers the operator door (endpoint + pan conversations heal) and the automatic heal-on-resurrect clearing of fork_status/fork_error/spawn_error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "heal-clears-stale-failure-state",
+        "to": "clear-fork-state-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-fork-state-endpoint",
+        "to": "conversations-heal-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-failure-message-accuracy",
+        "to": "supervisor-timeout-degrade",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-timeout-degrade",
+        "to": "clear-fork-state-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "sanitizer-canonical-home-pin",
+        "to": "docs-delivery-home-resolution",
+        "type": "informs"
+      },
+      {
+        "from": "supervisor-timeout-degrade",
+        "to": "docs-delivery-home-resolution",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-13-PAN-3671-test-home-overdeck-home-poisoned-shared-tmux-global-env-every-conversation-spawn-falsely-reports-spawn-failed-supervisor-socket-bound-in-tmp-test-home.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
