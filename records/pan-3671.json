@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:52:08.280Z",
+  "updated": "2026-08-13T11:55:15.465Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "supervisor-timeout-degrade": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2349941,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T11:52:08.280Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Stopped treating healthy pane tails as errors, added an explicit no-error-output timeout explanation, and covered healthy and error panes with fake-timer timeout tests.",
         "releasedAt": "2026-08-13T11:51:54.856Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2349941,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:52:08.280Z",
+        "itemId": "supervisor-timeout-degrade",
+        "outcome": "completed",
+        "reason": "Made a missing PTY supervisor socket non-fatal while the tmux session remains alive, retained propagation for dead sessions, logged fallback delivery, and covered both paths with fake timers.",
+        "releasedAt": "2026-08-13T11:55:15.465Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "supervisor-failure-message-accuracy": {
         "reason": "Stopped treating healthy pane tails as errors, added an explicit no-error-output timeout explanation, and covered healthy and error panes with fake-timer timeout tests.",
         "updatedAt": "2026-08-13T11:51:54.856Z"
+      },
+      "supervisor-timeout-degrade": {
+        "reason": "Made a missing PTY supervisor socket non-fatal while the tmux session remains alive, retained propagation for dead sessions, logged fallback delivery, and covered both paths with fake timers.",
+        "updatedAt": "2026-08-13T11:55:15.465Z"
       }
     }
   },
@@ -142,6 +149,8 @@
     "supervisor-failure-message-accuracy.ac1": "completed",
     "supervisor-failure-message-accuracy.ac2": "completed",
     "supervisor-failure-message-accuracy.ac3": "completed",
-    "supervisor-timeout-degrade": "running"
+    "supervisor-timeout-degrade": "completed",
+    "supervisor-timeout-degrade.ac1": "completed",
+    "supervisor-timeout-degrade.ac2": "completed"
   }
 }
