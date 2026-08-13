@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-1641-review-requirements",
+  "issueId": "PAN-1641",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "codex",
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "1514842f-e026-420f-aab5-03fd2222f448",
+      "startedAt": "2026-08-13T15:38:24.681Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-13T15:38:24.681Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
