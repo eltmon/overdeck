@@ -37,6 +37,7 @@ import {
   clearSwarmSlotCompletion,
   persistAndVerifySwarmSlotCompletion,
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
+import { clearAllSlotAssignments, recordSlotAssignment } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { getIssueRecordPathForWorkspace } from '../../../../src/lib/pan-dir/record.js';
 import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
@@ -220,6 +221,66 @@ describe('PAN-3685 merged-slot ownership consumption', () => {
     expect(swarm?.slotAssignments).toEqual([{ slotIndex: 2, itemId: 'running' }]);
     expect(swarm?.slotCompletions?.['1']).toBeUndefined();
     expect(swarm?.slotCompletions?.['2']).toBeDefined();
+  });
+});
+
+describe('PAN-3690 slot ownership replacement', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-ownership-replace-'));
+    remote = initGitRecordRoot(workspacePath);
+  });
+
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
+  });
+
+  it('atomically clears the prior completion when assigning a new item to the same slot', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [{ slotIndex: 2, itemId: 'item-a' }],
+        slotCompletions: {
+          '2': { slotIndex: 2, itemId: 'item-a', agentId: 'agent-pan-3690-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+        },
+      },
+    }));
+
+    await recordSlotAssignment(workspacePath, 'PAN-3690', {
+      slotIndex: 2,
+      itemId: 'item-b',
+      agentId: 'agent-pan-3690-slot-2',
+    });
+
+    const swarm = readRecord(workspacePath, 'PAN-3690').swarm;
+    expect(swarm?.slotAssignments).toEqual([
+      expect.objectContaining({ slotIndex: 2, itemId: 'item-b' }),
+    ]);
+    expect(swarm?.slotCompletions).toEqual({});
+  });
+
+  it('atomically clears every assignment and completion during reset', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [{ slotIndex: 2, itemId: 'item-a' }],
+        slotCompletions: {
+          '2': { slotIndex: 2, itemId: 'item-a', agentId: 'agent-pan-3690-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+          '3': { slotIndex: 3, itemId: 'item-c', agentId: 'agent-pan-3690-slot-3', completedAt: '2026-08-13T00:01:00.000Z' },
+        },
+      },
+    }));
+
+    await clearAllSlotAssignments(workspacePath, 'PAN-3690');
+
+    expect(readRecord(workspacePath, 'PAN-3690').swarm).toEqual(expect.objectContaining({
+      slotAssignments: [],
+      slotCompletions: {},
+    }));
   });
 });
 

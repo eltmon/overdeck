@@ -143,6 +143,8 @@ export interface CoordinateSwarmSlotsDeps {
    * that the slot finished; the runtime plane is rebuildable and may be absent.
    */
   readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
+  /** Delete a stale durable marker that does not belong to the active item. */
+  clearSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
   getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
   setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /**
@@ -209,6 +211,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   listSlotAssignments: listDurableSlotAssignments,
   readStatusOverrides: defaultReadStatusOverrides,
   readSlotCompletion: defaultReadSlotCompletion,
+  clearSlotCompletion: clearSwarmSlotCompletion,
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
@@ -410,6 +413,7 @@ export async function classifyInFlightSlots(
       | 'isSlotWorktreeClean'
       | 'sendCompletionNudge'
       | 'readSlotCompletion'
+      | 'clearSlotCompletion'
     >> = defaultDeps,
   options: ClassifyInFlightSlotsOptions = {},
 ): Promise<ClassifiedSwarmSlot[]> {
@@ -431,9 +435,16 @@ export async function classifyInFlightSlots(
         options.issueId,
         slot.slotIndex,
       );
-      if (completion && (!completion.itemId || completion.itemId === slot.itemId)) {
-        classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' });
-        continue;
+      if (completion) {
+        if (completion.itemId === slot.itemId) {
+          classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' });
+          continue;
+        }
+        await (deps.clearSlotCompletion ?? clearSwarmSlotCompletion)(
+          options.workspacePath,
+          options.issueId,
+          slot.slotIndex,
+        );
       }
     }
 
@@ -1003,19 +1014,32 @@ export async function dispatchNextWave(
   return actions;
 }
 
-function recordSlotAssignment(workspacePath: string, issueId: string, assignment: SlotAssignment): Promise<void> {
-  return writeSwarmSlotAssignments(workspacePath, issueId, (existing) => [
-    ...existing.filter(slot => slot.slotIndex !== assignment.slotIndex && slot.itemId !== assignment.itemId),
-    {
-      ...assignment,
-      assignedAt: new Date().toISOString(),
-    },
-  ]);
+export function recordSlotAssignment(workspacePath: string, issueId: string, assignment: SlotAssignment): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  return updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, record => {
+    const slotAssignments = [
+      ...(record.swarm?.slotAssignments ?? []).filter(
+        slot => slot.slotIndex !== assignment.slotIndex && slot.itemId !== assignment.itemId,
+      ),
+      { ...assignment, assignedAt: new Date().toISOString() },
+    ].sort((a, b) => a.slotIndex - b.slotIndex);
+    const slotCompletions = { ...(record.swarm?.slotCompletions ?? {}) };
+    delete slotCompletions[String(assignment.slotIndex)];
+    return { ...record, swarm: { ...(record.swarm ?? {}), slotAssignments, slotCompletions } };
+  }).then(() => undefined);
 }
 
-/** Drop every recorded slot assignment for the issue — used by `pan swarm reset` (PAN-2214). */
+/** Drop every recorded slot assignment and completion marker atomically. */
 export function clearAllSlotAssignments(workspacePath: string, issueId: string): Promise<void> {
-  return writeSwarmSlotAssignments(workspacePath, issueId, () => []);
+  const normalizedIssueId = issueId.toUpperCase();
+  return updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, record => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      slotAssignments: [],
+      slotCompletions: {},
+    },
+  })).then(() => undefined);
 }
 
 function clearSlotAssignment(workspacePath: string, issueId: string, slotIndex: number, itemId?: string): Promise<void> {
