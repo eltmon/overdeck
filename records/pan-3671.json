@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:55:29.881Z",
+  "updated": "2026-08-13T11:58:51.059Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "heal-clears-stale-failure-state": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2467456,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T11:55:29.881Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Made a missing PTY supervisor socket non-fatal while the tmux session remains alive, retained propagation for dead sessions, logged fallback delivery, and covered both paths with fake timers.",
         "releasedAt": "2026-08-13T11:55:15.465Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2467456,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:55:29.881Z",
+        "itemId": "heal-clears-stale-failure-state",
+        "outcome": "completed",
+        "reason": "Extended the running-state writer to clear spawn_error and failed fork state on resurrection while preserving in-flight forks and the active-row no-op guard.",
+        "releasedAt": "2026-08-13T11:58:51.058Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "supervisor-timeout-degrade": {
         "reason": "Made a missing PTY supervisor socket non-fatal while the tmux session remains alive, retained propagation for dead sessions, logged fallback delivery, and covered both paths with fake timers.",
         "updatedAt": "2026-08-13T11:55:15.465Z"
+      },
+      "heal-clears-stale-failure-state": {
+        "reason": "Extended the running-state writer to clear spawn_error and failed fork state on resurrection while preserving in-flight forks and the active-row no-op guard.",
+        "updatedAt": "2026-08-13T11:58:51.058Z"
       }
     }
   },
@@ -160,6 +167,9 @@
     "supervisor-timeout-degrade": "completed",
     "supervisor-timeout-degrade.ac1": "completed",
     "supervisor-timeout-degrade.ac2": "completed",
-    "heal-clears-stale-failure-state": "running"
+    "heal-clears-stale-failure-state": "completed",
+    "heal-clears-stale-failure-state.ac1": "completed",
+    "heal-clears-stale-failure-state.ac2": "completed",
+    "heal-clears-stale-failure-state.ac3": "completed"
   }
 }
