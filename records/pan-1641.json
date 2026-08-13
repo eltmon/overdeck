@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:34:20.226Z",
+  "updated": "2026-08-13T14:34:39.299Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,8 +250,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "install-ollama-step": {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 1707425,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:34:39.299Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -371,6 +379,7 @@
     "lazy-ensure-on-spawn": "completed",
     "lazy-ensure-on-spawn.ac1": "completed",
     "lazy-ensure-on-spawn.ac2": "completed",
-    "lazy-ensure-on-spawn.ac3": "completed"
+    "lazy-ensure-on-spawn.ac3": "completed",
+    "install-ollama-step": "running"
   }
 }
