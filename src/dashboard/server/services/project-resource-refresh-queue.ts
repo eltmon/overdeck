@@ -137,6 +137,9 @@ const MEMBERSHIP_REFRESH_REASONS = new Set([
   'boot-warm',
   'periodic-convergence',
   'issue.statusChanged:closed-out',
+  'pull_request:opened',
+  'pull_request:closed',
+  'pull_request:reopened',
 ]);
 
 export function shouldRefreshMembershipForResourceRefresh(

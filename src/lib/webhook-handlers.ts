@@ -460,6 +460,24 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   const repo = payload.repository!.full_name;
 
+  if (['opened', 'closed', 'reopened'].includes(payload.action ?? '')) {
+    try {
+      const { listProjectsSync, resolveProjectFromIssueSync } = await import('./projects.js');
+      const resolved = resolveProjectFromIssueSync(issueId);
+      const project = resolved
+        ? listProjectsSync().find((entry) => entry.key === resolved.projectKey)?.config
+        : undefined;
+      if (project) {
+        const { enqueueProjectResourceRefresh } = await import(
+          '../dashboard/server/services/project-resource-refresh-queue.js'
+        );
+        enqueueProjectResourceRefresh(project, `pull_request:${payload.action}`);
+      }
+    } catch (err: any) {
+      console.warn(`[webhook] Failed to enqueue membership refresh for ${issueId}: ${err?.message ?? err}`);
+    }
+  }
+
   // PAN-1513: fire postMergeLifecycle when GitHub reports the PR closed+merged.
   // Without this, admin-merges (gh pr merge --admin) and any merge that doesn't
   // route through Overdeck's own merge flow leave work agents, strikes, tmux
