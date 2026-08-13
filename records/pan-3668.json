@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:22:37.016Z",
+  "updated": "2026-08-13T00:24:23.626Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -102,16 +102,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 35,
-    "claims": {
-      "transcript-adapter-prime": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 350907,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:22:37.016Z"
-      }
-    },
+    "sequence": 36,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -299,6 +291,17 @@
         "outcome": "completed",
         "reason": "Implemented, tested, committed, and pushed in ae77ca780c",
         "releasedAt": "2026-08-13T00:22:33.508Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 350907,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:22:37.016Z",
+        "itemId": "transcript-adapter-prime",
+        "outcome": "completed",
+        "reason": "Implemented, tested, committed, and pushed in 2ad13e565c",
+        "releasedAt": "2026-08-13T00:24:23.626Z"
       }
     ],
     "statusReasons": {
@@ -369,6 +372,10 @@
       "message-delivery": {
         "reason": "Implemented, tested, committed, and pushed in ae77ca780c",
         "updatedAt": "2026-08-13T00:22:33.508Z"
+      },
+      "transcript-adapter-prime": {
+        "reason": "Implemented, tested, committed, and pushed in 2ad13e565c",
+        "updatedAt": "2026-08-13T00:24:23.626Z"
       }
     }
   },
@@ -432,6 +439,8 @@
     "message-delivery.ac1": "completed",
     "message-delivery.ac2": "completed",
     "message-delivery.ac3": "completed",
-    "transcript-adapter-prime": "running"
+    "transcript-adapter-prime": "completed",
+    "transcript-adapter-prime.ac1": "completed",
+    "transcript-adapter-prime.ac2": "completed"
   }
 }
