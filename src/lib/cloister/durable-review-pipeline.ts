@@ -1,5 +1,8 @@
 type SetReviewPending = (update: {
-  reviewStatus: 'pending';
+  // PAN-3674: 'failed' allowed so a dispatch failure is recorded as failed —
+  // forcing 'pending' there overwrote the dispatcher's own failure write and
+  // stranded the issue in a state no gate or sweep understands (PAN-3668).
+  reviewStatus: 'pending' | 'failed';
   reviewNotes?: string;
 }) => void;
 
@@ -61,6 +64,18 @@ export async function startRegisteredDurableReviewPipelineHostSide(
   input: DurableReviewPipelineHostInput,
 ): Promise<boolean> {
   return handler && dispatcher ? handler({ ...input, dispatchReview: dispatcher }) : false;
+}
+
+/**
+ * PAN-3674: run ONLY the registered review dispatcher (no verification re-run).
+ * The repair path for post-verification dispatch failures — verification already
+ * passed at this HEAD, so re-running the full gate suite per retry is waste.
+ * Returns null when no dispatcher is registered (non-server processes).
+ */
+export async function dispatchRegisteredReviewHostSide(
+  context: DurableReviewDispatchContext,
+): Promise<DurableReviewDispatchResult | null> {
+  return dispatcher ? dispatcher(context) : null;
 }
 
 /** Runs a supplied pipeline input, primarily for explicitly composed callers and tests. */

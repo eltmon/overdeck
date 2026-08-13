@@ -32,7 +32,7 @@ vi.mock('../../../src/lib/telemetry/pipeline.js', () => ({
   capturePipelineStageForIssue: capturePipelineStageForIssueMock,
 }));
 
-import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { getReviewStatusSync, setReviewStatusSync, _isStrandedPendingReviewForTest } from '../../../src/lib/review-status.js';
 import {
   registerReviewStatusMapReader,
   resolveCanonicalReviewStatus,
@@ -284,5 +284,59 @@ describe('review status', () => {
     expect(status.reviewRequestedAt).toBe('2026-07-25T10:00:00.000Z');
     const [, journalStatus] = mockUpdateIssueRecordForIssue.mock.calls.at(-1)!;
     expect(journalStatus.reviewRequestedAt).toBe('2026-07-25T10:00:00.000Z');
+  });
+});
+
+describe('PAN-3674: stranded pending review predicate', () => {
+  const NOW = Date.parse('2026-08-13T12:00:00Z');
+  const STALE_SPAWN = '2026-08-13T11:30:00Z'; // 30 min before NOW — past the 20 min threshold
+  const FRESH_SPAWN = '2026-08-13T11:59:00Z'; // 1 min before NOW — still within it
+
+  const base = {
+    reviewStatus: 'pending' as const,
+    mergeStatus: 'pending' as const,
+    verificationStatus: 'passed' as const,
+    readyForMerge: false,
+    reviewSpawnedAt: STALE_SPAWN,
+  };
+
+  it('flags a pending review with a stale spawn and passed verification', () => {
+    expect(_isStrandedPendingReviewForTest(base, NOW)).toBe(true);
+  });
+
+  it('accepts a numeric reviewSpawnedAt', () => {
+    expect(_isStrandedPendingReviewForTest({ ...base, reviewSpawnedAt: Date.parse(STALE_SPAWN) }, NOW)).toBe(true);
+  });
+
+  it('does not flag a fresh spawn — dispatch may still be in flight', () => {
+    expect(_isStrandedPendingReviewForTest({ ...base, reviewSpawnedAt: FRESH_SPAWN }, NOW)).toBe(false);
+  });
+
+  it('does not flag when no spawn was ever attempted', () => {
+    const { reviewSpawnedAt: _omit, ...noSpawn } = base;
+    expect(_isStrandedPendingReviewForTest(noSpawn, NOW)).toBe(false);
+  });
+
+  it('does not flag non-pending review states', () => {
+    for (const reviewStatus of ['reviewing', 'passed', 'failed', 'blocked', 'skipped'] as const) {
+      expect(_isStrandedPendingReviewForTest({ ...base, reviewStatus }, NOW)).toBe(false);
+    }
+  });
+
+  it('does not flag when verification has not passed — the work agent owns the next move', () => {
+    for (const verificationStatus of ['failed', 'pending'] as const) {
+      expect(_isStrandedPendingReviewForTest({ ...base, verificationStatus }, NOW)).toBe(false);
+    }
+    const { verificationStatus: _omit, ...noVerification } = base;
+    expect(_isStrandedPendingReviewForTest(noVerification, NOW)).toBe(false);
+  });
+
+  it('does not flag merged or merge-ready rows', () => {
+    expect(_isStrandedPendingReviewForTest({ ...base, mergeStatus: 'merged' }, NOW)).toBe(false);
+    expect(_isStrandedPendingReviewForTest({ ...base, readyForMerge: true }, NOW)).toBe(false);
+  });
+
+  it('does not flag an unparseable spawn timestamp', () => {
+    expect(_isStrandedPendingReviewForTest({ ...base, reviewSpawnedAt: 'not-a-date' }, NOW)).toBe(false);
   });
 });
