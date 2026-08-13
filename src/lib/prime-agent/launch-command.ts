@@ -8,6 +8,7 @@ import { primeAgentGlobalContextFile, resolveWorkspaceContextFile } from '../con
 import { existsSync, readFileSync } from 'fs';
 import { packageRoot } from '../paths.js';
 import { resolveHarnessBinary } from '../harness-binary.js';
+import { loadConfigSync } from '../config-yaml.js';
 
 function quoteShell(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -18,6 +19,7 @@ export interface PrimeAgentLaunchCommandOptions {
   model: string;
   workspace: string;
   authMode: AuthMode;
+  rpcStartupTimeoutMs?: number;
 }
 
 export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchCommandOptions): Promise<string> {
@@ -30,6 +32,7 @@ export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchComman
     .join('\n\n');
   const binary = await resolveHarnessBinary('prime-agent');
   if (!binary) throw new Error('Prime Agent executable is unavailable');
+  const startupTimeoutMs = options.rpcStartupTimeoutMs ?? loadConfigSync().config.primeAgent.rpcStartupTimeoutMs;
   return [
     `node ${quoteShell(join(packageRoot, 'dist', 'prime-agent-host.js'))}`,
     `--agent ${quoteShell(options.agentId)}`,
@@ -39,5 +42,6 @@ export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchComman
     `--model ${quoteShell(route.model)}`,
     `--session-dir ${quoteShell(sessionDir)}`,
     `--append-system-prompt ${quoteShell([PRIME_AGENT_MANAGED_POLICY, context].filter(Boolean).join('\n\n'))}`,
+    `--startup-timeout-ms ${startupTimeoutMs}`,
   ].join(' ');
 }

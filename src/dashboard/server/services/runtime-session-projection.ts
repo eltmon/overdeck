@@ -14,8 +14,8 @@ export function projectRuntimeSession(agentId: string, harness: RuntimeName): Ru
     if (!runtime) return { harness };
     const metrics = runtime.getSessionMetrics?.(agentId);
     const lastActivity = metrics?.lastActivity ?? runtime.getLastActivity(agentId);
-    const tokenUsage = metrics ? metrics.tokenUsage : runtime.getTokenUsage(agentId);
-    const cost = (metrics ? metrics.cost : runtime.getSessionCost(agentId))?.totalCost;
+    const tokenUsage = metrics?.tokenUsage;
+    const cost = metrics?.cost?.totalCost;
     return {
       harness,
       ...(lastActivity ? { lastActivity: lastActivity.toISOString() } : {}),

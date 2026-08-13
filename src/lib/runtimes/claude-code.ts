@@ -302,17 +302,6 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
     };
   }
 
-  getSessionMetrics(agentId: string) {
-    const path = this.getSessionPath(agentId);
-    const parsed = path ? parseClaudeSessionSync(path) : null;
-    const usage = parsed?.usage ?? null;
-    const inputCost = (usage?.inputTokens ?? 0) * 3 / 1_000_000;
-    const outputCost = (usage?.outputTokens ?? 0) * 15 / 1_000_000;
-    const cacheReadCost = (usage?.cacheReadTokens ?? 0) * 0.3 / 1_000_000;
-    const cacheWriteCost = (usage?.cacheWriteTokens ?? 0) * 3.75 / 1_000_000;
-    return { lastActivity: this.getLastActivity(agentId), tokenUsage: usage, cost: usage ? { inputCost, outputCost, cacheReadCost, cacheWriteCost, totalCost: inputCost + outputCost + cacheReadCost + cacheWriteCost, currency: 'USD' as const } : null };
-  }
-
   /**
    * Send a message to a running agent
    */

@@ -19,6 +19,7 @@ import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import { tmuxCreateSession } from './tmux-cli.js';
 import { getProviderAuthMode } from '../agents/provider-auth.js';
 import { buildPrimeAgentBaseCommand } from '../prime-agent/launch-command.js';
+import { loadConfigSync } from '../config-yaml.js';
 
 export interface PrimeAgentSessionStats {
   tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
@@ -39,15 +40,16 @@ export interface PrimeAgentRuntimeController {
 const productionController: PrimeAgentRuntimeController = {
   async spawn(config) {
     if (!config.model) throw new Error('Prime Agent spawn requires a model');
+    const startupTimeoutMs = loadConfigSync().config.primeAgent.rpcStartupTimeoutMs;
     const authMode = await getProviderAuthMode(config.model);
     if (!authMode) throw new Error(`Prime Agent provider credentials are unavailable for ${config.model}`);
-    let command = await buildPrimeAgentBaseCommand({ agentId: config.agentId, model: config.model, workspace: config.workspace, authMode });
+    let command = await buildPrimeAgentBaseCommand({ agentId: config.agentId, model: config.model, workspace: config.workspace, authMode, rpcStartupTimeoutMs: startupTimeoutMs });
     if (config.sessionId) command += ` --resume ${shellQuote(config.sessionId)}`;
     if (config.prompt) command += ` --prompt ${shellQuote(config.prompt)}`;
     rmSync(join(getAgentDir(config.agentId), 'prime-agent-session-id'), { force: true }); // PAN-3357: not a dir removal
     rmSync(join(getAgentDir(config.agentId), 'prime-agent-launch-error'), { force: true }); // PAN-3357: not a dir removal
     await tmuxCreateSession(config.agentId, config.workspace, command, { ...config.env, OVERDECK_AGENT_ID: config.agentId });
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + startupTimeoutMs;
     while (Date.now() < deadline) {
       const sessionId = readText(config.agentId, 'prime-agent-session-id');
       if (sessionId) return { sessionId, sessionPath: readText(config.agentId, 'prime-agent-session-path') ?? '' };

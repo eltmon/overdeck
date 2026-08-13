@@ -9,6 +9,10 @@ vi.mock('../../../src/lib/runtimes/index.js', () => ({
         cost: { totalCost: 0.04 },
       }),
       getLastActivity: () => { throw new Error('must not rescan'); },
+    } : harness === 'claude-code' ? {
+      getLastActivity: () => new Date('2026-08-12T21:00:00.000Z'),
+      getTokenUsage: () => { throw new Error('request route must not parse transcripts'); },
+      getSessionCost: () => { throw new Error('request route must not parse transcripts'); },
     } : undefined,
   }),
 }));
@@ -22,6 +26,13 @@ describe('dashboard runtime session projection', () => {
       lastActivity: '2026-08-12T20:00:00.000Z',
       tokenUsage: { inputTokens: 10, outputTokens: 2, cacheReadTokens: 3 },
       cost: 0.04,
+    });
+  });
+
+  it('does not synchronously parse transcripts when a runtime has no cached metrics', () => {
+    expect(projectRuntimeSession('agent-pan-1', 'claude-code')).toEqual({
+      harness: 'claude-code',
+      lastActivity: '2026-08-12T21:00:00.000Z',
     });
   });
 });

@@ -13,7 +13,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   listAgentStates: () => [],
 }));
 
-vi.mock('../../../../src/lib/config-yaml.js', () => ({ loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' } } }) }));
+vi.mock('../../../../src/lib/config-yaml.js', () => ({ loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' }, primeAgent: { rpcStartupTimeoutMs: 45_000 } } }) }));
 vi.mock('../../../../src/lib/openai-auth.js', async () => {
   const { Effect } = await import('effect');
   return { getOpenAIAuthStatus: () => Effect.succeed({ loggedIn: false }) };
@@ -30,6 +30,7 @@ describe('Prime Agent work launch', () => {
     expect(baseCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(baseCommand).toContain("--session-dir '/tmp/agent-pan-3668/prime-sessions'");
     expect(baseCommand).toContain('--append-system-prompt');
+    expect(baseCommand).toContain('--startup-timeout-ms 45000');
 
     const launcher = generateLauncherScriptSync({ role: 'work', workingDir: workspace, harness: 'prime-agent', baseCommand });
     expect(launcher).toContain('exec node');

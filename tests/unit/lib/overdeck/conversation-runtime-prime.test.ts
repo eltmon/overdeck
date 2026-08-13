@@ -10,7 +10,7 @@ vi.mock('../../../../src/lib/openai-auth.js', async () => {
 });
 vi.mock('../../../../src/lib/config-yaml.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../src/lib/config-yaml.js')>(),
-  loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' } }, path: '/tmp/config.yaml' }),
+  loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' }, primeAgent: { rpcStartupTimeoutMs: 45_000 } }, path: '/tmp/config.yaml' }),
 }));
 
 const { preparePrimeAgentConversationLaunch, resolveAllowedHarness } = await import(
@@ -31,6 +31,7 @@ describe('Prime Agent conversation launch', () => {
     expect(launch.runtimeCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(launch.runtimeCommand).toContain("--session-dir '/tmp/conv-prime/prime-sessions'");
     expect(launch.runtimeCommand).toContain('--append-system-prompt');
+    expect(launch.runtimeCommand).toContain('--startup-timeout-ms 45000');
     expect(launch.runtimeCommand).not.toContain('--permission-mode');
   });
 });
