@@ -4,13 +4,19 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { conversationsRouteLayer } from '../../../../../src/dashboard/server/routes/conversations.js';
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = join(__dirname, '..', '..', '..', '..', '..');
+const CONVERSATIONS_ROUTE_FILE = join(
+  WORKSPACE_ROOT,
+  'src',
+  'dashboard',
+  'server',
+  'routes',
+  'conversations.ts',
+);
 
 const CONVERSATION_ROUTE_SURFACE_FILES = [
-  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversations.ts'),
+  CONVERSATIONS_ROUTE_FILE,
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-archive.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-delivery.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-diffs.ts'),
@@ -76,7 +82,9 @@ function enumerateConversationRoutes(): Set<string> {
 
 describe('PAN-2145 conversations route no-loss audit', () => {
   it('keeps the legacy conversationsRouteLayer export available', () => {
-    expect(conversationsRouteLayer).toBeDefined();
+    const source = readFileSync(CONVERSATIONS_ROUTE_FILE, 'utf8');
+
+    expect(source).toMatch(/export\s+const\s+conversationsRouteLayer\s*=/);
   });
 
   it('keeps all 36 conversationsRouteLayer method/path registrations', () => {
