@@ -27,6 +27,11 @@
       "timestamp": "2026-08-13T12:17:22.786Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T12:24:40.489Z"
     }
   ],
   "feedback": [],
@@ -79,16 +84,17 @@
     "recordedAt": "2026-08-13T12:17:15.974Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:17:56.288Z",
+  "updated": "2026-08-13T12:24:40.489Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:17:55.469Z",
+    "updatedAt": "2026-08-13T12:24:40.272Z",
+    "verificationNotes": "Verification FAILED at lint (170432ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3671/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewRequestedAt": "2026-08-13T12:17:19.130Z",
     "scopeDrift": {
@@ -188,7 +194,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.789369,
-        "pricingAsOf": "2026-08-13T12:17:56.277Z"
+        "pricingAsOf": "2026-08-13T12:24:40.321Z"
       }
     },
     "merges": [
