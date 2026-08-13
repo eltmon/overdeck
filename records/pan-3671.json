@@ -22,11 +22,64 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-13T12:08:57.370Z"
+    },
+    {
+      "timestamp": "2026-08-13T12:17:22.786Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-MESSAGE-DELIVERY.md",
+      "src/cli/commands/conversations/__tests__/heal.test.ts",
+      "src/cli/commands/conversations/heal.ts",
+      "src/cli/commands/conversations/index.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/__tests__/launcher-generator.test.ts",
+      "src/lib/__tests__/tmux-server.test.ts",
+      "src/lib/launcher-generator.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/paths.ts",
+      "src/lib/tmux.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
+      "tests/unit/lib/overdeck/conversations.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-MESSAGE-DELIVERY.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/conversations/__tests__/heal.test.ts",
+      "src/cli/commands/conversations/heal.ts",
+      "src/cli/commands/conversations/index.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/__tests__/launcher-generator.test.ts",
+      "src/lib/__tests__/tmux-server.test.ts",
+      "src/lib/launcher-generator.ts",
+      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/paths.ts",
+      "src/lib/tmux.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
+      "tests/unit/lib/overdeck/conversations.test.ts"
+    ],
+    "recordedAt": "2026-08-13T12:17:15.974Z"
+  },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:17:19.132Z",
+  "updated": "2026-08-13T12:17:22.889Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -35,7 +88,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:17:19.130Z",
+    "updatedAt": "2026-08-13T12:17:22.782Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewRequestedAt": "2026-08-13T12:17:19.130Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -84,35 +138,62 @@
         "tests/unit/lib/overdeck/conversations.test.ts"
       ],
       "recordedAt": "2026-08-13T12:17:15.974Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3676"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 2467003,
+            "output": 3144,
+            "cacheRead": 2325248,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 23393435,
+            "output": 31737,
+            "cacheRead": 22923776,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 9844,
-            "output": 102,
+            "input": 25566,
+            "output": 302,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 2467003,
+          "output": 3144,
+          "cacheRead": 2325248,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 23393435,
+          "output": 31737,
+          "cacheRead": 22923776,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5": {
-          "input": 9844,
-          "output": 102,
+          "input": 25566,
+          "output": 302,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0.010354,
-        "pricingAsOf": "2026-08-13T11:38:22.749Z"
+        "usd": 14.789369,
+        "pricingAsOf": "2026-08-13T12:17:22.836Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3676"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -288,53 +369,5 @@
     "docs-delivery-home-resolution.ac1": "completed",
     "docs-delivery-home-resolution.ac2": "completed",
     "docs-delivery-home-resolution.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt",
-      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
-      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/AGENT-MESSAGE-DELIVERY.md",
-      "src/cli/commands/conversations/__tests__/heal.test.ts",
-      "src/cli/commands/conversations/heal.ts",
-      "src/cli/commands/conversations/index.ts",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/lib/__tests__/launcher-generator.test.ts",
-      "src/lib/__tests__/tmux-server.test.ts",
-      "src/lib/launcher-generator.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/paths.ts",
-      "src/lib/tmux.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
-      "tests/unit/lib/overdeck/conversations.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/AGENT-MESSAGE-DELIVERY.md",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/conversations/__tests__/heal.test.ts",
-      "src/cli/commands/conversations/heal.ts",
-      "src/cli/commands/conversations/index.ts",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/lib/__tests__/launcher-generator.test.ts",
-      "src/lib/__tests__/tmux-server.test.ts",
-      "src/lib/launcher-generator.ts",
-      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/paths.ts",
-      "src/lib/tmux.ts",
-      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
-      "tests/unit/lib/overdeck/conversations.test.ts"
-    ],
-    "recordedAt": "2026-08-13T12:17:15.974Z"
   }
 }
