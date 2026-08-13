@@ -252,6 +252,7 @@ describe('agents auth routing', () => {
         'unset CLAUDE_CODE_AUTO_COMPACT_WINDOW',
         'unset CLAUDE_CODE_MAX_CONTEXT_TOKENS',
         'unset OPENAI_API_KEY',
+        'unset OPENAI_BASE_URL',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
         'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
