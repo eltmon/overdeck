@@ -244,6 +244,28 @@ describe('deacon-swarm next-wave dispatch', () => {
     );
     expect(fakeDeps.releaseSwarmSlot).toHaveBeenCalledTimes(1);
   });
+
+  it('does not claim a dependent when reconciliation falsely labels its running blocker merged', async () => {
+    const parent = item('wi-parent', ['src/parent.ts']);
+    parent.status = 'running';
+    const child = item('wi-child', ['src/child.ts']);
+    const plan = doc([parent, child]);
+    plan.plan.edges = [{ from: 'wi-parent', to: 'wi-child', type: 'blocks' }];
+    const fakeDeps = deps();
+
+    const actions = await dispatchNextWave(
+      'PAN-2203',
+      '/repo/workspaces/feature-pan-2203',
+      plan,
+      reconciled({ merged: [mergedSlot('wi-parent')] }),
+      analyzeSwarmReadiness(plan),
+      fakeDeps,
+    );
+
+    expect(actions).toEqual([]);
+    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
+  });
 });
 
 describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regression)', () => {
