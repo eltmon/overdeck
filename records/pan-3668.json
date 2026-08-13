@@ -27,6 +27,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-13T10:52:29.634Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T11:27:03.202Z"
     }
   ],
   "feedback": [],
@@ -274,7 +279,7 @@
     "recordedAt": "2026-08-13T01:25:24.991Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T11:26:57.226Z",
+  "updated": "2026-08-13T11:27:03.203Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "reviewing",
@@ -284,13 +289,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T10:52:28.294Z",
+    "updatedAt": "2026-08-13T11:26:57.435Z",
     "reviewNotes": "Timed out waiting for Codex app-server readiness for agent-pan-3668-review. Last status error: app-server socket missing for agent-pan-3668-review",
     "inspectNotes": "AC-1 pass: policy text carries provenance, workspace-boundary, pan-lifecycle, no-hidden-agents, and state-write-door rules; injection at spawn is work item 7 (constant currently unconsumed). AC-2 pass: deny-list verified against installed prime-agent 0.7.2 RPC dispatch - all 15 names are real and are exactly the daemon-coordination block (send_message, agent_messages_*, list/add/cancel_schedule, list/get/set/update/manage_heartbeat, observe/unobserve); no autonomous_* RPC command exists, heartbeats/schedules are the continuation surface and are covered; error message is standalone. AC-3 pass: checkpoint recorded with fallback, and enforcement independently re-verified against the pinned-range release during inspection. FLAG (non-blocking): policy.ts checkpoint comment overclaims doctor - doctor-prime-agent.ts pins semver >=0.1.0 <1.0.0 plus a --mode rpc help probe, not a protocol/command list, so 'protocol drift is rejected by doctor' is false; a future 0.x adding coordination commands would pass doctor and slip the deny-list. Fix the comment; consider an allow-list of root-session commands so the guard fails closed. Minor: assert applies to every Prime RPC session, not only managed ones - stricter than FR-17 requires and consistent with the PRD non-goal, but the 'Managed' name is then misleading.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "lastVerifiedCommit": "a85fc48abe86e8f5a3a4ac48a2a116aaff82fad7",
     "reviewRequestedAt": "2026-08-13T01:25:28.542Z",
-    "reviewSpawnedAt": "2026-08-13T10:52:28.292Z",
+    "reviewSpawnedAt": "2026-08-13T11:26:57.431Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/TELEMETRY.md",
@@ -546,16 +551,16 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 74961448,
-            "output": 119278,
-            "cacheRead": 73737216,
+            "input": 78837806,
+            "output": 136200,
+            "cacheRead": 77295360,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 6922,
-            "output": 556,
+            "input": 25876,
+            "output": 974,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -569,21 +574,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 74961448,
-          "output": 119278,
-          "cacheRead": 73737216,
+          "input": 78837806,
+          "output": 136200,
+          "cacheRead": 77295360,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 6922,
-          "output": 556,
+          "input": 25876,
+          "output": 974,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 46.57781,
-        "pricingAsOf": "2026-08-13T10:52:28.470Z"
+        "usd": 50.476656,
+        "pricingAsOf": "2026-08-13T11:26:57.882Z"
       }
     },
     "merges": [
