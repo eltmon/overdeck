@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3686",
+  "schemaVersion": 2,
+  "created": "2026-08-13T20:00:00.206Z",
+  "updated": "2026-08-13T20:00:00.206Z",
+  "pipeline": {
+    "issueId": "PAN-3686",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T20:00:00.206Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "k3[1m]"
+}
