@@ -72,12 +72,9 @@ interface SlotCompletionContext {
 }
 
 export function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
-  // The CLI accepts both the runtime agent id (`agent-min-888-slot-1`) and the
-  // operator-facing slot id printed by swarm commands (`MIN-888-SLOT-1`).
-  // Always normalize either spelling to the canonical runtime agent id before
-  // issue/project resolution. Otherwise a bare slot id is treated as an issue
-  // id and migrated projects fall back to a legacy workspace `.pan/records`
-  // path while auto-commit targets the state worktree.
+  // Normalize both the runtime `agent-*` id and the operator-facing bare slot
+  // id before project resolution; otherwise migrated projects use a legacy
+  // workspace record path while auto-commit targets the state worktree.
   const match = /^(?:agent-)?([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
   if (!match) return null;
   const slotIndex = Number(match[2]);
