@@ -344,6 +344,23 @@ describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regressi
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 2 }));
   });
 
+  it('a stopped historical agent does not occupy its slot index (PAN-3689)', async () => {
+    const plan = doc([item('wi-a', ['src/a.ts'])]);
+    const fakeDeps = deps();
+
+    const actions = await dispatchNextWave(
+      'PAN-2203',
+      '/repo/workspaces/feature-pan-2203',
+      plan,
+      reconciled({ agents: [{ slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' }] }),
+      analyzeSwarmReadiness(plan),
+      fakeDeps,
+    );
+
+    expect(actions).toEqual(['[swarm] dispatched implementation slot 1 (item wi-a) for PAN-2203']);
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 1 }));
+  });
+
   it('never spawns or assigns an index above the bound even under an inconsistent registry', async () => {
     const plan = doc([
       item('wi-a', ['src/a.ts']),

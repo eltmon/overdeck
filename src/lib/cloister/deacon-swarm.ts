@@ -891,7 +891,7 @@ export async function dispatchNextWave(
     ...reconciled.inFlight.map(slot => slot.slotIndex),
     // Active merged slots are covered by their assignment, agent, or worktree (PAN-3689).
     ...reconciled.branches.filter(branch => !branch.merged).map(branch => branch.slotIndex),
-    ...reconciled.agents.map(agent => agent.slotIndex),
+    ...reconciled.agents.filter(agent => agent.status !== 'stopped').map(agent => agent.slotIndex),
     ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
     ...(reconciled.superseded ?? []).map(attempt => attempt.slotIndex),
   ]);
