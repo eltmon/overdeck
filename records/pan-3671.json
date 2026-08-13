@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:44:23.966Z",
+  "updated": "2026-08-13T11:48:12.757Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "launcher-export-overdeck-home": {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2213059,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:48:12.757Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -95,6 +103,7 @@
     "sanitizer-canonical-home-pin": "completed",
     "sanitizer-canonical-home-pin.ac1": "completed",
     "sanitizer-canonical-home-pin.ac2": "completed",
-    "sanitizer-canonical-home-pin.ac3": "completed"
+    "sanitizer-canonical-home-pin.ac3": "completed",
+    "launcher-export-overdeck-home": "running"
   }
 }
