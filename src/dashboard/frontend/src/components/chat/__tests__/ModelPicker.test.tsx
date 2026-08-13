@@ -120,7 +120,8 @@ describe('chat ModelPicker live harness labels', () => {
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(4);
+    expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(5);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 

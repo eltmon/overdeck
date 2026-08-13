@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import { updateConversationTitle } from './ConversationList';
 import { closeConversationPanes } from '../../lib/panesStore';
+import type { Harness } from '../Settings/types';
 
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
@@ -47,7 +48,7 @@ type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 type HandoffAuthor = 'source' | 'external';
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; handoffAuthor?: HandoffAuthor; handoffAuthorModel?: string; handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'; projectKey?: string }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: Harness; summaryHarness?: Harness; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; handoffAuthor?: HandoffAuthor; handoffAuthorModel?: string; handoffAuthorHarness?: Harness; projectKey?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -83,7 +84,7 @@ export interface ConversationMutations {
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   move: (opts: { name: string; projectKey: string; projectName: string }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', projectKey?: string) => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: Harness, summaryHarness?: Harness, focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: Harness, projectKey?: string) => void;
   forkTarget: Conversation | null;
   forkTargetMode: ForkModeOption | undefined;
   forkTargetFocus: string | undefined;
@@ -233,7 +234,7 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', projectKey?: string) => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: Harness, summaryHarness?: Harness, focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: Harness, projectKey?: string) => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
