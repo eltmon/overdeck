@@ -387,7 +387,7 @@ function parseAgentRole(value: string | undefined): ArtifactAgentRole | undefine
 
 export function parseAgentHarness(value: string | undefined): ArtifactAgentHarness | undefined {
   if (value === undefined) return undefined;
-  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'user') return value;
+  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'prime-agent' || value === 'user') return value;
   throw new Error(`Invalid --agent-harness: ${value}`);
 }
 

@@ -10,6 +10,7 @@ import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/overdeck/control-settings.js';
 import { isPaneDead, killSession, sessionExists } from '../../../lib/tmux.js';
+import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import {
   abortFlywheelRun,
   getFlywheelRunDetail,
@@ -38,7 +39,7 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
-  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness: RuntimeName;
   model: string;
   effort: RoleEffort;
   minAgents: number;
@@ -146,7 +147,7 @@ async function createInitialFlywheelStatus(
   startedAt: string,
   cwd: string,
   agentModel: string | undefined,
-  agentHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | undefined,
+  agentHarness: RuntimeName | undefined,
   roleConfig: ResolvedFlywheelRoleConfig,
 ): Promise<FlywheelStatus> {
   const ramTotalMb = mb(totalmem());

@@ -199,8 +199,8 @@ export type PrerequisiteResolver = (
 ) => Promise<string | null>;
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
-  const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
-  return stdout;
+  const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
+  return stdout || stderr;
 };
 
 const defaultResolver: PrerequisiteResolver = async (command, options) => {

@@ -3,7 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { summarizeSerializedText } from './smart-compaction.js';
-import type { ConversationTranscriptAdapter } from './transcript-adapter.js';
+import type { ConversationTranscriptAdapter } from './transcript-adapter-types.js';
 
 const DETAIL_LIMIT = 4_000;
 

@@ -207,7 +207,7 @@ function parseAgentRole(value: string | undefined): ArtifactMetadata['agentRole'
 }
 
 export function parseAgentHarness(value: string | undefined): ArtifactMetadata['agentHarness'] {
-  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'user') {
+  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'prime-agent' || value === 'user') {
     return value;
   }
   return null;

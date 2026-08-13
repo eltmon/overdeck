@@ -505,6 +505,7 @@ export async function previewContextLayers(
       codex: previews.codex,
       acp: previews.acp,
       'kimi-code': previews['kimi-code'],
+      'prime-agent': previews['prime-agent'],
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

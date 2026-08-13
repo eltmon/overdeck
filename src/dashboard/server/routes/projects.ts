@@ -295,7 +295,7 @@ async function collectSessionTreeNodes(
         awaitingInputReason: awaitingInput?.reason,
         pendingInputKinds: context.agentSnapshotsById?.get(checkId)?.pendingInputKinds,
         hasJsonl: !!jsonlPath,
-        ...projectRuntimeSession(checkId, state.harness),
+        ...projectRuntimeSession(checkId, state.harness ?? 'claude-code'),
         deliveryMethod: state.deliveryMethod,
         planningComplete: isPlanning ? planningFinished : undefined,
         ...await readSessionGateFields(checkId, state),

@@ -19,6 +19,7 @@ import { killSession } from '../../../../lib/tmux.js';
 import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
 import { resolveReviewParentRunState } from '../../../../lib/cloister/review-run-recovery.js';
+import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { execAsync, readJsonBody, validateSpecialistAgentName } from './shared.js';
@@ -570,7 +571,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const project = params['project'] as string;
     const issueId = params['issueId'] as string;
     const body = yield* readJsonBody;
-    const { model, harness } = body as { model?: string; harness?: 'claude-code' | 'pi' | 'codex' };
+    const { model, harness } = body as { model?: string; harness?: RuntimeName };
 
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),

@@ -271,7 +271,7 @@ export async function fetchActivityDataWithContext(
     roundMetadata?: ReviewerRoundMetadata;
     modelOrigin?: ModelOriginData;
     planningComplete?: boolean;
-    [key: string]: unknown;
+    harness?: string; lastActivity?: string; tokenUsage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }; cost?: number;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -380,7 +380,7 @@ export async function fetchActivityDataWithContext(
         hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
         planningComplete: sectionType === 'planning' ? planningFinished : undefined,
-        ...projectRuntimeSession(checkId, state.harness),
+        ...projectRuntimeSession(checkId, state.harness ?? 'claude-code'),
       });
     } catch { /* skip malformed state */ }
   }
