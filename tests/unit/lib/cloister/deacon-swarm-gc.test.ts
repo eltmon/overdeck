@@ -13,12 +13,15 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   };
 }
 
-function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'slotWorktreeExists'> {
+function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'slotWorktreeExists'> & { listSlotWorkspaceWorktrees: () => { isPolyrepo: false; nested: [] } } {
   return {
     runGitCommand: vi.fn(async () => undefined),
     clearSlotAssignment: vi.fn(),
     listSessionNames: vi.fn(async () => sessionNames),
     slotWorktreeExists: vi.fn(() => options.worktreeExists ?? true),
+    // Hermetic default: treat every issue as monorepo so the real project
+    // config resolver never runs in unit tests.
+    listSlotWorkspaceWorktrees: () => ({ isPolyrepo: false, nested: [] }),
   };
 }
 
@@ -183,6 +186,151 @@ describe('deacon-swarm merged slot GC', () => {
       '[swarm] gc deferred slot 1 (item wi-1) for PAN-2203: branch delete failed: branch is checked out',
     ]);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+});
+
+describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
+  const workspacePath = '/myn/workspaces/feature-min-888';
+  const slotWorkspace = `${workspacePath}-slot-2`;
+  const slotBranch = 'feature/min-888-slot-2';
+  const nested = [
+    { repoKey: 'fe', dir: `${slotWorkspace}/fe`, parentRepo: '/myn/frontend', featureBranch: 'feature/min-888' },
+    { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/myn/api', featureBranch: 'feature/min-888' },
+  ];
+
+  function polyrepoDeps(options: {
+    aheadByRepo?: Record<string, string>;
+    aheadThrows?: boolean;
+    dirtyByRepo?: Record<string, string>;
+    rootRemoveError?: string;
+    nestedRemoveErrorRepo?: string;
+  } = {}) {
+    const removeDirectory = vi.fn(async () => undefined);
+    const fakeDeps = {
+      runGitCommand: vi.fn(async (command: string, cwd: string) => {
+        if (command.startsWith('git rev-list --count')) {
+          if (options.aheadThrows) throw new Error('unknown revision');
+          const repo = nested.find(wt => wt.parentRepo === cwd);
+          return { stdout: `${options.aheadByRepo?.[repo?.repoKey ?? ''] ?? '0'}\n` };
+        }
+        if (command.startsWith('git status --porcelain')) {
+          const repo = nested.find(wt => wt.dir === cwd);
+          return { stdout: options.dirtyByRepo?.[repo?.repoKey ?? ''] ?? '' };
+        }
+        if (command.startsWith('git worktree remove')) {
+          if (command.includes(JSON.stringify(slotWorkspace)) && options.rootRemoveError) {
+            throw new Error(options.rootRemoveError);
+          }
+          const failing = nested.find(wt => wt.repoKey === options.nestedRemoveErrorRepo);
+          if (failing && command.includes(JSON.stringify(failing.dir))) {
+            throw new Error('nested worktree is locked');
+          }
+          return undefined;
+        }
+        return undefined;
+      }),
+      clearSlotAssignment: vi.fn(),
+      listSessionNames: vi.fn(async () => [] as string[]),
+      slotWorktreeExists: vi.fn(() => true),
+      listSlotWorkspaceWorktrees: () => ({ isPolyrepo: true, nested }),
+      removeDirectory,
+    };
+    return fakeDeps;
+  }
+
+  const polySlot = () => slot({
+    itemId: 'wi-36',
+    slotIndex: 2,
+    branch: slotBranch,
+    agentId: 'agent-min-888-slot-2',
+  });
+
+  it('detaches every nested worktree in its parent repo before removing the aggregate root', async () => {
+    const fakeDeps = polyrepoDeps();
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toEqual(['[swarm] gc slot 2 (item wi-36) for MIN-888']);
+    const calls = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command, cwd]) => `${command} @ ${cwd}`);
+    const rootRemoveIndex = calls.findIndex(c => c.startsWith(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`));
+    for (const wt of nested) {
+      expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+        `git worktree remove --force ${JSON.stringify(wt.dir)}`,
+        wt.parentRepo,
+      );
+      expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+        `git branch -D ${JSON.stringify(slotBranch)}`,
+        wt.parentRepo,
+      );
+      const nestedRemoveIndex = calls.findIndex(c => c.startsWith(`git worktree remove --force ${JSON.stringify(wt.dir)}`));
+      expect(nestedRemoveIndex).toBeGreaterThanOrEqual(0);
+      expect(nestedRemoveIndex).toBeLessThan(rootRemoveIndex);
+    }
+    expect(rootRemoveIndex).toBeGreaterThanOrEqual(0);
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git branch -D ${JSON.stringify(slotBranch)}`,
+      workspacePath,
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'MIN-888', 2, 'wi-36');
+  });
+
+  it('preserves a slot whose nested branch has unmerged commits', async () => {
+    const fakeDeps = polyrepoDeps({ aheadByRepo: { api: '3' } });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('preserving nested work');
+    expect(actions[0]).toContain('api');
+    expect(actions[0]).toContain('3 unmerged commit(s)');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('preserves a slot when a nested merge state cannot be determined', async () => {
+    const fakeDeps = polyrepoDeps({ aheadThrows: true });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('could not be determined');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('preserves a slot whose nested worktree has uncommitted tracked changes', async () => {
+    const fakeDeps = polyrepoDeps({ dirtyByRepo: { fe: ' M src/app.ts\n' } });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('uncommitted tracked changes');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('defers without clearing the assignment when a nested worktree remove fails', async () => {
+    const fakeDeps = polyrepoDeps({ nestedRemoveErrorRepo: 'api' });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions.some(action => action.includes('nested worktree remove failed in api'))).toBe(true);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes(JSON.stringify(slotWorkspace)))).toBe(false);
+  });
+
+  it('removes an unregistered aggregate root as a plain directory after nested detach', async () => {
+    const fakeDeps = polyrepoDeps({ rootRemoveError: `fatal: '${slotWorkspace}' is not a working tree` });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toEqual(['[swarm] gc slot 2 (item wi-36) for MIN-888']);
+    expect(fakeDeps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'MIN-888', 2, 'wi-36');
   });
 });
 
