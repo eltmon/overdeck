@@ -334,23 +334,22 @@
     "recordedAt": "2026-08-13T01:25:24.991Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T12:49:03.414Z",
+  "updated": "2026-08-13T12:54:47.637Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:49:01.882Z",
+    "updatedAt": "2026-08-13T12:54:47.548Z",
     "reviewNotes": "Synthesis on disk: production Prime sessions not connected to the RPC controller (launcher-generator.ts:473) + doctor/preview/smoke gaps — see synthesis.md",
-    "verificationNotes": "Verification FAILED at lint (152073ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification-latest.json",
     "inspectNotes": "AC-1 pass: policy text carries provenance, workspace-boundary, pan-lifecycle, no-hidden-agents, and state-write-door rules; injection at spawn is work item 7 (constant currently unconsumed). AC-2 pass: deny-list verified against installed prime-agent 0.7.2 RPC dispatch - all 15 names are real and are exactly the daemon-coordination block (send_message, agent_messages_*, list/add/cancel_schedule, list/get/set/update/manage_heartbeat, observe/unobserve); no autonomous_* RPC command exists, heartbeats/schedules are the continuation surface and are covered; error message is standalone. AC-3 pass: checkpoint recorded with fallback, and enforcement independently re-verified against the pinned-range release during inspection. FLAG (non-blocking): policy.ts checkpoint comment overclaims doctor - doctor-prime-agent.ts pins semver >=0.1.0 <1.0.0 plus a --mode rpc help probe, not a protocol/command list, so 'protocol drift is rejected by doctor' is false; a future 0.x adding coordination commands would pass doctor and slip the deny-list. Fix the comment; consider an allow-list of root-session commands so the guard fails closed. Minor: assert applies to every Prime RPC session, not only managed ones - stricter than FR-17 requires and consistent with the PRD non-goal, but the 'Managed' name is then misleading.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "2212cbf2ec71a0a69ca80c5dfe87a243fc7f7982",
-    "lastVerifiedCommit": "ad27d6c599ae0fc3517438f5b2d9b6587d1199d8",
+    "lastVerifiedCommit": "2212cbf2ec71a0a69ca80c5dfe87a243fc7f7982",
     "reviewSpawnedAt": "2026-08-13T11:54:33.283Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -601,15 +600,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 12533799,
-            "output": 10071,
-            "cacheRead": 9597184,
+            "input": 12615290,
+            "output": 10147,
+            "cacheRead": 9602048,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 100339339,
-            "output": 181312,
-            "cacheRead": 97775232,
+            "input": 102601363,
+            "output": 183145,
+            "cacheRead": 100023168,
             "cacheWrite": 0
           }
         },
@@ -624,15 +623,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 12533799,
-          "output": 10071,
-          "cacheRead": 9597184,
+          "input": 12615290,
+          "output": 10147,
+          "cacheRead": 9602048,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 100339339,
-          "output": 181312,
-          "cacheRead": 97775232,
+          "input": 102601363,
+          "output": 183145,
+          "cacheRead": 100023168,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -643,8 +642,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 67.1828563,
-        "pricingAsOf": "2026-08-13T12:49:03.396Z"
+        "usd": 68.4322543,
+        "pricingAsOf": "2026-08-13T12:54:47.597Z"
       }
     },
     "merges": [
