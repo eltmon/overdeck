@@ -3,17 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-13T23:11:07.021Z",
+  "updated": "2026-08-13T23:11:09.483Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
-    "mergeStep": "validating-pr",
+    "mergeStatus": "verifying",
+    "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T23:10:06.371Z",
-    "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3690 --base main --title PAN-3690 --body-file /tmp/pan-pr-body-PAN-3690-1786660396209.md\npull request create failed: GraphQL: No commits between main and strike/pan-3690 (createPullRequest)\n",
+    "updatedAt": "2026-08-13T23:10:11.446Z",
     "strikeReadyHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
     "strikeReadyAt": "2026-08-13T23:06:49.965Z",
     "strikeLandingState": "landing",
@@ -76,7 +75,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.237222,
-        "pricingAsOf": "2026-08-13T23:10:06.380Z"
+        "pricingAsOf": "2026-08-13T23:11:09.475Z"
       }
     },
     "merges": [],
