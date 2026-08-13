@@ -133,7 +133,7 @@ describe('deacon-swarm completion classification', () => {
     ]);
   });
 
-  it('recovers a vanished clean committed slot as ready-to-merge from durable git state', async () => {
+  it('does not infer completion for a vanished slot from branch state alone', async () => {
     const agentId = 'agent-pan-2203-slot-1';
 
     await expect(classifyInFlightSlots([slot(1, agentId)], deps({
@@ -146,14 +146,13 @@ describe('deacon-swarm completion classification', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         slotIndex: 1,
-        lifecycle: 'ready-to-merge',
-        exitStatus: 0,
-        signal: 'inferred',
+        lifecycle: 'failed',
+        reason: 'vanished-session',
       }),
     ]);
   });
 
-  it('recovers a missing-agent clean committed slot as ready-to-merge from durable git state', async () => {
+  it('does not infer completion for a missing agent from branch state alone', async () => {
     await expect(classifyInFlightSlots([{ ...slot(2), agentId: undefined }], deps({
       sessions: [],
       aheadCount: 1,
@@ -164,9 +163,8 @@ describe('deacon-swarm completion classification', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         slotIndex: 2,
-        lifecycle: 'ready-to-merge',
-        exitStatus: 0,
-        signal: 'inferred',
+        lifecycle: 'failed',
+        reason: 'missing-agent',
       }),
     ]);
   });
@@ -264,7 +262,7 @@ describe('deacon-swarm completion classification', () => {
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 
-  it('infers ready-to-merge on the second unchanged idle observation in auto mode', async () => {
+  it('never infers completion from an unchanged clean branch in auto mode', async () => {
     const agentId = 'agent-pan-2203-slot-2';
     const fakeDeps = deps({
       sessions: [agentId],
@@ -300,8 +298,8 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'ready-to-merge',
-        signal: 'inferred',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: [],
       }),
     ]);

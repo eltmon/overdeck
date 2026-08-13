@@ -64,10 +64,6 @@ export async function classifyDoneWithoutSignal(
   }
 
   slotCompletionObservations.set(observation.progressKey, current);
-  if (mode === 'auto' && current.consecutiveDoneCount >= 2) {
-    return { ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'inferred', actions };
-  }
-
   return {
     ...slot,
     lifecycle: 'awaiting-completion-signal',

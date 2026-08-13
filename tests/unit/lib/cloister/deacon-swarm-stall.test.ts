@@ -417,7 +417,7 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
     }
   });
 
-  it('AC2: auto mode nudges exactly once and converges to ready-to-merge inferred after two stable observations', async () => {
+  it('PAN-3691: auto mode nudges but never completes without an item-bound durable signal', async () => {
     const deps = doneDeps();
     const options = opts('auto');
 
@@ -427,7 +427,7 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
 
     // Same signature (stable commit + output) ⇒ second consecutive stable observation.
     const second = await classifyDoneWithoutSignal(slot(), deps, options, observation());
-    expect(second).toEqual(expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'inferred', exitStatus: 0 }));
+    expect(second).toEqual(expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }));
     // No second nudge on the converging pass — exactly one nudge across the two observations.
     expect(deps.sendCompletionNudge).toHaveBeenCalledTimes(1);
   });
