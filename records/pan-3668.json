@@ -52,9 +52,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-13T11:54:45.720Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T11:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-13T11:57:20.164Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T11:57:20.316Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-13T11:57:20Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3668\n\n# Review Synthesis — PAN-3668 — 2026-08-13T07:56:50-04:00\n\n## Verdict: CHANGES REQUESTED — production Prime sessions are not connected to a persistent RPC controller\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/context.json\n- Branch: feature/pan-3668\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668\n- HEAD reviewed: ad27d6c599ae0fc3517438f5b2d9b6587d1199d8\n- Cycle number: 2\n- Prior cycle SHA: a85fc48abe86e8f5a3a4ac48a2a116aaff82fad7\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/requirements.md | 4 |\n\n## Blocking Findings\n\n### [correctness, requirements] Production Prime sessions are not connected to the RPC controller — `src/lib/launcher-generator.ts:473`\nThe production launcher starts a bare `prime-agent --mode rpc` process, but no production path constructs `PrimeAgentRpcClient`, registers the session, or supplies a functional controller to the global runtime. Managed work agents and conversations therefore receive no initial prompt, later delivery fails against an empty registry, and lifecycle, statistics, and resume operations cannot use the promised runtime path. This deduplicates the correctness launch defect and the requirements gaps for runtime-adapter, work-agent-launch, conversation-launch, message-delivery, cost mapping, and dashboard live projection.\n\n### [correctness] Prime doctor reports RPC support without probing production binaries — `src/cli/commands/doctor-prime-agent.ts:44`\nThe `--help` capability probe runs only when callers inject the optional test probe. Normal production callers omit it, so any binary in the accepted version range is reported as supporting RPC even when it does not advertise `--mode rpc`.\n\n### [requirements] Prime doctor does not check provider credentials — `src/cli/commands/doctor-prime-agent.ts:31`\nFR-4, FR-14, and NFR-8 require binary, version, RPC, and credential checks. The new doctor stops after binary/version/help checks, so it can declare Prime ready even when the selected provider cannot authenticate.\n\n### [requirements] Prime context preview is never rendered — `src/dashboard/server/routes/context.ts:79`\nThe response reads `previews['prime-agent']`, but `PREVIEW_HARNESSES` omits `prime-agent`. The API therefore returns an undefined preview instead of the effective rendered Prime context required by FR-15.\n\n### [requirements] The live smoke bypasses the production runtime path — `tests/integration/prime-agent-smoke.test.ts:20`\nThe smoke directly spawns Prime and constructs its own RPC client. It does not exercise Overdeck's production launcher, controller, registry, delivery, lifecycle, or resume entry points, so it remains green while the primary integration path is disconnected.\n\n### [performance] Dashboard list routes synchronously parse every agent transcript twice — `src/dashboard/server/services/runtime-session-projection.ts:15`\nThe new request-time projection calls token-usage and session-cost methods separately for every listed agent. Existing runtimes synchronously read and parse the complete JSONL transcript for both calls, making these endpoints block the Node event loop with work proportional to agent count times transcript size, with each transcript scanned twice.\n\n## Non-blocking Findings\n\n### [performance] Partial JSONL records are repeatedly copied and rescanned — `src/lib/prime-agent/jsonl-framing.ts:29`\nThe framer concatenates and rescans the full partial record for each chunk. An 8 MiB record split into small chunks can cause quadratic copying and scanning before the configured bound rejects or completes it; normal small records are unaffected.\n\n## Clean Sub-roles\n- Security reported no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-ad27d6c5/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3668 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -299,7 +317,7 @@
     "recordedAt": "2026-08-13T01:25:24.991Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T11:57:19.435Z",
+  "updated": "2026-08-13T11:57:20.317Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "blocked",
