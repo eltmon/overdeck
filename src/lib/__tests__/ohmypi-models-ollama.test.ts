@@ -1,11 +1,25 @@
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const configMock = vi.hoisted(() => ({
+  loadConfigSync: vi.fn(),
+}));
+
+vi.mock('../config-yaml.js', () => ({
+  loadConfigSync: configMock.loadConfigSync,
+}));
 
 import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 
 describe('Ollama Pi model registry provisioning', () => {
+  beforeEach(() => {
+    configMock.loadConfigSync.mockReturnValue({
+      config: { providerBaseUrls: {} },
+    });
+  });
+
   it('registers the bare Ollama tag against the OpenAI-compatible endpoint env', () => {
     const agentDir = mkdtempSync(join(tmpdir(), 'overdeck-ollama-models-'));
     provisionOhmypiProviderForModel('ollama:gemma4:12b', agentDir);

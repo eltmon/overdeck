@@ -770,10 +770,12 @@ export function piProviderForModel(modelId: string): string | undefined {
  * bare id unchanged when no Pi provider mapping exists.
  */
 export function qualifyPiModel(modelId: string): string {
+  if (modelId.startsWith('ollama:')) {
+    return `ollama/${modelId.slice('ollama:'.length)}`;
+  }
   // Idempotent: conversations pre-qualify (`anthropic/claude-...`) before the
   // launcher sees the model — never double-prefix an already-qualified id.
   if (modelId.includes('/')) return modelId;
   const piProvider = piProviderForModel(modelId);
-  const piModelId = modelId.startsWith('ollama:') ? modelId.slice('ollama:'.length) : modelId;
-  return piProvider ? `${piProvider}/${piModelId}` : piModelId;
+  return piProvider ? `${piProvider}/${modelId}` : modelId;
 }

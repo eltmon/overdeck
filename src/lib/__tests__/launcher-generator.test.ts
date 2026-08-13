@@ -1695,5 +1695,6 @@ describe('pi model provider qualification (PAN-1799)', () => {
   it('qualifies Ollama models and strips the Overdeck routing prefix', async () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('ollama:gemma4:12b')).toBe('ollama/gemma4:12b');
+    expect(qualifyPiModel('ollama:library/custom:latest')).toBe('ollama/library/custom:latest');
   });
 });
