@@ -2,8 +2,7 @@ import type { PrimeAgentRpcClient, PrimeAgentRpcResponse } from './rpc-client.js
 import { existsSync, readFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { join } from 'node:path';
-import { getAgentDir } from '../agents/agent-state.js';
-import { getOverdeckHome } from '../paths.js';
+import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 
 export interface PrimeAgentManagedSession {
   client: Pick<PrimeAgentRpcClient, 'request'>;
@@ -54,7 +53,7 @@ export async function deliverPrimeAgentMessage(
 
 export async function postPrimeAgentHost(agentId: string, body: unknown): Promise<Record<string, unknown>> {
   const socketPath = join(getOverdeckHome(), 'sockets', `prime-agent-${agentId}.sock`);
-  const tokenPath = join(getAgentDir(agentId), 'prime-agent-token');
+  const tokenPath = join(AGENTS_DIR, agentId, 'prime-agent-token');
   if (!existsSync(socketPath)) throw new Error(`MessageDeliveryFailed: Prime Agent host is unavailable for ${agentId}`);
   const token = readFileSync(tokenPath, 'utf8').trim();
   return new Promise((resolve, reject) => {
