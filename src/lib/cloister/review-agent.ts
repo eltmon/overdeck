@@ -44,6 +44,7 @@ import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
+import { isReviewSessionForIssue } from './specialists-registry.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
@@ -58,8 +59,6 @@ import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
-import { isReviewSessionForIssue } from './review-session-names.js';
-export { isReviewSessionForIssue } from './review-session-names.js';
 import {
   recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
@@ -729,6 +728,7 @@ async function spawnReviewRoleForIssuePromise(
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
  */
+export { isReviewSessionForIssue };
 async function killAllReviewerSessionsPromise(
   projectKey: string | undefined,
   issueId: string,
