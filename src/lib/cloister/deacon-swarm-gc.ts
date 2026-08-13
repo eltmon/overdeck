@@ -73,7 +73,7 @@ export async function gcMergedSlots(
       actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
-    deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
+    await deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
     actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
 

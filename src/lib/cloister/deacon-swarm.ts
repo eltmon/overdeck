@@ -64,7 +64,12 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
-import { createMinimalIssueRecord, writeSwarmFinalizedAt, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
+import {
+  clearSwarmSlotCompletion,
+  clearSwarmSlotOwnership,
+  createMinimalIssueRecord,
+  writeSwarmFinalizedAt,
+} from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
@@ -1019,9 +1024,7 @@ export function clearAllSlotAssignments(workspacePath: string, issueId: string):
 }
 
 function clearSlotAssignment(workspacePath: string, issueId: string, slotIndex: number, itemId?: string): Promise<void> {
-  return writeSwarmSlotAssignments(workspacePath, issueId, (existing) =>
-    existing.filter(slot => slot.slotIndex !== slotIndex && (itemId === undefined || slot.itemId !== itemId))
-  );
+  return clearSwarmSlotOwnership(workspacePath, issueId, slotIndex, itemId);
 }
 
 function writeSwarmSlotAssignments(

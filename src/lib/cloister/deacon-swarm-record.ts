@@ -112,6 +112,29 @@ export async function clearSwarmSlotCompletion(workspacePath: string, issueId: s
 }
 
 /**
+ * Consume all durable ownership for a slot in one record update. Merged-slot
+ * GC uses this after it removes the worktree and branch so a completion marker
+ * cannot outlive the assignment and keep the freed index occupied.
+ */
+export async function clearSwarmSlotOwnership(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  _itemId?: string,
+): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
+    const swarm = record.swarm ?? {};
+    const slotAssignments = (swarm.slotAssignments ?? []).filter(
+      assignment => assignment.slotIndex !== slotIndex,
+    );
+    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+    delete slotCompletions[String(slotIndex)];
+    return { ...record, swarm: { ...swarm, slotAssignments, slotCompletions } };
+  });
+}
+
+/**
  * PAN-2372 WI-3 / FR-4, FR-5: write the durable slot-completion marker and read
  * it straight back to confirm it persisted. Returns true only when the keyed
  * marker exists on disk with a matching agentId. The slot `pan done` caller MUST
