@@ -36,13 +36,18 @@
       "id": "D7",
       "summary": "pan install gains an Ollama detect/guide step behind a `--skip-ollama` flag and an optional `ollama pull <default Gemma tag>`, mirroring the existing Moonshine/beads install steps. pan doctor gains an optional Ollama check mirroring the Pi check.",
       "recordedAt": "2026-06-07T02:40:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Verified the installed Pi runtime contract for Ollama custom providers: models.json must contain the literal configured localhost /v1 base URL, api=openai-completions, the bare OPENAI_API_KEY resolver name, and the bare Ollama model tag. The launcher exports OPENAI_BASE_URL and OPENAI_API_KEY, exports no ANTHROPIC_* credentials, and legacy pi runtime names normalize to ohmypi.",
+      "recordedAt": "2026-08-13T14:25:05.563Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Pi's EXACT mechanism for targeting a local OpenAI-compatible endpoint is unverified — it may read OPENAI_BASE_URL/OPENAI_API_KEY from env, may require a ~/.pi/agent config entry, or may need a CLI flag. This determines the entire env shape of the pi-openai-env bead.",
-      "mitigation": "Begin the pi-openai-env bead with a short spike against the installed `pi` binary to confirm which env keys/config Pi honors for an OpenAI-compatible localhost endpoint. The e2e verification bead is the ground truth. Bead is flagged requiresInspection (deep)."
+      "summary": "RESOLVED: The installed Pi custom-provider contract for Ollama has been verified.",
+      "mitigation": "Implemented models.json provisioning with a literal validated localhost /v1 URL, a bare OPENAI_API_KEY resolver name, and a bare model tag; focused tests and deep inspection verify the contract."
     },
     {
       "id": "H2",
@@ -136,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:22:02.618Z",
+  "updated": "2026-08-13T14:25:05.578Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
