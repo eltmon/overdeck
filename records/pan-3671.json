@@ -93,16 +93,16 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T13:56:56.404Z",
+  "updated": "2026-08-13T13:57:06.949Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T13:56:55.185Z",
+    "updatedAt": "2026-08-13T13:57:06.926Z",
     "reviewNotes": "Approved: no PR-scoped blockers; derived tmux socket risk is pre-existing and advisory.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
@@ -179,8 +179,8 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 41031,
-            "output": 833,
+            "input": 42199,
+            "output": 958,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -200,15 +200,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 41031,
-          "output": 833,
+          "input": 42199,
+          "output": 958,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 27.592676,
-        "pricingAsOf": "2026-08-13T13:56:55.331Z"
+        "usd": 27.594469,
+        "pricingAsOf": "2026-08-13T13:57:06.931Z"
       }
     },
     "merges": [
@@ -216,8 +216,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3671",
