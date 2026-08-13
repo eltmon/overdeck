@@ -308,10 +308,12 @@ describe('PAN-2372 WI-4 durable slot-completion marker (FR-6)', () => {
   });
 
   it('AC2: a marker whose itemId differs from the slot is ignored and the slot falls through to normal classification', async () => {
+    const clearSlotCompletion = vi.fn(async () => undefined);
     const deps = {
       ...classifyDeps(),
       // Stale marker left for a different item (e.g. a re-plan rotated slot→item).
       readSlotCompletion: vi.fn(async () => marker(1, 'wi-other')),
+      clearSlotCompletion,
     };
 
     const result = await classifyInFlightSlots([slot()], deps, {
@@ -322,6 +324,23 @@ describe('PAN-2372 WI-4 durable slot-completion marker (FR-6)', () => {
     // Session alive + not dead ⇒ running. The mismatched marker did NOT short-circuit.
     expect(result).toEqual([expect.objectContaining({ lifecycle: 'running' })]);
     expect(result[0]?.signal).not.toBe('durable-completion');
+    expect(clearSlotCompletion).toHaveBeenCalledWith('/workspace', 'PAN-2203', 1);
+  });
+
+  it('PAN-3690: a legacy marker without itemId is deleted and cannot classify a new item ready', async () => {
+    const clearSlotCompletion = vi.fn(async () => undefined);
+    const result = await classifyInFlightSlots([slot()], {
+      ...classifyDeps(),
+      readSlotCompletion: vi.fn(async () => marker(1)),
+      clearSlotCompletion,
+    }, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    });
+
+    expect(result).toEqual([expect.objectContaining({ lifecycle: 'running' })]);
+    expect(result[0]?.signal).not.toBe('durable-completion');
+    expect(clearSlotCompletion).toHaveBeenCalledWith('/workspace', 'PAN-2203', 1);
   });
 
   it('AC3: a marker beats a vanished session — the slot is still ready-to-merge durable-completion', async () => {
