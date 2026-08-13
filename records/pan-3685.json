@@ -2,7 +2,7 @@
   "issueId": "PAN-3685",
   "schemaVersion": 2,
   "created": "2026-08-13T16:03:50.659Z",
-  "updated": "2026-08-13T16:03:50.659Z",
+  "updated": "2026-08-13T16:15:06.255Z",
   "pipeline": {
     "issueId": "PAN-3685",
     "reviewStatus": "pending",
@@ -19,5 +19,21 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "merge-agent",
+      "outcome": "needs-you",
+      "timestamp": "2026-08-13T16:15:06Z",
+      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3685 needs operator attention after 1 cycle(s).\n1. strike 7b5add82fbdb6a91e0ed3f379617546cc4697289; main 573390771f2b0543c5b13a79ec320871fb3f0063; failed: Failed to create PR: Command failed: gh pr create --head strike/pan-3685 --base main --title PAN-3685 --body-file /tmp/pan-pr-body-PAN-3685-1786637705011.md\npull request create failed: GraphQL: No commits between main and strike/pan-3685 (createPullRequest)\n; recovery not delivered: agent is paused (Operator paused all Panopticon issue agents)"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T16:15Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-08-13T16:15:06.255Z"
+    }
+  ]
 }
