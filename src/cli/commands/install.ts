@@ -26,6 +26,8 @@ import { refreshCacheSync, syncStatuslineSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
+import { DEFAULT_OLLAMA_AGENT_MODEL, isOllamaInstalled } from '../../lib/ollama.js';
+import type { Platform } from '../../lib/platform.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -36,6 +38,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
+    .option('--skip-ollama', 'Skip Ollama local-model setup')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .action(installCommand);
 }
@@ -46,6 +49,7 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipMoonshine?: boolean;
+  skipOllama?: boolean;
   skipTtsDaemon?: boolean;
 }
 
@@ -54,6 +58,59 @@ interface PrereqResult {
   passed: boolean;
   message: string;
   fix?: string;
+}
+
+interface OllamaInstallSpinner {
+  info(message: string): unknown;
+  warn(message: string): unknown;
+  start(message: string): unknown;
+  succeed(message: string): unknown;
+}
+
+export function getOllamaInstallGuidance(platform: Platform): string {
+  if (platform === 'darwin') return 'Install Ollama with `brew install ollama` or from https://ollama.com/download/mac.';
+  if (platform === 'linux' || platform === 'wsl') return 'Install Ollama with `curl -fsSL https://ollama.com/install.sh | sh`.';
+  return 'Install Ollama from https://ollama.com/download/windows.';
+}
+
+export async function setupOllamaForInstall(options: {
+  skip?: boolean;
+  platform: Platform;
+  spinner: OllamaInstallSpinner;
+  detectInstalled?: () => Promise<boolean>;
+  confirmPull?: (model: string) => Promise<boolean>;
+  pullModel?: (model: string) => void;
+}): Promise<void> {
+  if (options.skip) {
+    options.spinner.info('Skipping Ollama local-model setup (--skip-ollama)');
+    return;
+  }
+
+  const installed = await (options.detectInstalled ?? isOllamaInstalled)();
+  if (!installed) {
+    options.spinner.warn(`Ollama is not installed. ${getOllamaInstallGuidance(options.platform)}`);
+    return;
+  }
+
+  options.spinner.succeed('Ollama is installed');
+  const confirmPull = options.confirmPull ?? (async (model: string) => {
+    const answer = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'pull',
+      message: `Pull the recommended local agent model ${model} now?`,
+      default: false,
+    }]);
+    return Boolean(answer.pull);
+  });
+  if (!await confirmPull(DEFAULT_OLLAMA_AGENT_MODEL)) return;
+
+  options.spinner.start(`Pulling ${DEFAULT_OLLAMA_AGENT_MODEL} with Ollama...`);
+  try {
+    (options.pullModel ?? ((model: string) => execFileSync('ollama', ['pull', model], { stdio: 'pipe', timeout: 1_800_000 })))(DEFAULT_OLLAMA_AGENT_MODEL);
+    options.spinner.succeed(`Pulled ${DEFAULT_OLLAMA_AGENT_MODEL}`);
+  } catch {
+    options.spinner.warn(`Could not pull ${DEFAULT_OLLAMA_AGENT_MODEL}. Retry with \`ollama pull ${DEFAULT_OLLAMA_AGENT_MODEL}\`.`);
+  }
 }
 
 // Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
@@ -431,6 +488,12 @@ async function installCommand(options: InstallOptions): Promise<void> {
   } else {
     spinner.info(`Skipping Moonshine sidecar build (platform=${process.platform}/${process.arch}, only linux/x64 supported)`);
   }
+
+  await setupOllamaForInstall({
+    skip: options.skipOllama,
+    platform: plat,
+    spinner,
+  });
 
   if (options.skipTtsDaemon) {
     spinner.info('Skipping Qwen TTS daemon install (--skip-tts-daemon)');

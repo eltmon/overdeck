@@ -3,6 +3,7 @@ import { platform } from 'node:os';
 
 export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
+export const DEFAULT_OLLAMA_AGENT_MODEL = 'gemma4:12b';
 
 export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
 
