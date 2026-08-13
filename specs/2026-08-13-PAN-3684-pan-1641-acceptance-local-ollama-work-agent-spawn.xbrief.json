@@ -1,0 +1,68 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-13T16:05:50.422Z",
+    "updated": "2026-08-13T16:05:50.422Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-3684: PAN-1641 acceptance: local Ollama work-agent spawn",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-3684",
+    "title": "PAN-1641 acceptance: local Ollama work-agent spawn",
+    "status": "proposed",
+    "uid": "2761d3ec-18eb-46e2-ab34-20c5be55c8ab",
+    "author": "overdeck/auto-start",
+    "sequence": 1,
+    "created": "2026-08-13T16:05:50.422Z",
+    "updated": "2026-08-13T16:05:50.422Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3684",
+        "label": "PAN-3684",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-13-PAN-3684-pan-1641-acceptance-local-ollama-work-agent-spawn.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "Temporary acceptance issue for PAN-1641. Spawn an Overdeck Pi work agent with model ollama:gemma4:12b. The agent must create LOCAL_OLLAMA_OK.txt containing exactly LOCAL_OK, commit it, push it, and run pan task done. Close this issue after evidence is recorded.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-13T16:05:50.422Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-3684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Temporary acceptance issue for PAN-1641. Spawn an Overdeck Pi work agent with model ollama:gemma4:12b. The agent must create LOCAL_OLLAMA_OK.txt containing exactly LOCAL_OK, commit it, push it, and run pan task done. Close this issue after evidence is recorded."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Issue's stated fix implemented with tests",
+            "status": "pending",
+            "created": "2026-08-13T16:05:50.422Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
