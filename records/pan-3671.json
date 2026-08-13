@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:38:45.249Z",
+  "updated": "2026-08-13T11:39:50.389Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -67,5 +67,20 @@
       "needsYouEmittedAt": "2026-08-13T11:37:07.615Z"
     }
   ],
-  "workModel": "gpt-5.6-sol"
+  "workModel": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "sanitizer-canonical-home-pin": {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 1953183,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:39:50.389Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "sanitizer-canonical-home-pin": "running"
+  }
 }
