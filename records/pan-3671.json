@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:48:29.015Z",
+  "updated": "2026-08-13T11:51:54.856Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "supervisor-failure-message-accuracy": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2221489,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T11:48:29.015Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Exported the spawning process's resolved OVERDECK_HOME in every non-remote launcher, omitted it for Fly remote launchers, and updated deterministic launcher coverage.",
         "releasedAt": "2026-08-13T11:48:16.043Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2221489,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:48:29.015Z",
+        "itemId": "supervisor-failure-message-accuracy",
+        "outcome": "completed",
+        "reason": "Stopped treating healthy pane tails as errors, added an explicit no-error-output timeout explanation, and covered healthy and error panes with fake-timer timeout tests.",
+        "releasedAt": "2026-08-13T11:51:54.856Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "launcher-export-overdeck-home": {
         "reason": "Exported the spawning process's resolved OVERDECK_HOME in every non-remote launcher, omitted it for Fly remote launchers, and updated deterministic launcher coverage.",
         "updatedAt": "2026-08-13T11:48:16.043Z"
+      },
+      "supervisor-failure-message-accuracy": {
+        "reason": "Stopped treating healthy pane tails as errors, added an explicit no-error-output timeout explanation, and covered healthy and error panes with fake-timer timeout tests.",
+        "updatedAt": "2026-08-13T11:51:54.856Z"
       }
     }
   },
@@ -123,6 +130,9 @@
     "launcher-export-overdeck-home.ac1": "completed",
     "launcher-export-overdeck-home.ac2": "completed",
     "launcher-export-overdeck-home.ac3": "completed",
-    "supervisor-failure-message-accuracy": "running"
+    "supervisor-failure-message-accuracy": "completed",
+    "supervisor-failure-message-accuracy.ac1": "completed",
+    "supervisor-failure-message-accuracy.ac2": "completed",
+    "supervisor-failure-message-accuracy.ac3": "completed"
   }
 }
