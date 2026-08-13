@@ -93,19 +93,19 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T13:51:24.769Z",
+  "updated": "2026-08-13T13:56:55.360Z",
   "pipeline": {
     "issueId": "PAN-3671",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T13:51:24.686Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-08-13T13:56:55.185Z",
+    "reviewNotes": "Approved: no PR-scoped blockers; derived tmux socket risk is pre-existing and advisory.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
-    "reviewRequestedAt": "2026-08-13T12:56:19.456Z",
     "reviewSpawnedAt": "2026-08-13T13:51:24.686Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -171,16 +171,16 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 35829681,
-            "output": 46964,
-            "cacheRead": 34864128,
+            "input": 39966788,
+            "output": 60510,
+            "cacheRead": 38689280,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 25566,
-            "output": 302,
+            "input": 41031,
+            "output": 833,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -194,21 +194,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 35829681,
-          "output": 46964,
-          "cacheRead": 34864128,
+          "input": 39966788,
+          "output": 60510,
+          "cacheRead": 38689280,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 25566,
-          "output": 302,
+          "input": 41031,
+          "output": 833,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.695825,
-        "pricingAsOf": "2026-08-13T13:51:24.727Z"
+        "usd": 27.592676,
+        "pricingAsOf": "2026-08-13T13:56:55.331Z"
       }
     },
     "merges": [
