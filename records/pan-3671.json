@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:59:07.925Z",
+  "updated": "2026-08-13T12:02:32.896Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "clear-fork-state-endpoint": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2611661,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T11:59:07.924Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -134,6 +126,17 @@
         "outcome": "completed",
         "reason": "Extended the running-state writer to clear spawn_error and failed fork state on resurrection while preserving in-flight forks and the active-row no-op guard.",
         "releasedAt": "2026-08-13T11:58:51.058Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2611661,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:59:07.924Z",
+        "itemId": "clear-fork-state-endpoint",
+        "outcome": "completed",
+        "reason": "Added the guarded clear-fork-state REST door and canonical writer, returning 404 for unknown conversations, 409 for dead sessions, and clearing all failure fields only for live sessions; updated the route no-loss audit.",
+        "releasedAt": "2026-08-13T12:02:32.895Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "heal-clears-stale-failure-state": {
         "reason": "Extended the running-state writer to clear spawn_error and failed fork state on resurrection while preserving in-flight forks and the active-row no-op guard.",
         "updatedAt": "2026-08-13T11:58:51.058Z"
+      },
+      "clear-fork-state-endpoint": {
+        "reason": "Added the guarded clear-fork-state REST door and canonical writer, returning 404 for unknown conversations, 409 for dead sessions, and clearing all failure fields only for live sessions; updated the route no-loss audit.",
+        "updatedAt": "2026-08-13T12:02:32.895Z"
       }
     }
   },
@@ -179,6 +186,9 @@
     "heal-clears-stale-failure-state.ac1": "completed",
     "heal-clears-stale-failure-state.ac2": "completed",
     "heal-clears-stale-failure-state.ac3": "completed",
-    "clear-fork-state-endpoint": "running"
+    "clear-fork-state-endpoint": "completed",
+    "clear-fork-state-endpoint.ac1": "completed",
+    "clear-fork-state-endpoint.ac2": "completed",
+    "clear-fork-state-endpoint.ac3": "completed"
   }
 }
