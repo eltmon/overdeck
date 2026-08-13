@@ -104,15 +104,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-13T12:57:43Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3668\n\n# Review Synthesis — PAN-3668 — 2026-08-13T08:57:14-04:00\n\n## Verdict: CHANGES REQUESTED — the new production host ignores the configured startup timeout and bypasses strict resume verification\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/context.json\n- Branch: feature/pan-3668\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668\n- HEAD reviewed: 2212cbf2ec71a0a69ca80c5dfe87a243fc7f7982\n- Cycle number: 3\n- Prior cycle SHA: ad27d6c599ae0fc3517438f5b2d9b6587d1199d8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/performance.md | 2 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] `primeAgent.rpcStartupTimeoutMs` is ignored by production startup — `src/lib/runtimes/prime-agent.ts:50`\nThe new production controller hardcodes a 30-second readiness deadline, and the new host constructs `PrimeAgentRpcClient` with its independent 30-second default. The configured value is never passed into either boundary, so increasing or decreasing the setting has no effect. This finding is inside the cycle diff because the production controller and host were added after the prior synthesis.\n\n### [requirements] Production resume bypasses strict session identity verification — `src/lib/prime-agent/host.ts:28`\nThe new production path passes `--resume` directly, records whatever identity `get_state` returns, and never calls the existing strict verifier or compares the returned identity with the requested one. Missing or mismatched sessions can therefore be accepted as replacements, violating FR-7 and FR-9. This finding is promotable in cycle three because the cited host and launcher resume paths were added or changed after the prior synthesis.\n\n### [performance] Dashboard list routes still synchronously parse every agent transcript — `src/dashboard/server/services/runtime-session-projection.ts:15`\nThe cycle-three change consolidates two transcript parses into `getSessionMetrics()`, but the new implementations still synchronously locate, read, and parse one complete JSONL transcript per agent during each command-deck and project-list request. Request work remains proportional to agent count times transcript size and blocks the dashboard event loop. The cited projection and runtime metric implementations changed after the prior synthesis, so the convergence gate does not demote this unresolved blocker.\n\n### [performance] Prime host synchronously rewrites stats for every RPC event — `src/lib/prime-agent/host.ts:34`\nThe new host performs `writeFileSync` from the RPC event callback for every streamed event. Tool-event bursts serialize stdout processing and message-control requests behind filesystem latency, creating backpressure and delaying operator messages or aborts. The host is new in this cycle.\n\n## Non-blocking Findings\n\n### [correctness] Readiness is published before initial prompt delivery succeeds — `src/lib/prime-agent/host.ts:71`\nThe host writes its session readiness marker before sending the initial prompt. A prompt failure can therefore occur after the spawning caller has already returned success.\n\n## Clean Sub-roles\n- Security reported no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.pan/review/agent-pan-3668-review-2212cbf2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3668 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -365,7 +357,7 @@
     "recordedAt": "2026-08-13T13:46:44.006Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T13:51:14.298Z",
+  "updated": "2026-08-13T13:51:15.938Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
