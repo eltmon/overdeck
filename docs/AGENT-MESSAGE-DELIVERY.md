@@ -49,6 +49,30 @@ still cannot be confirmed, it keeps the conversation alive but records
 `forkStatus = 'failed'` with an actionable `forkError` instead of presenting an
 empty transcript as a healthy completed fork.
 
+## Home resolution and supervisor recovery
+
+Local launcher scripts export the spawning process's resolved `OVERDECK_HOME`.
+The PTY supervisor and in-session `pan` commands therefore do not depend on the
+tmux server's global environment to find runtime files. The shared `overdeck`
+socket sanitizer always pins canonical `HOME` and `OVERDECK_HOME` values and
+refuses a caller's non-canonical home. Test and throwaway instances use
+`OVERDECK_TMUX_SOCKET_NAME` or the automatically derived per-home socket, where
+the caller's resolved home remains valid.
+
+A missing supervisor socket does not make a live tmux session a failed spawn.
+When the socket wait expires but the session still exists, Overdeck logs a
+warning and continues. Later messages use the remaining Channels and tmux-paste
+fallback tiers. If the tmux session is also gone, the timeout remains a real
+spawn failure. A healthy harness statusline is never quoted as supervisor error
+output.
+
+The liveness repair clears `spawn_error` and a failed `fork_status`/`fork_error`
+when it resurrects a conversation whose tmux session and harness are alive. An
+operator can run `pan conversations heal <name>`, which calls
+`POST /api/conversations/:name/clear-fork-state`, to perform the same repair.
+The endpoint refuses to clear failures when the tmux session is dead because
+that stored failure state is still accurate.
+
 Docker workspaces remain excluded from supervisor wiring until host/container
 socket sharing is designed; Pi keeps using its `rpc.in` FIFO. H1 lifecycle
 semantics apply: the supervisor owns Claude's PTY master fd, so if the
@@ -72,4 +96,3 @@ the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 `WARNING: Loading development channels` dialog is dismissed only when that MCP
 config is actually wired; supervisor-only sessions must not receive this Enter
 keystroke.
-
