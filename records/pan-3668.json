@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:24:26.711Z",
+  "updated": "2026-08-13T00:26:23.649Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -102,16 +102,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 37,
-    "claims": {
-      "cost-usage-mapping": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 364413,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:24:26.711Z"
-      }
-    },
+    "sequence": 38,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -310,6 +302,17 @@
         "outcome": "completed",
         "reason": "Implemented, tested, committed, and pushed in 2ad13e565c",
         "releasedAt": "2026-08-13T00:24:23.626Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 364413,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:24:26.711Z",
+        "itemId": "cost-usage-mapping",
+        "outcome": "completed",
+        "reason": "Implemented, tested, committed, and pushed in 4d180b753d",
+        "releasedAt": "2026-08-13T00:26:23.649Z"
       }
     ],
     "statusReasons": {
@@ -384,6 +387,10 @@
       "transcript-adapter-prime": {
         "reason": "Implemented, tested, committed, and pushed in 2ad13e565c",
         "updatedAt": "2026-08-13T00:24:23.626Z"
+      },
+      "cost-usage-mapping": {
+        "reason": "Implemented, tested, committed, and pushed in 4d180b753d",
+        "updatedAt": "2026-08-13T00:26:23.649Z"
       }
     }
   },
@@ -450,6 +457,8 @@
     "transcript-adapter-prime": "completed",
     "transcript-adapter-prime.ac1": "completed",
     "transcript-adapter-prime.ac2": "completed",
-    "cost-usage-mapping": "running"
+    "cost-usage-mapping": "completed",
+    "cost-usage-mapping.ac1": "completed",
+    "cost-usage-mapping.ac2": "completed"
   }
 }
