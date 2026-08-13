@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { resolveOllamaBaseUrl } from '../ollama.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -32,7 +33,7 @@ import {
 function normalizeProviderConfig(
   providerConfig: ProviderConfig | boolean | undefined,
   fallbackKey?: string
-): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan; harness?: RuntimeName } {
+): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan; harness?: RuntimeName; base_url?: string } {
   if (providerConfig === undefined) {
     return { enabled: false };
   }
@@ -47,6 +48,7 @@ function normalizeProviderConfig(
     harness: providerConfig.harness,
     auth: providerConfig.auth,
     plan: providerConfig.plan,
+    base_url: providerConfig.base_url,
   };
 }
 
@@ -115,6 +117,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
+    providerBaseUrls: { ...DEFAULT_CONFIG.providerBaseUrls },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
     tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
@@ -241,6 +244,19 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.models?.providers) {
       const providers = config.models.providers;
       const legacyKeys = config.api_keys || {};
+
+      // Ollama (no API key; endpoint must remain local)
+      const ollama = normalizeProviderConfig(providers.ollama, undefined);
+      applyProviderHarness(result, 'ollama', ollama.harness);
+      result.providerBaseUrls.ollama = resolveOllamaBaseUrl({
+        providers: { ollama: { base_url: ollama.base_url } },
+      });
+      if (ollama.enabled) {
+        result.enabledProviders.add('ollama');
+      } else if (providers.ollama !== undefined) {
+        explicitlyDisabled.add('ollama');
+        result.enabledProviders.delete('ollama');
+      }
 
       // Anthropic
       const anthropic = normalizeProviderConfig(providers.anthropic, undefined);

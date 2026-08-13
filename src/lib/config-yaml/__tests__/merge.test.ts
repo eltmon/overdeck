@@ -45,3 +45,27 @@ describe('ACP config merge', () => {
     expect(PROVIDERS.kimi.defaultHarness).toBe('kimi-code');
   });
 });
+
+describe('Ollama config merge', () => {
+  it('defaults the Ollama base URL to localhost', () => {
+    expect(mergeConfigs().config.providerBaseUrls.ollama).toBe('http://localhost:11434');
+  });
+
+  it('normalizes boolean and object provider forms without requiring an API key', () => {
+    const booleanConfig = mergeConfigs({ models: { providers: { ollama: true } } }).config;
+    expect(booleanConfig.enabledProviders.has('ollama')).toBe(true);
+    expect(booleanConfig.providerBaseUrls.ollama).toBe('http://localhost:11434');
+
+    const objectConfig = mergeConfigs({
+      models: { providers: { ollama: { enabled: true, base_url: 'http://127.0.0.1:22434/' } } },
+    }).config;
+    expect(objectConfig.enabledProviders.has('ollama')).toBe(true);
+    expect(objectConfig.providerBaseUrls.ollama).toBe('http://127.0.0.1:22434');
+  });
+
+  it('rejects a remote Ollama base URL', () => {
+    expect(() => mergeConfigs({
+      models: { providers: { ollama: { enabled: true, base_url: 'https://ollama.example.com' } } },
+    })).toThrow('Ollama baseUrl must be a localhost address');
+  });
+});

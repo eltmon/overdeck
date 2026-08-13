@@ -22,6 +22,8 @@ export interface ProviderConfig {
   auth?: AuthMode;
   /** Subscription plan tier (only used when auth is 'subscription') */
   plan?: SubscriptionPlan;
+  /** Provider endpoint override. Currently supported by the localhost-only Ollama provider. */
+  base_url?: string;
 }
 
 /**
@@ -483,6 +485,7 @@ export interface YamlConfig {
       openrouter?: ProviderConfig | boolean;
       nous?: ProviderConfig | boolean;
       dashscope?: ProviderConfig | boolean;
+      ollama?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
@@ -806,6 +809,9 @@ export interface NormalizedConfig {
 
   /** Default harness by provider. Role/request harnesses override these defaults. */
   providerHarnesses: Partial<Record<ModelProvider, RuntimeName>>;
+
+  /** Validated provider endpoint overrides. */
+  providerBaseUrls: Partial<Record<ModelProvider, string>>;
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];

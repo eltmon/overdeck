@@ -51,6 +51,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   providerAuth: {},
   providerPlan: {},
   providerHarnesses: {},
+  providerBaseUrls: { ollama: 'http://localhost:11434' },
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
