@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:03:53.982Z",
+  "updated": "2026-08-13T00:05:01.959Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -58,16 +58,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "managed-session-policy": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 250884,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:03:53.982Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -211,6 +203,17 @@
         "outcome": "completed",
         "reason": "Added durable-path preflight and get_state identity verification; missing, mismatched, and process-exit recovery paths stop or avoid the replacement and explicitly refuse a silent fresh session.",
         "releasedAt": "2026-08-13T00:03:36.715Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 250884,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:03:53.982Z",
+        "itemId": "managed-session-policy",
+        "outcome": "completed",
+        "reason": "Injected explicit provenance/workspace/lifecycle/child/state-door policy, denied all documented Prime daemon coordination commands in the RPC client, and recorded the pinned-protocol enforcement checkpoint and conversations-only fallback.",
+        "releasedAt": "2026-08-13T00:05:01.959Z"
       }
     ],
     "statusReasons": {
@@ -265,6 +268,10 @@
       "session-resume-recovery": {
         "reason": "Added durable-path preflight and get_state identity verification; missing, mismatched, and process-exit recovery paths stop or avoid the replacement and explicitly refuse a silent fresh session.",
         "updatedAt": "2026-08-13T00:03:36.715Z"
+      },
+      "managed-session-policy": {
+        "reason": "Injected explicit provenance/workspace/lifecycle/child/state-door policy, denied all documented Prime daemon coordination commands in the RPC client, and recorded the pinned-protocol enforcement checkpoint and conversations-only fallback.",
+        "updatedAt": "2026-08-13T00:05:01.959Z"
       }
     }
   },
@@ -314,6 +321,9 @@
     "session-resume-recovery": "completed",
     "session-resume-recovery.ac1": "completed",
     "session-resume-recovery.ac2": "completed",
-    "managed-session-policy": "running"
+    "managed-session-policy": "completed",
+    "managed-session-policy.ac1": "completed",
+    "managed-session-policy.ac2": "completed",
+    "managed-session-policy.ac3": "completed"
   }
 }
