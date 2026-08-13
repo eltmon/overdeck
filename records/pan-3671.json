@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:17:00.464Z",
+  "updated": "2026-08-13T12:17:15.976Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -238,5 +238,53 @@
     "docs-delivery-home-resolution.ac1": "completed",
     "docs-delivery-home-resolution.ac2": "completed",
     "docs-delivery-home-resolution.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-MESSAGE-DELIVERY.md",
+      "src/cli/commands/conversations/__tests__/heal.test.ts",
+      "src/cli/commands/conversations/heal.ts",
+      "src/cli/commands/conversations/index.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/__tests__/launcher-generator.test.ts",
+      "src/lib/__tests__/tmux-server.test.ts",
+      "src/lib/launcher-generator.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/paths.ts",
+      "src/lib/tmux.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
+      "tests/unit/lib/overdeck/conversations.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-MESSAGE-DELIVERY.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/conversations/__tests__/heal.test.ts",
+      "src/cli/commands/conversations/heal.ts",
+      "src/cli/commands/conversations/index.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/__tests__/launcher-generator.test.ts",
+      "src/lib/__tests__/tmux-server.test.ts",
+      "src/lib/launcher-generator.ts",
+      "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/paths.ts",
+      "src/lib/tmux.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
+      "tests/unit/lib/overdeck/conversations.test.ts"
+    ],
+    "recordedAt": "2026-08-13T12:17:15.974Z"
   }
 }
