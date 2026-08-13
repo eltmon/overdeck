@@ -136,33 +136,33 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:16:50.759Z",
+  "updated": "2026-08-13T14:21:13.690Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:16:46.085Z",
-    "inspectNotes": "AC-1 and AC-3 pass (OPENAI_BASE_URL/-API_KEY only, no ANTHROPIC_*; key added to PROVIDER_ENV_KEYS + child-env + launcher unsets). AC-2/AC-4/AC-5 fail; the omp registry entry cannot work as written, verified against the installed prime-agent binary (/home/eltmon/.config/nvm/versions/node/v22.22.0/lib/node_modules/prime-agent).\n\nBLOCKER 1 - src/lib/ohmypi-models.ts:49 writes baseUrl: '$OPENAI_BASE_URL'. omp NEVER env-resolves baseUrl: parseModels takes providerConfig.baseUrl verbatim (dist/core/model-registry.js:548 and :559; same at :1218/:1244) and resolveConfigValue is applied only to apiKey and headers (model-registry.js:847, :953, :1018, :1101). The model endpoint therefore becomes the literal string '$OPENAI_BASE_URL' and every request fails. Fix: write the resolved URL - the same value getProviderEnvForModel computes (config.providerBaseUrls.ollama + '/v1') - exactly as the working dashscope entry does with getDashScopeUpstreamBaseUrl() at ohmypi-models.ts:75.\n\nBLOCKER 2 - src/lib/ohmypi-models.ts:50 writes apiKey: '$OPENAI_API_KEY'. resolveConfigValue does process.env[config] on the BARE name (dist/core/resolve-config-value.js:17-19: 'const envValue = process.env[config]; return envValue || config'), so a leading $ misses and falls through to the literal '$OPENAI_API_KEY'. The proven dashscope entry writes the bare name 'DASHSCOPE_API_KEY' (ohmypi-models.ts:76). Fix: drop the $ so it reads 'OPENAI_API_KEY'.\n\nBLOCKER 3 (AC-2) - src/lib/providers.ts:775 qualifyPiModel returns early for any id containing '/', so a namespaced tag such as 'ollama:library/custom:latest' keeps its 'ollama:' prefix and is never provider-qualified. The previous bead's own test (tests/lib/providers.test.ts) asserts that exact id routes to PROVIDERS.ollama, and ohmypi-models.ts:47 strips it to 'library/custom:latest' - so the registry model id and the --model id disagree and omp fails with 'No model selected'. Fix: strip the 'ollama:' prefix BEFORE the idempotency slash check.\n\nBLOCKER 4 (AC-4) - the Pi wiring mechanism is not confirmed nor documented. continues/pan-1641.vbrief.json decisions end at D7, all recordedAt 2026-06-07T02:40 (planning time); no new decision records this bead's mechanism, and hazard H1 explicitly flagged Pi's env/config contract as unverified. The rewritten module header at ohmypi-models.ts:12-14 asserts that endpoints are 'written as env-var names ... omp's resolveConfigValue() checks process.env first' - that claim is false for baseUrl per BLOCKER 1. Record a decision stating the confirmed mechanism (literal baseUrl; bare env-var name for apiKey only) with the model-registry.js line evidence.\n\nAC-5 - src/lib/__tests__/ohmypi-models-ollama.test.ts:16-17 pins the two broken values as expected, so the suite currently locks in the defect; those assertions must change with the fix."
+    "updatedAt": "2026-08-13T14:21:13.584Z",
+    "inspectNotes": "Inspecting item pi-openai-env"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1116559,
-            "output": 4955,
-            "cacheRead": 687360,
+            "input": 1381608,
+            "output": 5360,
+            "cacheRead": 861952,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 81774982,
-            "output": 44747,
-            "cacheRead": 80664320,
+            "input": 89977090,
+            "output": 47672,
+            "cacheRead": 88832768,
             "cacheWrite": 0
           }
         },
@@ -197,15 +197,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1116559,
-          "output": 4955,
-          "cacheRead": 687360,
+          "input": 1381608,
+          "output": 5360,
+          "cacheRead": 861952,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 81774982,
-          "output": 44747,
-          "cacheRead": 80664320,
+          "input": 89977090,
+          "output": 47672,
+          "cacheRead": 88832768,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -234,8 +234,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 61.9397946,
-        "pricingAsOf": "2026-08-13T14:16:46.200Z"
+        "usd": 66.2800686,
+        "pricingAsOf": "2026-08-13T14:21:13.662Z"
       }
     },
     "merges": [],
