@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:16:46.582Z",
+  "updated": "2026-08-13T14:19:54.932Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
@@ -102,7 +102,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:16:45.220Z",
+    "updatedAt": "2026-08-13T14:19:50.260Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -134,8 +134,8 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 44094,
-            "output": 1239,
+            "input": 45066,
+            "output": 1446,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -163,8 +163,8 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 44094,
-          "output": 1239,
+          "input": 45066,
+          "output": 1446,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -176,8 +176,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 28.944943000000002,
-        "pricingAsOf": "2026-08-13T14:16:45.258Z"
+        "usd": 28.94695,
+        "pricingAsOf": "2026-08-13T14:19:50.384Z"
       }
     },
     "merges": [
