@@ -14,6 +14,7 @@ import {
   backfillConversationModels,
   conversationRuntimeRootPids,
   handleConversationCreate,
+  handleConversationClearForkState,
   handleConversationDelete,
   handleConversationRestartAll,
   handleConversationResume,
@@ -338,6 +339,17 @@ const postConversationStopRoute = HttpRouter.add(
     return yield* Effect.promise(async () => handleConversationStop(name, {
       resolveSessionFileForCleanup: (conv) => (conv as { sessionFile?: string | null }).sessionFile ?? null,
     }));
+  }),
+);
+const postConversationClearForkStateRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/clear-fork-state',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const params = yield* HttpRouter.params;
+    return yield* Effect.promise(() => handleConversationClearForkState(params['name'] ?? ''));
   }),
 );
 const postConversationResumeRoute = HttpRouter.add(
@@ -1002,6 +1014,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationMoveRoute,
   deleteConversationRoute,
   postConversationStopRoute,
+  postConversationClearForkStateRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,
   postConversationThinkingLevelRoute,

@@ -1287,13 +1287,14 @@ export function markConversationEnded(name: string): void {
     .run(Date.now(), name);
 }
 
-// PAN-1972: resurrect a conversation the liveness poller previously latched to
-// 'ended'. tmux is the liveness oracle — when a session + harness are observed
-// alive, the row must read 'active'. The `status != 'active'` guard makes this a
-// true no-op (no needless write) when the row is already correct.
+// PAN-1972/PAN-3671: resurrect a conversation when tmux + the harness are alive,
+// clearing stale spawn failures and failed fork state. Preserve in-flight fork
+// state for stuck-fork recovery. Active rows remain a true no-op.
 export function markConversationRunning(name: string): void {
   overdeckDb()
-    .prepare(`UPDATE conversations SET status = 'active', ended_at = NULL WHERE name = ? AND status != 'active'`)
+    .prepare(`UPDATE conversations SET status = 'active', ended_at = NULL, spawn_error = NULL,
+      fork_error = CASE WHEN fork_status = 'failed' THEN NULL ELSE fork_error END,
+      fork_status = CASE WHEN fork_status = 'failed' THEN NULL ELSE fork_status END WHERE name = ? AND status != 'active'`)
     .run(name);
 }
 
@@ -1412,6 +1413,12 @@ export function updateForkStatus(name: string, status: string | null, error?: st
   overdeckDb()
     .prepare(`UPDATE conversations SET fork_status = ?, fork_error = ? WHERE name = ?`)
     .run(status, error ?? null, name);
+}
+
+export function clearConversationFailureState(name: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET fork_status = NULL, fork_error = NULL, spawn_error = NULL WHERE name = ?`)
+    .run(name);
 }
 
 export function getStuckForks(): LegacyConversation[] {

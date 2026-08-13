@@ -7,10 +7,11 @@
  * AC3: Conversation/favorites/file-pointer metadata reads and writes route through
  *      the two doors.
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { Effect, Layer } from 'effect';
 
 import { Db, EventBus } from '../../../../src/lib/overdeck/infra.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 import {
   ConversationsResolver, ConversationsResolverLive,
   ConversationWriter, ConversationWriterLive,
@@ -19,6 +20,12 @@ import {
   ConversationNotFound, AlreadyArchived, NotArchived,
   type ConversationName,
   type Conversation,
+  createConversation,
+  getConversationByName,
+  markConversationEnded,
+  markConversationRunning,
+  updateForkStatus,
+  updateSpawnError,
 } from '../../../../src/lib/overdeck/conversations.js';
 
 // ── Fake DB ───────────────────────────────────────────────────────────────────
@@ -265,6 +272,56 @@ describe('AC1 — ConversationsResolver and ConversationWriter are distinct Cont
     );
 
     expect(result).toBe(true);
+  });
+});
+
+describe('markConversationRunning failure-state repair', () => {
+  let odb: OverdeckTestDb;
+
+  beforeEach(() => {
+    odb = setupOverdeckTestDb();
+    createConversation({ name: 'repair-me', tmuxSession: 'conv-repair-me', cwd: '/tmp' });
+  }, 15_000);
+
+  afterEach(() => {
+    teardownOverdeckTestDb(odb);
+  });
+
+  it('clears failed fork state and spawn_error when resurrecting', () => {
+    updateForkStatus('repair-me', 'failed', 'fork failed');
+    updateSpawnError('repair-me', 'spawn failed');
+    markConversationEnded('repair-me');
+
+    markConversationRunning('repair-me');
+
+    expect(getConversationByName('repair-me')).toMatchObject({
+      status: 'active',
+      forkStatus: null,
+      forkError: null,
+      spawnError: null,
+    });
+  });
+
+  it('preserves in-flight fork state while clearing spawn_error', () => {
+    updateForkStatus('repair-me', 'injecting', 'still working');
+    updateSpawnError('repair-me', 'stale failure');
+    markConversationEnded('repair-me');
+
+    markConversationRunning('repair-me');
+
+    expect(getConversationByName('repair-me')).toMatchObject({
+      status: 'active',
+      forkStatus: 'injecting',
+      forkError: 'still working',
+      spawnError: null,
+    });
+  });
+
+  it('does not write an already-active row', () => {
+    markConversationRunning('repair-me');
+
+    const row = odb.raw().prepare('SELECT changes() AS count').get() as { count: number };
+    expect(row.count).toBe(0);
   });
 });
 

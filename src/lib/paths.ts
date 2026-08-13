@@ -3,11 +3,16 @@ import { basename, join, sep } from 'path';
 import { existsSync, readFileSync } from 'fs';
 
 // Overdeck home directory (can be overridden for testing)
-export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
+export const OVERDECK_HOME = process.env.OVERDECK_HOME || getCanonicalOverdeckHome();
 
 /** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
 export function getOverdeckHome(): string {
-  return process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
+  return process.env.OVERDECK_HOME || getCanonicalOverdeckHome();
+}
+
+/** The canonical home used by the shared Overdeck runtime. */
+export function getCanonicalOverdeckHome(): string {
+  return join(homedir(), '.overdeck');
 }
 
 /**

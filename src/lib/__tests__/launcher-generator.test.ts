@@ -68,16 +68,34 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
 }
 
 describe('generateLauncherScript', () => {
+  it('exports the spawning process home for non-remote launchers', () => {
+    const script = generateLauncherScriptSync(DEFAULT_CONFIG);
+    expect(script).toContain(`export OVERDECK_HOME='${tempHome}'`);
+  });
+
+  it('omits the spawning process home from remote launchers', () => {
+    const script = generateLauncherScriptSync({ ...DEFAULT_CONFIG, spawnMode: 'remote' });
+    expect(script).not.toContain('export OVERDECK_HOME=');
+  });
+
+  it('reflects a changed process home in non-remote launchers', () => {
+    const alternateHome = join(tempHome, 'alternate home');
+    process.env.OVERDECK_HOME = alternateHome;
+    const script = generateLauncherScriptSync(DEFAULT_CONFIG);
+    expect(script).toContain(`export OVERDECK_HOME='${alternateHome}'`);
+  });
+
   it('work agent spawn (basic)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -94,10 +112,11 @@ describe('generateLauncherScript', () => {
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -119,10 +138,11 @@ describe('generateLauncherScript', () => {
       resumeSessionId: 'sess-123',
       model: 'gpt-5.4',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -250,6 +270,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -438,6 +459,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -668,10 +690,11 @@ describe('generateLauncherScript', () => {
       sessionId: 'sess-xyz',
       model: 'claude-sonnet-4-6',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -701,10 +724,11 @@ describe('generateLauncherScript', () => {
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -731,10 +755,11 @@ describe('generateLauncherScript', () => {
       extraArgs: '--effort "high"',
       keepAlive: true,
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -766,10 +791,11 @@ describe('generateLauncherScript', () => {
       resumeSessionId: 'sess-resume',
       keepAlive: true,
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -798,7 +824,7 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       changeDir: false,
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -819,10 +845,11 @@ describe('generateLauncherScript', () => {
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -840,10 +867,11 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       promptInline: 'Please read the continuation prompt and continue.',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
@@ -879,10 +907,11 @@ describe('generateLauncherScript', () => {
       changeDir: false,
       baseCommand: 'claude --model claude-sonnet-4-6',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
+      export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       exec claude --model claude-sonnet-4-6
@@ -1158,13 +1187,14 @@ describe('generateLauncherWrapper', () => {
       sessionId: 'sess-abc',
     };
 
-    it('flag-off: output is byte-identical to pre-PAN-985 behaviour', () => {
+    it('flag-off: omits channels bridge arguments', () => {
       const script = generateLauncherScriptSync(FIXTURE_CONFIG);
       expect(script).toBe(
         [
           '#!/bin/bash',
           'export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"',
           'unset TMUX TMUX_PANE STY',
+          `export OVERDECK_HOME='${tempHome}'`,
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
           "cd -- '/workspace/project'",
