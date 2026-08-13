@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:55:15.465Z",
+  "updated": "2026-08-13T11:55:29.881Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "heal-clears-stale-failure-state": {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2467456,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:55:29.881Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -151,6 +159,7 @@
     "supervisor-failure-message-accuracy.ac3": "completed",
     "supervisor-timeout-degrade": "completed",
     "supervisor-timeout-degrade.ac1": "completed",
-    "supervisor-timeout-degrade.ac2": "completed"
+    "supervisor-timeout-degrade.ac2": "completed",
+    "heal-clears-stale-failure-state": "running"
   }
 }
