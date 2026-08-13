@@ -409,7 +409,15 @@ export function recordAgentActivitySync(
   if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
     state.costSoFar = activity.costSoFar;
   }
-  saveOverdeckAgentStateSync(state);
+  // An activity write is telemetry — it must never take down the caller. On
+  // 2026-08-13 an unhandled SQLITE_BUSY here crashed the PAN-3668 review
+  // orchestrator's app-server host mid-synthesis. The JSON mirror still runs
+  // when the DB write fails.
+  try {
+    saveOverdeckAgentStateSync(state);
+  } catch (err) {
+    console.warn(`[agents] activity DB write failed for ${agentId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
   writeAgentStateJsonSync(state);
   return true;
 }

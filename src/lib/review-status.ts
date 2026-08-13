@@ -608,7 +608,7 @@ function maybeRedispatchStrandedReviewHostSide(issueId: string, status: ReviewSt
 async function redispatchStrandedReviewHostSide(issueId: string, status: ReviewStatus): Promise<void> {
   try {
     const { listSessions } = await import('./tmux.js');
-    const { isReviewSessionForIssue } = await import('./cloister/review-agent.js');
+    const { isReviewSessionForIssue } = await import('./cloister/specialists-registry.js');
     const sessions = await Effect.runPromise(listSessions()).catch(() => [] as readonly { name: string }[]);
     // A live reviewer session means the row — not the pipeline — is stale;
     // there is nothing to repair.
