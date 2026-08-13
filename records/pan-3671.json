@@ -2,7 +2,7 @@
   "issueId": "PAN-3671",
   "schemaVersion": 2,
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:11:39.051Z",
+  "updated": "2026-08-13T11:11:42.526Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3671: Test-home OVERDECK_HOME poisoned shared tmux global env — every conversation spawn falsely reports 'Spawn failed' (supervisor socket bound in /tmp test home)",
       "timestamp": "2026-08-13T11:11:39.050Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
