@@ -1,5 +1,6 @@
 import type { Writable } from 'node:stream';
 import { encodePrimeAgentJsonl, PrimeAgentJsonlFramer } from './jsonl-framing.js';
+import { assertPrimeAgentManagedCommandAllowed } from './policy.js';
 
 export interface PrimeAgentRpcResponse<T = unknown> {
   type: 'response';
@@ -44,6 +45,7 @@ export class PrimeAgentRpcClient {
   }
 
   request<T = unknown>(command: Record<string, unknown> & { type: string }): Promise<PrimeAgentRpcResponse<T>> {
+    assertPrimeAgentManagedCommandAllowed(command.type);
     if (this.closedError) return Promise.reject(this.closedError);
     if (this.pending.size >= this.maxPendingRequests) {
       return Promise.reject(new Error(`Prime Agent RPC has ${this.pending.size} pending requests; refusing unbounded growth`));
