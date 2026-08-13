@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:29:54.355Z",
+  "updated": "2026-08-13T14:34:20.226Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "lazy-ensure-on-spawn": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 1574944,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:29:54.355Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -325,6 +317,16 @@
         "itemId": "pi-openai-env",
         "outcome": "completed",
         "releasedAt": "2026-08-13T14:29:27.489Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 1574944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:29:54.355Z",
+        "itemId": "lazy-ensure-on-spawn",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T14:34:20.225Z"
       }
     ],
     "statusReasons": {
@@ -366,6 +368,9 @@
     "pi-openai-env.ac3": "completed",
     "pi-openai-env.ac4": "completed",
     "pi-openai-env.ac5": "completed",
-    "lazy-ensure-on-spawn": "running"
+    "lazy-ensure-on-spawn": "completed",
+    "lazy-ensure-on-spawn.ac1": "completed",
+    "lazy-ensure-on-spawn.ac2": "completed",
+    "lazy-ensure-on-spawn.ac3": "completed"
   }
 }
