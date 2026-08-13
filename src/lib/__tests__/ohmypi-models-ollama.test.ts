@@ -13,8 +13,8 @@ describe('Ollama Pi model registry provisioning', () => {
     const registry = JSON.parse(readFileSync(join(agentDir, 'models.json'), 'utf8')) as {
       providers: Record<string, { baseUrl: string; apiKey: string; models: Array<{ id: string }> }>;
     };
-    expect(registry.providers.ollama.baseUrl).toBe('$OPENAI_BASE_URL');
-    expect(registry.providers.ollama.apiKey).toBe('$OPENAI_API_KEY');
+    expect(registry.providers.ollama.baseUrl).toBe('http://localhost:11434/v1');
+    expect(registry.providers.ollama.apiKey).toBe('OPENAI_API_KEY');
     expect(registry.providers.ollama.models).toEqual([
       expect.objectContaining({ id: 'gemma4:12b' }),
     ]);

@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { homedir } from 'os';
 import { join } from 'path';
 
+import { loadConfigSync } from './config-yaml.js';
 import { getDashScopeUpstreamBaseUrl } from './openai-compatible-proxy.js';
 import { getProviderForModelSync } from './providers.js';
 
@@ -45,9 +46,12 @@ interface OmpProviderDef {
 function ompProviderDef(providerName: string, modelId: string): OmpProviderDef | undefined {
   if (providerName === 'ollama') {
     const bareModelId = modelId.replace(/^ollama[/:]/, '');
+    const baseUrl = loadConfigSync().config.providerBaseUrls.ollama ?? 'http://localhost:11434';
     return {
-      baseUrl: '$OPENAI_BASE_URL',
-      apiKey: '$OPENAI_API_KEY',
+      // Pi takes provider baseUrl literally; unlike apiKey and headers it does
+      // not resolve environment-variable references in this field.
+      baseUrl: `${baseUrl}/v1`,
+      apiKey: 'OPENAI_API_KEY',
       api: 'openai-completions',
       models: [{
         id: bareModelId,
