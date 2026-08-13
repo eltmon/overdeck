@@ -1,18 +1,25 @@
 {
   "issueId": "PAN-3669",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-13T12:08:58.917Z"
+    }
+  ],
   "feedback": [],
   "created": "2026-08-13T00:37:37.963Z",
-  "updated": "2026-08-13T12:08:58.918Z",
+  "updated": "2026-08-13T12:23:06.943Z",
   "pipeline": {
     "issueId": "PAN-3669",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T00:54:07.774Z",
-    "strikeReadyHead": "c7cd4b9eb80a3e934c1bb6cf01ed1e9bddbfd59c",
-    "strikeReadyAt": "2026-08-13T00:54:07.773Z",
+    "updatedAt": "2026-08-13T12:23:06.913Z",
+    "strikeReadyHead": "c4b9f85a20efc41f47598763bacdd3c014789f91",
+    "strikeReadyAt": "2026-08-13T12:23:06.912Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -22,62 +29,55 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 215685,
-            "output": 807,
-            "cacheRead": 179456,
+            "input": 370595,
+            "output": 1783,
+            "cacheRead": 203776,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 5814867,
-            "output": 5960,
-            "cacheRead": 5533440,
+            "input": 15868716,
+            "output": 15102,
+            "cacheRead": 15211520,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 787,
-            "output": 107,
-            "cacheRead": 0,
+            "input": 1274,
+            "output": 307,
+            "cacheRead": 3,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 215685,
-          "output": 807,
-          "cacheRead": 179456,
+          "input": 370595,
+          "output": 1783,
+          "cacheRead": 203776,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5814867,
-          "output": 5960,
-          "cacheRead": 5533440,
+          "input": 15868716,
+          "output": 15102,
+          "cacheRead": 15211520,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 787,
-          "output": 107,
-          "cacheRead": 0,
+          "input": 1274,
+          "output": 307,
+          "cacheRead": 3,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.353977,
-        "pricingAsOf": "2026-08-13T00:54:07.786Z"
+        "usd": 11.3476093,
+        "pricingAsOf": "2026-08-13T12:23:06.933Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-08-13T12:08:58.917Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
