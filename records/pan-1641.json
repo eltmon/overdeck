@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:47:23.669Z",
+  "updated": "2026-08-13T14:50:31.252Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "docs-local-models": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 1991292,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:47:23.668Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -355,6 +347,16 @@
         "itemId": "doctor-ollama-check",
         "outcome": "completed",
         "releasedAt": "2026-08-13T14:47:12.749Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 1991292,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:47:23.668Z",
+        "itemId": "docs-local-models",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T14:50:31.252Z"
       }
     ],
     "statusReasons": {
@@ -408,6 +410,9 @@
     "doctor-ollama-check": "completed",
     "doctor-ollama-check.ac1": "completed",
     "doctor-ollama-check.ac2": "completed",
-    "docs-local-models": "running"
+    "docs-local-models": "completed",
+    "docs-local-models.ac1": "completed",
+    "docs-local-models.ac2": "completed",
+    "docs-local-models.ac3": "completed"
   }
 }
