@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-09T11:36:32.139Z",
-  "updated": "2026-08-13T20:04:01.283Z",
+  "updated": "2026-08-13T20:09:22.537Z",
   "pipeline": {
     "issueId": "PAN-3620",
     "reviewStatus": "pending",
@@ -19,10 +19,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-09T23:05:08.379Z",
-    "updatedAt": "2026-08-13T20:03:28.818Z",
+    "updatedAt": "2026-08-13T20:08:44.537Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3620 after its harness exited before push.",
     "strikeReadyHead": "eb99d522834a18fea63266acaf9808f3e661d7f3",
-    "strikeReadyAt": "2026-08-13T20:03:28.818Z",
+    "strikeReadyAt": "2026-08-13T20:08:44.537Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -61,7 +61,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.636213,
-        "pricingAsOf": "2026-08-13T20:03:28.833Z"
+        "pricingAsOf": "2026-08-13T20:08:44.550Z"
       }
     },
     "merges": [],
