@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-13T23:06:50.001Z",
+  "updated": "2026-08-13T23:11:07.021Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
@@ -12,11 +12,11 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T23:06:49.966Z",
+    "updatedAt": "2026-08-13T23:10:06.371Z",
     "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3690 --base main --title PAN-3690 --body-file /tmp/pan-pr-body-PAN-3690-1786660396209.md\npull request create failed: GraphQL: No commits between main and strike/pan-3690 (createPullRequest)\n",
     "strikeReadyHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
     "strikeReadyAt": "2026-08-13T23:06:49.965Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -33,15 +33,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 443649,
-            "output": 1179,
-            "cacheRead": 208384,
+            "input": 572556,
+            "output": 1348,
+            "cacheRead": 276480,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 40873947,
-            "output": 21141,
-            "cacheRead": 40229120,
+            "input": 41285857,
+            "output": 22122,
+            "cacheRead": 40634880,
             "cacheWrite": 0
           }
         },
@@ -56,15 +56,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 443649,
-          "output": 1179,
-          "cacheRead": 208384,
+          "input": 572556,
+          "output": 1348,
+          "cacheRead": 276480,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 40873947,
-          "output": 21141,
-          "cacheRead": 40229120,
+          "input": 41285857,
+          "output": 22122,
+          "cacheRead": 40634880,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -75,8 +75,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.974162,
-        "pricingAsOf": "2026-08-13T23:06:49.989Z"
+        "usd": 24.237222,
+        "pricingAsOf": "2026-08-13T23:10:06.380Z"
       }
     },
     "merges": [],
