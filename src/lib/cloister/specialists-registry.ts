@@ -474,3 +474,26 @@ export function recordWake(name: SpecialistAgentName, sessionId?: string): void 
   updateSpecialistMetadata(name, updates);
 }
 
+
+/**
+ * True when a tmux session name belongs to any review phase of this issue —
+ * the parent review role, convoy children, and legacy coordinator sessions —
+ * so callers do not need to know which review phase has started. Lives in this
+ * leaf module (not review-agent.ts) so the review-status read door can classify
+ * sessions without closing an import cycle (PAN-3674).
+ */
+export function isReviewSessionForIssue(sessionName: string, projectKey: string | undefined, issueId: string): boolean {
+  const session = sessionName.toLowerCase();
+  const issue = issueId.toLowerCase();
+  const project = projectKey?.toLowerCase();
+
+  // Belt-and-suspenders: a user conversation session (`conv-*`) must never be
+  // classified as a reviewer session and swept into reviewer cleanup/kill.
+  if (session.startsWith('conv-')) return false;
+
+  if (session === `agent-${issue}-review` || session.startsWith(`agent-${issue}-review-`)) return true;
+  if (session.startsWith(`review-${issue}-`) || session.startsWith(`review-coordinator-${issue}-`)) return true;
+  if (!project) return false;
+  if (session === `specialist-${project}-${issue}-review-agent`) return true;
+  return session.startsWith(`specialist-${project}-${issue}-review-`);
+}

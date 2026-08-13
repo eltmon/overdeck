@@ -57,7 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
-import { isReviewSessionForIssue } from './review-session-classifier.js';
+import { isReviewSessionForIssue } from './specialists-registry.js';
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,
@@ -728,7 +728,7 @@ async function spawnReviewRoleForIssuePromise(
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
  */
-export { isReviewSessionForIssue } from './review-session-classifier.js';
+export { isReviewSessionForIssue };
 
 async function killAllReviewerSessionsPromise(
   projectKey: string | undefined,
