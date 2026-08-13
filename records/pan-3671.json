@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T11:48:12.757Z",
+  "updated": "2026-08-13T11:48:16.043Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "launcher-export-overdeck-home": {
-        "writerId": "agent-pan-3671",
-        "agentId": "agent-pan-3671",
-        "pid": 2213059,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T11:48:12.757Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Pinned canonical HOME and OVERDECK_HOME on the actual shared socket, preserved resolved caller values on isolated sockets, warned on non-canonical shared use, and added focused tests.",
         "releasedAt": "2026-08-13T11:44:23.966Z"
+      },
+      {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2213059,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T11:48:12.757Z",
+        "itemId": "launcher-export-overdeck-home",
+        "outcome": "completed",
+        "reason": "Exported the spawning process's resolved OVERDECK_HOME in every non-remote launcher, omitted it for Fly remote launchers, and updated deterministic launcher coverage.",
+        "releasedAt": "2026-08-13T11:48:16.043Z"
       }
     ],
     "statusReasons": {
       "sanitizer-canonical-home-pin": {
         "reason": "Pinned canonical HOME and OVERDECK_HOME on the actual shared socket, preserved resolved caller values on isolated sockets, warned on non-canonical shared use, and added focused tests.",
         "updatedAt": "2026-08-13T11:44:23.966Z"
+      },
+      "launcher-export-overdeck-home": {
+        "reason": "Exported the spawning process's resolved OVERDECK_HOME in every non-remote launcher, omitted it for Fly remote launchers, and updated deterministic launcher coverage.",
+        "updatedAt": "2026-08-13T11:48:16.043Z"
       }
     }
   },
@@ -104,6 +111,9 @@
     "sanitizer-canonical-home-pin.ac1": "completed",
     "sanitizer-canonical-home-pin.ac2": "completed",
     "sanitizer-canonical-home-pin.ac3": "completed",
-    "launcher-export-overdeck-home": "running"
+    "launcher-export-overdeck-home": "completed",
+    "launcher-export-overdeck-home.ac1": "completed",
+    "launcher-export-overdeck-home.ac2": "completed",
+    "launcher-export-overdeck-home.ac3": "completed"
   }
 }
