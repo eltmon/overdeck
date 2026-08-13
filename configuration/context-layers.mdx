@@ -83,6 +83,7 @@ harness; spawn-time plumbing delivers it:
 | **Claude Code** | managed region of `~/.claude/CLAUDE.md` | Claude Code natively reads `~/.claude/CLAUDE.md` at session start |
 | **Codex** | `~/.overdeck/context/codex-global.md` | At spawn, Overdeck seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
 | **Pi** | `~/.overdeck/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
+| **Prime Agent** | `~/.overdeck/context/prime-agent-global.md` | Injected into the root RPC session's supplemental system prompt at spawn; Overdeck never writes `~/.prime/agent` |
 
 The `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
@@ -133,7 +134,8 @@ Write completion markers via `/pan-done` when ready for review.
 {{/harness:pi}}
 ```
 
-Blocks may be stacked to target several harnesses; `{{#harness:codex}}` is
+Use `{{#harness:prime-agent}}...{{/harness:prime-agent}}` for Prime-only
+content. Blocks may be stacked to target several harnesses; `{{#harness:codex}}` is
 also recognized.
 
 ## CLI

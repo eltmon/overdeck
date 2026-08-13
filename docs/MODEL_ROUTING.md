@@ -29,6 +29,15 @@ When Overdeck needs to make an LLM call, it resolves the model through this chai
 
 Overdeck supports seven LLM providers:
 
+### Prime Agent provider mapping
+
+The `prime-agent` harness receives an explicit provider and model on every
+launch. Anthropic routes to `anthropic`, OpenAI routes to `openai`, and Google
+routes to `google`. Unsupported mappings fail loudly; Overdeck does not pick a
+different model or harness. Provider authentication remains provider-owned.
+Using Claude Pro or Max subscription credentials through Prime Agent bills as
+extra API usage and does not consume the Claude plan quota.
+
 | Provider | Auth Method | Notes |
 |----------|-------------|-------|
 | **Anthropic** | Claude Code subscription login (default, always enabled) | Opus 4.6, Sonnet 4.6, Haiku 4.5 |
