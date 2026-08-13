@@ -2,7 +2,7 @@
   "issueId": "PAN-3684",
   "schemaVersion": 2,
   "created": "2026-08-13T16:05:04.907Z",
-  "updated": "2026-08-13T16:05:04.908Z",
+  "updated": "2026-08-13T16:11:24.348Z",
   "pipeline": {
     "issueId": "PAN-3684",
     "reviewStatus": "pending",
@@ -18,5 +18,15 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "workModel": "ollama:gemma4:12b"
+  "workModel": "ollama:gemma4:12b",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3684",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-13T16:11:24.346Z"
+    }
+  ]
 }
