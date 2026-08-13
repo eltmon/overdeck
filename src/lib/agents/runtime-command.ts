@@ -30,9 +30,29 @@ import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
+import { resolvePrimeAgentModelRoute } from '../prime-agent/provider-map.js';
+import { PRIME_AGENT_MANAGED_POLICY } from '../prime-agent/policy.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
+
+function quoteShell(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+export async function getPrimeAgentBaseCommand(agentId: string, model: string, workspace: string): Promise<string> {
+  const authMode = await getProviderAuthMode(model) ?? 'api-key';
+  const route = resolvePrimeAgentModelRoute(model, authMode);
+  const sessionDir = join(getAgentDir(agentId), 'prime-sessions');
+  await mkdir(sessionDir, { recursive: true, mode: 0o700 });
+  return [
+    'prime-agent --mode rpc',
+    `--provider ${quoteShell(route.provider)}`,
+    `--model ${quoteShell(route.model)}`,
+    `--session-dir ${quoteShell(sessionDir)}`,
+    `--append-system-prompt ${quoteShell(PRIME_AGENT_MANAGED_POLICY)}`,
+  ].join(' ');
+}
 
 export interface RoleMcpServerDef {
   type?: string;
@@ -776,6 +796,12 @@ export async function getAgentRuntimeBaseCommand(
     // command; return a stub base command so the launcher generator can short-circuit.
     return 'kimi-code';
   }
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    if (!agentName) throw new Error('prime-agent launcher requires an agent ID');
+    const workspace = getAgentStateSync(agentName)?.workspace;
+    if (!workspace) throw new Error(`prime-agent launcher cannot resolve workspace for ${agentName}`);
+    return getPrimeAgentBaseCommand(agentName, validatedModel, workspace);
+  }
 
   // Integration tests can inject a harmless harness command so a leaked or
   // intentionally-real tmux session never runs the production `claude` binary.
@@ -968,6 +994,11 @@ export async function getRoleRuntimeBaseCommand(
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
     return 'kimi-code';
+  }
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    const workspace = getAgentStateSync(agentName)?.workspace;
+    if (!workspace) throw new Error(`prime-agent launcher cannot resolve workspace for ${agentName}`);
+    return getPrimeAgentBaseCommand(agentName, validatedModel, workspace);
   }
 
   // Integration tests can inject a harmless harness command so a leaked or

@@ -470,6 +470,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'kimi-code-tui') {
       return buildKimiCodeCommand(config, false);
     }
+    if (behavior.launchCommandKind === 'prime-agent-rpc') {
+      return config.baseCommand ? [config.baseCommand] : [];
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -563,6 +566,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     return buildKimiCodeCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    return config.baseCommand ? [`${useExec ? 'exec ' : ''}${config.baseCommand}`] : [];
   }
 
   const parts: string[] = [];
