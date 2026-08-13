@@ -6,6 +6,11 @@
       "reason": "feedback",
       "note": "[2026-08-13T16:09Z] merge-agent → NEEDS-YOU — seq 1",
       "timestamp": "2026-08-13T16:09:12.241Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-08-13T17:16:52.411Z"
     }
   ],
   "feedback": [
@@ -18,7 +23,7 @@
     }
   ],
   "created": "2026-08-13T12:30:11.070Z",
-  "updated": "2026-08-13T16:09:20.540Z",
+  "updated": "2026-08-13T17:16:52.412Z",
   "pipeline": {
     "issueId": "PAN-3677",
     "reviewStatus": "pending",
