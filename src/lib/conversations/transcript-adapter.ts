@@ -38,6 +38,7 @@ import {
   generateSmartSummary,
   summarizeSerializedText,
 } from './smart-compaction.js';
+import { primeAgentAdapter } from './prime-transcript-adapter.js';
 
 export interface CompactSummaryOptions {
   /** Model for the summarizer LLM. */
@@ -480,6 +481,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'codex': claudeCodeAdapter,
   'acp': acpAdapter,
   'kimi-code': kimiCodeAdapter,
+  'prime-agent': primeAgentAdapter,
 };
 
 /**
