@@ -1,4 +1,5 @@
 import { exec } from 'node:child_process'
+import { getManagedTmuxSocketName } from '../tmux.js';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { request } from 'node:http'
 import { join } from 'node:path'
@@ -142,7 +143,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
     let panePid: string | null = null
     try {
       const { stdout } = await this.execCommand(
-        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`,
+        `tmux -L ${shellQuote(getManagedTmuxSocketName())} list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`,
       )
       panePid = stdout.trim() || null
       if (panePid) {

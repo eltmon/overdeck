@@ -51,3 +51,6 @@
 1065 src/dashboard/server/routes/workspaces/workspace-data.ts # PAN-3362
 1666 src/dashboard/server/services/issue-data-service.ts # PAN-3659
 1334 src/dashboard/server/ws-rpc.ts # PAN-3659
+1340 src/lib/tmux.ts # PAN-3672
+1372 src/lib/tmux.ts # PAN-3673
+1358 src/cli/index.ts # PAN-3673

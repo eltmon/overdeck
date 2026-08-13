@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import { execSync } from 'child_process';
 import { readlinkSync } from 'fs';
-import { listSessionsSync } from '../../lib/tmux.js';
+import { getManagedTmuxSocketName, listSessionsSync } from '../../lib/tmux.js';
 import { listConversations } from '../../lib/overdeck/conversations.js';
 import { registerHygieneCommand } from './hygiene.js';
 
@@ -193,7 +193,7 @@ function categorizeProcesses(processes: ClaudeProcess[]): void {
         if (convTmuxNames.has(session.name)) {
           try {
             const paneInfo = execSync(
-              `tmux -L overdeck list-panes -t ${session.name} -F '#{pane_tty}' 2>/dev/null`,
+              `tmux -L ${getManagedTmuxSocketName()} list-panes -t ${session.name} -F '#{pane_tty}' 2>/dev/null`,
               { encoding: 'utf-8' }
             ).trim();
             if (paneInfo.includes(`/dev/pts/${ttyNum}`)) {

@@ -180,7 +180,7 @@ import {
 } from './specialists.js';
 import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, clearAgentTroubledSync, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
+import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
@@ -1001,7 +1001,7 @@ const ORPHAN_REVIEWER_AGE_MS = 60 * 60 * 1000; // 1 hour
 async function loadTmuxSessionsWithCreationTimes(): Promise<{ sessions: string[]; creationTimes: Map<string, number> } | null> {
   try {
     const { stdout } = await execAsync(
-      `tmux -L overdeck -f ${join(OVERDECK_HOME, 'tmux', 'overdeck.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
+      `tmux -L ${getManagedTmuxSocketName()} -f ${join(OVERDECK_HOME, 'tmux', 'overdeck.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
       { encoding: 'utf-8' },
     );
     const lines = stdout.split('\n').filter(l => l.trim());

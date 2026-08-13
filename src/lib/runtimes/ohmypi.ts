@@ -43,7 +43,7 @@ import type {
   Agent,
 } from './types.js'
 import { OHMYPI_BEHAVIOR } from './behavior.js'
-import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
+import { sessionExists, killSession, createSession, listSessionsSync, getManagedTmuxSocketName } from '../tmux.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
@@ -291,13 +291,13 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
 
     // Step 3: SIGTERM via tmux.
     try {
-      await execAsync(`tmux -L overdeck send-keys -t ${agentId} C-c 2>/dev/null || true`)
+      await execAsync(`tmux -L ${shellQuote(getManagedTmuxSocketName())} send-keys -t ${agentId} C-c 2>/dev/null || true`)
     } catch {
       // ignore
     }
     try {
       const { stdout } = await execAsync(
-        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
+        `tmux -L ${shellQuote(getManagedTmuxSocketName())} list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
       )
       const pid = stdout.trim()
       if (pid) {

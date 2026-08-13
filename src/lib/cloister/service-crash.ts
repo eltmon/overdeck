@@ -7,7 +7,7 @@ import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
-import { exactPaneTarget } from '../tmux.js';
+import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
 import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
@@ -120,7 +120,7 @@ export async function progressFingerprint(_host: CrashHost, agentId: string): Pr
   try {
     const { stdout } = await execFileAsync(
       'tmux',
-      ['-L', 'overdeck', 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
+      ['-L', getManagedTmuxSocketName(), 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
       { encoding: 'utf-8' },
     );
     pane = stdout;

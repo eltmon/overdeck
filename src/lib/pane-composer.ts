@@ -13,7 +13,14 @@ export function deliveryVerifyLine(content: string): string {
   return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
 }
 
-function activeComposerRegion(viewport: PaneViewport): string | null {
+/**
+ * The cursor-anchored active-composer region of a pane: the rows between the
+ * composer's top border (if any) and the cursor row, ANSI-stripped. Returns
+ * null when the composer cannot be anchored (blank pane or unreadable cursor).
+ * Exported so delivery-verification callers can match against the composer
+ * only — never the transcript scrollback above it.
+ */
+export function activeComposerRegion(viewport: PaneViewport): string | null {
   const lines = viewport.text
     .replace(PANE_ANSI_PATTERN, '')
     .split('\n')
