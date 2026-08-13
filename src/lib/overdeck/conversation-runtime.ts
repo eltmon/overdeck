@@ -436,6 +436,21 @@ export async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PT
   const detail = failure ? `supervisor output: ${failure}` : 'the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME';
   throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath} — ${detail}`);
 }
+export async function waitForPtySupervisorOrFallback(
+  agentId: string,
+  timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS,
+  sessionAlive: (name: string) => Promise<boolean> = tmuxSessionExists,
+): Promise<void> {
+  try {
+    await waitForPtySupervisorSocket(agentId, timeoutMs);
+  } catch (error) {
+    if (!await sessionAlive(agentId)) throw error;
+    console.warn(
+      `[conversations] PTY supervisor socket unavailable for ${agentId}; `
+      + `continuing with fallback delivery: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
 async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
   try {
     if (!existsSync(sessionFile)) return null;
@@ -800,7 +815,7 @@ export async function spawnConversationSession(
       throw err;
     }
     if (useSupervisor) {
-      await waitForPtySupervisorSocket(tmuxSession);
+      await waitForPtySupervisorOrFallback(tmuxSession);
     }
     if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
       const codexHomeDir = codexFields.codexHome;

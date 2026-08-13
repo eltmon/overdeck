@@ -20,6 +20,7 @@
 1016 src/lib/agents/runtime-command.ts # PAN-1837
 1463 src/lib/model-capabilities.ts # PAN-1837
 1111 src/lib/overdeck/conversation-runtime.ts # PAN-3419
+1124 src/lib/overdeck/conversation-runtime.ts # PAN-3671
 1144 src/lib/overdeck/agents.ts # PAN-3479
 1052 src/lib/overdeck/memory.ts # PAN-1990
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
