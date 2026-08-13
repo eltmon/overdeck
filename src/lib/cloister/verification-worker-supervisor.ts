@@ -42,6 +42,24 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Kill an expired worker and its gate children. The worker is spawned
+ * detached, so it leads its own process group — signal the group first so a
+ * mid-gate `npm`/`bun` child dies with it, falling back to the bare pid.
+ * Best-effort and async; callers never block on the outcome.
+ */
+async function killWorkerProcessGroup(pid: number): Promise<void> {
+  for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      try { process.kill(pid, signal); } catch { /* already gone */ }
+    }
+    if (!isProcessAlive(pid)) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
+  }
+}
+
 export function readVerificationWorkerState(issueId: string): WorkerState | null {
   try {
     const parsed = JSON.parse(readFileSync(statePath(issueId), 'utf8')) as Partial<WorkerState>;
@@ -117,6 +135,11 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
     const current = readVerificationWorkerState(state.issueId) ?? state;
     const deadline = verificationWorkerDeadline(current);
     if (deadline !== null && Date.now() >= deadline) {
+      // PAN-3674 follow-up: kill the expired worker — it outlived its budget.
+      // Leaving it alive stranded PAN-3668 on 2026-08-13: every later attempt
+      // re-joined the zombie registration and instantly re-failed on the same
+      // deadline, and no fresh worker ever started.
+      void killWorkerProcessGroup(state.pid);
       return { outcome: 'error', message: `Verification worker ${state.pid} exceeded ${MAX_RUN_MS}ms after CPU admission` };
     }
     await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
@@ -131,9 +154,17 @@ export async function runSupervisedVerification(
   options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> = {},
 ): Promise<VerificationRunnerOutcome> {
   const existing = readVerificationWorkerState(issueId);
+  // Never join a worker past its deadline: its result (if it ever lands) is
+  // for a stale gate run, and waitForResult would re-fail on the same deadline
+  // forever. Kill it and fall through to a fresh worker.
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {
-    console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
-    return waitForResult(existing);
+    const existingDeadline = verificationWorkerDeadline(existing);
+    if (existingDeadline === null || Date.now() < existingDeadline) {
+      console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
+      return waitForResult(existing);
+    }
+    console.warn(`[${logPrefix}] Verification worker ${existing.pid} for ${issueId} is past its deadline — killing it and starting fresh`);
+    await killWorkerProcessGroup(existing.pid);
   }
 
   const dir = workerDir(issueId);
