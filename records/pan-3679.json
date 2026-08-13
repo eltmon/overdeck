@@ -1,9 +1,17 @@
 {
   "issueId": "PAN-3679",
   "schemaVersion": 2,
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "merge-agent",
+      "outcome": "needs-you",
+      "timestamp": "2026-08-13T15:26:29Z",
+      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3679 needs operator attention after 1 cycle(s).\n1. strike d710a225588dba19670b7cc283546bf76dbd8d97; main 5e51ddf04f861b95be585f2118ca48d4efea9acc; failed: Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent was stopped by the operator"
+    }
+  ],
   "created": "2026-08-13T14:27:46.870Z",
-  "updated": "2026-08-13T15:17:19.237Z",
+  "updated": "2026-08-13T15:26:29.757Z",
   "pipeline": {
     "issueId": "PAN-3679",
     "reviewStatus": "pending",
@@ -74,5 +82,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T15:26Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-08-13T15:26:29.757Z"
+    }
+  ]
 }
