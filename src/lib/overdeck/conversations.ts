@@ -1415,6 +1415,12 @@ export function updateForkStatus(name: string, status: string | null, error?: st
     .run(status, error ?? null, name);
 }
 
+export function clearConversationFailureState(name: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET fork_status = NULL, fork_error = NULL, spawn_error = NULL WHERE name = ?`)
+    .run(name);
+}
+
 export function getStuckForks(): LegacyConversation[] {
   const rows = overdeckDb()
     .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.fork_status IS NOT NULL AND c.fork_status != 'failed' ORDER BY c.created_at ASC`)

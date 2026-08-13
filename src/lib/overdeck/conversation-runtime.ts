@@ -25,6 +25,7 @@ import {
   archiveConversation,
   removeFavorite,
   updateSpawnError,
+  clearConversationFailureState,
   hasOtherActiveConversationOnTmuxSession,
   type LegacyConversation as Conversation,
 } from './conversations.js';
@@ -995,6 +996,21 @@ export async function handleConversationStop(name: string, deps: { resolveSessio
     console.error('[conversations] stop conversation failed:', msg);
     return jsonResponse({ error: 'Internal server error' }, { status: 500 });
   }
+}
+export async function handleConversationClearForkState(
+  name: string,
+  deps: {
+    sessionExists?: (session: string) => Promise<boolean>;
+    clearFailureState?: (conversation: string) => void;
+  } = {},
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  if (!await (deps.sessionExists ?? tmuxSessionExists)(conv.tmuxSession)) {
+    return jsonResponse({ error: 'Cannot clear failure state while the tmux session is not alive' }, { status: 409 });
+  }
+  (deps.clearFailureState ?? clearConversationFailureState)(name);
+  return jsonResponse({ ...(getConversationByName(name) ?? conv), sessionAlive: true });
 }
 export async function handleConversationResume(
   name: string,

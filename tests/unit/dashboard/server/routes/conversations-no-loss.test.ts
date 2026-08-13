@@ -28,6 +28,7 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'GET /api/conversations/:name/handoff-doc',
   'POST /api/conversations',
   'POST /api/conversations/:name/stop',
+  'POST /api/conversations/:name/clear-fork-state',
   'POST /api/conversations/:name/resume',
   'POST /api/conversations/:name/switch-model',
   'POST /api/conversations/:name/thinking-level',
@@ -79,7 +80,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(conversationsRouteLayer).toBeDefined();
   });
 
-  it('keeps all 36 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 37 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -102,6 +103,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(36);
+    expect(liveRoutes.size).toBe(37);
   });
 });
