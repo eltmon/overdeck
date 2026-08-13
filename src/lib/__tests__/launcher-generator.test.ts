@@ -590,6 +590,7 @@ describe('generateLauncherScript', () => {
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
+      unset OPENAI_BASE_URL
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
@@ -679,6 +680,7 @@ describe('generateLauncherScript', () => {
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
+      unset OPENAI_BASE_URL
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
@@ -1689,5 +1691,9 @@ describe('pi model provider qualification (PAN-1799)', () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
     expect(() => qualifyPiModel('totally-unknown-model')).toThrow('Unknown model "totally-unknown-model".');
+  });
+  it('qualifies Ollama models and strips the Overdeck routing prefix', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('ollama:gemma4:12b')).toBe('ollama/gemma4:12b');
   });
 });

@@ -512,6 +512,13 @@ export function getProviderEnvSync(
   apiKey: string,
   harness?: RuntimeName,
 ): Record<string, string> {
+  if (provider.name === 'ollama') {
+    return {
+      OPENAI_BASE_URL: provider.baseUrl ?? 'http://localhost:11434/v1',
+      OPENAI_API_KEY: apiKey || 'ollama',
+    };
+  }
+
   if (provider.name === 'openai') {
     // OpenAI never receives provider-native or Anthropic token env here.
     // getProviderEnvForModel routes subscription launches through CLIProxy and
@@ -751,6 +758,8 @@ export function piProviderForModel(modelId: string): string | undefined {
       // Not in omp's bundled catalog — provisioned into the omp user
       // registry (~/.omp/agent/models.json) by ohmypi-models.ts at spawn.
       return 'dashscope';
+    case 'ollama':
+      return 'ollama';
     default:
       return undefined;
   }
@@ -765,5 +774,6 @@ export function qualifyPiModel(modelId: string): string {
   // launcher sees the model — never double-prefix an already-qualified id.
   if (modelId.includes('/')) return modelId;
   const piProvider = piProviderForModel(modelId);
-  return piProvider ? `${piProvider}/${modelId}` : modelId;
+  const piModelId = modelId.startsWith('ollama:') ? modelId.slice('ollama:'.length) : modelId;
+  return piProvider ? `${piProvider}/${piModelId}` : piModelId;
 }

@@ -3,15 +3,15 @@
  *
  * omp resolves `--model <id>` against its bundled provider catalog plus the
  * user registry at ~/.omp/agent/models.json. Overdeck providers whose models
- * are absent from the bundled catalog — DashScope is the first — otherwise
+ * are absent from the bundled catalog — DashScope and Ollama — otherwise
  * fail at spawn with omp's "No model selected" error. This module merge-
  * writes the omp user-registry entry for such providers when a launcher is
  * generated, so every ohmypi spawn (work agent or conversation) is
  * self-sufficient on any machine.
  *
- * The provider apiKey is written as the env-var NAME, never the key
+ * Provider credentials and endpoints are written as env-var names, never key
  * material: omp's resolveConfigValue() checks process.env first, and the
- * launcher already exports DASHSCOPE_API_KEY via getProviderEnvSync().
+ * launcher exports the matching values through getProviderEnvSync().
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
@@ -42,7 +42,24 @@ interface OmpProviderDef {
  * Build the omp user-registry entry for an Overdeck provider, or undefined
  * when the provider needs no provisioning (bundled catalog covers it).
  */
-function ompProviderDef(providerName: string): OmpProviderDef | undefined {
+function ompProviderDef(providerName: string, modelId: string): OmpProviderDef | undefined {
+  if (providerName === 'ollama') {
+    const bareModelId = modelId.replace(/^ollama[/:]/, '');
+    return {
+      baseUrl: '$OPENAI_BASE_URL',
+      apiKey: '$OPENAI_API_KEY',
+      api: 'openai-completions',
+      models: [{
+        id: bareModelId,
+        name: bareModelId,
+        reasoning: false,
+        supportsTools: true,
+        contextWindow: 128000,
+        maxTokens: 16384,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      }],
+    };
+  }
   if (providerName !== 'dashscope') return undefined;
   // contextWindow values mirror model-capabilities.ts; maxTokens for the
   // older ids are conservative caps (Alibaba does not publish per-model max
@@ -63,7 +80,7 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
 }
 
 /** Providers Overdeck provisions into the omp user registry at spawn time. */
-const PROVISIONED_PROVIDERS = new Set(['dashscope']);
+const PROVISIONED_PROVIDERS = new Set(['dashscope', 'ollama']);
 
 /**
  * Merge-write the omp user registry for the provider behind `modelId`.
@@ -76,7 +93,7 @@ const PROVISIONED_PROVIDERS = new Set(['dashscope']);
 export function provisionOhmypiProviderForModel(modelId: string, agentDir?: string): void {
   const prefix = modelId.split('/')[0];
   const providerName = PROVISIONED_PROVIDERS.has(prefix) ? prefix : getProviderForModelSync(modelId).name;
-  const def = ompProviderDef(providerName);
+  const def = ompProviderDef(providerName, modelId);
   if (!def) return;
 
   const dir = agentDir ?? join(homedir(), '.omp', 'agent');

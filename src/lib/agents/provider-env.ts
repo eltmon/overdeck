@@ -41,6 +41,11 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
 
   const { config } = loadYamlConfig();
 
+  if (provider.name === 'ollama') {
+    const baseUrl = config.providerBaseUrls.ollama ?? 'http://localhost:11434';
+    return getProviderEnvSync({ ...provider, baseUrl: `${baseUrl}/v1` }, 'ollama', harness);
+  }
+
   // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key
   if (provider.name === 'openrouter') {
     const apiKey = config.apiKeys.openrouter;
@@ -108,6 +113,7 @@ const PROVIDER_ENV_KEYS = [
   'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
   'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
   'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',

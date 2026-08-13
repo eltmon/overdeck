@@ -1,0 +1,22 @@
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
+
+describe('Ollama Pi model registry provisioning', () => {
+  it('registers the bare Ollama tag against the OpenAI-compatible endpoint env', () => {
+    const agentDir = mkdtempSync(join(tmpdir(), 'overdeck-ollama-models-'));
+    provisionOhmypiProviderForModel('ollama:gemma4:12b', agentDir);
+
+    const registry = JSON.parse(readFileSync(join(agentDir, 'models.json'), 'utf8')) as {
+      providers: Record<string, { baseUrl: string; apiKey: string; models: Array<{ id: string }> }>;
+    };
+    expect(registry.providers.ollama.baseUrl).toBe('$OPENAI_BASE_URL');
+    expect(registry.providers.ollama.apiKey).toBe('$OPENAI_API_KEY');
+    expect(registry.providers.ollama.models).toEqual([
+      expect.objectContaining({ id: 'gemma4:12b' }),
+    ]);
+  });
+});
