@@ -1,30 +1,70 @@
 {
   "issueId": "PAN-3664",
   "schemaVersion": 2,
-  "created": "2026-08-12T04:38:51.554Z",
-  "updated": "2026-08-12T04:44:36.126Z",
-  "pipeline": {
-    "issueId": "PAN-3664",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-12T04:38:51.554Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
   "sessionHistory": [
     {
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-12T04:42:54.989Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-08-12T04:38:51.554Z",
+  "updated": "2026-08-13T13:54:50.657Z",
+  "pipeline": {
+    "issueId": "PAN-3664",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T13:54:30.808Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3664 after its harness exited before push.",
+    "strikeReadyHead": "80a885be92f3bd8202ab036354434f9c7c11f166",
+    "strikeReadyAt": "2026-08-13T13:54:30.807Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 265011,
+            "output": 928,
+            "cacheRead": 152320,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 6915450,
+            "output": 8312,
+            "cacheRead": 6085120,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 265011,
+          "output": 928,
+          "cacheRead": 152320,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 6915450,
+          "output": 8312,
+          "cacheRead": 6085120,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.44357,
+        "pricingAsOf": "2026-08-13T13:54:30.853Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
