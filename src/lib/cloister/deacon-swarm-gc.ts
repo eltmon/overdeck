@@ -157,8 +157,9 @@ async function removeSlotWorkspace(
 /**
  * Why a nested slot worktree must be preserved, or null when it is safe to
  * remove. Safe means: the nested slot branch has zero commits the per-repo
- * feature branch lacks, and the checkout has no tracked local modifications
- * (untracked build artifacts do not block removal).
+ * feature branch lacks, and the checkout has no local modifications — any
+ * tracked change or non-ignored untracked file blocks removal (ignored
+ * build artifacts do not).
  */
 async function nestedWorktreePreservationReason(
   runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
@@ -173,9 +174,9 @@ async function nestedWorktreePreservationReason(
     return `${worktree.repoKey}: ${slotBranch} has ${ahead} unmerged commit(s) not in ${worktree.featureBranch}`;
   }
   try {
-    const status = await runGitCommand('git status --porcelain --untracked-files=no', worktree.dir) as { stdout?: unknown };
+    const status = await runGitCommand('git status --porcelain --untracked-files=all', worktree.dir) as { stdout?: unknown };
     if (String(status?.stdout ?? '').trim().length > 0) {
-      return `${worktree.repoKey}: worktree has uncommitted tracked changes`;
+      return `${worktree.repoKey}: worktree has uncommitted changes`;
     }
   } catch {
     return `${worktree.repoKey}: worktree status could not be determined`;
@@ -194,8 +195,12 @@ async function countCommitsAhead(
       `git rev-list --count ${JSON.stringify(featureBranch)}..${JSON.stringify(slotBranch)}`,
       parentRepo,
     ) as { stdout?: unknown };
-    const count = Number(String(result?.stdout ?? '').trim());
-    return Number.isFinite(count) ? count : null;
+    const stdout = String(result?.stdout ?? '').trim();
+    // An empty or non-numeric stdout is not evidence of "zero commits ahead" —
+    // Number('') === 0 would misread it as safely merged. Only a digits-only
+    // payload proves the count.
+    if (!/^\d+$/.test(stdout)) return null;
+    return Number(stdout);
   } catch {
     return null;
   }

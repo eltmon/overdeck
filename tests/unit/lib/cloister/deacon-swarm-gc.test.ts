@@ -306,7 +306,36 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
 
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toContain('uncommitted tracked changes');
+    expect(actions[0]).toContain('uncommitted changes');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('preserves a slot whose nested worktree contains an untracked user file', async () => {
+    const fakeDeps = polyrepoDeps({ dirtyByRepo: { fe: '?? notes-wip.ts\n' } });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('uncommitted changes');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('treats an empty rev-list stdout as unknown merge state, never as merged', async () => {
+    const fakeDeps = polyrepoDeps();
+    vi.mocked(fakeDeps.runGitCommand).mockImplementation(async (command: string) => {
+      if (command.startsWith('git rev-list --count')) return undefined;
+      if (command.startsWith('git status --porcelain')) return { stdout: '' };
+      return undefined;
+    });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('could not be determined');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
