@@ -5,6 +5,7 @@ import { readCavemanVariant } from '../caveman/workspace.js';
 import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from '../cliproxy.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
+import { checkOllamaHealth, ensureOllamaServeRunning } from '../ollama.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
@@ -43,6 +44,11 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
 
   if (provider.name === 'ollama') {
     const baseUrl = config.providerBaseUrls.ollama ?? 'http://localhost:11434';
+    await ensureOllamaServeRunning({ baseUrl });
+    const health = await checkOllamaHealth(model, baseUrl);
+    if (!health.endpointReachable || !health.modelPresent) {
+      throw new Error(health.message ?? `Ollama model ${model.replace(/^ollama:/, '')} is unavailable.`);
+    }
     return getProviderEnvSync({ ...provider, baseUrl: `${baseUrl}/v1` }, 'ollama', harness);
   }
 

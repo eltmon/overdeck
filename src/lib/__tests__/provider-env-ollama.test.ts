@@ -3,11 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const configMock = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
 }));
+const ollamaMock = vi.hoisted(() => ({
+  ensureOllamaServeRunning: vi.fn(),
+  checkOllamaHealth: vi.fn(),
+}));
 
 vi.mock('../config-yaml.js', () => ({
   loadConfigSync: configMock.loadConfigSync,
   resolveModel: vi.fn(),
 }));
+
+vi.mock('../ollama.js', () => ollamaMock);
 
 import {
   buildSpawnEnvForModel,
@@ -18,11 +24,17 @@ import { getProviderEnvSync, PROVIDERS } from '../providers.js';
 
 describe('Ollama provider environment', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     configMock.loadConfigSync.mockReturnValue({
       config: {
         apiKeys: {},
         providerBaseUrls: { ollama: 'http://127.0.0.1:22434' },
       },
+    });
+    ollamaMock.ensureOllamaServeRunning.mockResolvedValue(undefined);
+    ollamaMock.checkOllamaHealth.mockResolvedValue({
+      endpointReachable: true,
+      modelPresent: true,
     });
   });
 
@@ -35,6 +47,36 @@ describe('Ollama provider environment', () => {
       OPENAI_BASE_URL: 'http://localhost:11434/v1',
       OPENAI_API_KEY: 'ollama',
     });
+    expect(ollamaMock.ensureOllamaServeRunning).toHaveBeenCalledWith({
+      baseUrl: 'http://127.0.0.1:22434',
+    });
+    expect(ollamaMock.checkOllamaHealth).toHaveBeenCalledWith(
+      'ollama:gemma4:12b',
+      'http://127.0.0.1:22434',
+    );
+  });
+
+  it('surfaces a distinct endpoint error before returning spawn environment', async () => {
+    ollamaMock.ensureOllamaServeRunning.mockRejectedValueOnce(
+      new Error('Ollama did not become reachable at http://127.0.0.1:22434 after starting `ollama serve`.'),
+    );
+
+    await expect(getProviderEnvForModel('ollama:gemma4:12b', 'ohmypi')).rejects.toThrow(
+      'Ollama did not become reachable at http://127.0.0.1:22434 after starting `ollama serve`.',
+    );
+    expect(ollamaMock.checkOllamaHealth).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the pull command when the requested model is absent', async () => {
+    ollamaMock.checkOllamaHealth.mockResolvedValueOnce({
+      endpointReachable: true,
+      modelPresent: false,
+      message: 'Ollama model gemma4:12b is not pulled. Run `ollama pull gemma4:12b`.',
+    });
+
+    await expect(getProviderEnvForModel('ollama:gemma4:12b', 'ohmypi')).rejects.toThrow(
+      'Ollama model gemma4:12b is not pulled. Run `ollama pull gemma4:12b`.',
+    );
   });
 
   it('unsets stale endpoint variables before exporting the Ollama endpoint', async () => {
