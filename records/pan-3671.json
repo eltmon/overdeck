@@ -118,16 +118,16 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:55:11.457Z",
+  "updated": "2026-08-13T14:55:23.223Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-13T14:55:08.567Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T14:55:23.164Z",
     "testNotes": "npm run typecheck: clean (dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). npm run lint: clean (circular-deps 56 baselined/0 new, file-size guard clean, effect-diagnostics 308 known/0 new, ratchet-audit clean). npm test: 1446 test files passed / 3 skipped (1449 total), 13638 tests passed / 50 skipped (13695 total), 0 failures, plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Issue is backend/CLI/API-only (sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs) — no frontend files in diff and ConversationPanel.tsx is an explicit NonGoal, so UAT is not required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "1d742dfa2e21502d68e00a6444babff84a7a595d",
@@ -145,16 +145,16 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 51995950,
-            "output": 74075,
-            "cacheRead": 50196736,
+            "input": 52462872,
+            "output": 76664,
+            "cacheRead": 50646784,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 45066,
-            "output": 1446,
+            "input": 46234,
+            "output": 1563,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -176,14 +176,14 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 51995950,
-          "output": 74075,
-          "cacheRead": 50196736,
+          "input": 52462872,
+          "output": 76664,
+          "cacheRead": 50646784,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 45066,
-          "output": 1446,
+          "input": 46234,
+          "output": 1563,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -195,8 +195,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 37.414856,
-        "pricingAsOf": "2026-08-13T14:55:11.444Z"
+        "usd": 37.803673,
+        "pricingAsOf": "2026-08-13T14:55:23.206Z"
       }
     },
     "merges": [
