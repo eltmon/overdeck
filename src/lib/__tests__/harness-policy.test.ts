@@ -62,6 +62,12 @@ describe('canUseHarness', () => {
     },
   )
 
+  it('allows pi + Ollama on every authMode', () => {
+    for (const authMode of AUTH_MODES) {
+      expect(canUseHarnessSync('pi', 'ollama:gemma3:12b', authMode)).toEqual({ allowed: true })
+    }
+  })
+
   it.each(PROVIDERS)('allows claude-code + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {

@@ -54,6 +54,25 @@ describe('providers', () => {
     expect(getProviderForModelSync('k3[1m]')).toBe(PROVIDERS.kimi);
   });
 
+  it('routes every ollama:<tag> model id to the model-agnostic Ollama provider', () => {
+    expect(PROVIDERS.ollama).toMatchObject({
+      name: 'ollama',
+      baseUrl: 'http://localhost:11434/v1',
+      models: [],
+      tested: false,
+    });
+    expect(getProviderForModelSync('ollama:gemma3:12b')).toBe(PROVIDERS.ollama);
+    expect(getProviderForModelSync('ollama:anything')).toBe(PROVIDERS.ollama);
+    expect(getProviderForModelSync('ollama:library/custom:latest')).toBe(PROVIDERS.ollama);
+  });
+
+  it('preserves existing provider routing after adding the Ollama prefix', () => {
+    expect(getProviderForModelSync('claude-sonnet-4-6')).toBe(PROVIDERS.anthropic);
+    expect(getProviderForModelSync('gpt-5.4')).toBe(PROVIDERS.openai);
+    expect(getProviderForModelSync('qwen/qwen3.6-plus:free')).toBe(PROVIDERS.openrouter);
+    expect(getProviderForModelSync('minimax-m2.7')).toBe(PROVIDERS.minimax);
+  });
+
   describe('resolveKimiCodeModelAlias (PAN-1837 review fix)', () => {
     it('passes an already-native kimi-code/<alias> id through unchanged', () => {
       expect(resolveKimiCodeModelAlias('kimi-code/k3')).toBe('kimi-code/k3');

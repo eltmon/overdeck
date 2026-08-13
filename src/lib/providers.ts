@@ -15,7 +15,7 @@ import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'ollama';
 
 /**
  * Provider configuration
@@ -180,6 +180,18 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
     tested: true,
     description: 'Route directly to OpenRouter Anthropic-compatible endpoint; slash-containing model IDs pass through unchanged.',
+  },
+
+  ollama: {
+    name: 'ollama',
+    displayName: 'Ollama',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    baseUrl: 'http://localhost:11434/v1',
+    authType: 'static',
+    models: [], // Dynamic local models; use the ollama:<tag> routing prefix.
+    tested: false,
+    description: 'Route local models through the Ollama OpenAI-compatible endpoint using the Pi harness.',
   },
 
   nous: {
@@ -390,6 +402,11 @@ function nearestKnownModelId(modelId: string): string | undefined {
  * Get provider for a given model ID
  */
 export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
+  // Ollama tags may contain both colons and slashes. The explicit namespace
+  // must win before the generic slash-delimited OpenRouter heuristic.
+  if (modelId.startsWith('ollama:')) {
+    return PROVIDERS.ollama;
+  }
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
