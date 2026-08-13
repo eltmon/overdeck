@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3679",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-13T15:26Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-08-13T15:26:29.757Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 1,
@@ -11,7 +18,7 @@
     }
   ],
   "created": "2026-08-13T14:27:46.870Z",
-  "updated": "2026-08-13T15:26:29.757Z",
+  "updated": "2026-08-13T15:27:40.562Z",
   "pipeline": {
     "issueId": "PAN-3679",
     "reviewStatus": "pending",
@@ -20,7 +27,8 @@
     "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T15:16:17.758Z",
+    "updatedAt": "2026-08-13T15:26:29.703Z",
+    "mergeNotes": "Could not validate strike branch: spawn git ENOENT",
     "strikeReadyHead": "d710a225588dba19670b7cc283546bf76dbd8d97",
     "strikeReadyAt": "2026-08-13T14:54:03.452Z",
     "strikeLandingState": "landing",
@@ -75,19 +83,12 @@
       },
       "costAtCloseOut": {
         "usd": 8.924845,
-        "pricingAsOf": "2026-08-13T15:16:17.779Z"
+        "pricingAsOf": "2026-08-13T15:27:05.939Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-13T15:26Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-13T15:26:29.757Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
