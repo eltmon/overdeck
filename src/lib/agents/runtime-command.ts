@@ -13,7 +13,6 @@ import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { getClaudeAuthStatus } from '../claude-auth.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -22,36 +21,22 @@ import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSy
 import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
-import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
 import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
-import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
-import { resolvePrimeAgentModelRoute } from '../prime-agent/provider-map.js';
-import { PRIME_AGENT_MANAGED_POLICY } from '../prime-agent/policy.js';
+import { buildPrimeAgentBaseCommand } from '../prime-agent/launch-command.js';
+import { getProviderAuthMode } from './provider-auth.js';
+export { getProviderAuthMode } from './provider-auth.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
 
-function quoteShell(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
 export async function getPrimeAgentBaseCommand(agentId: string, model: string, workspace: string): Promise<string> {
   const authMode = await getProviderAuthMode(model) ?? 'api-key';
-  const route = resolvePrimeAgentModelRoute(model, authMode);
-  const sessionDir = join(getAgentDir(agentId), 'prime-sessions');
-  await mkdir(sessionDir, { recursive: true, mode: 0o700 });
-  return [
-    'prime-agent --mode rpc',
-    `--provider ${quoteShell(route.provider)}`,
-    `--model ${quoteShell(route.model)}`,
-    `--session-dir ${quoteShell(sessionDir)}`,
-    `--append-system-prompt ${quoteShell(PRIME_AGENT_MANAGED_POLICY)}`,
-  ].join(' ');
+  return buildPrimeAgentBaseCommand({ agentId, model, workspace, authMode });
 }
 
 export interface RoleMcpServerDef {
@@ -732,30 +717,6 @@ export async function writeOhmypiAgentPrompt(agentId: string, prompt: string, ti
     }
     throw err;
   }
-}
-
-export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
-  const provider = getProviderForModelSync(model);
-  if (provider.name === 'anthropic') {
-    const authStatus = await Effect.runPromise(getClaudeAuthStatus());
-    if (authStatus.hasAnthropicApiKey) return 'api-key';
-    return authStatus.loggedIn ? 'subscription' : undefined;
-  }
-
-  if (provider.name === 'openai') {
-    const { config } = loadYamlConfig();
-    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
-    return authStatus.loggedIn
-      ? 'subscription'
-      : (config.providerAuth?.openai ?? 'api-key');
-  }
-
-  if (provider.name === 'google') {
-    const { config } = loadYamlConfig();
-    return config.providerAuth?.google;
-  }
-
-  return undefined;
 }
 
 /**
