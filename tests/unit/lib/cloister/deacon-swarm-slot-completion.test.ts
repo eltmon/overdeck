@@ -184,6 +184,45 @@ describe('PAN-2372 WI-3 clearSwarmSlotCompletion (FR-6)', () => {
   });
 });
 
+describe('PAN-3685 merged-slot ownership consumption', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-ownership-clear-'));
+    remote = initGitRecordRoot(workspacePath);
+  });
+
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
+  });
+
+  it('atomically removes the assignment and completion while preserving a running sibling', async () => {
+    const { clearSwarmSlotOwnership } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3685', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [
+          { slotIndex: 1, itemId: 'integrated' },
+          { slotIndex: 2, itemId: 'running' },
+        ],
+        slotCompletions: {
+          '1': { slotIndex: 1, itemId: 'integrated', agentId: 'agent-pan-3685-slot-1', completedAt: '2026-08-13T00:00:00.000Z' },
+          '2': { slotIndex: 2, itemId: 'running', agentId: 'agent-pan-3685-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+        },
+      },
+    }));
+
+    await clearSwarmSlotOwnership(workspacePath, 'PAN-3685', 1, 'integrated');
+
+    const swarm = readRecord(workspacePath, 'PAN-3685').swarm;
+    expect(swarm?.slotAssignments).toEqual([{ slotIndex: 2, itemId: 'running' }]);
+    expect(swarm?.slotCompletions?.['1']).toBeUndefined();
+    expect(swarm?.slotCompletions?.['2']).toBeDefined();
+  });
+});
+
 describe('PAN-2372 WI-3 persistAndVerifySwarmSlotCompletion (FR-4, FR-5)', () => {
   let workspacePath: string;
 
