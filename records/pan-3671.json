@@ -118,7 +118,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T15:25:24.248Z",
+  "updated": "2026-08-13T15:25:27.554Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
@@ -127,8 +127,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-08-13T15:25:24.158Z",
-    "testNotes": "typecheck clean (dashboard-types 30 known/0 new, frontend-types 0 known/0 new); lint clean (circular-deps 56 baselined/0 new, ratchet-audit clean, quarantine-audit 12 validated, effect-diagnostics 308 known/0 new); backend vitest full suite run twice, 11 distinct files timed out (5000ms hook/setup timeouts, no overlap between runs, none in PAN-3671 scope) all confirmed passing in isolation = CPU-load flakiness not regression; frontend issueActions/fr7 suite 4 files/64 tests passed; net 0 genuine failures across 1449 backend files/13695 tests + 64 frontend tests. UAT not required: PAN-3671 scope is entirely backend/CLI/API/docs with explicit NonGoal excluding frontend/ConversationPanel.tsx changes.",
+    "updatedAt": "2026-08-13T15:25:24.187Z",
+    "testNotes": "npm run typecheck: clean (tsc root+hooks+evals, dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new, acp tsconfig clean). npm run lint: clean (eslint, effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/park-exits/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit-merge-gate lanes all pass; circular-deps 56 baselined/0 new; ratchet-audit clean; quarantine-audit 12 entries validated; effect-diagnostics 308 known/0 new). npm test backend (vitest run --configLoader runner) run twice full-suite: first run 7 files/6 tests failed, second run a disjoint set of 4 files/4 tests failed — all failures were 'Hook/Test timed out in 5000ms' on beforeEach/setup hooks (DB setup, fake timers, imports) in files with no overlap across the two runs and no overlap with PAN-3671's changed-file scope (src/lib/tmux.ts, src/lib/paths.ts, src/lib/launcher-generator.ts, src/lib/overdeck/conversation-runtime.ts, src/lib/overdeck/conversations.ts, src/dashboard/server/routes/conversations.ts, src/cli/commands/conversations/*, docs/AGENT-MESSAGE-DELIVERY.md). Re-ran all 11 distinct failing files in isolation (2 separate vitest invocations, 39 tests total): all passed cleanly, confirming CPU-load-induced flakiness (consistent with known concurrent-agent-load symptom on this dev machine) rather than a regression from this branch. Frontend suite (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) ran clean: 4 files / 64 tests passed. Net: 1449 backend test files / 13695 tests all pass when accounting for confirmed transient timeouts, plus 4/64 frontend tests, 0 genuine failures. UAT not required: PAN-3671's xBRIEF scope is entirely backend/CLI/API/docs (tmux sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs/AGENT-MESSAGE-DELIVERY.md) with an explicit NonGoal excluding frontend changes to ConversationPanel.tsx; no frontend files appear in files_scope or the actual diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "1d742dfa2e21502d68e00a6444babff84a7a595d",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
@@ -196,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.975756000000004,
-        "pricingAsOf": "2026-08-13T15:25:24.207Z"
+        "pricingAsOf": "2026-08-13T15:25:27.534Z"
       }
     },
     "merges": [
