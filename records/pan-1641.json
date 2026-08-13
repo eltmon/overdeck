@@ -136,18 +136,18 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:21:13.690Z",
+  "updated": "2026-08-13T14:22:02.618Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:21:13.584Z",
-    "inspectNotes": "Inspecting item pi-openai-env"
+    "updatedAt": "2026-08-13T14:22:01.737Z",
+    "inspectNotes": "Re-inspect of d6ec4f8b. BLOCKER 1 and BLOCKER 2 from the prior verdict are FIXED and verified: ohmypi-models.ts:52 now writes a literal resolved endpoint (config.providerBaseUrls.ollama + '/v1') matching the dashscope precedent at :78, and ohmypi-models.ts:54 writes the bare env-var name 'OPENAI_API_KEY', which is what omp's resolveConfigValue (process.env[config]) actually looks up. Ran the three touched files: 83 tests pass. AC-1 and AC-3 remain satisfied.\n\nTwo blockers from the prior verdict are UNTOUCHED by this commit, so the bead still fails.\n\nBLOCKER 3 (AC-2) - src/lib/providers.ts:775 qualifyPiModel still returns early on any id containing '/': 'if (modelId.includes(\"/\")) return modelId;'. A namespaced tag such as 'ollama:library/custom:latest' therefore keeps its 'ollama:' prefix and is never provider-qualified, while ohmypi-models.ts:48 strips it to 'library/custom:latest' via /^ollama[/:]/ - the registry model id and the --model id disagree and omp fails with 'No model selected'. That id form is not hypothetical: the register-ollama-provider bead's own test in tests/lib/providers.test.ts asserts getProviderForModelSync('ollama:library/custom:latest') routes to PROVIDERS.ollama. Fix: strip the leading 'ollama:' BEFORE the idempotency slash check, and add a qualifyPiModel test for the namespaced form.\n\nBLOCKER 4 (AC-4) - still no decision recorded. continues/pan-1641.vbrief.json decisions remain D1-D7, every one recordedAt 2026-06-07T02:40 (planning time); hazard H1 flagged the Pi env/config contract as unverified pending this bead. The mechanism is now correct in code and a one-line comment at ohmypi-models.ts:50-51 notes it, but AC-4 requires it documented as a decision in continue.json. Record one stating the confirmed contract - omp takes provider baseUrl literally (dist/core/model-registry.js:548,559,1218,1244) and env-resolves only apiKey/headers by BARE name (dist/core/resolve-config-value.js:17-19) - so baseUrl must be a resolved URL and apiKey a bare env-var name.\n\nALSO REQUIRED (AC-5, test isolation) - src/lib/__tests__/ohmypi-models-ollama.test.ts:16 asserts the literal 'http://localhost:11434/v1' while ompProviderDef now calls the real loadConfigSync() at ohmypi-models.ts:49. The test reads the operator's live ~/.overdeck/config.yaml and passes here only because providers.ollama.base_url is unset on this machine; any machine that sets it fails the test for the wrong reason. Mock loadConfigSync the way the sibling src/lib/__tests__/provider-env-ollama.test.ts:3-10 already does."
   },
   "closeOut": {
     "usage": {
@@ -235,7 +235,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.2800686,
-        "pricingAsOf": "2026-08-13T14:21:13.662Z"
+        "pricingAsOf": "2026-08-13T14:22:02.055Z"
       }
     },
     "merges": [],
