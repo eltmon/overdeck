@@ -3,19 +3,30 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T16:03:50.659Z",
-  "updated": "2026-08-13T16:16:04.567Z",
+  "updated": "2026-08-13T16:16:11.590Z",
   "pipeline": {
     "issueId": "PAN-3685",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "failed",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T16:15:01.785Z",
+    "updatedAt": "2026-08-13T16:15:06.240Z",
+    "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3685 --base main --title PAN-3685 --body-file /tmp/pan-pr-body-PAN-3685-1786637705011.md\npull request create failed: GraphQL: No commits between main and strike/pan-3685 (createPullRequest)\n; recovery not delivered: agent is paused (Operator paused all Panopticon issue agents)",
     "strikeReadyHead": "7b5add82fbdb6a91e0ed3f379617546cc4697289",
     "strikeReadyAt": "2026-08-13T16:15:01.714Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-13T16:15:06.237Z",
+        "strikeHead": "7b5add82fbdb6a91e0ed3f379617546cc4697289",
+        "mainHead": "573390771f2b0543c5b13a79ec320871fb3f0063",
+        "outcome": "failed",
+        "detail": "Failed to create PR: Command failed: gh pr create --head strike/pan-3685 --base main --title PAN-3685 --body-file /tmp/pan-pr-body-PAN-3685-1786637705011.md\npull request create failed: GraphQL: No commits between main and strike/pan-3685 (createPullRequest)\n; recovery not delivered: agent is paused (Operator paused all Panopticon issue agents)"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -65,7 +76,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.828949,
-        "pricingAsOf": "2026-08-13T16:16:04.534Z"
+        "pricingAsOf": "2026-08-13T16:16:07.976Z"
       }
     },
     "merges": [],
