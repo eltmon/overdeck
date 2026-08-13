@@ -44,6 +44,7 @@
 1688 src/lib/settings-api.ts # PAN-3410
 1022 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-3410
 1007 src/cli/commands/doctor.ts # PAN-3538
+1045 src/cli/commands/doctor.ts # PAN-1641
 1319 src/lib/tmux.ts # PAN-3539
 1518 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3544
 1008 src/lib/cloister/review-agent.ts # PAN-3549

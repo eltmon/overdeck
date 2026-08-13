@@ -47,6 +47,8 @@ import {
   readDockerDaemonPools,
 } from '../../lib/docker-bridge-pool.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
+import { checkOllamaHealth, DEFAULT_OLLAMA_AGENT_MODEL, DEFAULT_OLLAMA_BASE_URL, isOllamaInstalled, type OllamaHealth } from '../../lib/ollama.js';
+import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 const execAsync = promisify(exec);
@@ -207,6 +209,39 @@ export interface CheckResult {
   status: 'ok' | 'warn' | 'error';
   message: string;
   fix?: string;
+}
+
+export async function checkOllama(options: {
+  baseUrl?: string;
+  detectInstalled?: () => Promise<boolean>;
+  checkHealth?: (model: string, baseUrl: string) => Promise<OllamaHealth>;
+} = {}): Promise<CheckResult[]> {
+  const installed = await (options.detectInstalled ?? isOllamaInstalled)();
+  if (!installed) {
+    return [{
+      name: 'Ollama',
+      status: 'warn',
+      message: 'Not installed (optional local-model sidecar)',
+      fix: 'Install from https://ollama.com/download',
+    }];
+  }
+
+  const baseUrl = options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL;
+  const health = await (options.checkHealth ?? checkOllamaHealth)(DEFAULT_OLLAMA_AGENT_MODEL, baseUrl);
+  if (!health.endpointReachable) {
+    return [{
+      name: 'Ollama',
+      status: 'warn',
+      message: `Installed but endpoint is unreachable at ${baseUrl}`,
+      fix: 'Start it with `ollama serve`',
+    }];
+  }
+
+  return [{
+    name: 'Ollama',
+    status: 'ok',
+    message: `Installed and reachable at ${baseUrl}`,
+  }];
 }
 
 function checkCommand(cmd: string): boolean {
@@ -748,6 +783,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+
+  const { config } = loadYamlConfig();
+  for (const c of await checkOllama({ baseUrl: config.providerBaseUrls.ollama })) checks.push(c);
 
   // Check Overdeck directories
   const directories = [
