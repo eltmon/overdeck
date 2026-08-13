@@ -272,6 +272,7 @@ function buildSelfReviewPrompt(opts: {
 async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
+  const dispatchStartedAtMs = Date.now();
   if (!opts.model) {
     const project = resolveProjectForIssue(opts.issueId);
     const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
@@ -678,6 +679,28 @@ async function spawnReviewRoleForIssuePromise(
     };
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
+    // PAN-3674: tear down the half-started runtime this dispatch created so a
+    // later resume does not attach to a wedge — on 2026-08-13 the PAN-3668
+    // orchestrator's app-server host sat alive-but-socketless in its pane for
+    // 5h after a readiness timeout, invisible to every liveness reader (its
+    // state row still said 'starting'). Only tear down what THIS dispatch
+    // created: an older startedAt means a pre-existing session that must not
+    // be killed here.
+    try {
+      const orphan = getAgentStateSync(reviewSessionName);
+      const orphanStartedMs = orphan?.startedAt ? Date.parse(orphan.startedAt) : Number.NaN;
+      const createdByThisDispatch = orphan !== null && orphan !== undefined
+        && Number.isFinite(orphanStartedMs) && orphanStartedMs >= dispatchStartedAtMs - 5_000;
+      if (createdByThisDispatch) {
+        const sessions = await Effect.runPromise(listSessionNames()).catch(() => [] as string[]);
+        if (sessions.includes(reviewSessionName)) {
+          await Effect.runPromise(killSession(reviewSessionName)).catch(() => {});
+        }
+        orphan.status = 'error';
+        const { saveAgentState } = await import('../agents.js');
+        await Effect.runPromise(saveAgentState(orphan)).catch(() => {});
+      }
+    } catch { /* teardown is best-effort; the status write below still lands */ }
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'failed',
       reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,

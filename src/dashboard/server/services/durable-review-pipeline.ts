@@ -89,8 +89,12 @@ export async function startDashboardDurableReviewPipeline(
         ...(prUrl ? { prUrl } : {}),
       });
       if (!result.success) {
+        // PAN-3674: a failed dispatch IS failed. Writing 'pending' here used to
+        // overwrite spawnReviewRole's own 'failed' write, leaving the row in a
+        // state that disables every recovery gate and menu action (PAN-3668
+        // stranded 5h on 2026-08-13 until an operator noticed).
         setReviewPending({
-          reviewStatus: 'pending',
+          reviewStatus: 'failed',
           reviewNotes: result.error || result.message || 'Failed to dispatch review',
         });
         return;

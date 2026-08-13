@@ -567,7 +567,77 @@ async function deliverReviewVerdictFeedbackHostSide(
 const reviewDispatchAttemptAt = new Map<string, number>();
 const staleReviewRequestClearAttemptedAt = new Map<string, number>();
 const REVIEW_AUTO_DISPATCH_THROTTLE_MS = 30_000;
+const STRANDED_REVIEW_SPAWN_AGE_MS = 20 * 60_000;
+const STRANDED_REDISPATCH_COOLDOWN_MS = 10 * 60_000;
+const strandedReviewRedispatchAt = new Map<string, number>();
 let loggedMissingPipelineHandler = false;
+
+/**
+ * PAN-3674: a pending review whose dispatch already ran (reviewSpawnedAt set)
+ * but produced no live reviewer sessions is stranded by a failed spawn — the
+ * 2026-08-13 PAN-3668 incident sat like this for 5h while the dashboard showed
+ * a benign 'Pending'. needsReviewDispatch stands down once spawnedAt covers the
+ * request, so without this repair nothing ever retries.
+ */
+function isStrandedPendingReview(status: ReviewStatus, now = Date.now()): boolean {
+  if (status.reviewStatus !== 'pending') return false;
+  if (status.readyForMerge === true || status.mergeStatus === 'merged') return false;
+  // Verification must have passed — a pending row with failed or absent
+  // verification waits on the work agent, not on a review re-dispatch.
+  if (status.verificationStatus !== 'passed' && status.verificationStatus !== 'skipped') return false;
+  const spawned = status.reviewSpawnedAt;
+  if (spawned === undefined || spawned === null) return false;
+  const spawnedMs = typeof spawned === 'number' ? spawned : Date.parse(spawned);
+  if (!Number.isFinite(spawnedMs)) return false;
+  return now - spawnedMs >= STRANDED_REVIEW_SPAWN_AGE_MS;
+}
+
+/** @internal Test-only export — the stranded predicate is the safety gate for the repair. */
+export function _isStrandedPendingReviewForTest(status: ReviewStatus, now?: number): boolean {
+  return isStrandedPendingReview(status, now);
+}
+
+function maybeRedispatchStrandedReviewHostSide(issueId: string, status: ReviewStatus): void {
+  if (!isStrandedPendingReview(status)) return;
+  const last = strandedReviewRedispatchAt.get(issueId) ?? 0;
+  if (Date.now() - last < STRANDED_REDISPATCH_COOLDOWN_MS) return;
+  strandedReviewRedispatchAt.set(issueId, Date.now());
+  void redispatchStrandedReviewHostSide(issueId, status);
+}
+
+async function redispatchStrandedReviewHostSide(issueId: string, status: ReviewStatus): Promise<void> {
+  try {
+    const { listSessions } = await import('./tmux.js');
+    const { isReviewSessionForIssue } = await import('./cloister/review-agent.js');
+    const sessions = await Effect.runPromise(listSessions()).catch(() => [] as readonly { name: string }[]);
+    // A live reviewer session means the row — not the pipeline — is stale;
+    // there is nothing to repair.
+    if (sessions.some((s) => isReviewSessionForIssue(s.name, undefined, issueId))) return;
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const { existsSync } = await import('fs');
+    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspace)) return;
+    const { dispatchRegisteredReviewHostSide } = await import('./cloister/durable-review-pipeline.js');
+    // Dispatch-only: verification already passed at this HEAD (the predicate
+    // requires it), so the full pipeline's gate re-run would be pure waste.
+    const result = await dispatchRegisteredReviewHostSide({
+      issueId,
+      workspace,
+      branch: `feature/${issueId.toLowerCase()}`,
+      ...(status.prUrl ? { prUrl: status.prUrl } : {}),
+    });
+    if (!result) return; // No dispatcher registered (CLI process) — stay silent.
+    const message = result.success
+      ? `${issueId} — stranded pending review re-dispatched after a failed spawn (PAN-3674): ${result.message ?? 'ok'}`
+      : `${issueId} — stranded pending review re-dispatch failed (PAN-3674): ${result.error ?? result.message ?? 'unknown'}`;
+    console.log(`[review-status] ${message}`);
+    emitActivityEntrySync({ source: 'review', level: result.success ? 'info' : 'warn', issueId, message });
+  } catch (err) {
+    console.warn(`[review-status] stranded review re-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus): void {
   if (!needsReviewDispatch({
@@ -577,6 +647,9 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
     mergeStatus: status.mergeStatus,
     readyForMerge: status.readyForMerge,
   })) {
+    // PAN-3674: the dispatch gate has nothing to do, but a stale spawn with no
+    // live reviewers means the last dispatch died — repair it.
+    maybeRedispatchStrandedReviewHostSide(issueId, status);
     if (!isReviewRequestStale({ reviewRequestedAt: status.reviewRequestedAt }) ||
         staleReviewRequestClearAttemptedAt.has(issueId)) return;
     staleReviewRequestClearAttemptedAt.set(issueId, Date.now());
