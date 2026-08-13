@@ -13,6 +13,13 @@ const agent = {
   slotItemId: 'sync-schema-foundation',
 };
 
+const liveAgentWithoutEmbeddedSlotMetadata = {
+  id: 'agent-min-888-slot-1',
+  issueId: 'MIN-888',
+  role: 'work' as const,
+  workspace: '/workspaces/feature-min-888-slot-1',
+};
+
 const plan = {
   plan: {
     items: [{ id: 'sync-schema-foundation', status: 'running' }],
@@ -34,6 +41,26 @@ describe('terminal swarm slot lifecycle', () => {
     } as PanIssueRecord;
 
     expect(isTerminalSwarmSlotAgent(agent, () => plan, () => record)).toBe(true);
+  });
+
+  it('retires the live state shape by resolving the slot and item from durable ownership', () => {
+    const record = {
+      statusOverrides: { 'sync-schema-foundation': 'completed' },
+      swarm: {
+        slotAssignments: [{
+          slotIndex: 1,
+          itemId: 'sync-schema-foundation',
+          agentId: liveAgentWithoutEmbeddedSlotMetadata.id,
+          branch: 'feature/min-888-slot-1',
+        }],
+      },
+    } as PanIssueRecord;
+
+    expect(isTerminalSwarmSlotAgent(
+      liveAgentWithoutEmbeddedSlotMetadata,
+      () => plan,
+      () => record,
+    )).toBe(true);
   });
 
   it('does not retire ownership while the canonical item remains in flight', () => {
