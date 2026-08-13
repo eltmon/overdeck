@@ -116,6 +116,7 @@
       "packages/contracts/src/harness-behavior.test.ts",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
+      "scripts/guard-agent-dir-removal.sh",
       "src/cli/commands/artifacts.ts",
       "src/cli/commands/doctor-prime-agent.ts",
       "src/cli/commands/flywheel.ts",
@@ -142,6 +143,7 @@
       "src/lib/agents/provider-auth.ts",
       "src/lib/artifacts/lifecycle.ts",
       "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/review-agent.ts",
       "src/lib/composer-commands/__tests__/harness-matrix.test.ts",
       "src/lib/config-yaml/__tests__/merge.test.ts",
       "src/lib/config-yaml/defaults.ts",
@@ -158,6 +160,7 @@
       "src/lib/planning/spawn-planning-session.ts",
       "src/lib/prime-agent/__tests__/jsonl-framing.test.ts",
       "src/lib/prime-agent/__tests__/rpc-client.test.ts",
+      "src/lib/prime-agent/host.ts",
       "src/lib/prime-agent/launch-command.ts",
       "src/lib/prime-agent/provider-map.test.ts",
       "src/lib/prime-agent/session-controller.ts",
@@ -168,7 +171,8 @@
       "tests/unit/cli/doctor-prime-agent.test.ts",
       "tests/unit/dashboard/runtime-session-projection.test.ts",
       "tests/unit/lib/context-layers/prime-agent.test.ts",
-      "tests/unit/lib/overdeck/conversation-runtime-prime.test.ts"
+      "tests/unit/lib/overdeck/conversation-runtime-prime.test.ts",
+      "tsdown.config.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/server/services/resource-discovery.ts",
@@ -258,6 +262,7 @@
       "packages/contracts/src/types.ts",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
+      "scripts/guard-agent-dir-removal.sh",
       "src/cli/commands/artifacts.ts",
       "src/cli/commands/doctor-prime-agent.ts",
       "src/cli/commands/doctor.ts",
@@ -294,6 +299,7 @@
       "src/lib/agents/runtime-command.ts",
       "src/lib/artifacts/lifecycle.ts",
       "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/review-agent.ts",
       "src/lib/composer-commands/__tests__/harness-matrix.test.ts",
       "src/lib/config-yaml/__tests__/merge.test.ts",
       "src/lib/config-yaml/defaults.ts",
@@ -319,6 +325,7 @@
       "src/lib/planning/spawn-planning-session.ts",
       "src/lib/prime-agent/__tests__/jsonl-framing.test.ts",
       "src/lib/prime-agent/__tests__/rpc-client.test.ts",
+      "src/lib/prime-agent/host.ts",
       "src/lib/prime-agent/jsonl-framing.ts",
       "src/lib/prime-agent/launch-command.ts",
       "src/lib/prime-agent/policy.ts",
@@ -347,12 +354,13 @@
       "tests/unit/lib/prime-agent-no-loss-audit.test.ts",
       "tests/unit/lib/prime-agent/delivery.test.ts",
       "tests/unit/lib/prime-agent/policy.test.ts",
-      "tests/unit/lib/prime-agent/session-resume.test.ts"
+      "tests/unit/lib/prime-agent/session-resume.test.ts",
+      "tsdown.config.ts"
     ],
-    "recordedAt": "2026-08-13T01:25:24.991Z"
+    "recordedAt": "2026-08-13T13:46:44.006Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T13:46:14.724Z",
+  "updated": "2026-08-13T13:46:44.027Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
