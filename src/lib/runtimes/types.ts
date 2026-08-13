@@ -206,6 +206,13 @@ export interface AgentRuntimeSync {
    */
   getSessionCost(agentId: string): CostBreakdown | null;
 
+  /** Read dashboard metrics in one pass. Request-time routes use this to avoid repeated transcript scans. */
+  getSessionMetrics?(agentId: string): {
+    lastActivity: Date | null;
+    tokenUsage: TokenUsage | null;
+    cost: CostBreakdown | null;
+  };
+
   /**
    * Send a message to a running agent
    *

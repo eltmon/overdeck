@@ -76,7 +76,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'prime-agent'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -438,6 +438,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '## Overdeck-controlled Kimi Code bundle',
     '',
     previews['kimi-code'] || '(no rendered context)',
+    '',
+    '## Overdeck-controlled Prime Agent bundle',
+    '',
+    previews['prime-agent'] || '(no rendered context)',
     '',
     '## Runtime-only sections',
     '',

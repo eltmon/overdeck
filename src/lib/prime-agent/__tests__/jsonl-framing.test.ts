@@ -16,6 +16,14 @@ describe('PrimeAgentJsonlFramer', () => {
     framer.finish();
   });
 
+  it('handles a large record delivered one byte at a time', () => {
+    const framer = new PrimeAgentJsonlFramer();
+    const input = Buffer.from(`${JSON.stringify({ text: 'x'.repeat(64 * 1024) })}\n`);
+    const records: unknown[] = [];
+    for (const byte of input) records.push(...framer.push(Uint8Array.of(byte)));
+    expect(records).toEqual([{ text: 'x'.repeat(64 * 1024) }]);
+  });
+
   it('strips one CR from CRLF records', () => {
     const framer = new PrimeAgentJsonlFramer();
     expect(framer.push(Buffer.from('{"ok":true}\r\n'))).toEqual([{ ok: true }]);

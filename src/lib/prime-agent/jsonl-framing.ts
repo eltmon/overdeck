@@ -14,7 +14,8 @@ export interface PrimeAgentJsonlFramerOptions {
 
 /** Incremental strict-LF JSONL decoder. It intentionally does not use readline. */
 export class PrimeAgentJsonlFramer {
-  private buffered = Buffer.alloc(0);
+  private chunks: Buffer[] = [];
+  private bufferedBytes = 0;
   private readonly maxRecordBytes: number;
 
   constructor(options: PrimeAgentJsonlFramerOptions = {}) {
@@ -26,29 +27,37 @@ export class PrimeAgentJsonlFramer {
 
   push(chunk: Uint8Array): unknown[] {
     if (chunk.byteLength === 0) return [];
-    const input = this.buffered.byteLength === 0
-      ? Buffer.from(chunk)
-      : Buffer.concat([this.buffered, chunk], this.buffered.byteLength + chunk.byteLength);
+    const input = Buffer.from(chunk);
     const records: unknown[] = [];
     let start = 0;
 
     for (let index = 0; index < input.byteLength; index += 1) {
       if (input[index] !== LF) continue;
-      const rawEnd = index > start && input[index - 1] === CR ? index - 1 : index;
-      const byteLength = rawEnd - start;
+      const piece = input.subarray(start, index);
+      const byteLength = this.bufferedBytes + piece.byteLength;
       if (byteLength > this.maxRecordBytes) this.throwOversized(byteLength);
-      if (byteLength > 0) records.push(this.parse(input.subarray(start, rawEnd)));
+      const record = this.chunks.length === 0
+        ? piece
+        : Buffer.concat([...this.chunks, piece], byteLength);
+      const rawEnd = record.byteLength > 0 && record[record.byteLength - 1] === CR ? record.byteLength - 1 : record.byteLength;
+      if (rawEnd > 0) records.push(this.parse(record.subarray(0, rawEnd)));
+      this.chunks = [];
+      this.bufferedBytes = 0;
       start = index + 1;
     }
 
-    this.buffered = Buffer.from(input.subarray(start));
-    if (this.buffered.byteLength > this.maxRecordBytes) this.throwOversized(this.buffered.byteLength);
+    if (start < input.byteLength) {
+      const tail = input.subarray(start);
+      this.chunks.push(tail);
+      this.bufferedBytes += tail.byteLength;
+      if (this.bufferedBytes > this.maxRecordBytes) this.throwOversized(this.bufferedBytes);
+    }
     return records;
   }
 
   finish(): void {
-    if (this.buffered.byteLength > 0) {
-      throw new PrimeAgentJsonlError(`Prime Agent RPC stdout ended with ${this.buffered.byteLength} unterminated byte(s)`);
+    if (this.bufferedBytes > 0) {
+      throw new PrimeAgentJsonlError(`Prime Agent RPC stdout ended with ${this.bufferedBytes} unterminated byte(s)`);
     }
   }
 

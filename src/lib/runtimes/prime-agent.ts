@@ -1,4 +1,5 @@
-import { statSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type { AgentState } from '../agents.js';
 import { getAgentStateSync, listAgentStates } from '../agents.js';
 import { getRuntimeBehavior } from './behavior.js';
@@ -12,6 +13,12 @@ import type {
   SpawnConfig,
   TokenUsage,
 } from './types.js';
+import { getAgentDir } from '../agents/agent-state.js';
+import { deliverPrimeAgentMessage, postPrimeAgentHost } from '../prime-agent/session-controller.js';
+import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { tmuxCreateSession } from './tmux-cli.js';
+import { getProviderAuthMode } from '../agents/provider-auth.js';
+import { buildPrimeAgentBaseCommand } from '../prime-agent/launch-command.js';
 
 export interface PrimeAgentSessionStats {
   tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
@@ -29,16 +36,45 @@ export interface PrimeAgentRuntimeController {
   sessionPath(agentId: string): string | null;
 }
 
-const unconfiguredController: PrimeAgentRuntimeController = {
-  async spawn() { throw new Error('Prime Agent RPC controller is not configured'); },
-  async send() { throw new Error('Prime Agent RPC controller is not configured'); },
-  async abort() { return undefined; },
-  async terminate() { return undefined; },
-  async isRunning() { return false; },
-  stats() { return null; },
-  lastEventAt() { return null; },
-  sessionPath() { return null; },
+const productionController: PrimeAgentRuntimeController = {
+  async spawn(config) {
+    if (!config.model) throw new Error('Prime Agent spawn requires a model');
+    const authMode = await getProviderAuthMode(config.model);
+    if (!authMode) throw new Error(`Prime Agent provider credentials are unavailable for ${config.model}`);
+    let command = await buildPrimeAgentBaseCommand({ agentId: config.agentId, model: config.model, workspace: config.workspace, authMode });
+    if (config.sessionId) command += ` --resume ${shellQuote(config.sessionId)}`;
+    if (config.prompt) command += ` --prompt ${shellQuote(config.prompt)}`;
+    rmSync(join(getAgentDir(config.agentId), 'prime-agent-session-id'), { force: true });
+    rmSync(join(getAgentDir(config.agentId), 'prime-agent-launch-error'), { force: true });
+    await tmuxCreateSession(config.agentId, config.workspace, command, { ...config.env, OVERDECK_AGENT_ID: config.agentId });
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const sessionId = readText(config.agentId, 'prime-agent-session-id');
+      if (sessionId) return { sessionId, sessionPath: readText(config.agentId, 'prime-agent-session-path') ?? '' };
+      const launchError = readText(config.agentId, 'prime-agent-launch-error');
+      if (launchError) throw new Error(`Prime Agent host failed to start: ${launchError}`);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error(`Prime Agent host did not become ready for ${config.agentId}`);
+  },
+  async send(agentId, message) { await deliverPrimeAgentMessage(agentId, message); },
+  async abort(agentId) { await postPrimeAgentHost(agentId, { op: 'abort' }); },
+  async terminate(agentId) { await tmuxKillSession(agentId); },
+  async isRunning(agentId) { return existsSync(join(getAgentDir(agentId), 'prime-agent-token')) && await tmuxSessionExists(agentId); },
+  stats(agentId) { return readStats(agentId)?.stats ?? null; },
+  lastEventAt(agentId) { const value = readStats(agentId)?.lastEventAt; return value ? new Date(value) : null; },
+  sessionPath(agentId) { return readText(agentId, 'prime-agent-session-path'); },
 };
+
+function shellQuote(value: string): string { return `'${value.replace(/'/g, `'\\''`)}'`; }
+
+function readText(agentId: string, file: string): string | null {
+  try { return readFileSync(join(getAgentDir(agentId), file), 'utf8').trim() || null; } catch { return null; }
+}
+
+function readStats(agentId: string): { stats?: PrimeAgentSessionStats; lastEventAt?: string } | null {
+  try { return JSON.parse(readFileSync(join(getAgentDir(agentId), 'prime-agent-stats.json'), 'utf8')) as { stats?: PrimeAgentSessionStats; lastEventAt?: string }; } catch { return null; }
+}
 
 export interface PrimeAgentRuntimeOptions {
   controller?: PrimeAgentRuntimeController;
@@ -53,7 +89,7 @@ export class PrimeAgentRuntimeSync implements AgentRuntimeSync {
   private readonly resolveAgentStates: () => AgentState[];
 
   constructor(options: PrimeAgentRuntimeOptions = {}) {
-    this.controller = options.controller ?? unconfiguredController;
+    this.controller = options.controller ?? productionController;
     this.resolveAgentState = options.getAgentState ?? getAgentStateSync;
     this.resolveAgentStates = options.listAgentStates ?? listAgentStates;
   }
@@ -85,6 +121,17 @@ export class PrimeAgentRuntimeSync implements AgentRuntimeSync {
   getSessionCost(agentId: string): CostBreakdown | null {
     const cost = this.controller.stats(agentId)?.cost;
     return cost === undefined ? null : { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0, totalCost: cost, currency: 'USD' };
+  }
+
+  getSessionMetrics(agentId: string) {
+    const snapshot = readStats(agentId);
+    const tokens = snapshot?.stats?.tokens;
+    const cost = snapshot?.stats?.cost;
+    return {
+      lastActivity: snapshot?.lastEventAt ? new Date(snapshot.lastEventAt) : this.getLastActivity(agentId),
+      tokenUsage: tokens ? { inputTokens: tokens.input ?? 0, outputTokens: tokens.output ?? 0, cacheReadTokens: tokens.cacheRead, cacheWriteTokens: tokens.cacheWrite } : null,
+      cost: cost === undefined ? null : { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0, totalCost: cost, currency: 'USD' as const },
+    };
   }
 
   sendMessage(agentId: string, message: string): Promise<void> { return this.controller.send(agentId, message); }

@@ -1,4 +1,9 @@
 import type { PrimeAgentRpcClient, PrimeAgentRpcResponse } from './rpc-client.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { request } from 'node:http';
+import { join } from 'node:path';
+import { getAgentDir } from '../agents/agent-state.js';
+import { getOverdeckHome } from '../paths.js';
 
 export interface PrimeAgentManagedSession {
   client: Pick<PrimeAgentRpcClient, 'request'>;
@@ -34,13 +39,37 @@ export async function deliverPrimeAgentMessage(
   message: string,
   preferred: 'prompt' | 'steer' | 'follow_up' = 'steer',
 ): Promise<PrimeAgentDeliveryReceipt> {
-  const session = getPrimeAgentSession(agentId);
+  const session = sessions.get(agentId);
+  if (!session) {
+    const result = await postPrimeAgentHost(agentId, { op: 'message', message, preferred });
+    return { accepted: true, command: result.command as PrimeAgentDeliveryReceipt['command'] };
+  }
   const state = await session.client.request<{ isStreaming?: boolean }>({ type: 'get_state' });
   const command = state.data?.isStreaming
     ? preferred === 'follow_up' ? 'follow_up' : 'steer'
     : 'prompt';
   await session.client.request({ type: command, message });
   return { accepted: true, command };
+}
+
+export async function postPrimeAgentHost(agentId: string, body: unknown): Promise<Record<string, unknown>> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `prime-agent-${agentId}.sock`);
+  const tokenPath = join(getAgentDir(agentId), 'prime-agent-token');
+  if (!existsSync(socketPath)) throw new Error(`MessageDeliveryFailed: Prime Agent host is unavailable for ${agentId}`);
+  const token = readFileSync(tokenPath, 'utf8').trim();
+  return new Promise((resolve, reject) => {
+    const req = request({ socketPath, path: '/', method: 'POST', headers: { 'content-type': 'application/json', 'x-overdeck-bridge-token': token } }, response => {
+      const chunks: Buffer[] = [];
+      response.on('data', chunk => chunks.push(Buffer.from(chunk)));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        if ((response.statusCode ?? 500) >= 300) reject(new Error(`Prime Agent host returned HTTP ${response.statusCode}: ${text}`));
+        else resolve(text ? JSON.parse(text) as Record<string, unknown> : {});
+      });
+    });
+    req.once('error', reject);
+    req.end(JSON.stringify(body));
+  });
 }
 
 export async function killPrimeAgentSession(agentId: string, graceMs = 1_000): Promise<void> {

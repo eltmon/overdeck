@@ -518,6 +518,13 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     };
   }
 
+  getSessionMetrics(agentId: string) {
+    const path = this.getSessionPath(agentId);
+    const parsed = path ? parseKimiSessionSync(path) : null;
+    const totalCost = parsed ? parsed.cost_v2 ?? parsed.cost ?? 0 : 0;
+    return { lastActivity: this.getLastActivity(agentId), tokenUsage: parsed?.usage ?? null, cost: parsed ? { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0, totalCost, currency: 'USD' as const } : null };
+  }
+
   async sendMessage(agentId: string, message: string): Promise<void> {
     const result = await this.deliverMessage(agentId, message);
     if (!result.ok) {

@@ -471,7 +471,7 @@ function buildCommand(config: LauncherConfig): string[] {
       return buildKimiCodeCommand(config, false);
     }
     if (behavior.launchCommandKind === 'prime-agent-rpc') {
-      return config.baseCommand ? [config.baseCommand] : [];
+      return buildPrimeAgentCommand(config, false);
     }
 
     // Conversation panel doesn't use exec — it runs the command then loops
@@ -554,6 +554,9 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (getHarnessBehavior(config.harness ?? 'claude-code').launchCommandKind === 'prime-agent-rpc') {
+    return buildPrimeAgentCommand(config, useExec);
+  }
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
@@ -623,6 +626,15 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   const wrapped = wrapWithSupervisor(config, cmd.trim());
   parts.push(useExec ? `exec ${wrapped}` : wrapped);
   return parts;
+}
+
+function buildPrimeAgentCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.baseCommand) return [];
+  const args: string[] = [];
+  if (config.resumeSessionId) args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
+  if (config.promptFile) args.push(`--prompt-file ${shellQuote(config.promptFile)}`);
+  else if (config.promptInline) args.push(`--prompt ${shellQuote(config.promptInline)}`);
+  return [`${useExec ? 'exec ' : ''}${config.baseCommand} ${args.join(' ')}`.trim()];
 }
 
 /**

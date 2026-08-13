@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../src/lib/runtimes/index.js', () => ({
   getGlobalRegistry: () => ({
     get: (harness: string) => harness === 'prime-agent' ? {
-      getLastActivity: () => new Date('2026-08-12T20:00:00.000Z'),
-      getTokenUsage: () => ({ inputTokens: 10, outputTokens: 2, cacheReadTokens: 3 }),
-      getSessionCost: () => ({ totalCost: 0.04 }),
+      getSessionMetrics: () => ({
+        lastActivity: new Date('2026-08-12T20:00:00.000Z'),
+        tokenUsage: { inputTokens: 10, outputTokens: 2, cacheReadTokens: 3 },
+        cost: { totalCost: 0.04 },
+      }),
+      getLastActivity: () => { throw new Error('must not rescan'); },
     } : undefined,
   }),
 }));

@@ -26,12 +26,14 @@ describe('Prime Agent work launch', () => {
   it('assembles explicit RPC provider, model, session directory, and managed policy arguments', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'prime-workspace-'));
     const baseCommand = await getPrimeAgentBaseCommand('agent-pan-3668', 'gpt-5.4', workspace);
-    expect(baseCommand).toContain("prime-agent --mode rpc --provider 'openai' --model 'gpt-5.4'");
+    expect(baseCommand).toContain("prime-agent-host.js' --agent 'agent-pan-3668'");
+    expect(baseCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(baseCommand).toContain("--session-dir '/tmp/agent-pan-3668/prime-sessions'");
     expect(baseCommand).toContain('--append-system-prompt');
 
     const launcher = generateLauncherScriptSync({ role: 'work', workingDir: workspace, harness: 'prime-agent', baseCommand });
-    expect(launcher).toContain('exec prime-agent --mode rpc');
+    expect(launcher).toContain('exec node');
+    expect(launcher).toContain('prime-agent-host.js');
     expect(launcher).not.toContain('exec claude');
   });
 

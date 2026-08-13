@@ -27,7 +27,8 @@ describe('Prime Agent conversation launch', () => {
   it('assembles a persistent managed RPC launch', async () => {
     const launch = await preparePrimeAgentConversationLaunch('conv-prime', '/workspaces/project', 'gpt-5.4');
     expect(launch.fields).toEqual({ harness: 'prime-agent' });
-    expect(launch.runtimeCommand).toContain("prime-agent --mode rpc --provider 'openai' --model 'gpt-5.4'");
+    expect(launch.runtimeCommand).toContain("prime-agent-host.js' --agent 'conv-prime'");
+    expect(launch.runtimeCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(launch.runtimeCommand).toContain("--session-dir '/tmp/conv-prime/prime-sessions'");
     expect(launch.runtimeCommand).toContain('--append-system-prompt');
     expect(launch.runtimeCommand).not.toContain('--permission-mode');

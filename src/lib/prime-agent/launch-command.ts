@@ -6,6 +6,8 @@ import { PRIME_AGENT_MANAGED_POLICY } from './policy.js';
 import { resolvePrimeAgentModelRoute } from './provider-map.js';
 import { primeAgentGlobalContextFile, resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { existsSync, readFileSync } from 'fs';
+import { packageRoot } from '../paths.js';
+import { resolveHarnessBinary } from '../harness-binary.js';
 
 function quoteShell(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -26,8 +28,13 @@ export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchComman
     .filter(existsSync)
     .map(file => readFileSync(file, 'utf8'))
     .join('\n\n');
+  const binary = await resolveHarnessBinary('prime-agent');
+  if (!binary) throw new Error('Prime Agent executable is unavailable');
   return [
-    'prime-agent --mode rpc',
+    `node ${quoteShell(join(packageRoot, 'dist', 'prime-agent-host.js'))}`,
+    `--agent ${quoteShell(options.agentId)}`,
+    `--binary ${quoteShell(binary)}`,
+    `--workspace ${quoteShell(options.workspace)}`,
     `--provider ${quoteShell(route.provider)}`,
     `--model ${quoteShell(route.model)}`,
     `--session-dir ${quoteShell(sessionDir)}`,

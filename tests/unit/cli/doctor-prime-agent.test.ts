@@ -21,4 +21,11 @@ describe('checkPrimeAgent', () => {
     const noRpc = await checkPrimeAgent(async (_path, args) => args[0] === '--version' ? '0.1.0' : 'Usage: prime-agent', resolver);
     expect(noRpc[0]).toMatchObject({ status: 'warn', message: expect.stringContaining('--mode rpc') });
   });
+
+  it('reports missing provider credentials', async () => {
+    const result = await checkPrimeAgent(async (_path, args) => args[0] === '--version'
+      ? 'prime-agent 0.1.0'
+      : 'Usage: prime-agent --mode <interactive|rpc>', resolver, async () => false);
+    expect(result[1]).toMatchObject({ name: 'Prime Agent provider credentials', status: 'warn' });
+  });
 });
