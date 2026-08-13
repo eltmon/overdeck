@@ -547,11 +547,18 @@ const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(sta
 // parallelism is now an in-context concern owned by the work agent (see
 // roles/work.md "Parallel work via subagents"), not a separate spawn verb.
 const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && hasStoppedAgent(state) && !state.reviewStatus && !isMerged(state) && !isDoneOrCanceled(state);
+// PAN-3675: 'pending' is included — a failed dispatch strands the row at
+// pending with no live reviewers (the PAN-3668 shape), and the server endpoint
+// coalesces a redundant trigger while a healthy dispatch is still in flight,
+// so the operator's force re-review is always safe to offer on a non-terminal
+// review. The dispatch resumes the review agent's saved session when possible
+// (PAN-1862); a fresh session only on harness/model change.
 const canRestartReview = (state: IssueActionState) => {
   const review = state.reviewStatus;
-  return review?.reviewStatus === 'reviewing' || review?.reviewStatus === 'blocked' || review?.reviewStatus === 'failed' || review?.testStatus === 'testing' || review?.testStatus === 'failed' || review?.testStatus === 'dispatch_failed' || review?.mergeStatus === 'merging' || review?.mergeStatus === 'failed';
+  return review?.reviewStatus === 'pending' || review?.reviewStatus === 'reviewing' || review?.reviewStatus === 'blocked' || review?.reviewStatus === 'failed' || review?.testStatus === 'testing' || review?.testStatus === 'failed' || review?.testStatus === 'dispatch_failed' || review?.mergeStatus === 'merging' || review?.mergeStatus === 'failed';
 };
-const hasReviewFailure = (state: IssueActionState) => isReviewPipelineStuck(state.reviewStatus ?? null);
+const hasReviewFailure = (state: IssueActionState) =>
+  isReviewPipelineStuck(state.reviewStatus ?? null) || state.reviewStatus?.reviewStatus === 'pending';
 // Complete review reset is available whenever review is in a restartable/stuck/failed
 // state — the "something's wrong with review, nuke all of it" gate. The stale-ghost case
 // (clean-looking review but leftover convoy sub-reviewers) is surfaced separately by the
@@ -608,7 +615,7 @@ const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'tell', label: 'Tell agent', description: 'Send the running agent a message — feedback, direction, a question.', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'communicate' },
   { key: 'doneWork', label: 'Done — mark work complete & start review', description: 'Tell the agent to wrap up; code review starts automatically.', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'lifecycle' },
   { key: 'requestReview', label: 'Request review', description: 'Send the current code out for AI review.', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'lifecycle' },
-  { key: 'restartReview', label: 'Re-run review on latest commit', description: 'Review again from the newest commit (e.g. after pushing fixes).', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'lifecycle' },
+  { key: 'restartReview', label: 'Re-run review on latest commit', description: 'Review again from the newest commit — resumes the review agent’s saved session when possible, so it re-checks instead of re-researching.', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'lifecycle' },
   { key: 'recoverReview', label: 'Reset stalled review state', description: 'Un-wedge a review that stopped moving; nothing is deleted.', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'recover' },
   { key: 'resyncPipelineState', label: 'Re-sync pipeline state', description: 'Reload the canonical review status when the dashboard is stale; no verdict is changed.', panVerb: 'review resync', endpoint: '/api/review/:id/resync', enabledWhen: always, phasePrimary: [], kind: 'safe', group: 'recover' },
   { key: 'purgeReview', label: 'Remove review sessions & reset', description: 'Kill every reviewer session and clear review state — the "review is haunted" fix.', panVerb: null, endpoint: '/api/review/:id/purge', enabledWhen: canPurgeReview, phasePrimary: [], kind: 'destructive', group: 'recover' },

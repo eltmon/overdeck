@@ -46,6 +46,21 @@ afterEach(async () => {
   vi.mocked(getAgentStateSync).mockImplementation(() => null);
 });
 
+
+/** PAN-3675: lanes render only with evidence the reviewer exists. Seed a
+ *  minimal state row per convoy role so these tests model a real run. */
+async function seedStateRow(role: 'correctness' | 'security' | 'performance' | 'requirements'): Promise<void> {
+  const sessionId = getReviewerSessionName(role, PROJECT_KEY, ISSUE_ID);
+  await mkdir(join(agentsDir, sessionId), { recursive: true });
+  await writeFile(join(agentsDir, sessionId, 'state.json'), JSON.stringify({ id: sessionId, status: 'stopped' }));
+}
+
+async function seedAllStateRows(): Promise<void> {
+  for (const role of ['correctness', 'security', 'performance', 'requirements'] as const) {
+    await seedStateRow(role);
+  }
+}
+
 describe('extractReviewerRole (PAN-830)', () => {
   it('parses canonical PAN-830 session names', () => {
     const name = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
@@ -176,6 +191,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('returns exactly four convoy nodes without a synthesis child', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -193,6 +209,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('uses canonical session IDs for each role', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -262,6 +279,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('marks presence "ended" when no tmux session exists', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -276,6 +294,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('uses round metadata latestStatus when available', async () => {
+    await seedAllStateRows();
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
     await mkdir(join(agentsDir, correctness), { recursive: true });
     await writeFile(
@@ -306,6 +325,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('marks a finished sub-reviewer completed once its report lands, not the orchestrator status', async () => {
+    await seedAllStateRows();
     // PAN-1048 sub-reviewers are subagents with no tmux. A finished one must
     // not inherit the orchestrator's "running" status (which left it showing
     // "working" with no terminal). The report .md is the authoritative signal.
@@ -370,6 +390,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('computes duration from startedAt/endedAt', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -386,6 +407,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('returns null duration when endedAt missing', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -401,6 +423,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('uses per-reviewer stoppedAt (via getAgentStateSync) instead of parent endedAt', async () => {
+    await seedAllStateRows();
     // Sub-reviewer finished early, parent (synthesizer) still active.
     // Without per-node endedAt, the frontend renders "Starting…" over the JSONL.
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
@@ -491,6 +514,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('hasJsonl is false when no JSONL transcript resolves', async () => {
+    await seedAllStateRows();
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -598,5 +622,37 @@ describe('buildReviewerNodes (PAN-830)', () => {
       expect(node.presence).toBe('idle');
       expect(node.tmuxSession).toBeUndefined();
     });
+  });
+});
+
+describe('PAN-3675: phantom reviewer lanes', () => {
+  it('returns no lanes when the run died before any reviewer existed', async () => {
+    // The PAN-3668 incident shape: a failed dispatch left empty agent dirs with
+    // no state.json, no rounds, no transcripts, no sessions — and the tree
+    // rendered "4 reviewers · clean" over it.
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set(),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'pending',
+      agentsDirOverride: agentsDir,
+    });
+    expect(nodes).toEqual([]);
+  });
+
+  it('keeps lanes that have any evidence — a state row alone is enough', async () => {
+    await seedStateRow('correctness');
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set(),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'running',
+      agentsDirOverride: agentsDir,
+    });
+    expect(nodes.map(n => n.role)).toEqual(['correctness']);
   });
 });

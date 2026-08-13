@@ -361,6 +361,21 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('recoverAgent').enabledWhen(reviewRunning)).toBe(false);
   });
 
+  it('PAN-3675: enables review recovery on a stranded pending review (the PAN-3668 shape)', () => {
+    // A failed dispatch strands the row at pending with no live reviewers —
+    // every review action was disabled in exactly that state.
+    const strandedPending: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'pending' }) };
+    expect(action('restartReview').enabledWhen(strandedPending)).toBe(true);
+    expect(action('recoverReview').enabledWhen(strandedPending)).toBe(true);
+    expect(action('purgeReview').enabledWhen(strandedPending)).toBe(true);
+
+    // Terminal states stay protected.
+    const passed: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed' }) };
+    expect(action('restartReview').enabledWhen(passed)).toBe(false);
+    const merged: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged' }), isMerged: true };
+    expect(action('restartReview').enabledWhen(merged)).toBe(false);
+  });
+
   it('enables rebuildAndStart wherever a normal start is viable and a workspace exists', () => {
     const canStart: IssueActionState = {
       ...baseState,
