@@ -725,12 +725,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     }
   }
 
-  getSessionMetrics(agentId: string) {
-    const path = this.getSessionPath(agentId)
-    const parsed = path ? parseCodexSessionSync(path) : null
-    const totalCost = parsed ? parsed.cost_v2 ?? parsed.cost ?? 0 : 0
-    return { lastActivity: this.getLastActivity(agentId), tokenUsage: parsed?.usage ?? null, cost: parsed ? { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0, totalCost, currency: 'USD' as const } : null }
-  }
+  getSessionMetrics(agentId: string) { const path = this.getSessionPath(agentId); const parsed = path ? parseCodexSessionSync(path) : null
+    return { lastActivity: this.getLastActivity(agentId), tokenUsage: parsed?.usage ?? null, cost: parsed ? { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0, totalCost: parsed.cost_v2 ?? parsed.cost ?? 0, currency: 'USD' as const } : null } }
 
   /**
    * Deliver a follow-up message to a running Codex agent via `codex exec resume`.
