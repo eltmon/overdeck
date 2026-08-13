@@ -570,7 +570,7 @@ export async function spawnConversationSession(
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
   let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; resumeSessionId?: string } | undefined;
-  let primeAgentFields: { harness: 'prime-agent' } | undefined;
+  let primeAgentFields: { harness: 'prime-agent'; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -590,7 +590,7 @@ export async function spawnConversationSession(
       throw new Error('Invalid model name');
     }
     if (behavior.launchCommandKind === 'prime-agent-rpc') {
-      const primeLaunch = await preparePrimeAgentConversationLaunch(tmuxSession, cwd, model);
+      const primeLaunch = await preparePrimeAgentConversationLaunch(tmuxSession, cwd, model, resume);
       runtimeCommand = primeLaunch.runtimeCommand;
       primeAgentFields = primeLaunch.fields;
     } else {

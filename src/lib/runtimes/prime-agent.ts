@@ -49,15 +49,20 @@ const productionController: PrimeAgentRuntimeController = {
     rmSync(join(getAgentDir(config.agentId), 'prime-agent-session-id'), { force: true }); // PAN-3357: not a dir removal
     rmSync(join(getAgentDir(config.agentId), 'prime-agent-launch-error'), { force: true }); // PAN-3357: not a dir removal
     await tmuxCreateSession(config.agentId, config.workspace, command, { ...config.env, OVERDECK_AGENT_ID: config.agentId });
-    const deadline = Date.now() + startupTimeoutMs;
-    while (Date.now() < deadline) {
-      const sessionId = readText(config.agentId, 'prime-agent-session-id');
-      if (sessionId) return { sessionId, sessionPath: readText(config.agentId, 'prime-agent-session-path') ?? '' };
-      const launchError = readText(config.agentId, 'prime-agent-launch-error');
-      if (launchError) throw new Error(`Prime Agent host failed to start: ${launchError}`);
-      await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const deadline = Date.now() + startupTimeoutMs;
+      while (Date.now() < deadline) {
+        const sessionId = readText(config.agentId, 'prime-agent-session-id');
+        if (sessionId) return { sessionId, sessionPath: readText(config.agentId, 'prime-agent-session-path') ?? '' };
+        const launchError = readText(config.agentId, 'prime-agent-launch-error');
+        if (launchError) throw new Error(`Prime Agent host failed to start: ${launchError}`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      throw new Error(`Prime Agent host did not become ready for ${config.agentId}`);
+    } catch (error) {
+      if (await tmuxSessionExists(config.agentId)) await tmuxKillSession(config.agentId);
+      throw error;
     }
-    throw new Error(`Prime Agent host did not become ready for ${config.agentId}`);
   },
   async send(agentId, message) { await deliverPrimeAgentMessage(agentId, message); },
   async abort(agentId) { await postPrimeAgentHost(agentId, { op: 'abort' }); },

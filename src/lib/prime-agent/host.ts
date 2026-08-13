@@ -7,6 +7,11 @@ import { getAgentDir } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
 import { PrimeAgentRpcClient } from './rpc-client.js';
 import { resumePrimeAgentSession } from './session-resume.js';
+import {
+  PRIME_AGENT_HOST_MAX_CONCURRENT_REQUESTS,
+  PrimeAgentHostRequestTooLarge,
+  readPrimeAgentHostRequest,
+} from './host-http.js';
 
 const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i]!, process.argv[i + 1]!);
@@ -20,6 +25,8 @@ interface RunningPrime {
   child: ChildProcessWithoutNullStreams;
   client: PrimeAgentRpcClient;
 }
+
+let cleanupFailedHost: (() => Promise<void>) | undefined;
 
 async function main(): Promise<void> {
   const agentId = required('--agent');
@@ -39,6 +46,21 @@ async function main(): Promise<void> {
   let statsWrite: Promise<void> = Promise.resolve();
   let statsTimer: NodeJS.Timeout | undefined;
   let running: RunningPrime | undefined;
+  let server: ReturnType<typeof createServer> | undefined;
+  let stopped = false;
+  const cleanup = async (): Promise<void> => {
+    if (stopped) return;
+    stopped = true;
+    if (statsTimer) clearTimeout(statsTimer);
+    running?.client.close(new Error('Prime Agent host stopped'));
+    running?.child.kill('SIGTERM');
+    if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
+    await rm(socketPath, { force: true });
+  };
+  cleanupFailedHost = cleanup;
+  const stop = (): void => { void cleanup(); };
+  process.once('SIGTERM', stop);
+  process.once('SIGINT', stop);
 
   const persistStats = (): Promise<void> => {
     statsWrite = statsWrite.then(() => writeFile(
@@ -95,12 +117,16 @@ async function main(): Promise<void> {
   const active = running;
   if (!active) throw new Error('Prime Agent process did not start');
 
-  const server = createServer((request, response) => {
+  let activeRequests = 0;
+  server = createServer((request, response) => {
+    if (activeRequests >= PRIME_AGENT_HOST_MAX_CONCURRENT_REQUESTS) {
+      response.writeHead(503, { connection: 'close' }).end('Prime Agent host is busy');
+      return;
+    }
+    activeRequests += 1;
     void (async () => {
       if (request.headers['x-overdeck-bridge-token'] !== token) { response.writeHead(401).end(); return; }
-      const chunks: Buffer[] = [];
-      for await (const chunk of request) chunks.push(Buffer.from(chunk));
-      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { op: string; message?: string; preferred?: 'steer' | 'follow_up' };
+      const body = await readPrimeAgentHostRequest(request, request.headers['content-length']) as { op: string; message?: string; preferred?: 'steer' | 'follow_up' };
       if (body.op === 'message') {
         const state = await active.client.request<{ isStreaming?: boolean }>({ type: 'get_state' });
         const type = state.data?.isStreaming ? (body.preferred ?? 'steer') : 'prompt';
@@ -111,25 +137,32 @@ async function main(): Promise<void> {
       } else if (body.op === 'stats') {
         await refreshStats(); response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ stats, lastEventAt }));
       } else { response.writeHead(400).end('unknown operation'); }
-    })().catch(error => response.writeHead(500).end(error instanceof Error ? error.message : String(error)));
+    })().catch(error => {
+      const status = error instanceof PrimeAgentHostRequestTooLarge ? 413 : 500;
+      response.writeHead(status, { connection: 'close' }).end(error instanceof Error ? error.message : String(error));
+    }).finally(() => { activeRequests -= 1; });
   });
 
-  await new Promise<void>((resolve, reject) => server.listen(socketPath, resolve).once('error', reject));
-  const state = await active.client.request<Record<string, unknown>>({ type: 'get_state' });
-  const sessionId = String(state.data?.sessionFile ?? state.data?.sessionId ?? agentId);
-  const promptFile = args.get('--prompt-file');
-  const prompt = promptFile ? await readFile(promptFile, 'utf8') : args.get('--prompt');
-  if (prompt) await active.client.request({ type: 'prompt', message: prompt });
-  await refreshStats();
-  await writeFile(join(agentDir, 'prime-agent-session-path'), required('--session-dir'), { mode: 0o600 });
-  await writeFile(join(agentDir, 'prime-agent-session-id'), sessionId, { mode: 0o600 });
-
-  const stop = (): void => { active.child.kill('SIGTERM'); server.close(); void rm(socketPath, { force: true }); };
-  process.once('SIGTERM', stop);
-  process.once('SIGINT', stop);
+  try {
+    await new Promise<void>((resolve, reject) => server!.listen(socketPath, resolve).once('error', reject));
+    const state = await active.client.request<Record<string, unknown>>({ type: 'get_state' });
+    const sessionId = String(state.data?.sessionFile ?? state.data?.sessionId ?? agentId);
+    const promptFile = args.get('--prompt-file');
+    const prompt = promptFile ? await readFile(promptFile, 'utf8') : args.get('--prompt');
+    if (prompt) await active.client.request({ type: 'prompt', message: prompt });
+    await refreshStats();
+    const sessionPath = String(state.data?.sessionFile ?? state.data?.sessionPath ?? '');
+    if (!sessionPath) throw new Error('Prime Agent did not report a durable session path');
+    await writeFile(join(agentDir, 'prime-agent-session-path'), sessionPath, { mode: 0o600 });
+    await writeFile(join(agentDir, 'prime-agent-session-id'), sessionId, { mode: 0o600 });
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
 }
 
 void main().catch(async error => {
+  await cleanupFailedHost?.().catch(() => undefined);
   const agentId = args.get('--agent');
   if (agentId) {
     await mkdir(getAgentDir(agentId), { recursive: true, mode: 0o700 });
