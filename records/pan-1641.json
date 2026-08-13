@@ -141,33 +141,33 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:26:52.341Z",
+  "updated": "2026-08-13T14:28:02.407Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T14:26:52.262Z",
-    "inspectNotes": "Inspecting item pi-openai-env"
+    "updatedAt": "2026-08-13T14:28:02.219Z",
+    "inspectNotes": "Re-inspect of 7ecbf09b. AC-1, AC-2, AC-3 and AC-5 now all pass; AC-4 is the single remaining blocker.\n\nFIXED and verified this round:\n- AC-2: providers.ts:773-775 now strips the 'ollama:' prefix and qualifies to 'ollama/<tag>' BEFORE the idempotency slash check, so the namespaced form works ('ollama:library/custom:latest' -> 'ollama/library/custom:latest', asserted at launcher-generator.test.ts:1698). Idempotency is preserved: an already-qualified 'ollama/gemma4:12b' does not start with 'ollama:' and falls through to the unchanged includes('/') early return, so it is never double-prefixed. Non-ollama routing is byte-identical to the pre-bead behaviour.\n- AC-5 test isolation: ohmypi-models-ollama.test.ts:5-11 now mocks loadConfigSync (mirroring provider-env-ollama.test.ts), so the assertion no longer depends on the operator's live ~/.overdeck/config.yaml.\n- Ran ohmypi-models-ollama, provider-env-ollama, launcher-generator and tests/lib/providers: 109 tests pass.\n\nBLOCKER (AC-4) - the confirmed Pi wiring mechanism is still not documented as a decision. continues/pan-1641.vbrief.json is unchanged: decisions are still D1-D7, every one recordedAt 2026-06-07T02:40 (planning time), file 'updated' 2026-06-13T00:01:50Z. Planning hazard H1 explicitly flagged the Pi env/config contract as unverified and named this bead's inspection as the place that closes it, so an unrecorded decision leaves the hazard open. The code is now correct and a comment at ohmypi-models.ts:50-51 states the baseUrl half, but AC-4 asks for continue.json.\n\nRequired fix - append one decision (e.g. D8) via the state write door, the same pattern src/cli/commands/done.ts:229-234 uses: readRecordContinueViewSync(project, issueId) then writeRecordDecisionsSync(project, issueId, [...existing.decisions, { id, summary, recordedAt }]). Do not hand-edit the state file. The summary should record the contract as verified against the installed prime-agent binary: omp takes a provider's baseUrl LITERALLY - parseModels reads providerConfig.baseUrl verbatim (dist/core/model-registry.js:548 and :559; same at :1218/:1244) and never passes it through resolveConfigValue - while apiKey and headers ARE env-resolved by BARE variable name (dist/core/resolve-config-value.js:17-19, 'process.env[config] || config'). Hence baseUrl must be a fully resolved URL ending in /v1 and apiKey must be the bare name 'OPENAI_API_KEY'. Worth noting the 'ollama' provider is absent from omp's bundled catalog, which is why ohmypi-models.ts must provision it into ~/.omp/agent/models.json at spawn."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1764199,
-            "output": 6161,
-            "cacheRead": 1126400,
+            "input": 1976100,
+            "output": 6353,
+            "cacheRead": 1206528,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 93278547,
-            "output": 53700,
-            "cacheRead": 92051200,
+            "input": 93898679,
+            "output": 54676,
+            "cacheRead": 92662272,
             "cacheWrite": 0
           }
         },
@@ -202,15 +202,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1764199,
-          "output": 6161,
-          "cacheRead": 1126400,
+          "input": 1976100,
+          "output": 6353,
+          "cacheRead": 1206528,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 93278547,
-          "output": 53700,
-          "cacheRead": 92051200,
+          "input": 93898679,
+          "output": 54676,
+          "cacheRead": 92662272,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -239,8 +239,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 68.4852496,
-        "pricingAsOf": "2026-08-13T14:26:52.292Z"
+        "usd": 68.8653656,
+        "pricingAsOf": "2026-08-13T14:28:02.287Z"
       }
     },
     "merges": [],
