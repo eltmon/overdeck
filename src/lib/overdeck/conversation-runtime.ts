@@ -416,12 +416,13 @@ function getPtySupervisorSocketPath(agentId: string): string {
 export function extractSupervisorFailure(paneText: string): string | null {
   const lines = paneText.split('\n').map((line) => line.trim()).filter(Boolean);
   const errors = lines.filter((line) => /error|cannot find|ERR_[A-Z_]+|pty-supervisor:/i.test(line));
-  const chosen = (errors.length > 0 ? errors : lines).slice(-3);
+  const chosen = errors.slice(-3);
   if (chosen.length === 0) return null;
   return chosen.join(' | ').slice(0, 500);
 }
 
-async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
+/** @internal Exported only for focused timeout-message tests. */
+export async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
   const socketPath = getPtySupervisorSocketPath(agentId);
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -435,7 +436,9 @@ async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPER
   const failure = extractSupervisorFailure(await capturePaneText(agentId, 40));
   throw new Error(
     `Timed out waiting for PTY supervisor socket ${socketPath}`
-    + (failure ? ` — supervisor output: ${failure}` : ''),
+    + (failure
+      ? ` — supervisor output: ${failure}`
+      : ' — the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME'),
   );
 }
 async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
