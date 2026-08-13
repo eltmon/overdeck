@@ -284,12 +284,24 @@ function loadNodeSqlite(): { DatabaseSync: new (path: string, options?: OpenData
   }
 }
 
+/**
+ * PAN-3674 (2026-08-13 incident): WAL allows one writer plus many readers, so
+ * concurrent processes still collide writer-vs-writer — an unhandled
+ * SQLITE_BUSY in an agent host's activity write crashed the PAN-3668 review
+ * orchestrator mid-synthesis, after all four reviewers had reported. Every
+ * connection now waits up to 5s for a lock instead of throwing immediately.
+ */
+function withBusyTimeout<TRaw extends RawDatabase>(raw: TRaw): TRaw {
+  raw.exec('PRAGMA busy_timeout = 5000');
+  return raw;
+}
+
 export function openDatabase(path: string, options: OpenDatabaseOptions = {}): SqliteDatabase {
   if (isBunRuntime()) {
     const { Database } = _require('bun:sqlite') as { Database: new (path: string) => RawDatabase };
-    return wrapDatabase(new Database(path));
+    return wrapDatabase(withBusyTimeout(new Database(path)));
   }
 
   const { DatabaseSync } = loadNodeSqlite();
-  return wrapDatabase(new DatabaseSync(path, options));
+  return wrapDatabase(withBusyTimeout(new DatabaseSync(path, options)));
 }

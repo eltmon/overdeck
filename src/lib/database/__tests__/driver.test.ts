@@ -186,3 +186,19 @@ describe('SQLite driver adapter', () => {
     }
   });
 });
+
+describe('PAN-3674: busy_timeout', () => {
+  it('applies a 5s busy_timeout to every connection', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pan-driver-busy-'));
+    try {
+      const db = openDatabase(join(dir, 'test.db'));
+      try {
+        expect(db.pragma('busy_timeout', { simple: true })).toBe(5000);
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
