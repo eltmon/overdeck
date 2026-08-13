@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:28:47.171Z",
+  "updated": "2026-08-13T14:29:27.489Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "pi-openai-env": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 1201031,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:14:06.449Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -315,6 +307,16 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-1641 dead)",
         "releasedAt": "2026-08-13T14:02:11.089Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 1201031,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:14:06.449Z",
+        "itemId": "pi-openai-env",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T14:29:27.489Z"
       }
     ],
     "statusReasons": {
@@ -350,6 +352,11 @@
     "config-ollama-base-url.ac1": "completed",
     "config-ollama-base-url.ac2": "completed",
     "config-ollama-base-url.ac3": "completed",
-    "pi-openai-env": "running"
+    "pi-openai-env": "completed",
+    "pi-openai-env.ac1": "completed",
+    "pi-openai-env.ac2": "completed",
+    "pi-openai-env.ac3": "completed",
+    "pi-openai-env.ac4": "completed",
+    "pi-openai-env.ac5": "completed"
   }
 }
