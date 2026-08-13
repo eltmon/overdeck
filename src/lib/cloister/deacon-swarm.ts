@@ -912,19 +912,6 @@ export async function dispatchNextWave(
     if (!slotEligibleIds.has(item.id)) continue;
     if (inFlightItemIds.has(item.id)) continue;
 
-    // Enforce the DAG at the claim boundary. Reconciliation evidence must not
-    // let a stale or wrapper-repository branch classification bypass an
-    // unfinished blocker.
-    const unfinishedBlockers = doc.plan.edges
-      .filter(edge => edge.type === 'blocks' && edge.to === item.id)
-      .map(edge => doc.plan.items.find(candidate => candidate.id === edge.from))
-      .filter((blocker): blocker is XBriefItem => blocker !== undefined)
-      .filter(blocker => blocker.status !== 'completed' && blocker.status !== 'cancelled');
-    if (unfinishedBlockers.length > 0) {
-      actions.push(`[swarm] deferred ${item.id} for ${issueId}: unfinished blockers ${unfinishedBlockers.map(blocker => blocker.id).join(', ')}`);
-      continue;
-    }
-
     const overlapItemId = firstOverlappingItemId(item.id, [...inFlightItemIds, ...selectedItemIds], readiness);
     if (overlapItemId) {
       actions.push(`[swarm] deferred ${item.id} for ${issueId}: files_scope overlaps ${overlapItemId}`);

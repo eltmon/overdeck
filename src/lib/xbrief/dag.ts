@@ -240,8 +240,10 @@ export function getDispatchableItems(
   return actionable.filter(item => {
     const itemBlockers = blockers.get(item.id) ?? [];
     return itemBlockers.every(blockerId => {
-      if (mergedItemIds.has(blockerId)) return true;
       const blocker = itemById.get(blockerId);
+      // Branch ancestry cannot resolve a running task. Polyrepo wrapper
+      // branches may appear merged while member-repository work is still live.
+      if (mergedItemIds.has(blockerId) && blocker?.status === 'completed') return true;
       return blocker?.status === 'completed' || blocker?.status === 'cancelled';
     });
   });

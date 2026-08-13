@@ -262,9 +262,7 @@ describe('deacon-swarm next-wave dispatch', () => {
       fakeDeps,
     );
 
-    expect(actions).toEqual([
-      '[swarm] deferred wi-child for PAN-2203: unfinished blockers wi-parent',
-    ]);
+    expect(actions).toEqual([]);
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
   });
