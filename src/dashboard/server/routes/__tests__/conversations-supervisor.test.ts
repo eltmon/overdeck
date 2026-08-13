@@ -613,4 +613,31 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       vi.useRealTimers();
     }
   });
+
+  it('does not replace a Prime conversation when its durable session is missing', async () => {
+    resolvedConversationHarness = 'prime-agent';
+    const name = 'restart-prime-without-session';
+    const session = 'conv-restart-prime-without-session';
+    listedSessionNames = [session];
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+    conversations.createConversation({
+      name,
+      tmuxSession: session,
+      cwd: tmpdir(),
+      claudeSessionId: 'prime-session',
+      model: 'claude-sonnet-4-6',
+      harness: 'prime-agent',
+    });
+    const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const callsBefore = createSessionCalls.length;
+
+    const result = decodeJsonResponse(await handleConversationRestartAll({
+      resolveSessionFile: vi.fn().mockResolvedValue(null),
+    }));
+
+    expect(result['results']).toEqual([
+      { name, model: 'claude-sonnet-4-6', status: 'failed' },
+    ]);
+    expect(createSessionCalls).toHaveLength(callsBefore);
+  });
 });

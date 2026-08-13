@@ -19,11 +19,19 @@ export async function preparePrimeAgentConversationLaunch(tmuxSession: string, c
   runtimeCommand: string;
   fields: { harness: 'prime-agent'; resumeSessionId?: string };
 }> {
-  const resumeSessionId = resume
-    ? await readFile(join(getAgentDir(tmuxSession), 'prime-agent-session-path'), 'utf8')
-      .then(value => value.trim() || undefined)
-      .catch(() => undefined)
-    : undefined;
+  let resumeSessionId: string | undefined;
+  if (resume) {
+    const sessionPath = join(getAgentDir(tmuxSession), 'prime-agent-session-path');
+    try {
+      resumeSessionId = (await readFile(sessionPath, 'utf8')).trim() || undefined;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(`Prime Agent conversation ${tmuxSession} cannot resume because ${sessionPath} is unreadable: ${message}`);
+    }
+    if (!resumeSessionId) {
+      throw new Error(`Prime Agent conversation ${tmuxSession} cannot resume because ${sessionPath} is empty`);
+    }
+  }
   return {
     runtimeCommand: await getPrimeAgentBaseCommand(tmuxSession, model, cwd),
     fields: { harness: 'prime-agent', ...(resumeSessionId ? { resumeSessionId } : {}) },

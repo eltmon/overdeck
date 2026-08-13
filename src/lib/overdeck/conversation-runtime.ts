@@ -1009,6 +1009,7 @@ export async function handleConversationResume(
     if (oldSessionId) {
       const resumeFile = await deps.resolveSessionFile(conv);
       if (!resumeFile || !existsSync(resumeFile)) {
+        if (harness === 'prime-agent') throw new Error(`Prime Agent conversation ${name} cannot resume because its durable session is missing or unreadable: ${resumeFile ?? '<missing sidecar>'}`);
         canResume = false;
         console.error(`[conversations] SESSION-LOST ${name} harness=${harness} claudeSessionId=${oldSessionId} resolved=${resumeFile ?? 'null'} — resuming with a fresh session`);
       }
@@ -1018,8 +1019,7 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
-      // The harness may open its own blocking gate on resume. The operator owns
-      // that answer, so the contract delivery seam skips rather than races it.
+      // The operator owns any harness gate on resume, so contract delivery skips it rather than racing it.
       await deliverResumeContractUnlessGated(
         conv.tmuxSession,
         `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
@@ -1030,9 +1030,7 @@ export async function handleConversationResume(
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
-      // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
-      // acp — a failed capture must not leave a running tmux session with no
-      // owned native identity presented as a healthy conversation.
+      // PAN-1837: a failed ACP/Kimi capture must not leave a runtime without an owned native identity.
       if (harness === 'acp' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
@@ -1082,6 +1080,7 @@ export async function handleConversationRestartAll(
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
+        if (harness === 'prime-agent' && !canResume) throw new Error(`Prime Agent conversation ${conv.name} cannot restart because its durable session is missing or unreadable: ${sessionFileForResume ?? '<missing sidecar>'}`);
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
         if (harness === 'acp') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');

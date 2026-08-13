@@ -90,6 +90,7 @@ async function main(): Promise<void> {
       scheduleStatsWrite();
       if (event.type === 'agent_end') void refreshStats().catch(() => undefined);
     } });
+    child.once('error', error => client.close(new Error(`Prime Agent process failed to start: ${error.message}`)));
     child.stdout.on('data', chunk => client.acceptStdout(chunk));
     child.on('exit', code => client.close(new Error(`Prime Agent exited with code ${code ?? 'unknown'}`)));
     return { child, client };
