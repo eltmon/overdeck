@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:34:39.299Z",
+  "updated": "2026-08-13T14:38:49.605Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "install-ollama-step": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 1707425,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:34:39.299Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -335,6 +327,16 @@
         "itemId": "lazy-ensure-on-spawn",
         "outcome": "completed",
         "releasedAt": "2026-08-13T14:34:20.225Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 1707425,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:34:39.299Z",
+        "itemId": "install-ollama-step",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T14:38:49.605Z"
       }
     ],
     "statusReasons": {
@@ -380,6 +382,10 @@
     "lazy-ensure-on-spawn.ac1": "completed",
     "lazy-ensure-on-spawn.ac2": "completed",
     "lazy-ensure-on-spawn.ac3": "completed",
-    "install-ollama-step": "running"
+    "install-ollama-step": "completed",
+    "install-ollama-step.ac1": "completed",
+    "install-ollama-step.ac2": "completed",
+    "install-ollama-step.ac3": "completed",
+    "install-ollama-step.ac4": "completed"
   }
 }
