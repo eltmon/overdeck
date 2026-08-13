@@ -2,7 +2,15 @@ import { readFile } from 'node:fs/promises';
 import { platform } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_OLLAMA_MODEL, ensureOllama, OllamaEnsureError } from '../ollama.js';
+import {
+  checkOllamaHealth,
+  DEFAULT_OLLAMA_MODEL,
+  ensureOllama,
+  ensureOllamaServeRunning,
+  OllamaEnsureError,
+  OllamaError,
+  resolveOllamaBaseUrl,
+} from '../ollama.js';
 
 vi.mock('node:os', () => ({
   platform: vi.fn(() => 'linux'),
@@ -134,5 +142,74 @@ describe('ensureOllama', () => {
 
     expect(source).toContain('PAN-1641 coordination note');
     expect(source).toContain('future Pi-harness sidecar');
+  });
+});
+
+describe('Pi harness Ollama lifecycle', () => {
+  it('resolves the default and configured localhost base URLs and rejects remote hosts', () => {
+    expect(resolveOllamaBaseUrl()).toBe('http://localhost:11434');
+    expect(resolveOllamaBaseUrl({ providers: { ollama: { base_url: 'http://127.0.0.1:22434/' } } }))
+      .toBe('http://127.0.0.1:22434');
+    expect(() => resolveOllamaBaseUrl({ providers: { ollama: { base_url: 'https://ollama.example.com' } } }))
+      .toThrow(OllamaError);
+  });
+
+  it('does not spawn ollama serve when the endpoint already responds', async () => {
+    const fetchImpl = vi.fn(async () => response(true));
+    const runCommand = vi.fn(async () => {});
+    const startServer = vi.fn(async () => {});
+
+    await ensureOllamaServeRunning({ fetchImpl, runCommand, startServer });
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(startServer).not.toHaveBeenCalled();
+  });
+
+  it('starts an installed Ollama server asynchronously and waits until it responds', async () => {
+    vi.useFakeTimers();
+    try {
+      const health = [false, false, true];
+      const fetchImpl = vi.fn(async () => response(health.shift() ?? true));
+      const runCommand = vi.fn(async () => {});
+      const startServer = vi.fn(async () => {});
+
+      const result = ensureOllamaServeRunning({
+        fetchImpl,
+        runCommand,
+        startServer,
+        retryDelayMs: 100,
+        maxHealthAttempts: 3,
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      await result;
+
+      expect(runCommand).toHaveBeenCalledWith('ollama', ['--version']);
+      expect(startServer).toHaveBeenCalledOnce();
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('distinguishes an unreachable endpoint from a model that is not pulled', async () => {
+    const unreachable = await checkOllamaHealth(
+      'ollama:gemma3:12b',
+      undefined,
+      vi.fn(async () => { throw new Error('connection refused'); }),
+    );
+    expect(unreachable).toMatchObject({ endpointReachable: false, modelPresent: false });
+    expect(unreachable.message).toContain('ollama serve');
+
+    const missing = await checkOllamaHealth(
+      'ollama:gemma3:12b',
+      undefined,
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ models: [{ name: 'llama3:latest' }] }),
+      }) as Response),
+    );
+    expect(missing).toMatchObject({ endpointReachable: true, modelPresent: false });
+    expect(missing.message).toContain('ollama pull gemma3:12b');
   });
 });

@@ -4,7 +4,26 @@ import { platform } from 'node:os';
 export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
 
-const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
+export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
+
+export type OllamaErrorCode =
+  | 'invalid-base-url'
+  | 'not-installed'
+  | 'start-failed'
+  | 'endpoint-unreachable'
+  | 'model-not-pulled'
+  | 'command-failed';
+
+export class OllamaError extends Error {
+  constructor(
+    readonly code: OllamaErrorCode,
+    message: string,
+    readonly cause?: unknown,
+  ) {
+    super(message, { cause });
+    this.name = 'OllamaError';
+  }
+}
 
 export interface EnsureOllamaOptions {
   baseUrl?: string;
@@ -27,10 +46,101 @@ export interface EnsureOllamaResult {
 
 export type CommandRunner = (command: string, args: string[]) => Promise<void>;
 
-export class OllamaEnsureError extends Error {
-  constructor(message: string) {
-    super(message);
+export class OllamaEnsureError extends OllamaError {
+  constructor(message: string, code: OllamaErrorCode = 'command-failed') {
+    super(code, message);
     this.name = 'OllamaEnsureError';
+  }
+}
+
+export interface OllamaProviderConfig {
+  providers?: {
+    ollama?: {
+      base_url?: string;
+    };
+  };
+}
+
+export interface OllamaHealth {
+  endpointReachable: boolean;
+  modelPresent: boolean;
+  message?: string;
+}
+
+export interface OllamaLifecycleOptions {
+  baseUrl?: string;
+  fetchImpl?: typeof fetch;
+  runCommand?: CommandRunner;
+  startServer?: () => Promise<void>;
+  sleep?: (ms: number) => Promise<void>;
+  retryDelayMs?: number;
+  maxHealthAttempts?: number;
+}
+
+export function resolveOllamaBaseUrl(config: OllamaProviderConfig = {}): string {
+  return normalizeBaseUrl(config.providers?.ollama?.base_url ?? DEFAULT_OLLAMA_BASE_URL);
+}
+
+export async function isOllamaInstalled(runCommand: CommandRunner = runCommandWithSpawn): Promise<boolean> {
+  return hasOllamaBinary(runCommand);
+}
+
+export async function checkOllamaHealth(
+  model: string,
+  baseUrl = DEFAULT_OLLAMA_BASE_URL,
+  fetchImpl: typeof fetch = fetch,
+): Promise<OllamaHealth> {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  let response: Response;
+  try {
+    response = await fetchImpl(`${normalizedBaseUrl}/api/tags`, { method: 'GET' });
+  } catch {
+    return {
+      endpointReachable: false,
+      modelPresent: false,
+      message: `Ollama is not reachable at ${normalizedBaseUrl}. Start it with \`ollama serve\`.`,
+    };
+  }
+  if (!response.ok) {
+    return {
+      endpointReachable: false,
+      modelPresent: false,
+      message: `Ollama is not reachable at ${normalizedBaseUrl} (HTTP ${response.status}). Start it with \`ollama serve\`.`,
+    };
+  }
+
+  const data = await response.json() as { models?: Array<{ name?: string; model?: string }> };
+  const bareModel = model.replace(/^ollama:/, '');
+  const modelPresent = data.models?.some((entry) => entry.name === bareModel || entry.model === bareModel) ?? false;
+  return modelPresent
+    ? { endpointReachable: true, modelPresent: true }
+    : {
+        endpointReachable: true,
+        modelPresent: false,
+        message: `Ollama model ${bareModel} is not pulled. Run \`ollama pull ${bareModel}\`.`,
+      };
+}
+
+export async function ensureOllamaServeRunning(options: OllamaLifecycleOptions = {}): Promise<void> {
+  const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  if (await isOllamaHealthy(baseUrl, fetchImpl)) return;
+
+  if (!await isOllamaInstalled(options.runCommand)) {
+    throw new OllamaError('not-installed', 'Ollama is not installed. Install it from https://ollama.com/download.');
+  }
+
+  try {
+    await (options.startServer ?? startOllamaServerWithSpawn)();
+    await waitForOllamaHealth(
+      baseUrl,
+      fetchImpl,
+      options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
+      options.retryDelayMs ?? 1_000,
+      options.maxHealthAttempts ?? 30,
+    );
+  } catch (cause) {
+    throw new OllamaError('start-failed', `Ollama did not become reachable at ${baseUrl} after starting \`ollama serve\`.`, cause);
   }
 }
 
@@ -135,7 +245,7 @@ async function startOllamaServerWithSpawn(): Promise<void> {
 function normalizeBaseUrl(baseUrl: string): string {
   const normalized = baseUrl.replace(/\/$/, '');
   if (!SAFE_OLLAMA_HOST_RE.test(normalized)) {
-    throw new OllamaEnsureError(`Ollama baseUrl must be a localhost address (got: ${baseUrl})`);
+    throw new OllamaEnsureError(`Ollama baseUrl must be a localhost address (got: ${baseUrl})`, 'invalid-base-url');
   }
   return normalized;
 }
