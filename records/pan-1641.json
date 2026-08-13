@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:50:31.252Z",
+  "updated": "2026-08-13T14:50:41.777Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,8 +250,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "e2e-pi-local-gemma": {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2081299,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:50:41.776Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -413,6 +421,7 @@
     "docs-local-models": "completed",
     "docs-local-models.ac1": "completed",
     "docs-local-models.ac2": "completed",
-    "docs-local-models.ac3": "completed"
+    "docs-local-models.ac3": "completed",
+    "e2e-pi-local-gemma": "running"
   }
 }
