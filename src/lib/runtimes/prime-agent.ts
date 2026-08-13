@@ -44,8 +44,8 @@ const productionController: PrimeAgentRuntimeController = {
     let command = await buildPrimeAgentBaseCommand({ agentId: config.agentId, model: config.model, workspace: config.workspace, authMode });
     if (config.sessionId) command += ` --resume ${shellQuote(config.sessionId)}`;
     if (config.prompt) command += ` --prompt ${shellQuote(config.prompt)}`;
-    rmSync(join(getAgentDir(config.agentId), 'prime-agent-session-id'), { force: true });
-    rmSync(join(getAgentDir(config.agentId), 'prime-agent-launch-error'), { force: true });
+    rmSync(join(getAgentDir(config.agentId), 'prime-agent-session-id'), { force: true }); // PAN-3357: not a dir removal
+    rmSync(join(getAgentDir(config.agentId), 'prime-agent-launch-error'), { force: true }); // PAN-3357: not a dir removal
     await tmuxCreateSession(config.agentId, config.workspace, command, { ...config.env, OVERDECK_AGENT_ID: config.agentId });
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
