@@ -889,8 +889,10 @@ export async function dispatchNextWave(
   const occupiedSlotIndexes = new Set([
     ...blockedSlotIndexes, // PAN-2364: blocked slots count as occupied so other slots cannot collide with them
     ...reconciled.inFlight.map(slot => slot.slotIndex),
-    // Local branches hold their index until GC; archived indexes are added below.
-    ...reconciled.branches.map(branch => branch.slotIndex),
+    // Unmerged local branches hold their index. A merged branch without an
+    // assignment, live agent, or worktree is a GC artifact and must not block
+    // reuse of the index (PAN-3689); those active signals are added separately.
+    ...reconciled.branches.filter(branch => !branch.merged).map(branch => branch.slotIndex),
     ...reconciled.agents.map(agent => agent.slotIndex),
     ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
     ...(reconciled.superseded ?? []).map(attempt => attempt.slotIndex),
