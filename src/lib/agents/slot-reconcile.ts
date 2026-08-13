@@ -7,6 +7,7 @@ import type { XBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from './queries.js';
 import type { AgentState } from './agent-state.js';
 import { RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
+import type { PanIssueSwarmSlotCompletion } from '../pan-dir/record.js';
 
 const execAsync = promisify(exec);
 
@@ -55,6 +56,7 @@ export interface SlotReconcileDeps {
   listBranches: (issueId: string, workspace: string) => Promise<ReconciledSlotBranch[]>;
   listAgents: (issueId: string) => ReconciledSlotAgent[];
   listSlotAssignments: (issueId: string, workspace: string) => ReconciledSlotAssignment[];
+  listSlotCompletions: (issueId: string, workspace: string) => Record<string, PanIssueSwarmSlotCompletion>;
 }
 
 export interface SlotReconcileOptions {
@@ -72,11 +74,13 @@ export async function reconcileSlotState(
     listBranches: listSlotBranches,
     listAgents: listSlotAgents,
     listSlotAssignments,
+    listSlotCompletions,
     ...options.deps,
   };
   const branches = await deps.listBranches(issueId, workspace);
   const agents = deps.listAgents(issueId);
   const assignments = deps.listSlotAssignments(issueId, workspace);
+  const completions = deps.listSlotCompletions(issueId, workspace);
   const branchesBySlot = new Map(branches.map(branch => [branch.slotIndex, branch]));
   const agentsBySlot = new Map(agents.map(agent => [agent.slotIndex, agent]));
   const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspace));
@@ -104,8 +108,11 @@ export async function reconcileSlotState(
     // Branch ancestry is only supporting evidence. A polyrepo workspace root
     // can be unchanged while its member repositories still contain live slot
     // work, which makes the wrapper slot branch appear merged immediately.
-    // The task write door records completion only after the merge door succeeds.
-    const merged = completed;
+    // A slot completion marker means the worker is done but the merge door has
+    // not consumed the branch yet. mergeReadySlots clears that marker only
+    // after verifyAndMergeSlot succeeds, then records the item as completed.
+    const awaitingMerge = completions[String(slotItem.slotIndex)]?.itemId === slotItem.itemId;
+    const merged = completed && !awaitingMerge;
     const entry: ReconciledSlotItem = {
       ...slotItem,
       status: merged ? 'merged' : agent || branch ? 'in_flight' : 'pending',
@@ -170,6 +177,10 @@ export function listSlotAssignments(issueId: string, workspace: string): Reconci
       branch: assignment.branch,
     }))
     .sort((a, b) => a.slotIndex - b.slotIndex);
+}
+
+export function listSlotCompletions(issueId: string, workspace: string): Record<string, PanIssueSwarmSlotCompletion> {
+  return readIssueRecordForWorkspaceSync(workspace, issueId.toUpperCase())?.swarm?.slotCompletions ?? {};
 }
 
 export function listSlotOwnership(issueId: string, workspace: string): ReconciledSlotAssignment[] {
