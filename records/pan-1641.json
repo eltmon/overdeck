@@ -141,7 +141,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T14:50:41.777Z",
+  "updated": "2026-08-13T14:59:10.040Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
@@ -250,16 +250,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "e2e-pi-local-gemma": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 2081299,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T14:50:41.776Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -365,6 +357,16 @@
         "itemId": "docs-local-models",
         "outcome": "completed",
         "releasedAt": "2026-08-13T14:50:31.252Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2081299,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T14:50:41.776Z",
+        "itemId": "e2e-pi-local-gemma",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T14:59:10.039Z"
       }
     ],
     "statusReasons": {
@@ -422,6 +424,9 @@
     "docs-local-models.ac1": "completed",
     "docs-local-models.ac2": "completed",
     "docs-local-models.ac3": "completed",
-    "e2e-pi-local-gemma": "running"
+    "e2e-pi-local-gemma": "completed",
+    "e2e-pi-local-gemma.ac1": "completed",
+    "e2e-pi-local-gemma.ac2": "completed",
+    "e2e-pi-local-gemma.ac3": "completed"
   }
 }
