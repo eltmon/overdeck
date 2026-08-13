@@ -25,6 +25,7 @@
  */
 
 import { exec } from 'node:child_process';
+import { getManagedTmuxSocketName } from '../tmux.js';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { mkdir as mkdirAsync, readdir as readdirAsync, readFile as readFileAsync, rename as renameAsync, rm as rmAsync, stat as statAsync, writeFile as writeFileAsync } from 'node:fs/promises';
@@ -527,7 +528,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   async killAgent(agentId: string): Promise<void> {
     // Step 1: Ctrl-C the interactive TUI so it can wind down cleanly.
     try {
-      await this.execCommand(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`);
+      await this.execCommand(`tmux -L ${shellQuote(getManagedTmuxSocketName())} send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`);
     } catch {
       // Best effort: the SIGTERM/SIGKILL ladder below still tears down the session.
     }
@@ -537,7 +538,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     let panePid: string | null = null;
     try {
       const { stdout } = await this.execCommand(
-        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`,
+        `tmux -L ${shellQuote(getManagedTmuxSocketName())} list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`,
       );
       panePid = stdout.trim() || null;
       if (panePid) {

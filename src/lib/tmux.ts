@@ -2,9 +2,9 @@ import { execSync, execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import { writeFile, mkdir, unlink } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { randomUUID } from 'node:crypto';
+import { join, resolve } from 'path';
+import { homedir, tmpdir } from 'os';
+import { createHash, randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
@@ -75,8 +75,26 @@ export function getManagedTmuxConfigPath(): string {
   return join(getTmuxDir(), 'overdeck.tmux.conf');
 }
 
+const DEFAULT_MANAGED_TMUX_SOCKET = 'overdeck';
+
+/**
+ * PAN-3673: a process whose OVERDECK_HOME is not the default home is a separate
+ * Overdeck instance (an isolated verification dashboard, a scratch home). If it
+ * drives the shared 'overdeck' socket, its PAN-1798 sanitizer pins race the real
+ * stack's pins in the server global env, and whichever pinned last at the instant
+ * of `new-session` wins — real sessions then capture the wrong OVERDECK_HOME
+ * (PAN-3668 incident, 2026-08-13: the review orchestrator's app-server wrote its
+ * socket under a /tmp home and the readiness check never saw it). Derive a
+ * deterministic per-home socket instead so a non-default stack can never touch
+ * the shared server. An explicit OVERDECK_TMUX_SOCKET_NAME still wins (per-test
+ * isolation, PAN-1808).
+ */
 export function getManagedTmuxSocketName(): string {
-  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'overdeck';
+  if (process.env.OVERDECK_TMUX_SOCKET_NAME) return process.env.OVERDECK_TMUX_SOCKET_NAME;
+  const home = resolve(getOverdeckHome());
+  if (home === resolve(join(homedir(), '.overdeck'))) return DEFAULT_MANAGED_TMUX_SOCKET;
+  const hash = createHash('sha1').update(home).digest('hex').slice(0, 8);
+  return `${DEFAULT_MANAGED_TMUX_SOCKET}-${hash}`;
 }
 
 function ensureLogDir(): void {
@@ -298,7 +316,10 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   }
 
   const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
-  const startedBySystemd = (() => {
+  // PAN-3673: only the default socket may use the dedicated systemd unit — a
+  // derived (per-home) socket must never take over 'overdeck-tmux-server'.
+  const useManagedUnit = getManagedTmuxSocketName() === DEFAULT_MANAGED_TMUX_SOCKET;
+  const startedBySystemd = !useManagedUnit ? false : (() => {
     try {
       // start-server daemonizes, so the unit must be Type=forking: under the
       // default Type=simple the founding client's exit deactivates the unit and
@@ -340,11 +361,14 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
     if (!daemonized) {
       execFileSync('tmux', args, { stdio: 'ignore', env: cleanEnv });
     }
-    console.warn(
-      `[tmux] WARNING (PAN-1798): could not start '${MANAGED_TMUX_SERVER_UNIT}' via systemd-run. ` +
-        `Shared tmux server is running without systemd scope isolation; ` +
-        `killing the founding process tree may still destroy the server.`,
-    );
+    // Derived sockets (PAN-3673) never attempt the unit, so don't warn as if it failed.
+    if (useManagedUnit) {
+      console.warn(
+        `[tmux] WARNING (PAN-1798): could not start '${MANAGED_TMUX_SERVER_UNIT}' via systemd-run. ` +
+          `Shared tmux server is running without systemd scope isolation; ` +
+          `killing the founding process tree may still destroy the server.`,
+      );
+    }
   }
 
   const deadline = Date.now() + SERVER_ALIVE_TIMEOUT_MS;
@@ -498,10 +522,18 @@ function buildNewSessionArgs(
   const width = options?.width ?? DEFAULT_TMUX_WINDOW_COLS;
   const height = options?.height ?? DEFAULT_TMUX_WINDOW_ROWS;
   const args = ['new-session', '-d', '-s', name, '-c', cwd, '-x', String(width), '-y', String(height)];
-  if (options?.env) {
-    for (const [key, value] of Object.entries(options.env)) {
-      args.push('-e', `${key}=${value}`);
-    }
+  // PAN-3673: pin HOME/OVERDECK_HOME on the session itself. The PAN-1798 global-env
+  // sanitizer runs as a separate tmux call before new-session, so a second stack
+  // sharing the socket can re-poison the global env in between and win. `-e` flags
+  // are applied atomically at session creation and override the global env, so the
+  // pane always lands this process's resolved home. Caller-provided env still wins.
+  const env: Record<string, string> = {
+    HOME: process.env.HOME ?? homedir(),
+    OVERDECK_HOME: getOverdeckHome(),
+    ...options?.env,
+  };
+  for (const [key, value] of Object.entries(env)) {
+    args.push('-e', `${key}=${value}`);
   }
   if (initialCommand) {
     args.push(initialCommand);

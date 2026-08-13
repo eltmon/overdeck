@@ -111,6 +111,7 @@ import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
+import { getManagedTmuxSocketName } from '../lib/tmux.js';
 import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
@@ -689,7 +690,7 @@ program
       ];
       for (const varName of providerVars) {
         try {
-          execSync(`tmux -L overdeck set-environment -gu ${varName}`, { stdio: 'ignore' });
+          execSync(`tmux -L ${getManagedTmuxSocketName()} set-environment -gu ${varName}`, { stdio: 'ignore' });
         } catch {
           // No server running or var not set — fine
         }

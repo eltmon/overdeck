@@ -19,6 +19,7 @@
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { getManagedTmuxSocketName } from '../tmux.js';
 import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -764,7 +765,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
       }
     } else {
       try {
-        await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
+        await execAsync(`tmux -L ${shellQuote(getManagedTmuxSocketName())} send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
       } catch {
         // ignore
       }
@@ -779,7 +780,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     // process group directly.
     try {
       const { stdout } = await execAsync(
-        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
+        `tmux -L ${shellQuote(getManagedTmuxSocketName())} list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
       )
       const pid = stdout.trim()
       if (pid) await execAsync(`kill -TERM -- -${pid} 2>/dev/null || kill -TERM ${pid} 2>/dev/null || true`)

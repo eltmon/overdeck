@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { execFileSync, execSync, execFile } from 'child_process';
 import { readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import {
   createSession,
   ensureOverdeckTmuxServerSync,
   ensureOverdeckTmuxServerAsync,
   findManagedServerPidSync,
+  getManagedTmuxSocketName,
   _resetWarnedManagedServerDirtyForTest,
 } from '../tmux.js';
 import { Effect } from 'effect';
@@ -59,11 +62,16 @@ describe('ensureOverdeckTmuxServerSync', () => {
   let cgroupOutput = '';
   let cmdlineOutput = '';
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // PAN-3673: these tests exercise the managed systemd unit, which only serves
+  // the default socket; pin OVERDECK_HOME to the default home (vitest workers
+  // otherwise run with an isolated temp home, which now derives its own socket).
+  const savedOverdeckHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
     vi.clearAllMocks();
     _resetWarnedManagedServerDirtyForTest();
     process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
+    process.env.OVERDECK_HOME = join(homedir(), '.overdeck');
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;
@@ -142,6 +150,8 @@ describe('ensureOverdeckTmuxServerSync', () => {
   afterEach(() => {
     warnSpy.mockClear();
     delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
+    if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedOverdeckHome;
   });
 
   it('founds the shared server in a dedicated systemd unit', () => {
@@ -236,10 +246,14 @@ describe('ensureOverdeckTmuxServerAsync', () => {
   let serverAlive = false;
   let systemdAvailable = true;
   let setsidAvailable = true;
+  // PAN-3673: managed-unit founding only applies to the default socket; pin the
+  // default home (vitest workers run with an isolated temp OVERDECK_HOME).
+  const savedOverdeckHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
+    process.env.OVERDECK_HOME = join(homedir(), '.overdeck');
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;
@@ -283,6 +297,12 @@ describe('ensureOverdeckTmuxServerAsync', () => {
 
       return '';
     });
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
+    if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedOverdeckHome;
   });
 
   it('delegates to the sync helper and founds a dedicated systemd unit', async () => {
@@ -397,5 +417,185 @@ describe('findManagedServerPidSync', () => {
     });
 
     expect(findManagedServerPidSync()).toBeUndefined();
+  });
+});
+
+describe('PAN-3673: socket name isolation per OVERDECK_HOME', () => {
+  const savedHome = process.env.OVERDECK_HOME;
+  const savedSocket = process.env.OVERDECK_TMUX_SOCKET_NAME;
+
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedHome;
+    if (savedSocket === undefined) delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    else process.env.OVERDECK_TMUX_SOCKET_NAME = savedSocket;
+  });
+
+  it('returns the shared socket for the default home', () => {
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    delete process.env.OVERDECK_HOME;
+    expect(getManagedTmuxSocketName()).toBe('overdeck');
+  });
+
+  it('returns the shared socket when OVERDECK_HOME is set to the default home explicitly', () => {
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    process.env.OVERDECK_HOME = join(homedir(), '.overdeck');
+    expect(getManagedTmuxSocketName()).toBe('overdeck');
+  });
+
+  it('derives a deterministic per-home socket for a non-default home', () => {
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    process.env.OVERDECK_HOME = '/tmp/pan-3668-dashboard-home-20260812';
+    const first = getManagedTmuxSocketName();
+    expect(first).toMatch(/^overdeck-[0-9a-f]{8}$/);
+    expect(getManagedTmuxSocketName()).toBe(first);
+
+    process.env.OVERDECK_HOME = '/tmp/some-other-home';
+    const second = getManagedTmuxSocketName();
+    expect(second).toMatch(/^overdeck-[0-9a-f]{8}$/);
+    expect(second).not.toBe(first);
+  });
+
+  it('lets an explicit OVERDECK_TMUX_SOCKET_NAME win over derivation', () => {
+    process.env.OVERDECK_HOME = '/tmp/pan-3668-dashboard-home-20260812';
+    process.env.OVERDECK_TMUX_SOCKET_NAME = 'vitest-isolated';
+    expect(getManagedTmuxSocketName()).toBe('vitest-isolated');
+  });
+});
+
+describe('PAN-3673: createSession pins HOME/OVERDECK_HOME via -e flags', () => {
+  const savedHome = process.env.OVERDECK_HOME;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
+
+    mockedExecFileSync.mockImplementation((cmd: unknown, args?: unknown) => {
+      const command = String(cmd);
+      const argv = Array.isArray(args) ? (args as string[]) : [];
+      if (isListSessionsCall(command, argv)) return '';
+      if (isSystemctlShowCall(command)) return '0\n';
+      if (command === 'pgrep') throw new Error('no match');
+      return '';
+    });
+
+    mockedExecFile.mockImplementation((_cmd: unknown, _args?: unknown, optionsOrCallback?: unknown, callback?: unknown) => {
+      const cb = typeof optionsOrCallback === 'function' ? optionsOrCallback : callback;
+      if (typeof cb === 'function') {
+        cb(null, '', '');
+      }
+      return {} as ReturnType<typeof execFile>;
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
+    if (savedHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedHome;
+  });
+
+  function newSessionArgv(): string[] {
+    const call = mockedExecFile.mock.calls.find(
+      (c) => c[0] === 'tmux' && Array.isArray(c[1]) && c[1].includes('new-session'),
+    );
+    expect(call).toBeDefined();
+    return call![1] as string[];
+  }
+
+  it('passes authoritative HOME and OVERDECK_HOME -e flags on every spawn', async () => {
+    delete process.env.OVERDECK_HOME;
+    await Effect.runPromise(createSession('agent-pan-3673', '/tmp/workspace', 'bash launcher.sh'));
+
+    const argv = newSessionArgv();
+    expect(argv).toContain('-e');
+    expect(argv).toContain(`HOME=${process.env.HOME ?? homedir()}`);
+    expect(argv).toContain(`OVERDECK_HOME=${join(homedir(), '.overdeck')}`);
+  });
+
+  it('reflects a non-default process OVERDECK_HOME in the -e flag', async () => {
+    process.env.OVERDECK_HOME = '/tmp/pan-3668-dashboard-home-20260812';
+    await Effect.runPromise(createSession('agent-pan-3673', '/tmp/workspace', 'bash launcher.sh'));
+
+    expect(newSessionArgv()).toContain('OVERDECK_HOME=/tmp/pan-3668-dashboard-home-20260812');
+  });
+
+  it('caller-provided env entries win and are not duplicated', async () => {
+    delete process.env.OVERDECK_HOME;
+    await Effect.runPromise(createSession('agent-pan-3673', '/tmp/workspace', 'bash launcher.sh', {
+      env: { OVERDECK_HOME: '/tmp/caller-wins', FOO: 'bar' },
+    }));
+
+    const argv = newSessionArgv();
+    expect(argv).toContain('OVERDECK_HOME=/tmp/caller-wins');
+    expect(argv).toContain('FOO=bar');
+    expect(argv.filter((a) => a.startsWith('OVERDECK_HOME='))).toHaveLength(1);
+    expect(argv.filter((a) => a.startsWith('HOME='))).toHaveLength(1);
+  });
+});
+
+describe('PAN-3673: derived sockets never found via the managed systemd unit', () => {
+  const savedHome = process.env.OVERDECK_HOME;
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetWarnedManagedServerDirtyForTest();
+    process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
+    process.env.OVERDECK_HOME = '/tmp/pan-3673-isolated-home';
+    warnSpy.mockClear();
+
+    mockedExecFileSync.mockImplementation((cmd: unknown, args?: unknown) => {
+      const command = String(cmd);
+      const argv = Array.isArray(args) ? (args as string[]) : [];
+      if (isListSessionsCall(command, argv)) {
+        const err = new Error('no server running');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      }
+      if (command === 'setsid') return '';
+      if (command === 'sleep') return '';
+      // After setsid founding, the server answers.
+      if (command === 'tmux' && argv.includes('start-server')) return '';
+      return '';
+    });
+    mockedReadFileSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
+    if (savedHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedHome;
+    warnSpy.mockClear();
+  });
+
+  it('founds a derived-socket server via setsid, never via the overdeck-tmux-server unit', () => {
+    // The mock's list-sessions always throws, so after setsid "succeeds" the
+    // alive-wait would spin; make the second list-sessions call succeed.
+    let listCalls = 0;
+    mockedExecFileSync.mockImplementation((cmd: unknown, args?: unknown) => {
+      const command = String(cmd);
+      const argv = Array.isArray(args) ? (args as string[]) : [];
+      if (isListSessionsCall(command, argv)) {
+        listCalls += 1;
+        if (listCalls > 1) return '';
+        const err = new Error('no server running');
+        (err as NodeJS.ErrnoException).code = 'ENOENT';
+        throw err;
+      }
+      if (command === 'sleep') return '';
+      return '';
+    });
+
+    ensureOverdeckTmuxServerSync({});
+
+    const systemdCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'systemd-run');
+    expect(systemdCalls).toHaveLength(0);
+    const setsidCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'setsid');
+    expect(setsidCalls).toHaveLength(1);
+    const setsidArgv = setsidCalls[0]![1] as string[];
+    expect(setsidArgv.join(' ')).toContain(`-L ${getManagedTmuxSocketName()}`);
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('without systemd scope isolation'));
   });
 });
