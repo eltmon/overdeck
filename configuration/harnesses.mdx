@@ -72,6 +72,51 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   benchmark provider with no live endpoint, is also registered for pipeline
   testing — see `benchmarks/specs/quantumllama.md`.)
 
+#### Run a work agent on local Ollama
+
+Version one routes local Ollama models through `ohmypi` only. Codex, Claude Code,
+and dashboard model discovery are tracked in [PAN-1643](https://github.com/eltmon/overdeck/issues/1643).
+
+1. Install Ollama. On Linux, run the installer from
+   [ollama.com/download](https://ollama.com/download) or
+   `curl -fsSL https://ollama.com/install.sh | sh`. On Apple Silicon, use the
+   macOS download or `brew install ollama`; Ollama uses Metal automatically.
+2. Pull the recommended workstation model:
+
+   ```bash
+   ollama pull gemma4:12b
+   ```
+
+   The tag is about 8 GB at its default quantization. It fits a 24 GB NVIDIA
+   GPU or a 24 GB Apple Silicon system with room for the agent and operating
+   system.
+3. Add the local provider and work-role route to `~/.overdeck/config.yaml`:
+
+   ```yaml
+   providers:
+     ollama:
+       enabled: true
+       base_url: http://localhost:11434
+       harness: ohmypi
+
+   roles:
+     work:
+       harness: ohmypi
+       model: ollama:gemma4:12b
+   ```
+
+   The base URL must use `localhost`, `127.x.x.x`, or `::1`. Overdeck rejects
+   remote Ollama endpoints so local prompts cannot be redirected off-machine.
+4. Run `pan doctor`, then start work normally with `pan start <ISSUE>`. You can
+   also select the route for one start with
+   `pan start <ISSUE> --harness ohmypi --model ollama:gemma4:12b`.
+
+Overdeck starts `ollama serve` lazily when the first local agent launches. If
+the endpoint stays down or the tag is missing, the spawn stops with the exact
+`ollama serve` or `ollama pull` command to run. The `ollama:` prefix is required
+for every local tag, including namespaced tags such as
+`ollama:example/custom:latest`.
+
 ### OpenAI Codex CLI (alternative)
 
 - First-party OpenAI agent loop for the GPT model family (GPT-5.6 Sol/Terra/Luna,
