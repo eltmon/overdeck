@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:16:24.970Z",
+  "updated": "2026-08-13T14:16:28.026Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
@@ -102,8 +102,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-08-13T14:16:24.866Z",
-    "testNotes": "typecheck clean; lint clean; npm test: 1446 files/13638 tests passed, 3 files/50 tests skipped, 0 failures. Backend/CLI/API-only change (no frontend files touched; ConversationPanel.tsx is an explicit NonGoal) — UAT not required.",
+    "updatedAt": "2026-08-13T14:16:24.903Z",
+    "testNotes": "npm run typecheck: clean (dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). npm run lint: clean (circular-deps 56 baselined/0 new, file-size guard clean, effect-diagnostics 308 known/0 new, ratchet-audit clean). npm test: 1446 test files passed / 3 skipped (1449 total), 13638 tests passed / 50 skipped (13695 total), 0 failures, plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Issue is backend/CLI/API-only (sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs) — no frontend files in diff and ConversationPanel.tsx is an explicit NonGoal, so UAT is not required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
@@ -223,7 +223,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.906794,
-        "pricingAsOf": "2026-08-13T14:16:24.956Z"
+        "pricingAsOf": "2026-08-13T14:16:28.017Z"
       }
     },
     "merges": [
