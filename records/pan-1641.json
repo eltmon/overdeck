@@ -131,33 +131,33 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-13T12:02:01.315Z",
+  "updated": "2026-08-13T12:02:59.289Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T12:02:01.288Z",
-    "inspectNotes": "Inspecting item register-ollama-provider"
+    "updatedAt": "2026-08-13T12:02:59.208Z",
+    "inspectNotes": "All 5 ACs met. ProviderName+PROVIDERS.ollama (models: [], http://localhost:11434/v1, tested:false, defaultHarness ohmypi) at src/lib/providers.ts:185-195; ollama: prefix returns early at providers.ts:404-409 BEFORE the slash->openrouter heuristic, so colon+slash tags (ollama:library/custom:latest) route correctly; Effect getProviderForModel (providers.ts:668) delegates to the sync fn so both doors agree. Routing regression covered by tests/lib/providers.test.ts (anthropic/openai/openrouter/minimax); harness-policy.test.ts loops all three AUTH_MODES for canUseHarnessSync('pi','ollama:gemma3:12b'). Every Record keyed by ModelProvider is Partial<> so the model-fallback union widening breaks no exhaustiveness; the one exhaustive Record<ProviderName,...> (tests/unit/lib/providers.test.ts EXPECTED_DEFAULT_HARNESSES) got its matching entry. Ran the 3 touched files: 90 tests passed."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 50074,
-            "output": 334,
-            "cacheRead": 9728,
+            "input": 148108,
+            "output": 822,
+            "cacheRead": 78592,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 14104746,
-            "output": 8864,
-            "cacheRead": 13881856,
+            "input": 15907231,
+            "output": 9919,
+            "cacheRead": 15675136,
             "cacheWrite": 0
           }
         },
@@ -192,15 +192,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 50074,
-          "output": 334,
-          "cacheRead": 9728,
+          "input": 148108,
+          "output": 822,
+          "cacheRead": 78592,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 14104746,
-          "output": 8864,
-          "cacheRead": 13881856,
+          "input": 15907231,
+          "output": 9919,
+          "cacheRead": 15675136,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -229,8 +229,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.0278233,
-        "pricingAsOf": "2026-08-13T12:02:01.300Z"
+        "usd": 24.0021383,
+        "pricingAsOf": "2026-08-13T12:02:59.270Z"
       }
     },
     "merges": [],
