@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:40:06.457Z",
+  "updated": "2026-08-13T01:25:00.747Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -102,16 +102,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 49,
-    "claims": {
-      "verification-gauntlet": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 482664,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:40:06.457Z"
-      }
-    },
+    "sequence": 50,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -376,6 +368,16 @@
         "outcome": "completed",
         "reason": "Implemented, tested, committed, and pushed in 64a5b73d38",
         "releasedAt": "2026-08-13T00:39:55.090Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 482664,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:40:06.457Z",
+        "itemId": "verification-gauntlet",
+        "outcome": "completed",
+        "releasedAt": "2026-08-13T01:25:00.746Z"
       }
     ],
     "statusReasons": {
@@ -562,6 +564,9 @@
     "no-loss-audit.ac1": "completed",
     "no-loss-audit.ac2": "completed",
     "no-loss-audit.ac3": "completed",
-    "verification-gauntlet": "running"
+    "verification-gauntlet": "completed",
+    "verification-gauntlet.ac1": "completed",
+    "verification-gauntlet.ac2": "completed",
+    "verification-gauntlet.ac3": "completed"
   }
 }
