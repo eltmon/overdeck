@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-12T23:59:49.833Z",
+  "updated": "2026-08-13T00:02:26.423Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -58,16 +58,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "runtime-adapter": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 228801,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-12T23:59:49.833Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -189,6 +181,17 @@
         "outcome": "completed",
         "reason": "Added configured-binary prerequisite discovery, named compatible version bounds, RPC capability probing, install guidance, and focused doctor tests; extracted checks to keep the doctor command within its size guard.",
         "releasedAt": "2026-08-12T23:59:40.943Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 228801,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-12T23:59:49.833Z",
+        "itemId": "runtime-adapter",
+        "outcome": "completed",
+        "reason": "Added and registered a Prime Agent runtime adapter with RPC-controller delegation, live-event/detached-file heartbeat priority, usage/cost projection, ordered abort/terminate, and explicit persisted-harness routing.",
+        "releasedAt": "2026-08-13T00:02:26.423Z"
       }
     ],
     "statusReasons": {
@@ -235,6 +238,10 @@
       "doctor-prime-checks": {
         "reason": "Added configured-binary prerequisite discovery, named compatible version bounds, RPC capability probing, install guidance, and focused doctor tests; extracted checks to keep the doctor command within its size guard.",
         "updatedAt": "2026-08-12T23:59:40.943Z"
+      },
+      "runtime-adapter": {
+        "reason": "Added and registered a Prime Agent runtime adapter with RPC-controller delegation, live-event/detached-file heartbeat priority, usage/cost projection, ordered abort/terminate, and explicit persisted-harness routing.",
+        "updatedAt": "2026-08-13T00:02:26.423Z"
       }
     }
   },
@@ -277,6 +284,9 @@
     "doctor-prime-checks": "completed",
     "doctor-prime-checks.ac1": "completed",
     "doctor-prime-checks.ac2": "completed",
-    "runtime-adapter": "running"
+    "runtime-adapter": "completed",
+    "runtime-adapter.ac1": "completed",
+    "runtime-adapter.ac2": "completed",
+    "runtime-adapter.ac3": "completed"
   }
 }
