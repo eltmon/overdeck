@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-13T00:02:39.558Z",
+  "updated": "2026-08-13T00:03:36.715Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -58,16 +58,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "session-resume-recovery": {
-        "writerId": "agent-pan-3668",
-        "agentId": "agent-pan-3668",
-        "pid": 242302,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-13T00:02:39.557Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3668",
@@ -200,6 +192,17 @@
         "outcome": "completed",
         "reason": "Added and registered a Prime Agent runtime adapter with RPC-controller delegation, live-event/detached-file heartbeat priority, usage/cost projection, ordered abort/terminate, and explicit persisted-harness routing.",
         "releasedAt": "2026-08-13T00:02:26.423Z"
+      },
+      {
+        "writerId": "agent-pan-3668",
+        "agentId": "agent-pan-3668",
+        "pid": 242302,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T00:02:39.557Z",
+        "itemId": "session-resume-recovery",
+        "outcome": "completed",
+        "reason": "Added durable-path preflight and get_state identity verification; missing, mismatched, and process-exit recovery paths stop or avoid the replacement and explicitly refuse a silent fresh session.",
+        "releasedAt": "2026-08-13T00:03:36.715Z"
       }
     ],
     "statusReasons": {
@@ -250,6 +253,10 @@
       "runtime-adapter": {
         "reason": "Added and registered a Prime Agent runtime adapter with RPC-controller delegation, live-event/detached-file heartbeat priority, usage/cost projection, ordered abort/terminate, and explicit persisted-harness routing.",
         "updatedAt": "2026-08-13T00:02:26.423Z"
+      },
+      "session-resume-recovery": {
+        "reason": "Added durable-path preflight and get_state identity verification; missing, mismatched, and process-exit recovery paths stop or avoid the replacement and explicitly refuse a silent fresh session.",
+        "updatedAt": "2026-08-13T00:03:36.715Z"
       }
     }
   },
@@ -296,6 +303,8 @@
     "runtime-adapter.ac1": "completed",
     "runtime-adapter.ac2": "completed",
     "runtime-adapter.ac3": "completed",
-    "session-resume-recovery": "running"
+    "session-resume-recovery": "completed",
+    "session-resume-recovery.ac1": "completed",
+    "session-resume-recovery.ac2": "completed"
   }
 }
