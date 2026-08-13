@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T12:09:13.597Z",
+  "updated": "2026-08-13T12:09:34.265Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "docs-delivery-home-resolution": {
+        "writerId": "agent-pan-3671",
+        "agentId": "agent-pan-3671",
+        "pid": 2921514,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-13T12:09:34.265Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3671",
@@ -218,6 +226,7 @@
     "conversations-heal-cli": "completed",
     "conversations-heal-cli.ac1": "completed",
     "conversations-heal-cli.ac2": "completed",
-    "conversations-heal-cli.ac3": "completed"
+    "conversations-heal-cli.ac3": "completed",
+    "docs-delivery-home-resolution": "running"
   }
 }
