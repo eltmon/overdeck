@@ -4,17 +4,17 @@
     "created": "2026-08-13T11:27:11Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3671: Test-home OVERDECK_HOME poisoned shared tmux global env — every conversation spawn falsely reports 'Spawn failed'",
-    "updated": "2026-08-13T11:36:49.563Z"
+    "updated": "2026-08-13T11:38:41.002Z"
   },
   "plan": {
     "id": "pan-3671",
     "title": "Test-home OVERDECK_HOME poisoned shared tmux global env — every conversation spawn falsely reports 'Spawn failed' (supervisor socket bound in /tmp test home)",
-    "status": "proposed",
+    "status": "running",
     "uid": "fd5aac13-0fe1-4d70-b874-0c37dfcfe528",
     "author": "agent:claude",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-13T11:27:11Z",
-    "updated": "2026-08-13T11:36:49.563Z",
+    "updated": "2026-08-13T11:38:41.002Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3671",
@@ -582,5 +582,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
