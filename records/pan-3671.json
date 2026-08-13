@@ -93,7 +93,7 @@
     "recordedAt": "2026-08-13T12:56:18.413Z"
   },
   "created": "2026-08-13T11:11:39.051Z",
-  "updated": "2026-08-13T14:16:32.986Z",
+  "updated": "2026-08-13T14:16:46.582Z",
   "pipeline": {
     "issueId": "PAN-3671",
     "reviewStatus": "passed",
@@ -101,65 +101,19 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-13T14:16:24.903Z",
-    "testNotes": "npm run typecheck: clean (dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). npm run lint: clean (circular-deps 56 baselined/0 new, file-size guard clean, effect-diagnostics 308 known/0 new, ratchet-audit clean). npm test: 1446 test files passed / 3 skipped (1449 total), 13638 tests passed / 50 skipped (13695 total), 0 failures, plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Issue is backend/CLI/API-only (sanitizer, launcher env export, supervisor timeout degrade, heal writer, REST clear-fork-state endpoint, pan conversations heal CLI, docs) — no frontend files in diff and ConversationPanel.tsx is an explicit NonGoal, so UAT is not required.",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-13T14:16:45.220Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-08-13T14:16:45.219Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3676",
     "reviewedAtCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
     "lastVerifiedCommit": "2e32f4ad39d51de12200f08bf317c291c3173c88",
-    "reviewSpawnedAt": "2026-08-13T13:51:24.686Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "packages/contracts/src/composer-commands.generated.ts",
-        "scripts/file-size-allowlist.txt",
-        "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
-        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/AGENT-MESSAGE-DELIVERY.md",
-        "src/cli/commands/conversations/__tests__/heal.test.ts",
-        "src/cli/commands/conversations/heal.ts",
-        "src/cli/commands/conversations/index.ts",
-        "src/dashboard/server/routes/conversations.ts",
-        "src/lib/__tests__/launcher-generator.test.ts",
-        "src/lib/__tests__/tmux-server.test.ts",
-        "src/lib/launcher-generator.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/paths.ts",
-        "src/lib/tmux.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/AGENT-MESSAGE-DELIVERY.md",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/conversations/__tests__/heal.test.ts",
-        "src/cli/commands/conversations/heal.ts",
-        "src/cli/commands/conversations/index.ts",
-        "src/dashboard/server/routes/conversations.ts",
-        "src/lib/__tests__/launcher-generator.test.ts",
-        "src/lib/__tests__/tmux-server.test.ts",
-        "src/lib/launcher-generator.ts",
-        "src/lib/overdeck/__tests__/conversation-supervisor-failure.test.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/paths.ts",
-        "src/lib/tmux.ts",
-        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-clear-fork-state.test.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-supervisor-degrade.test.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-supervisor-failure-message.test.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ],
-      "recordedAt": "2026-08-13T12:56:18.413Z"
-    }
+    "reviewSpawnedAt": "2026-08-13T13:51:24.686Z"
   },
   "closeOut": {
     "usage": {
@@ -188,10 +142,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 52,
-            "output": 6253,
-            "cacheRead": 3965404,
-            "cacheWrite": 60803
+            "input": 54,
+            "output": 6514,
+            "cacheRead": 4137006,
+            "cacheWrite": 61289
           }
         }
       },
@@ -215,15 +169,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 52,
-          "output": 6253,
-          "cacheRead": 3965404,
-          "cacheWrite": 60803
+          "input": 54,
+          "output": 6514,
+          "cacheRead": 4137006,
+          "cacheWrite": 61289
         }
       },
       "costAtCloseOut": {
-        "usd": 28.906794,
-        "pricingAsOf": "2026-08-13T14:16:28.017Z"
+        "usd": 28.944943000000002,
+        "pricingAsOf": "2026-08-13T14:16:45.258Z"
       }
     },
     "merges": [
