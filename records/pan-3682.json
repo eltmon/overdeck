@@ -2,7 +2,7 @@
   "issueId": "PAN-3682",
   "schemaVersion": 2,
   "created": "2026-08-13T15:35:00.429Z",
-  "updated": "2026-08-13T15:35:00.429Z",
+  "updated": "2026-08-13T15:41:03.614Z",
   "pipeline": {
     "issueId": "PAN-3682",
     "reviewStatus": "pending",
@@ -19,5 +19,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3[1m]"
+  "model": "k3[1m]",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-08-13T15:41:03.613Z"
+    }
+  ]
 }
