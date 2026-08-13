@@ -426,7 +426,7 @@ const BOOT_RECONCILIATION_DECISIONS = new Set<BootReconciliationDecision>([
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
-  const row = overdeckDb()
+  const row = getOverdeckDatabaseSync(undefined, { readOnly: true })
     .prepare('SELECT value FROM app_settings WHERE key = ?')
     .get(key) as { value: string } | undefined;
   return row ? row.value : null;
@@ -641,7 +641,7 @@ export const ConfigApi = HttpApiGroup.make('config')
  * Sync version of SettingsResolver.getFlywheelRuntime().activeRunId.
  */
 export function getFlywheelActiveRunIdSync(): string | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
   const row = db
     .prepare(`SELECT value FROM app_settings WHERE key = 'flywheel.active_run_id'`)
     .get() as { value: string | null } | undefined;

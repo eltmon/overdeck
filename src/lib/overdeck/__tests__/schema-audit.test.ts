@@ -122,4 +122,24 @@ describe('overdeck schema audit', () => {
         .map((column) => column.name),
     ).not.toContain('phase');
   });
+
+  it('opens a current schema read-only without executing DDL or DML', () => {
+    const dbPath = makeDbPath();
+    createInitializedDatabase(dbPath).close();
+    const db = getOverdeckDatabaseSync(dbPath, { readOnly: true });
+
+    expect(db.prepare('SELECT COUNT(*) AS count FROM agents').get()).toEqual({ count: 0 });
+    expect(() => db.exec('UPDATE agents SET status = status')).toThrow(/read.?only/i);
+  });
+
+  it('fails read-only opens with a clear compatibility error when schema is stale', () => {
+    const dbPath = makeDbPath();
+    const setup = createInitializedDatabase(dbPath);
+    setup.exec('DROP INDEX `idx_cost_agent_id`');
+    setup.close();
+
+    expect(() => getOverdeckDatabaseSync(dbPath, { readOnly: true })).toThrow(
+      /schema is incompatible.*index idx_cost_agent_id/i,
+    );
+  });
 });

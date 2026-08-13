@@ -876,7 +876,7 @@ export interface BackfillAgentsSyncResult {
 export function listAgentIdsByPrefixSync(prefix: string): string[] {
   const ids = new Set<string>();
   try {
-    const rows = getOverdeckDatabaseSync()
+    const rows = getOverdeckDatabaseSync(undefined, { readOnly: true })
       .prepare(`SELECT id FROM agents WHERE id LIKE ?`)
       .all(`${prefix}%`) as Array<{ id: string }>;
     for (const r of rows) ids.add(r.id);
@@ -993,7 +993,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
  * Drop-in for countAgentsByStatus() from database/agents-db.ts.
  */
 export function countAgentsByStatus(status: string): Record<string, number> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
   const rows = db.prepare(
     `SELECT role, COUNT(*) AS n FROM agents WHERE status = ? GROUP BY role`,
   ).all(status) as Array<{ role: string; n: number }>;
@@ -1009,7 +1009,7 @@ export function countAgentsByStatus(status: string): Record<string, number> {
  * Drop-in for countAgentsByStatusRole() from database/agents-db.ts.
  */
 export function countAgentsByStatusRole(status: string, role: string): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
   const row = db.prepare(
     `SELECT COUNT(*) AS n FROM agents WHERE status = ? AND role = ?`,
   ).get(status, role) as { n: number } | undefined;
@@ -1067,7 +1067,7 @@ export function listAllAgentsSync(): Array<{
   channelsEnabled: boolean | null;
   updatedAt: string;
 }> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
   const rows = db.prepare(`
     SELECT id, issue_id, role, status, workspace, session_id, harness, model,
            host_override, delivery_method, started_at, last_resume_at,

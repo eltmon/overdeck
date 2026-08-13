@@ -240,14 +240,14 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
 }
 
 export function getOverdeckAgentStateSync(agentId: string): AgentState | null {
-  const row = getOverdeckDatabaseSync()
+  const row = getOverdeckDatabaseSync(undefined, { readOnly: true })
     .prepare(`${SELECT_AGENT_SQL} WHERE id = ?`)
     .get(agentId) as OverdeckAgentRow | undefined;
   return row ? overdeckRowToAgentState(row) : null;
 }
 
 export function listOverdeckAgentStatesSync(): AgentState[] {
-  const rows = getOverdeckDatabaseSync()
+  const rows = getOverdeckDatabaseSync(undefined, { readOnly: true })
     .prepare(SELECT_AGENT_SQL)
     .all() as OverdeckAgentRow[];
   return rows.map(overdeckRowToAgentState);
