@@ -96,9 +96,18 @@ type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
  * repository. Git cannot remove the aggregate root while nested worktrees
  * live inside it ("Directory not empty"), so every nested worktree is
  * detached through the workspace abstraction first, in its owning parent
- * repo. Never discards unmerged or locally-modified nested work: an unsafe
- * nested worktree defers the whole slot with the reason recorded. Returns
- * true when the slot workspace is gone and GC may proceed to branch cleanup.
+ * repo.
+ *
+ * Cleanup is atomic in intent: a read-only preflight proves every nested repo
+ * safe AND removable, and decides the aggregate root's removal route, before
+ * the first mutation. Discovering an unsafe or unremovable nested checkout
+ * after an earlier one was already detached is the Tier-1 partial-cleanup
+ * defect the preflight exists to prevent (PAN-3686 post-deploy review). Any
+ * preflight failure defers the whole slot with zero removals.
+ *
+ * Never discards unmerged or locally-modified nested work: an unsafe nested
+ * worktree defers the whole slot with the reason recorded. Returns true when
+ * the slot workspace is gone and GC may proceed to branch cleanup.
  */
 async function removeSlotWorkspace(
   issueId: string,
@@ -116,16 +125,51 @@ async function removeSlotWorkspace(
 
   const { isPolyrepo, nested } = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktreesSync)(issueId, slotWorkspace);
 
+  // ── Preflight (read-only): no mutations below this line until every check
+  // for every nested repo and the aggregate root has passed. ──
+
   for (const worktree of nested) {
     const blocked = await nestedWorktreePreservationReason(deps.runGitCommand, worktree, slotBranch);
     if (blocked) return defer(`preserving nested work: ${blocked}`);
   }
 
+  // Each nested checkout must be a registered worktree of its owning parent
+  // repo. The registration is what `git worktree remove` needs to succeed;
+  // checking it up front keeps a mid-loop failure from leaving the slot half
+  // detached. Nested gitdirs live in their owning parent repos, never under
+  // the aggregate, so this lookup does not depend on aggregate metadata that
+  // an earlier partial removal may have invalidated.
+  for (const worktree of nested) {
+    const registered = await isRegisteredWorktree(deps.runGitCommand, worktree.parentRepo, worktree.dir);
+    if (registered === null) {
+      return defer(`${worktree.repoKey}: worktree registration in parent repo could not be determined`);
+    }
+    if (!registered) {
+      return defer(`${worktree.repoKey}: nested worktree is not registered in its parent repo (an earlier partial cleanup may have detached it); run pan swarm reset ${issueId}`);
+    }
+  }
+
+  // Decide the aggregate root's removal route up front: a registered working
+  // tree is removed through git; an unregistered plain directory (polyrepo
+  // layouts that register only the nested paths, or a registration lost to an
+  // earlier partial cleanup) is removed as a directory after nested detach.
+  const aggregateRegistered = await isRegisteredWorktree(deps.runGitCommand, workspacePath, slotWorkspace);
+  if (aggregateRegistered === null) {
+    return defer('aggregate worktree registration could not be determined');
+  }
+
+  // ── Mutation: preflight proved every nested worktree safe and removable. ──
+
+  const detached: string[] = [];
   for (const worktree of nested) {
     try {
       await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktree.dir)}`, worktree.parentRepo);
+      detached.push(worktree.repoKey);
     } catch (error) {
-      return defer(`nested worktree remove failed in ${worktree.repoKey}: ${error instanceof Error ? error.message : String(error)}`);
+      // A failure here escaped preflight (I/O race, lock); report which nested
+      // worktrees were already detached so the partial state is on record.
+      const partial = detached.length > 0 ? ` (already detached: ${detached.join(', ')})` : '';
+      return defer(`nested worktree remove failed in ${worktree.repoKey}${partial}: ${error instanceof Error ? error.message : String(error)}`);
     }
     try {
       await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, worktree.parentRepo);
@@ -135,13 +179,23 @@ async function removeSlotWorkspace(
     }
   }
 
+  if (!aggregateRegistered && isPolyrepo) {
+    try {
+      await (deps.removeDirectory ?? (path => rm(path, { recursive: true, force: true })))(slotWorkspace);
+      return true;
+    } catch (rmError) {
+      return defer(`aggregate directory remove failed: ${rmError instanceof Error ? rmError.message : String(rmError)}`);
+    }
+  }
+
   try {
     await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // Some polyrepo layouts register only the nested paths; the aggregate
-    // root is then a plain directory git rightfully refuses to remove.
+    // The registration vanished between preflight and removal (or preflight
+    // was bypassed): the aggregate root is a plain directory git rightfully
+    // refuses to remove.
     if (isPolyrepo && /is not a working tree/.test(message)) {
       try {
         await (deps.removeDirectory ?? (path => rm(path, { recursive: true, force: true })))(slotWorkspace);
@@ -151,6 +205,30 @@ async function removeSlotWorkspace(
       }
     }
     return defer(`worktree remove failed: ${message}`);
+  }
+}
+
+/**
+ * Whether `worktreeDir` is a registered worktree of the repository at
+ * `repoDir`, or null when the registration state cannot be determined. The
+ * porcelain list always names at least the repository's own main worktree, so
+ * a response with no `worktree` lines is an anomaly, not proof of "absent".
+ */
+async function isRegisteredWorktree(
+  runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
+  repoDir: string,
+  worktreeDir: string,
+): Promise<boolean | null> {
+  try {
+    const result = await runGitCommand('git worktree list --porcelain', repoDir) as { stdout?: unknown };
+    const paths = String(result?.stdout ?? '')
+      .split('\n')
+      .filter(line => line.startsWith('worktree '))
+      .map(line => line.slice('worktree '.length).trim());
+    if (paths.length === 0) return null;
+    return paths.includes(worktreeDir);
+  } catch {
+    return null;
   }
 }
 

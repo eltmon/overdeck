@@ -15,7 +15,14 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
 
 function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'slotWorktreeExists'> & { listSlotWorkspaceWorktrees: () => { isPolyrepo: false; nested: [] } } {
   return {
-    runGitCommand: vi.fn(async () => undefined),
+    runGitCommand: vi.fn(async (command: string, cwd: string) => {
+      // Answer the aggregate-registration preflight: every slot workspace of
+      // this base is a registered worktree.
+      if (command === 'git worktree list --porcelain') {
+        return { stdout: `worktree ${cwd}\n\nworktree ${cwd}-slot-1\n\nworktree ${cwd}-slot-4\n\nworktree ${cwd}-slot-9\n` };
+      }
+      return undefined;
+    }),
     clearSlotAssignment: vi.fn(),
     listSessionNames: vi.fn(async () => sessionNames),
     slotWorktreeExists: vi.fn(() => options.worktreeExists ?? true),
@@ -160,8 +167,9 @@ describe('deacon-swarm merged slot GC', () => {
 
   it('degrades a worktree-remove failure to a deferred action instead of throwing', async () => {
     const fakeDeps = deps();
-    fakeDeps.runGitCommand = vi.fn(async (command: string) => {
+    fakeDeps.runGitCommand = vi.fn(async (command: string, cwd: string) => {
       if (command.startsWith('git worktree remove')) throw new Error('worktree is dirty');
+      if (command === 'git worktree list --porcelain') return { stdout: `worktree ${cwd}\n\nworktree ${cwd}-slot-1\n` };
       return undefined;
     });
 
@@ -170,7 +178,12 @@ describe('deacon-swarm merged slot GC', () => {
     expect(actions).toEqual([
       '[swarm] gc deferred slot 1 (item wi-1) for PAN-2203: worktree remove failed: worktree is dirty',
     ]);
-    expect(fakeDeps.runGitCommand).toHaveBeenCalledTimes(1);
+    // Exactly two calls, in order: the aggregate registration preflight, then
+    // the failing remove. Nothing else mutates.
+    expect(vi.mocked(fakeDeps.runGitCommand).mock.calls).toEqual([
+      ['git worktree list --porcelain', '/repo/workspaces/feature-pan-2203'],
+      ['git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-1"', '/repo/workspaces/feature-pan-2203'],
+    ]);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -204,6 +217,9 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     dirtyByRepo?: Record<string, string>;
     rootRemoveError?: string;
     nestedRemoveErrorRepo?: string;
+    unregisteredRepo?: string;
+    aggregateRegistered?: boolean;
+    worktreeListThrows?: boolean;
   } = {}) {
     const removeDirectory = vi.fn(async () => undefined);
     const fakeDeps = {
@@ -216,6 +232,18 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
         if (command.startsWith('git status --porcelain')) {
           const repo = nested.find(wt => wt.dir === cwd);
           return { stdout: options.dirtyByRepo?.[repo?.repoKey ?? ''] ?? '' };
+        }
+        if (command === 'git worktree list --porcelain') {
+          if (options.worktreeListThrows) throw new Error('worktree list failed');
+          if (cwd === workspacePath) {
+            const lines = [`worktree ${workspacePath}`, ''];
+            if (options.aggregateRegistered !== false) lines.push(`worktree ${slotWorkspace}`, '');
+            return { stdout: lines.join('\n') };
+          }
+          const repo = nested.find(wt => wt.parentRepo === cwd);
+          const lines = [`worktree ${cwd}`, ''];
+          if (repo && repo.repoKey !== options.unregisteredRepo) lines.push(`worktree ${repo.dir}`, '');
+          return { stdout: lines.join('\n') };
         }
         if (command.startsWith('git worktree remove')) {
           if (command.includes(JSON.stringify(slotWorkspace)) && options.rootRemoveError) {
@@ -285,6 +313,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(actions[0]).toContain('3 unmerged commit(s)');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -297,6 +326,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(actions[0]).toContain('could not be determined');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -309,6 +339,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(actions[0]).toContain('uncommitted changes');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -321,6 +352,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(actions[0]).toContain('uncommitted changes');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -338,6 +370,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(actions[0]).toContain('could not be determined');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
@@ -347,9 +380,54 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
 
     expect(actions.some(action => action.includes('nested worktree remove failed in api'))).toBe(true);
+    // The failure escaped preflight after fe was already detached; the defer
+    // reason must record the partial state.
+    expect(actions.some(action => action.includes('already detached: fe'))).toBe(true);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes(JSON.stringify(slotWorkspace)))).toBe(false);
+  });
+
+  it('removes nothing when a nested worktree fails the registration preflight', async () => {
+    const fakeDeps = polyrepoDeps({ unregisteredRepo: 'api' });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('not registered');
+    expect(actions[0]).toContain('api');
+    // Zero removals: no worktree remove, no branch delete, no directory rm.
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('removes nothing when the aggregate registration cannot be determined', async () => {
+    const fakeDeps = polyrepoDeps({ worktreeListThrows: true });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('could not be determined');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('removes a preflight-unregistered aggregate root as a plain directory without a git attempt', async () => {
+    const fakeDeps = polyrepoDeps({ aggregateRegistered: false });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toEqual(['[swarm] gc slot 2 (item wi-36) for MIN-888']);
+    // The aggregate git-remove is never attempted — preflight already routed
+    // to the plain-directory removal.
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes(JSON.stringify(slotWorkspace)) && command.includes('worktree remove'))).toBe(false);
+    expect(fakeDeps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'MIN-888', 2, 'wi-36');
   });
 
   it('removes an unregistered aggregate root as a plain directory after nested detach', async () => {
