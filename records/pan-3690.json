@@ -3,20 +3,23 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-13T23:11:09.483Z",
+  "updated": "2026-08-13T23:15:59.920Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T23:10:11.446Z",
+    "updatedAt": "2026-08-13T23:15:20.127Z",
     "strikeReadyHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
     "strikeReadyAt": "2026-08-13T23:06:49.965Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-13T23:16:20.116Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-13T22:33:17.295Z",
@@ -24,6 +27,13 @@
         "mainHead": "c33ef72cd2c826993f8d3cd6d42d5af21f3ce5e6",
         "outcome": "failed",
         "detail": "Failed to create PR: Command failed: gh pr create --head strike/pan-3690 --base main --title PAN-3690 --body-file /tmp/pan-pr-body-PAN-3690-1786660396209.md\npull request create failed: GraphQL: No commits between main and strike/pan-3690 (createPullRequest)\n"
+      },
+      {
+        "timestamp": "2026-08-13T23:15:20.116Z",
+        "strikeHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
+        "mainHead": "35598b91dc96cf2dded6b0f8ee784aefe80b18b6",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -75,7 +85,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.237222,
-        "pricingAsOf": "2026-08-13T23:11:09.475Z"
+        "pricingAsOf": "2026-08-13T23:15:20.129Z"
       }
     },
     "merges": [],
