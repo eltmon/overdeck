@@ -184,6 +184,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/conversations/:name',                          kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive (idempotent alias)' },
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
   { surface: 'POST /api/conversations/:name/unarchive',                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unarchive' },
+  { surface: 'POST /api/conversations/:name/clear-fork-state',           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.clearForkState' },
   { surface: 'POST /api/conversations/restart-all',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.restart fan-out' },
   { surface: 'POST /api/conversations/:name/favorite',                   kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setFavorite' },
   { surface: 'DELETE /api/conversations/:name/favorite',                 kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unsetFavorite' },
