@@ -54,6 +54,8 @@ export interface AgentState {
   harness?: RuntimeName;
   /** Unified role primitive (PAN-1048). */
   role: Role;
+  /** Parent work agent that owns a swarm's gated orchestration loop. */
+  foreman?: boolean;
   model: string;
   /**
    * The exact spawn key fed to the weighted-distribution model picker at spawn

@@ -36,6 +36,9 @@ import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
+import { spawnRun } from '../../lib/agents/spawn.js';
+import { messageAgent } from '../../lib/agents/messaging.js';
+import { buildWorkAgentPrompt } from '../../lib/cloister/work-agent-prompt.js';
 import {
   swarmDispatchCommand,
   swarmMergeCommand,
@@ -91,6 +94,7 @@ export interface SwarmCommandDeps {
   readSwarmHold: typeof readSwarmHold;
   readSwarmInterventionCount: typeof readSwarmInterventionCount;
   writeSwarmIntervention: typeof writeSwarmIntervention;
+  ensureSwarmForeman: typeof ensureSwarmForeman;
   console: ConsoleLike;
 }
 
@@ -156,6 +160,7 @@ const defaultDeps: SwarmCommandDeps = {
   readSwarmHold,
   readSwarmInterventionCount,
   writeSwarmIntervention,
+  ensureSwarmForeman,
   console,
 };
 
@@ -198,32 +203,52 @@ export async function swarmCommand(
       + 'which would otherwise stop the Deacon from coordinating this swarm after this command.',
     ));
   }
-  // Manual dispatch runs the IDENTICAL reconcile → classify → merge → gc →
-  // dispatch pipeline the Deacon patrol runs — including the operator-hold
-  // skip, advance backoff, failed-merge block, duplicate guards, bounded
-  // allocation, and the per-spawn freeze gate. The old path called
-  // dispatchNextWave with an EMPTY reconcile result and raced the Deacon
-  // (PAN-2214). Re-running the command is idempotent: already-dispatched
-  // work is reconciled, not re-spawned.
-  const actions = await deps.coordinateSwarmSlots({ issueId: issue, manual: true });
-
-  if (actions.length === 0) {
-    deps.console.log(chalk.yellow(`No swarm slots dispatched for ${issue}.`));
-  } else {
-    for (const action of actions) deps.console.log(action);
-  }
-
-  const holdSkip = actions.find(action => action.includes('operator hold'));
-  if (holdSkip) {
-    deps.console.log(chalk.yellow(
-      `${issue} is under an operator hold, so the coordinator skipped it and dispatched nothing. `
-      + `Run \`pan swarm resume ${issue}\` to lift the hold and re-enable swarm coordination.`,
-    ));
-  } else {
-    deps.console.log(chalk.dim('Ongoing swarm coordination will continue in Deacon.'));
-  }
+  const actions = await deps.ensureSwarmForeman(issue, workspacePath, { startedBy: 'cli:swarm' });
+  for (const action of actions) deps.console.log(action);
+  deps.console.log(chalk.dim('The foreman owns dispatch; this command does not dispatch slot work.'));
 
   return { ok: true, actions, workspacePath };
+}
+
+export interface EnsureSwarmForemanDeps {
+  listSessionNamesSync: () => string[];
+  messageAgent: typeof messageAgent;
+  buildWorkAgentPrompt: typeof buildWorkAgentPrompt;
+  spawnRun: typeof spawnRun;
+}
+
+const defaultForemanDeps: EnsureSwarmForemanDeps = {
+  listSessionNamesSync,
+  messageAgent,
+  buildWorkAgentPrompt,
+  spawnRun,
+};
+
+export async function ensureSwarmForeman(
+  issueId: string,
+  workspacePath: string,
+  options: { startedBy: string },
+  deps: EnsureSwarmForemanDeps = defaultForemanDeps,
+): Promise<string[]> {
+  const issue = issueId.toUpperCase();
+  const agentId = `agent-${issue.toLowerCase()}`;
+  if (deps.listSessionNamesSync().includes(agentId)) {
+    await deps.messageAgent(agentId, `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, 'pan-swarm');
+    return [`[swarm] attached to live foreman ${agentId} for ${issue}`];
+  }
+  const prompt = await deps.buildWorkAgentPrompt({
+    issueId: issue,
+    env: 'LOCAL',
+    workspacePath,
+    projectRoot: join(workspacePath, '..', '..'),
+  });
+  const state = await deps.spawnRun(issue, 'work', {
+    workspace: workspacePath,
+    prompt,
+    foreman: true,
+    startedBy: options.startedBy,
+  });
+  return [`[swarm] spawned foreman ${state.id} for ${issue}`];
 }
 
 export async function swarmRecoverCommand(

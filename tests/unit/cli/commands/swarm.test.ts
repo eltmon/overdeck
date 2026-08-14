@@ -73,6 +73,7 @@ function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
       '[swarm] considered PAN-2203: swarm eligible',
       '[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203',
     ]),
+    ensureSwarmForeman: vi.fn(async issueId => [`[swarm] spawned foreman agent-${issueId.toLowerCase()} for ${issueId}`]),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
     getFailedMergeBlocks: vi.fn(() => []),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
@@ -111,7 +112,7 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(false);
     expect(deps.ensureWorkspace).not.toHaveBeenCalled();
-    expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
+    expect(deps.ensureSwarmForeman).not.toHaveBeenCalled();
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('PAN-2203 is not swarm eligible'));
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('missing files_scope'));
   });
@@ -132,7 +133,7 @@ describe('pan swarm command', () => {
     const result = await swarmCommand('PAN-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
+    expect(deps.ensureSwarmForeman).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203', { startedBy: 'cli:swarm' });
     expect(deps.console.error).not.toHaveBeenCalledWith(expect.stringContaining('not swarm eligible'));
   });
 
@@ -156,8 +157,8 @@ describe('pan swarm command', () => {
     // The opt-in must be durable BEFORE dispatch so a crash mid-coordination
     // cannot leave an orphaned swarm that patrols skip.
     const writeOrder = vi.mocked(deps.writeSwarmPolicyMode).mock.invocationCallOrder[0];
-    const coordinateOrder = vi.mocked(deps.coordinateSwarmSlots).mock.invocationCallOrder[0];
-    expect(writeOrder).toBeLessThan(coordinateOrder);
+    const foremanOrder = vi.mocked(deps.ensureSwarmForeman).mock.invocationCallOrder[0];
+    expect(writeOrder).toBeLessThan(foremanOrder);
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('swarm.policy.mode=always'));
   });
 
@@ -174,7 +175,7 @@ describe('pan swarm command', () => {
     expect(deps.writeSwarmPolicyMode).not.toHaveBeenCalled();
   });
 
-  it('ensures the workspace and dispatches through coordinateSwarmSlots with real reconcile (PAN-2214)', async () => {
+  it('ensures the workspace and starts the foreman without dispatching slots', async () => {
     const doc = makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
       makeEligibleItem('wi-2', 'src/b.ts'),
@@ -185,8 +186,9 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.ensureWorkspace).toHaveBeenCalledWith('PAN-2203', { projectName: 'overdeck', projectPath: '/repo' });
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('dispatched implementation slot 1'));
+    expect(deps.ensureSwarmForeman).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203', { startedBy: 'cli:swarm' });
+    expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('spawned foreman'));
   });
 
   it('prints the operator-hold skip and names pan swarm resume when the issue is held', async () => {
@@ -196,15 +198,14 @@ describe('pan swarm command', () => {
     ]);
     const deps = {
       ...makeDeps(doc),
-      coordinateSwarmSlots: vi.fn(async () => ['[swarm] skipped PAN-2203: deacon-ignored — operator hold']),
+      readSwarmHold: vi.fn(() => ({ reason: 'operator hold', setBy: 'test', at: '2026-08-13T00:00:00Z' })),
     };
 
     const result = await swarmCommand('PAN-2203', deps);
 
-    expect(result.ok).toBe(true);
-    expect(deps.console.log).toHaveBeenCalledWith('[swarm] skipped PAN-2203: deacon-ignored — operator hold');
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
-    expect(deps.console.log).not.toHaveBeenCalledWith(expect.stringContaining('continue in Deacon'));
+    expect(result.ok).toBe(false);
+    expect(deps.ensureSwarmForeman).not.toHaveBeenCalled();
+    expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
   });
 
   it('re-running pan swarm is idempotent: already-dispatched work is reconciled, not re-spawned', async () => {
@@ -270,13 +271,14 @@ describe('pan swarm command', () => {
         ...makeDeps(doc),
         ensureWorkspace: vi.fn(async () => workspacePath),
         coordinateSwarmSlots: vi.fn((opts) => coordinateSwarmSlots(opts, inner)),
+        ensureSwarmForeman: vi.fn(async () => []),
       };
 
       const result = await swarmCommand('PAN-2203', deps);
 
       expect(result.ok).toBe(true);
       expect(spawnRun).not.toHaveBeenCalled();
-      expect(result.actions).toContain('[swarm] considered PAN-2203: swarm eligible');
+      expect(deps.ensureSwarmForeman).toHaveBeenCalledTimes(1);
       expect(result.actions.some(action => action.includes('dispatched'))).toBe(false);
     } finally {
       rmSync(projectPath, { recursive: true, force: true });

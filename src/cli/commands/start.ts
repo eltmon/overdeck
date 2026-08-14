@@ -23,6 +23,7 @@ import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-uti
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
@@ -1201,6 +1202,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
         autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
         effort: resolvedEffort,
+        foreman: readIssueRecordForWorkspaceSync(workspace, id)?.swarm?.policy?.mode === 'always' || undefined,
       })),
     );
     if (!admitted.check.decision.eligible || !admitted.result) {
