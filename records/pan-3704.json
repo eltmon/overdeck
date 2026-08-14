@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:31:51.568Z",
+  "updated": "2026-08-14T06:33:01.516Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "palette-toggle-docs": {
-        "writerId": "agent-pan-3704",
-        "agentId": "agent-pan-3704",
-        "pid": 1414499,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T06:31:51.568Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3704",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Added six PAN-3704 cases covering default recency order, toggle persistence, stored false, deterministic fallback, aria-pressed state, and unaffected action ordering; all 25 CommandPalette tests pass.",
         "releasedAt": "2026-08-14T06:31:35.999Z"
+      },
+      {
+        "writerId": "agent-pan-3704",
+        "agentId": "agent-pan-3704",
+        "pid": 1414499,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T06:31:51.568Z",
+        "itemId": "palette-toggle-docs",
+        "outcome": "completed",
+        "reason": "Documented the default-on, per-browser Newest first preference and its localStorage key in desktop docs and the CommandPalette module header.",
+        "releasedAt": "2026-08-14T06:33:01.515Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "toggle-tests": {
         "reason": "Added six PAN-3704 cases covering default recency order, toggle persistence, stored false, deterministic fallback, aria-pressed state, and unaffected action ordering; all 25 CommandPalette tests pass.",
         "updatedAt": "2026-08-14T06:31:35.999Z"
+      },
+      "palette-toggle-docs": {
+        "reason": "Documented the default-on, per-browser Newest first preference and its localStorage key in desktop docs and the CommandPalette module header.",
+        "updatedAt": "2026-08-14T06:33:01.515Z"
       }
     }
   },
@@ -163,6 +170,8 @@
     "toggle-tests.ac2": "completed",
     "toggle-tests.ac3": "completed",
     "toggle-tests.ac4": "completed",
-    "palette-toggle-docs": "running"
+    "palette-toggle-docs": "completed",
+    "palette-toggle-docs.ac1": "completed",
+    "palette-toggle-docs.ac2": "completed"
   }
 }
