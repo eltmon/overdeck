@@ -1,0 +1,147 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T06:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3703: Ctrl-K search: show conversations newest first",
+    "updated": "2026-08-14T06:21:36.904Z"
+  },
+  "plan": {
+    "id": "pan-3703",
+    "title": "Ctrl-K search: show conversations newest first",
+    "status": "proposed",
+    "uid": "2797e4d6-d9c7-4d74-b9a6-bd98e2472fbf",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-14T06:20:00.000Z",
+    "updated": "2026-08-14T06:21:36.904Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3703",
+        "label": "PAN-3703",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-palette",
+      "search",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "Ctrl-K search renders conversation results in relevance (rank) order: the render path in CommandPalette.tsx sorts every palette group by ascending rank, and each hit's canonical transcript timestamp (ts) is used only as a display chip. The most recently active conversation — the one the operator is most likely to resume — is not prioritized.",
+      "Proposal": "Frontend-only change in src/dashboard/frontend/src/components/CommandPalette.tsx: add an optional ts field to PaletteAction, populate it from hit.ts when building conversation actions, and make the render sort group-aware — the Conversations group sorts newest-first by ts (missing/unparseable ts last; ties by ascending rank, then action id), while every other group keeps rank-ascending order. Relevance ranking (RRF) and the server response are untouched; recency only reorders the returned set. Tests extend CommandPalette.test.tsx's existing fetch-mock harness with fixtures for multiple timestamps, equal timestamps, a missing timestamp, and a non-conversation group.",
+      "NonGoals": "- Changing RRF relevance ranking, candidate limits, or the result limit\n- Per-conversation (session-level) recency joins against the embeddings DB or transcripts resolver\n- Reordering any palette group other than Conversations\n- Server-side (/api/palette/search) response-order changes\n- Debounce, scope-chip, or keyboard-navigation behavior changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sort key is the hit-level chunk ts, not a per-conversation MAX(ts) join",
+        "rationale": "Each palette row represents a matched chunk and already displays that chunk's ts as its date chip; sorting by the displayed value keeps the UI self-consistent. A session-level recency join would sort by a hidden value (old chunk of an active conversation jumps to top showing an old date) and add a DB query per search."
+      },
+      {
+        "summary": "The sort lives in the frontend render path, not the server",
+        "rationale": "Presentation ordering is already frontend-owned (group ordering and the rank sort both live in CommandPalette.tsx); the server already returns the canonical ts, so ordering by it on the client satisfies the issue's 'canonical timestamp rather than display or arrival order' criterion while keeping the API response purely relevance-ordered."
+      },
+      {
+        "summary": "Missing/unparseable ts sorts last; equal ts falls back to rank then action id",
+        "rationale": "A hit with no recency information is the least-likely resume target; rank is unique within one response and the action id (conv-<sessionId>-<byteOffset>) is unique per row, so the fallback chain is fully deterministic as the issue requires."
+      },
+      {
+        "summary": "Relevance still selects the result set; recency only reorders it",
+        "rationale": "The issue asks for ordering, not ranking changes; keeping RRF and the limit of 15 untouched matches the criterion that search filtering does not change the newest-first ordering."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "No documented surface describes palette search result ordering: configuration/workspaces.mdx covers only the Workspaces section (ordering unchanged) and docs/INDEX.md's command-palette entries route to DESKTOP-APP.md, which does not cover result ordering. No doc file is added or edited.",
+      "canonicalFilename": "2026-08-14-PAN-3703-ctrl-k-search-show-conversations-newest-first.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "conversations-newest-first",
+        "title": "Sort the Ctrl-K Conversations group newest-first by hit ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T06:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3703",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CommandPalette.test.tsx passes including the four new PAN-3703 ordering tests (multiple timestamps, equal timestamps, missing timestamp, memory group unchanged)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx: (1) add `ts?: string | null` to the PaletteAction interface next to `rank?: number` (line ~64); (2) in the memoryActions useMemo, add `ts: hit.ts,` to the conversation action object next to `rank: hit.rank,` (line ~785); (3) add module-level comparators `compareByRank` (rank ascending) and `compareConversationHits` (ts descending; unparseable/missing ts sorts last via Number.isNaN guard; ties fall back to compareByRank then a.id.localeCompare(b.id)) near formatHitDate (~line 189); (4) change the render sort at line ~972 from `.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))` to `.sort(group === 'Conversations' ? compareConversationHits : compareByRank)`. Then extend src/dashboard/frontend/src/components/CommandPalette.test.tsx with a new describe block using the existing installStrictFetchMock / fake-timers harness (advance 120ms for the debounce, look rows up via getOptionByValue with values conv-<sessionId>-<byteOffset>, assert pairwise DOM order with compareDocumentPosition & Node.DOCUMENT_POSITION_FOLLOWING): T1 three hits whose rank order disagrees with ts order render newest-first; T2 two hits with equal ts render in ascending rank order; T3 a ts:null hit renders after timestamped hits; T4 two memory hits in the same response keep rank-ascending order. Exact fixtures and before/after snippets are in the PRD at .pan/drafts/PAN-3703.md (WI-1)."
+        },
+        "items": [
+          {
+            "id": "conversations-newest-first.ac1",
+            "title": "Given three conversation hits whose rank order disagrees with timestamp order, when the palette renders the Conversations group, then rows appear newest-first by ts (T1 passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-newest-first.ac2",
+            "title": "Given two conversation hits with equal ts, when rendered, then the row with the lower rank appears first (T2 passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-newest-first.ac3",
+            "title": "Given a conversation hit with ts null and one with a real ts, when rendered, then the timestamped row appears first and the null-ts row falls back to deterministic placement after it (T3 passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-newest-first.ac4",
+            "title": "Given memory hits in the same search response, when the Conversations group sorts newest-first, then the memory group preserves rank-ascending order (T4 passes) — actions, workspaces, and issues ordering is likewise untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-newest-first.ac5",
+            "title": "Given the comparator applies to the post-filter list at render, when the operator narrows to the Conversations scope chip or changes the query, then the newest-first ordering persists across filtering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
