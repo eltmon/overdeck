@@ -4,6 +4,7 @@ import {
   getAgentResumeGateBlockReason,
   markAgentRunning,
   clearAgentOperatorGatesForIssueSync,
+  clearAgentOperatorGatesForIssuesSync,
   saveAgentStateSync,
   getAgentStateSync,
   type AgentState,
@@ -226,5 +227,49 @@ describe('clearAgentOperatorGatesForIssueSync', () => {
     const loaded = getAgentStateSync('agent-pan-3727-yielded');
     expect(loaded?.paused).toBe(true);
     expect(loaded?.yieldedByScheduler).toBe(true);
+  });
+});
+
+describe('clearAgentOperatorGatesForIssuesSync (batch, PAN-3727 review finding)', () => {
+  let odb: OverdeckTestDb;
+  beforeEach(() => { odb = setupOverdeckTestDb(); });
+  afterEach(() => { teardownOverdeckTestDb(odb); });
+
+  function stoppedState(overrides: Partial<AgentState> = {}): AgentState {
+    return {
+      id: 'agent-pan-3727-work',
+      issueId: 'PAN-3727',
+      workspace: '/tmp/workspace',
+      role: 'work',
+      model: 'claude-opus-4-8',
+      status: 'stopped',
+      startedAt: '2026-08-01T00:00:00.000Z',
+      ...overrides,
+    } as AgentState;
+  }
+
+  it('clears matching stopped rows across multiple issues in one pass and groups results by issue', () => {
+    saveAgentStateSync(stoppedState({ id: 'agent-pan-1-work', issueId: 'PAN-1', stoppedByUser: true }));
+    saveAgentStateSync(stoppedState({ id: 'agent-pan-2-work', issueId: 'PAN-2', troubled: true, troubledAt: '2026-08-01T00:00:00.000Z' }));
+    saveAgentStateSync(stoppedState({ id: 'agent-pan-3-work', issueId: 'PAN-3', stoppedByUser: true }));
+
+    const mutated = clearAgentOperatorGatesForIssuesSync(new Set(['PAN-1', 'PAN-2']));
+
+    expect([...mutated.keys()].sort()).toEqual(['PAN-1', 'PAN-2']);
+    expect(mutated.get('PAN-1')).toEqual(['agent-pan-1-work']);
+    expect(mutated.get('PAN-2')).toEqual(['agent-pan-2-work']);
+    expect(getAgentStateSync('agent-pan-1-work')?.stoppedByUser).toBeUndefined();
+    expect(getAgentStateSync('agent-pan-2-work')?.troubled).toBeUndefined();
+    // PAN-3 was not in the requested set — left untouched.
+    expect(getAgentStateSync('agent-pan-3-work')?.stoppedByUser).toBe(true);
+  });
+
+  it('returns an empty map without scanning when given an empty issue set', () => {
+    saveAgentStateSync(stoppedState({ id: 'agent-pan-1-work', issueId: 'PAN-1', stoppedByUser: true }));
+
+    const mutated = clearAgentOperatorGatesForIssuesSync(new Set());
+
+    expect(mutated.size).toBe(0);
+    expect(getAgentStateSync('agent-pan-1-work')?.stoppedByUser).toBe(true);
   });
 });

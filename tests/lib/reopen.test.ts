@@ -382,6 +382,55 @@ describe('reopenWorkspaceState', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     });
 
+    it('drops a stale mergeStatus="merged" on a merged-only record with no closedOut marker (review finding, PAN-3727)', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      const recordDir = join(projectRoot, '.pan', 'records');
+      mkdirSync(recordDir, { recursive: true });
+      const now = '2026-08-06T00:00:00Z';
+      const recordPath = join(recordDir, 'pan-904.json');
+      writeFileSync(
+        recordPath,
+        JSON.stringify({
+          issueId: 'PAN-904',
+          schemaVersion: 2,
+          created: now,
+          updated: now,
+          decisions: [],
+          hazards: [],
+          resumePoint: null,
+          tasksMapping: {},
+          statusOverrides: {},
+          sessionHistory: [],
+          feedback: [],
+          pipeline: {
+            issueId: 'PAN-904',
+            reviewStatus: 'passed',
+            testStatus: 'passed',
+            readyForMerge: false,
+            updatedAt: now,
+            mergeStatus: 'merged',
+          },
+          closeOut: null,
+        }),
+        'utf-8',
+      );
+      projectStub = { projectPath: projectRoot, projectKey: 'fixture-project' };
+
+      seedStatus({
+        'PAN-904': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
+      });
+      const wsDir = createWorkspace();
+
+      await Effect.runPromise(reopenWorkspaceState('PAN-904', wsDir));
+
+      const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
+      expect(updated.pipeline.mergeStatus).toBeUndefined();
+      expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
+
+      rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
     it('appends session breadcrumb to record on review-failed reopen', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
       seedRecord(projectRoot, 'PAN-902');

@@ -667,19 +667,27 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
   });
 
 /**
- * Clear operator-gate residue (stoppedByUser, paused, troubled) on an issue's
- * STOPPED agent rows — used by close-out and the terminal-issue residue
- * patrol so a terminal issue's preserved agent rows stop reappearing in the
- * operator-gate parked orbit (PAN-3727). Running/starting agents and
- * scheduler yields are never touched: a yield is a live scheduling decision,
- * not operator residue, and a live agent's gates are not this issue's to clear.
+ * Clear operator-gate residue (stoppedByUser, paused, troubled) on STOPPED
+ * agent rows whose issueId is in `issueIds` — used by close-out and the
+ * terminal-issue residue patrol so a terminal issue's preserved agent rows
+ * stop reappearing in the operator-gate parked orbit (PAN-3727). Running/
+ * starting agents and scheduler yields are never touched: a yield is a live
+ * scheduling decision, not operator residue, and a live agent's gates are not
+ * this issue's to clear.
+ *
+ * Batched (one `listOverdeckAgentStatesSync()` scan for every issueId in the
+ * set) so the recurring residue patrol does not perform one full agent-table
+ * scan per terminal issue (review finding, PAN-3727) — cost scales with the
+ * agent table once per patrol run, not with the number of terminal issues.
  */
-export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
-  const normalized = issueId.toUpperCase();
-  const mutated: string[] = [];
+export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<string>): Map<string, string[]> {
+  const mutated = new Map<string, string[]>();
+  if (issueIds.size === 0) return mutated;
+
   for (const state of listOverdeckAgentStatesSync()) {
     if (state.status !== 'stopped') continue;
-    if (state.issueId?.toUpperCase() !== normalized) continue;
+    const normalized = state.issueId?.toUpperCase();
+    if (!normalized || !issueIds.has(normalized)) continue;
 
     let changed = false;
     if (state.stoppedByUser) {
@@ -696,10 +704,18 @@ export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
     }
     if (changed) {
       saveAgentStateSync(state);
-      mutated.push(state.id);
+      const ids = mutated.get(normalized) ?? [];
+      ids.push(state.id);
+      mutated.set(normalized, ids);
     }
   }
   return mutated;
+}
+
+/** Single-issue convenience wrapper over {@link clearAgentOperatorGatesForIssuesSync}. */
+export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
+  const normalized = issueId.toUpperCase();
+  return clearAgentOperatorGatesForIssuesSync(new Set([normalized])).get(normalized) ?? [];
 }
 
 function applyAgentFailure(state: AgentState, reason: string): void {

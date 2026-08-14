@@ -130,7 +130,10 @@ export function clearRecordPipelineClosedOutSync(
   reopenedAt = new Date().toISOString(),
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
-  if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
+  // PAN-3727 review: a merged-only record (mergeStatus='merged', no closedOut
+  // marker) is ALSO record-terminal per isRecordPipelineTerminal — the guard
+  // must not skip it, or reopening never reaches the mergeStatus clear below.
+  if (!record.pipeline.closedOut && !record.pipeline.closedOutAt && record.pipeline.mergeStatus !== 'merged') return;
   record.pipeline.closedOut = undefined;
   record.pipeline.closedOutAt = undefined;
   record.pipeline.reopenedAt = reopenedAt;
@@ -152,7 +155,7 @@ export async function clearRecordPipelineClosedOut(
   let changed = false;
   const reopenedAt = options.reopenedAt ?? new Date().toISOString();
   await updateIssueRecord(project, issueId, (record) => {
-    if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
+    if (!record.pipeline.closedOut && !record.pipeline.closedOutAt && record.pipeline.mergeStatus !== 'merged') return;
     record.pipeline.closedOut = undefined;
     record.pipeline.closedOutAt = undefined;
     record.pipeline.reopenedAt = reopenedAt;

@@ -252,6 +252,28 @@ describe('clearRecordPipelineClosedOut drops stale mergeStatus (PAN-3727)', () =
     git(root, 'push', '-q', 'origin', 'main');
   }
 
+  function seedMergedOnlyRecord(): void {
+    const record = {
+      issueId: ISSUE,
+      schemaVersion: 2,
+      statusOverrides: {},
+      pipeline: {
+        issueId: ISSUE,
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+        updatedAt: new Date().toISOString(),
+        mergeStatus: 'merged',
+      },
+      closeOut: null,
+    } as unknown as PanIssueRecord;
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'records', 'reopen-1.json'), JSON.stringify(record));
+    git(root, 'add', '.pan/records');
+    git(root, 'commit', '-q', '-m', 'seed merged-only record');
+    git(root, 'push', '-q', 'origin', 'main');
+  }
+
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'pan-record-reopen-'));
     remote = mkdtempSync(join(tmpdir(), 'pan-record-reopen-origin-'));
@@ -297,5 +319,26 @@ describe('clearRecordPipelineClosedOut drops stale mergeStatus (PAN-3727)', () =
     const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
     expect(persisted.pipeline.closedOut).toBeUndefined();
     expect(persisted.pipeline.mergeStatus).toBeUndefined();
+  });
+
+  it('clearRecordPipelineClosedOutSync also clears a merged-only record with no close-out marker (review finding)', () => {
+    seedMergedOnlyRecord();
+
+    clearRecordPipelineClosedOutSync(project, ISSUE, '2026-08-14T00:00:00.000Z');
+
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+    expect(persisted.pipeline.reopenedAt).toBe('2026-08-14T00:00:00.000Z');
+  });
+
+  it('clearRecordPipelineClosedOut (async) also clears a merged-only record with no close-out marker (review finding)', async () => {
+    seedMergedOnlyRecord();
+
+    const changed = await clearRecordPipelineClosedOut(project, ISSUE, { reopenedAt: '2026-08-14T00:00:00.000Z' });
+
+    expect(changed).toBe(true);
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+    expect(persisted.pipeline.reopenedAt).toBe('2026-08-14T00:00:00.000Z');
   });
 });

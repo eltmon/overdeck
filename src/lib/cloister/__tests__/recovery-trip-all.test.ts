@@ -20,6 +20,13 @@ vi.mock('../../projects.js', async (importOriginal) => {
   };
 });
 
+const recordUpdateSpy = vi.hoisted(() => ({ updateIssueRecordForWorkspace: vi.fn() }));
+vi.mock('../../pan-dir/record-update.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../pan-dir/record-update.js')>();
+  recordUpdateSpy.updateIssueRecordForWorkspace.mockImplementation(actual.updateIssueRecordForWorkspace);
+  return { ...actual, updateIssueRecordForWorkspace: recordUpdateSpy.updateIssueRecordForWorkspace };
+});
+
 import { acknowledgeAllOpenRecoveryTrips, recordRecoveryFailure } from '../recovery-trip.js';
 import { readIssueRecord } from '../../pan-dir/record.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../../tests/helpers/git-record-fixture.js';
@@ -59,5 +66,21 @@ describe('acknowledgeAllOpenRecoveryTrips', () => {
   it('returns 0 and writes nothing for an issue that resolves to no project', async () => {
     const acked = await acknowledgeAllOpenRecoveryTrips('MIN-9999');
     expect(acked).toBe(0);
+  });
+
+  it('review finding (performance): acks 3 open trips in exactly ONE updateIssueRecordForWorkspace mutation, not one per trip', async () => {
+    workspace = mkdtempSync(join(tmpdir(), 'pan-3727-ack-batch-'));
+    remote = initGitRecordRoot(workspace);
+    projects.registry.set('PAN-9002', { projectKey: 'fixture-project', projectPath: workspace });
+
+    await recordRecoveryFailure(workspace, 'PAN-9002', 'trip-a', 'wi-1', 1);
+    await recordRecoveryFailure(workspace, 'PAN-9002', 'trip-b', 'wi-2', 1);
+    await recordRecoveryFailure(workspace, 'PAN-9002', 'trip-c', 'wi-3', 1);
+    recordUpdateSpy.updateIssueRecordForWorkspace.mockClear();
+
+    const acked = await acknowledgeAllOpenRecoveryTrips('PAN-9002');
+
+    expect(acked).toBe(3);
+    expect(recordUpdateSpy.updateIssueRecordForWorkspace).toHaveBeenCalledTimes(1);
   });
 });

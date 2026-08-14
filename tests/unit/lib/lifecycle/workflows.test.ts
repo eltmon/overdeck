@@ -1363,18 +1363,44 @@ describe('workflows', () => {
       expect(step?.details?.[0]).toContain('cleared operator gates on 1 agent row(s)');
     });
 
-    it('records the residue-ack step as skipped (non-blocking) when the ack door throws (PAN-3727)', async () => {
+    it('records the residue-ack step as skipped (non-blocking) when the ack door throws, but still clears operator gates (PAN-3727 review finding)', async () => {
       mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async () => {
         throw new Error('record lock unavailable');
+      });
+      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce((issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        return ['agent-pan-100-work'];
       });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.success).toBe(true);
+      expect(mockClearAgentOperatorGatesForIssueSync).toHaveBeenCalledWith('PAN-100');
       const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
       expect(step).toMatchObject({ success: true, skipped: true });
-      expect(step?.details?.[0]).toContain('record lock unavailable');
+      expect(step?.details?.join(' ')).toContain('record lock unavailable');
+      expect(step?.details?.join(' ')).toContain('cleared operator gates on 1 agent row(s)');
+    });
+
+    it('records the residue-ack step as skipped (non-blocking) when the gate door throws, but still acknowledges trips (PAN-3727 review finding)', async () => {
+      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async (issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        return 2;
+      });
+      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce(() => {
+        throw new Error('agents db unavailable');
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(true);
+      expect(mockAcknowledgeAllOpenRecoveryTrips).toHaveBeenCalledWith('PAN-100');
+      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
+      expect(step).toMatchObject({ success: true, skipped: true });
+      expect(step?.details?.join(' ')).toContain('agents db unavailable');
+      expect(step?.details?.join(' ')).toContain('Acked 2 open trip(s)');
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {

@@ -424,18 +424,34 @@ export function closeOut(
       // PAN-3727: acknowledge open recovery trips and clear operator-gate
       // residue (stoppedByUser/paused/troubled) so a terminal issue's
       // preserved agent rows and record stop reappearing in the parked
-      // population. Non-blocking — a bookkeeping ack failure must never
-      // strand an already-merged issue's close-out.
+      // population. The two doors are independent residue — run and catch
+      // each separately (review finding) so a trip-ack failure can never
+      // suppress gate clearing, or vice versa. Non-blocking overall — a
+      // bookkeeping failure must never strand an already-merged close-out.
       allSteps.push(yield* Effect.promise(async () => {
+        let trips = 0;
+        let tripsError: string | undefined;
         try {
-          const trips = await acknowledgeAllOpenRecoveryTrips(ctx.issueId);
-          const gates = clearAgentOperatorGatesForIssueSync(ctx.issueId);
-          return stepOk('close-out:ack-parked-residue', [
-            `Acked ${trips} open trip(s); cleared operator gates on ${gates.length} agent row(s)`,
-          ]);
+          trips = await acknowledgeAllOpenRecoveryTrips(ctx.issueId);
         } catch (err) {
-          return stepSkipped('close-out:ack-parked-residue', [(err as Error).message ?? String(err)]);
+          tripsError = (err as Error).message ?? String(err);
         }
+        let gates: string[] = [];
+        let gatesError: string | undefined;
+        try {
+          gates = clearAgentOperatorGatesForIssueSync(ctx.issueId);
+        } catch (err) {
+          gatesError = (err as Error).message ?? String(err);
+        }
+        const summary = `Acked ${trips} open trip(s); cleared operator gates on ${gates.length} agent row(s)`;
+        if (!tripsError && !gatesError) {
+          return stepOk('close-out:ack-parked-residue', [summary]);
+        }
+        return stepSkipped('close-out:ack-parked-residue', [
+          summary,
+          ...(tripsError ? [`trip acknowledgement failed: ${tripsError}`] : []),
+          ...(gatesError ? [`gate clearing failed: ${gatesError}`] : []),
+        ]);
       }));
     }
 
