@@ -151,7 +151,6 @@ export interface CoordinateSwarmSlotsDeps {
    * activates mid-patrol (PAN-2214 slot-20 regression).
    */
   shouldDispatch?: (issueId: string) => boolean;
-  /** Dedicated swarm hold, checked again after claim and before every spawn. */
   readSwarmHold?: typeof readSwarmHold;
   /**
    * Inclusive upper bound for slot index allocation — the swarm reserve.
@@ -397,11 +396,9 @@ export async function coordinateSwarmSlots(
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-
   return actions;
 }
 
-/** Deacon backstop: enumerate active swarms and garbage-collect merged/orphaned slots only. */
 export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultDeps): Promise<string[]> {
   const actions: string[] = [];
   const sessions = await deps.listSessionNames();
@@ -423,7 +420,6 @@ export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultD
   }
   return actions;
 }
-
 export { resetForemanRespawnFailuresForTests };
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
@@ -448,8 +444,6 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
-    // A durable completion marker beats the rebuildable runtime plane. Ignore
-    // stale markers left for a slot that is now bound to a different item.
     if (options.workspacePath && options.issueId) {
       const completion = await (deps.readSlotCompletion ?? defaultReadSlotCompletion)(
         options.workspacePath,
