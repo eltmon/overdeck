@@ -40,6 +40,32 @@ function assertSafeAgentId(agentId: string): void {
 const CHECKPOINT_AUTHOR_NAME = 'Overdeck'
 const CHECKPOINT_AUTHOR_EMAIL = 'overdeck@users.noreply.github.com'
 
+// ─── Non-git capture targets (PAN-3725) ──────────────────────────────────────
+//
+// Some agent workspaces are not git repositories at all — polyrepo wrapper
+// directories that only contain sibling repos, or worktrees whose parent gitdir
+// metadata was pruned. Every capture there fails with "fatal: not a git
+// repository", and the activity-driven capture path retries on every event,
+// which filled the dashboard log with thousands of identical CheckpointErrors.
+// The first such failure permanently disables the target for this process; the
+// set is in-memory only, so a workspace that later becomes a real repo is
+// retried after the next dashboard restart.
+const disabledCheckpointTargets = new Set<string>()
+const NON_GIT_REPO_RE = /not a git repository/i
+
+/** True when checkpoint capture for this workspace has been disabled. */
+export function isCheckpointTargetDisabled(cwd: string): boolean {
+  return disabledCheckpointTargets.has(cwd)
+}
+
+/** Disable a workspace (once, with one warning) when capture failed for lack of a git repo. */
+function noteCheckpointCaptureFailure(cwd: string, cause: unknown): void {
+  if (!NON_GIT_REPO_RE.test(String(cause))) return
+  if (disabledCheckpointTargets.has(cwd)) return
+  disabledCheckpointTargets.add(cwd)
+  console.warn(`[checkpoint] Disabled checkpoint capture for ${cwd} — not a git repository`)
+}
+
 export function checkpointStateExclusions(): string[] {
   return [
     '.overdeck',
@@ -498,10 +524,14 @@ export function captureCheckpoint(
 ): Effect.Effect<void, CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
+    // Never spawn git again for a workspace already known not to be a git repo.
+    if (isCheckpointTargetDisabled(cwd)) return
     yield* Effect.tryPromise({
       try: () => captureCheckpointPromise(cwd, agentId, turnId),
-      catch: (cause) =>
-        new CheckpointError({ agentId, operation: 'capture', message: String(cause), cause }),
+      catch: (cause) => {
+        noteCheckpointCaptureFailure(cwd, cause)
+        return new CheckpointError({ agentId, operation: 'capture', message: String(cause), cause })
+      },
     })
   })
 }
