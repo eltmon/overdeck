@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:50:40.019Z",
+  "updated": "2026-08-14T06:50:56.363Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -173,5 +173,23 @@
     "palette-toggle-docs": "completed",
     "palette-toggle-docs.ac1": "completed",
     "palette-toggle-docs.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DESKTOP-APP.md",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/DESKTOP-APP.md",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx"
+    ],
+    "recordedAt": "2026-08-14T06:50:56.362Z"
   }
 }
