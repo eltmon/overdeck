@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   fsMkdir: vi.fn(),
   supervisorDeploymentFailure: vi.fn(),
   dashboardServerBootFailure: vi.fn(),
+  waitForRestartApproval: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -89,6 +90,13 @@ vi.mock('../../../lib/platform-lifecycle.js', () => ({
 
 vi.mock('../../../lib/restart-status.js', () => ({
   writeRestartStatus: mocks.writeRestartStatus,
+}));
+
+// The restart-approval gate (PAN-3729) polls the dashboard over HTTP. Mock it so
+// these tests never reach the network and never wait on a real poll interval.
+vi.mock('../../../lib/restart-gate-client.js', () => ({
+  restartGateRequesterId: (kind: string) => `${kind}:1234`,
+  waitForRestartApproval: mocks.waitForRestartApproval,
 }));
 
 vi.mock('../restart.js', () => ({
@@ -216,6 +224,7 @@ describe('reloadCommand', () => {
     mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
     mocks.dashboardServerBootFailure.mockReturnValue(null);
+    mocks.waitForRestartApproval.mockResolvedValue({ proceed: true, reason: 'ungated', detail: 'no gate in tests' });
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -774,5 +783,46 @@ describe('reloadCommand', () => {
       expect.any(Function),
       expect.objectContaining({ expectedIdentity: { repoRoot: '/repo', mode: 'primary' } }),
     );
+  });
+
+  describe('restart-approval gate (PAN-3729)', () => {
+    it('builds first, then waits for approval before restarting', async () => {
+      mocks.statSync
+        .mockReturnValueOnce({ mtimeMs: 1000 })
+        .mockReturnValueOnce({ mtimeMs: 2000 });
+      mockSpawnExits();
+
+      await reloadCommand({});
+
+      expect(mocks.waitForRestartApproval).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'reload',
+        requesterId: 'reload:1234',
+      }));
+      // The build is ungated; only the restart waits.
+      expect(mocks.spawn.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.waitForRestartApproval.mock.invocationCallOrder[0]);
+      expect(mocks.waitForRestartApproval.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+    });
+
+    it('keeps the freshly built deployment but restarts nothing when another approved restart already ran', async () => {
+      mocks.statSync
+        .mockReturnValueOnce({ mtimeMs: 1000 })
+        .mockReturnValueOnce({ mtimeMs: 2000 });
+      mockSpawnExits();
+      mocks.waitForRestartApproval.mockResolvedValue({
+        proceed: false,
+        reason: 'satisfied',
+        detail: 'another approved requester already restarted the dashboard',
+      });
+
+      await reloadCommand({});
+
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledWith(expect.objectContaining({ repoRoot: '/repo' }));
+      expect(process.exitCode).toBeUndefined();
+      const messages = vi.mocked(console.log).mock.calls.map(([message]) => String(message));
+      expect(messages.some(message => message.includes('restarted nothing'))).toBe(true);
+    });
   });
 });
