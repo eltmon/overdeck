@@ -52,3 +52,4 @@ src/lib/overdeck/conversation-forks.ts
 src/lib/overdeck/issue-transitions.ts > src/lib/overdeck/workspace-hygiene.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts
+src/dashboard/server/routes/jsonl-resolver.ts > src/lib/agents.ts > src/lib/agents/resume.ts > src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/conversations/transcript-adapter.ts
