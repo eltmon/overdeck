@@ -267,20 +267,19 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T08:56:14.771Z",
+  "updated": "2026-08-14T08:56:17.045Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T08:55:54.178Z",
-    "reviewNotes": "Cycle-5 retry-safe reset cleanup passes; repeated findings are unchanged and non-promotable.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-14T08:55:54.241Z",
+    "testNotes": "typecheck: npm run typecheck passed (root tsc, hooks, evals, acp, dashboard-types guard 30 known/0 new, frontend-types guard 0 known/0 new). lint: npm run lint passed (eslint, skills/slash-commands/prompt/prompt-trailer lint, file-size guard, source-introspection guard, no-coderabbit-merge-gate guard, circular-deps guard 54 baselined/0 new, ratchet-audit, quarantine-audit 12 entries, effect-diagnostics guard 308 known/0 new). tests: npm test passed clean on a full rerun -- 1459 test files / 13757 tests passed, 3 files / 50 tests skipped (root), plus 4 files / 64 tests passed (frontend); 0 failures. All 14 xBRIEF-scoped test files for this issue's items (swarm-hold, dispatch-gate, merge-gate, swarm-wait, foreman-spawn, reclaim, completion-observations, janitor/in-flight-guard, foreman-liveness, stall-events, policy-foreman, polyrepo integration) pass individually and within the full run. A first full-suite attempt hit 37/13814 failures, all 'Hook timed out in 5000ms' on setupOverdeckTestDb in beforeEach, across files unrelated to this issue (conversations CLI heal/list/scan, workspaces writer, dashboard branch-fallback route) -- none touch deacon-swarm or any PAN-3680-scoped file. An immediate clean rerun (0 failures) confirms this was transient CPU-load flakiness from concurrent test invocations during this verification pass, not a regression from the change. MERGE-STATE NOTE for the merge stage (not a gate failure, no code was edited): the git index in this workspace carries a stale, never-finished merge of origin/main -- MERGE_HEAD 24936d87502955f0f7efeb2a426f7958e19ecc2d is present and src/lib/cloister/deacon-swarm.ts shows as unmerged (UU) in git status, alongside stray staged-vs-unstaged drift on deacon-swarm-types.ts and tests/unit/lib/cloister/deacon-swarm-doneness.test.ts. Verified directly: `git diff HEAD -- <each touched file>` is empty for every file involved (deacon-swarm.ts, deacon-swarm-types.ts, deacon-swarm-advance.ts, deacon-swarm-gc.ts, deacon-swarm-orphan-gc.ts, deacon-swarm-gc.test.ts, deacon-swarm-doneness.test.ts, scripts/circular-deps-baseline.txt) -- the working tree is byte-identical to committed HEAD 7098583cd8, so this verification does cover the reviewed commit content. But the stale MERGE_HEAD/unmerged index entries will block a clean git commit, rebase, or merge at the next pipeline stage and should be cleared (git merge --abort, or resolve and commit) before merge is attempted.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "fa3cdce3d5c0ee92e88b8165b11f2ef7ebfc78b7",
     "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
@@ -348,7 +347,7 @@
       },
       "costAtCloseOut": {
         "usd": 120.230511,
-        "pricingAsOf": "2026-08-14T08:55:54.271Z"
+        "pricingAsOf": "2026-08-14T08:56:17.033Z"
       }
     },
     "merges": [
