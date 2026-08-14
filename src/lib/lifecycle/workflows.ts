@@ -40,6 +40,8 @@ import {
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
+import { acknowledgeAllOpenRecoveryTrips } from '../cloister/recovery-trip.js';
+import { clearAgentOperatorGatesForIssueSync } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
 import {
@@ -418,6 +420,23 @@ export function closeOut(
       allSteps.push(pruned.preserved.length > 0
         ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
         : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
+
+      // PAN-3727: acknowledge open recovery trips and clear operator-gate
+      // residue (stoppedByUser/paused/troubled) so a terminal issue's
+      // preserved agent rows and record stop reappearing in the parked
+      // population. Non-blocking — a bookkeeping ack failure must never
+      // strand an already-merged issue's close-out.
+      allSteps.push(yield* Effect.promise(async () => {
+        try {
+          const trips = await acknowledgeAllOpenRecoveryTrips(ctx.issueId);
+          const gates = clearAgentOperatorGatesForIssueSync(ctx.issueId);
+          return stepOk('close-out:ack-parked-residue', [
+            `Acked ${trips} open trip(s); cleared operator gates on ${gates.length} agent row(s)`,
+          ]);
+        } catch (err) {
+          return stepSkipped('close-out:ack-parked-residue', [(err as Error).message ?? String(err)]);
+        }
+      }));
     }
 
     // 9. Clear review status
