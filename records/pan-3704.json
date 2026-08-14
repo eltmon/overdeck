@@ -39,17 +39,20 @@
     "recordedAt": "2026-08-14T06:50:56.362Z"
   },
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:57:35.555Z",
+  "updated": "2026-08-14T07:32:55.142Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
+    "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:57:35.478Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-14T07:32:55.074Z",
     "reviewNotes": "All four reviewers are clean; all 11 in-scope requirements are covered.",
+    "testNotes": "typecheck clean; lint clean; npm test clean rerun 1450 files/13744 tests passed, 4 frontend files/64 tests passed, 0 failures (earlier run's 8 setupOverdeckTestDb beforeEach timeouts confirmed transient concurrent-load flakes via serial + full clean rerun); CommandPalette.test.tsx 25/25 passed",
+    "uatNotes": "Rebuilt+restarted workspace devcontainer dashboard (buildCommit matches HEAD be79f486). Playwright UAT on live workspace dashboard: Newest-first toggle button renders w/ aria-pressed, default ON, keyboard-Space-activates, persists to localStorage key overdeck.ui.paletteConversationsNewestFirst across remount+reload. Real conversation search disabled in isolated container (no embeddings key); used client-side fetch mock to inject synthetic conversation+memory hits and verified real-DOM sort: ON=newest-first w/ missing-ts-last, OFF=rank-ascending, zero new /api/palette/search requests on toggle (network log confirmed), Memory group stays rank-ascending in both states",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3710",
     "reviewSpawnedAt": "2026-08-14T06:53:54.419Z",
@@ -83,9 +86,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 17536110,
-            "output": 23200,
-            "cacheRead": 16909312,
+            "input": 17783516,
+            "output": 24478,
+            "cacheRead": 17145600,
             "cacheWrite": 0
           }
         },
@@ -95,6 +98,14 @@
             "output": 78,
             "cacheRead": 0,
             "cacheWrite": 0
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 220,
+            "output": 37039,
+            "cacheRead": 21366819,
+            "cacheWrite": 250860
           }
         }
       },
@@ -106,9 +117,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 17536110,
-          "output": 23200,
-          "cacheRead": 16909312,
+          "input": 17783516,
+          "output": 24478,
+          "cacheRead": 17145600,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -116,11 +127,17 @@
           "output": 78,
           "cacheRead": 0,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 220,
+          "output": 37039,
+          "cacheRead": 21366819,
+          "cacheWrite": 250860
         }
       },
       "costAtCloseOut": {
-        "usd": 12.293273,
-        "pricingAsOf": "2026-08-14T06:57:35.485Z"
+        "usd": 17.776696,
+        "pricingAsOf": "2026-08-14T07:32:55.114Z"
       }
     },
     "merges": [
