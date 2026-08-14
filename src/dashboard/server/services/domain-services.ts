@@ -16,7 +16,8 @@ import { ReadModelService } from '../read-model.js';
 import { startSessionContextWriter } from './session-context-writer.js';
 import { markEventStoreProjectionReady } from './project-ci-refill-startup.js';
 import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
-import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
+import { captureCheckpoint, diffCheckpointFiles, isCheckpointTargetDisabled, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
+import { isTerminalTurnDiffSummaryStatus } from '@overdeck/contracts';
 import { randomUUID } from 'crypto';
 
 // ─── EventStoreService ────────────────────────────────────────────────────────
@@ -55,6 +56,26 @@ function shouldRefreshSessionContext(type: string): boolean {
     type.startsWith('cost.') ||
     type.startsWith('merge.') ||
     type.startsWith('system.health_');
+}
+
+/**
+ * Resolve the workspace a checkpoint may be captured in, or null when capture
+ * must be skipped (PAN-3725).
+ *
+ * Skipped when the agent has no workspace, when the agent has reached a
+ * terminal status (a stopped/done/archived/closed agent produces no new turns,
+ * so capturing is pure waste — same rule the read model's checkpoint
+ * reconciliation uses), or when the workspace was already found not to be a git
+ * repository.
+ */
+export function checkpointCaptureTarget(
+  agent: { status?: unknown; workspace?: unknown } | undefined,
+): string | null {
+  const workspace = typeof agent?.workspace === 'string' ? agent.workspace : '';
+  if (!workspace) return null;
+  if (isTerminalTurnDiffSummaryStatus(agent?.status)) return null;
+  if (isCheckpointTargetDisabled(workspace)) return null;
+  return workspace;
 }
 
 export function mapDomainEventToDetailed(event: StoredEvent): {
@@ -217,9 +238,9 @@ export const EventStoreServiceLive = Layer.effect(
           // Look up agent workspace from read model snapshot
           const snapshot = await Effect.runPromise(readModel.getSnapshot);
           const agent = (snapshot.agents as any[]).find((a: any) => a.id === agentId);
-          if (!agent?.workspace) return;
+          const workspace = checkpointCaptureTarget(agent);
+          if (!workspace) return;
 
-          const workspace: string = agent.workspace;
           const turnId = `turn-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           // Capture checkpoint (git tag at current working tree state)

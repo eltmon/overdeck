@@ -8,15 +8,20 @@
  * - streamEvents delivers live events
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
 import { createEventStore, type DbAdapter } from '../../../src/dashboard/server/event-store.js';
 import {
+  checkpointCaptureTarget,
   EventStoreService,
   EventStoreServiceShape,
   mapDomainEventToDetailed,
 } from '../../../src/dashboard/server/services/domain-services.js';
+import { captureCheckpoint } from '../../../src/lib/checkpoint/checkpoint-manager.js';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 // ─── Test DB setup ────────────────────────────────────────────────────────────
 
@@ -242,5 +247,41 @@ describe('EventStoreService', () => {
       const svc = makeTestService();
       expect(svc.streamEvents).toBeDefined();
     });
+  });
+});
+
+// ─── checkpointCaptureTarget (PAN-3725) ───────────────────────────────────────
+
+describe('checkpointCaptureTarget', () => {
+  it('returns the workspace for a live agent', () => {
+    expect(checkpointCaptureTarget({ status: 'running', workspace: '/tmp/pan-3725-live' }))
+      .toBe('/tmp/pan-3725-live');
+  });
+
+  it('skips agents in a terminal status — a stopped agent never captures', () => {
+    expect(checkpointCaptureTarget({ status: 'stopped', workspace: '/tmp/pan-3725-live' })).toBeNull();
+    expect(checkpointCaptureTarget({ status: 'done', workspace: '/tmp/pan-3725-live' })).toBeNull();
+    expect(checkpointCaptureTarget({ status: 'archived', workspace: '/tmp/pan-3725-live' })).toBeNull();
+  });
+
+  it('skips agents without a workspace', () => {
+    expect(checkpointCaptureTarget({ status: 'running', workspace: undefined })).toBeNull();
+    expect(checkpointCaptureTarget(undefined)).toBeNull();
+  });
+
+  it('skips a workspace already found not to be a git repository', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'pan-3725-nongit-'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(checkpointCaptureTarget({ status: 'running', workspace })).toBe(workspace);
+
+      // First capture fails ("fatal: not a git repository") and disables the target.
+      await Effect.runPromise(captureCheckpoint(workspace, 'agent-min-889-slot-1', 'turn-1')).catch(() => {});
+
+      expect(checkpointCaptureTarget({ status: 'running', workspace })).toBeNull();
+    } finally {
+      warnSpy.mockRestore();
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 });
