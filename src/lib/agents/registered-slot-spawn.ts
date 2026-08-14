@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 import { createActiveSlice } from '../xbrief/dag.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import type { RegisteredSlotSpawn } from './spawn-prep.js';
 
 const execAsync = promisify(exec);
@@ -46,7 +47,43 @@ export function buildRegisteredSlotPrompt(
   return lines.join('\n');
 }
 
-export async function ensureRegisteredSlotWorktree(baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
+export async function ensureRegisteredSlotWorktree(issueId: string, baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
+  const repoRoots = resolveWorkspaceRepoRootsSync(issueId, baseWorkspace);
+  const polyrepoRoots = repoRoots.filter(root => root.isPolyrepo);
+  if (polyrepoRoots.length > 0) {
+    const expected = polyrepoRoots.map(root => ({
+      ...root,
+      target: `${slot.workspace}/${root.dir.slice(baseWorkspace.length + 1).split('/')[0]}`,
+    }));
+    if (existsSync(slot.workspace)) {
+      const missing = expected.filter(root => !existsSync(`${root.target}/.git`));
+      if (missing.length === 0) {
+        const branches = await Promise.all(expected.map(async root => {
+          try {
+            return (await execAsync('git branch --show-current', { cwd: root.target })).stdout.trim();
+          } catch {
+            return '';
+          }
+        }));
+        if (branches.every(branch => branch === slot.branch)) return;
+      }
+      throw new Error(`Registered polyrepo slot workspace is incomplete at ${slot.workspace}; run pan swarm reset before dispatching it.`);
+    }
+    await mkdir(slot.workspace, { recursive: true });
+    try {
+      for (const root of expected) {
+        const branchExists = await gitBranchExists(root.dir, slot.branch);
+        const command = branchExists
+          ? `git worktree add ${JSON.stringify(root.target)} ${JSON.stringify(slot.branch)}`
+          : `git worktree add -b ${JSON.stringify(slot.branch)} ${JSON.stringify(root.target)} HEAD`;
+        await execAsync(command, { cwd: root.dir });
+      }
+    } catch (error) {
+      throw new Error(`Could not create isolated polyrepo slot workspace ${slot.workspace}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return;
+  }
+
   if (existsSync(slot.workspace)) return;
   await mkdir(dirname(slot.workspace), { recursive: true });
   const branchExists = await gitBranchExists(baseWorkspace, slot.branch);

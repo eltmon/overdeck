@@ -143,7 +143,7 @@ describe('deacon-swarm completion classification', () => {
     ]);
   });
 
-  it('does not infer completion for a vanished slot from branch state alone', async () => {
+  it('recovers a vanished clean committed slot as ready-to-merge from durable git state', async () => {
     const agentId = 'agent-pan-2203-slot-1';
 
     await expect(classifyInFlightSlots([slot(1, agentId)], deps({
@@ -156,13 +156,14 @@ describe('deacon-swarm completion classification', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         slotIndex: 1,
-        lifecycle: 'failed',
-        reason: 'vanished-session',
+        lifecycle: 'ready-to-merge',
+        exitStatus: 0,
+        signal: 'inferred',
       }),
     ]);
   });
 
-  it('does not infer completion for a missing agent from branch state alone', async () => {
+  it('recovers a missing-agent clean committed slot as ready-to-merge from durable git state', async () => {
     await expect(classifyInFlightSlots([{ ...slot(2), agentId: undefined }], deps({
       sessions: [],
       aheadCount: 1,
@@ -173,8 +174,9 @@ describe('deacon-swarm completion classification', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         slotIndex: 2,
-        lifecycle: 'failed',
-        reason: 'missing-agent',
+        lifecycle: 'ready-to-merge',
+        exitStatus: 0,
+        signal: 'inferred',
       }),
     ]);
   });
@@ -271,7 +273,7 @@ describe('deacon-swarm completion classification', () => {
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 
-  it('infers completion after two stable record-backed observations in auto mode', async () => {
+  it('keeps a live slot waiting for its durable completion signal in auto mode', async () => {
     const agentId = 'agent-pan-2203-slot-2';
     const fakeDeps = deps({
       sessions: [agentId],
@@ -307,14 +309,14 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'ready-to-merge',
-        signal: 'inferred',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: [],
       }),
     ]);
   });
 
-  it('resumes completion inference from a durable observation after a simulated process restart', async () => {
+  it('resumes the completion nudge observation after a simulated process restart without inferring live completion', async () => {
     const agentId = 'agent-pan-2203-slot-8';
     const observations = new Map<string, { signature: string; nudged: boolean; consecutiveDoneCount: number }>();
     const firstDeps = deps({ sessions: [agentId], aheadCount: 1, clean: true });
@@ -332,7 +334,7 @@ describe('deacon-swarm completion classification', () => {
     restartedDeps.readCompletionObservation = vi.fn((_workspace, _issue, key) => observations.get(key));
     restartedDeps.writeCompletionObservation = vi.fn(async (_workspace, _issue, key, value) => { observations.set(key, value); });
     await expect(classifyInFlightSlots([slot(8, agentId)], restartedDeps, options)).resolves.toEqual([
-      expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'inferred' }),
+      expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }),
     ]);
   });
 

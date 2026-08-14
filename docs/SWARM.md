@@ -116,11 +116,10 @@ Set issue policy with `pan staffing <id> --swarm off|auto|always|default`. Globa
 
 If the marker is missing, `swarm.infer_completion` controls git-based inference:
 
-- `auto` nudges once, then treats two stable observations of branch-ahead, output, and clean worktree state as completion.
-- `nudge` requests `pan done` but never infers completion.
+- `auto` and `nudge` request `pan done` from a live slot but never infer its completion from branch state alone.
 - `off` disables both behavior paths.
 
-Completion observations live in `swarm.completionObservations`, so a Deacon restart does not reset the evidence. State-plane-only worktree changes count as clean; uncommitted implementation changes do not.
+When a slot has no live agent, clean current-item commits can still prove durable completion. Polyrepo checks count commits in the item's real repositories, not wrapper bookkeeping. Completion observations live in `swarm.completionObservations`, so a Deacon restart does not reset the evidence. State-plane-only worktree changes count as clean; uncommitted implementation changes do not.
 
 The Deacon retains progress fingerprints in its process for stall detection. If branch-tip and pane-output fingerprints do not change for 30 minutes, it sends one `[swarm-event] slot N stalled` message to the foreman. It writes no recovery block and makes no recovery decision. `PAN_SWARM_STALL_THRESHOLD_MS` overrides the threshold for tests or operations.
 

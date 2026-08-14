@@ -129,6 +129,9 @@ describe('foreman swarm dogfood', () => {
     const commandCalls: Array<{ command: string; cwd: string }> = [];
     const run = async (command: string, cwd: string) => {
       commandCalls.push({ command, cwd });
+      // PAN-3691: the zero-current-item-work guard counts base..slot commits
+      // before merging — model one ahead commit per slot branch.
+      if (command.startsWith('git rev-list --count')) return { stdout: '1', stderr: '' };
       const mergeBranch = /^git merge --no-ff "([^"]+)"$/.exec(command)?.[1];
       if (mergeBranch) mergedBranches.add(mergeBranch);
       return { stdout: `ok: ${command}`, stderr: '' };
@@ -140,7 +143,20 @@ describe('foreman swarm dogfood', () => {
         { issueId: ISSUE_ID, featureWorkspace: FEATURE_WORKSPACE },
         index + 1,
         planItem,
-        { deps: { run } },
+        {
+          deps: {
+            run,
+            // Deterministic single-repo roots seam — one root at the slot
+            // workspace on the issue's feature branch.
+            resolveRepoRoots: (_id, ws) => [{
+              repoKey: 'overdeck',
+              dir: ws,
+              sourceBranch: 'feature/pan-1762',
+              targetBranch: 'main',
+              isPolyrepo: false,
+            }],
+          },
+        },
       ));
     }
 
@@ -151,8 +167,10 @@ describe('foreman swarm dogfood', () => {
     expect(mergedBranches).toEqual(new Set(['feature/pan-1762-slot-1', 'feature/pan-1762-slot-2']));
     expect(commandCalls).toEqual([
       { command: 'npm run test:tier-table', cwd: '/repo/workspaces/feature-pan-1762-slot-1' },
+      { command: 'git rev-list --count "feature/pan-1762".."feature/pan-1762-slot-1"', cwd: '/repo/workspaces/feature-pan-1762-slot-1' },
       { command: 'git merge --no-ff "feature/pan-1762-slot-1"', cwd: FEATURE_WORKSPACE },
       { command: 'npm run test:relevance-map', cwd: '/repo/workspaces/feature-pan-1762-slot-2' },
+      { command: 'git rev-list --count "feature/pan-1762".."feature/pan-1762-slot-2"', cwd: '/repo/workspaces/feature-pan-1762-slot-2' },
       { command: 'git merge --no-ff "feature/pan-1762-slot-2"', cwd: FEATURE_WORKSPACE },
     ]);
     expect(new Set(slotSpawns.map(slot => slot!.slotItemId))).toEqual(new Set(doc.plan.items.map(planItem => planItem.id)));

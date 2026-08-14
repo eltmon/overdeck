@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -761,8 +761,12 @@ describe('pan swarm reset (PAN-2214)', () => {
       listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
       removeAgent: vi.fn(async () => {}),
+      listSlotWorkspaceDirectories: vi.fn(() => []),
+      resolveSlotWorkspaceWorktrees: vi.fn(() => ({ isPolyrepo: false, nested: [] })),
+      removeDirectory: vi.fn(async () => undefined),
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
+      clearSupersededSwarmAttempts: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
       getFailedMergeBlocks: vi.fn(() => [{ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' }]),
       runGitCommand: vi.fn(async (command: string) => {
@@ -774,6 +778,9 @@ describe('pan swarm reset (PAN-2214)', () => {
           for (const [branch, count] of Object.entries(branches)) {
             if (command === `git rev-list --count HEAD..${JSON.stringify(branch)}`) return { stdout: `${count}\n` };
           }
+          return { stdout: '0\n' };
+        }
+        if (command.startsWith('git rev-list --count ')) {
           return { stdout: '0\n' };
         }
         if (command === 'git worktree list --porcelain') {
@@ -818,6 +825,30 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deleteIndex).toBeGreaterThan(pushIndex);
   });
 
+  it('removes stale polyrepo slot directories and nested worktrees left by reset', async () => {
+    const deps = makeResetDeps();
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-4';
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [{
+        repoKey: 'api',
+        dir: `${slotWorkspace}/api`,
+        parentRepo: '/repo/api',
+        featureBranch: 'feature/pan-2203',
+      }],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-4/api"',
+      '/repo/api',
+    );
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+  });
+
   it('a push failure without --force aborts with the branch named and deletes nothing', async () => {
     const deps = makeResetDeps({
       slotBranches: { 'feature/pan-2203-slot-1': '2' },
@@ -833,6 +864,9 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deps.gitCalls.some(cmd => cmd.startsWith('git worktree remove'))).toBe(false);
     expect(deps.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
     expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+    // PAN-3694: an aborted reset must preserve the superseded-attempt history —
+    // clearing it is only valid once every slot workspace/branch removal succeeded.
+    expect(deps.clearSupersededSwarmAttempts).not.toHaveBeenCalled();
   });
 
   it('--force continues past a push failure and still deletes', async () => {
@@ -860,6 +894,9 @@ describe('pan swarm reset (PAN-2214)', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    // PAN-3694: a successful reset also clears the superseded-attempt high-water
+    // so a fresh swarm may reuse indexes 1..N.
+    expect(deps.clearSupersededSwarmAttempts).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
     expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     // The running row is stopped twice at most (once via stop's enumeration, once via the
     // final sweep) — the essential guarantee is it is stopped and the stopped row is not touched.
@@ -937,5 +974,30 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });
     expect(merged.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(merged.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
+  });
+});
+
+describe('isSlotWorkspaceDirectoryName (PAN-3694)', () => {
+  const base = 'feature-min-888';
+
+  it('accepts exact slot workspace directory names', () => {
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1')).toBe(true);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-12')).toBe(true);
+  });
+
+  it('rejects preserved archive directories that share the -slot- prefix', () => {
+    // The MIN-888 recovery archives that crashed slotBranchFromPath.
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1-reset-backup-20260814')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-2-failed-20260814120000')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-3-quarantine')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1-backup')).toBe(false);
+  });
+
+  it('rejects non-numeric slot suffixes and other issues\' workspaces', () => {
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1a')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-x')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-889-slot-1')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888')).toBe(false);
   });
 });

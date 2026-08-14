@@ -51,6 +51,7 @@ import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspace
 import { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 import {
   classifyDoneWithoutSignal,
+  classifyDurableReadySlot,
   clearSwarmCompletionObservation,
   defaultGetSlotBranchAheadCount,
   defaultIsSlotWorktreeClean,
@@ -468,7 +469,12 @@ export async function classifyInFlightSlots(
       }
     }
 
+    // PAN-3691: only a DEAD slot may be salvaged from durable git state; a LIVE agent never infers completion from branch state.
+    const durableReady = await classifyDurableReadySlot(slot, deps, options);
     if (!slot.agentId) {
+      if (durableReady) {
+        classified.push(durableReady); continue;
+      }
       classified.push({ ...slot, lifecycle: 'failed', reason: 'missing-agent' });
       continue;
     }
@@ -480,6 +486,10 @@ export async function classifyInFlightSlots(
     }
 
     if (!sessionNames.has(slot.agentId)) {
+      if (durableReady) {
+        classified.push(durableReady);
+        continue;
+      }
       classified.push({ ...slot, lifecycle: 'failed', reason: 'vanished-session' });
       continue;
     }
