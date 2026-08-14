@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:20:51.335Z",
+  "updated": "2026-08-14T13:27:04.709Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "reopen-clears-record-merge": {
-        "writerId": "agent-pan-3727",
-        "agentId": "agent-pan-3727",
-        "pid": 933796,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T13:20:51.335Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Added close-out:ack-parked-residue step to closeOut() right after prune-agent-rows: calls acknowledgeAllOpenRecoveryTrips + clearAgentOperatorGatesForIssueSync, non-blocking on failure (stepSkipped). Added 2 tests to workflows.test.ts covering the happy path (trip removed, gate cleared) and the throw-is-non-blocking path. Also bumped the file-size allowlist for workflows.ts (1224->1243 lines, required by CI). Typecheck and tests green.",
         "releasedAt": "2026-08-14T13:20:34.331Z"
+      },
+      {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 933796,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:20:51.335Z",
+        "itemId": "reopen-clears-record-merge",
+        "outcome": "completed",
+        "reason": "clearRecordPipelineClosedOutSync/clearRecordPipelineClosedOut now delete record.pipeline.mergeStatus when it is 'merged', alongside clearing closedOut/closedOutAt and stamping reopenedAt. Added tests to record-update.test.ts (sync + async doors) and reopen.test.ts (end-to-end via reopenWorkspaceState). Typecheck and tests green.",
+        "releasedAt": "2026-08-14T13:27:04.708Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "closeout-acks-residue": {
         "reason": "Added close-out:ack-parked-residue step to closeOut() right after prune-agent-rows: calls acknowledgeAllOpenRecoveryTrips + clearAgentOperatorGatesForIssueSync, non-blocking on failure (stepSkipped). Added 2 tests to workflows.test.ts covering the happy path (trip removed, gate cleared) and the throw-is-non-blocking path. Also bumped the file-size allowlist for workflows.ts (1224->1243 lines, required by CI). Typecheck and tests green.",
         "updatedAt": "2026-08-14T13:20:34.331Z"
+      },
+      "reopen-clears-record-merge": {
+        "reason": "clearRecordPipelineClosedOutSync/clearRecordPipelineClosedOut now delete record.pipeline.mergeStatus when it is 'merged', alongside clearing closedOut/closedOutAt and stamping reopenedAt. Added tests to record-update.test.ts (sync + async doors) and reopen.test.ts (end-to-end via reopenWorkspaceState). Typecheck and tests green.",
+        "updatedAt": "2026-08-14T13:27:04.708Z"
       }
     }
   },
@@ -142,6 +149,8 @@
     "closeout-acks-residue.ac1": "completed",
     "closeout-acks-residue.ac2": "completed",
     "closeout-acks-residue.ac3": "completed",
-    "reopen-clears-record-merge": "running"
+    "reopen-clears-record-merge": "completed",
+    "reopen-clears-record-merge.ac1": "completed",
+    "reopen-clears-record-merge.ac2": "completed"
   }
 }
