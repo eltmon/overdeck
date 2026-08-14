@@ -607,15 +607,20 @@
    hex/oklch literals, not bare H-S-L triplets, so var() can't supply just
    the H-S-L components the way that trick needs. Alpha is applied via
    color-mix(), the same idiom --secondary/--accent already use above.
-   Ledger has no wash concept, so its scopes invalidate the property. Hues
-   (35/28) stay inside the same warm 28-35 band the rest of Broadsheet's
-   neutral ramp uses above, so the glow reads as "warm light", not an
-   arbitrary color. */
+   Ledger has no wash concept, so its scopes invalidate the property.
+
+   SATURATION IS THE WHOLE TRICK: the reference wash reads as ambient LIGHT,
+   not as a color. Its source value is a near-neutral (6% saturation in light,
+   0% in dark) lifted only by opacity — at 38-45% saturation the same gradient
+   renders as a visible brown stain across the top-left third of the viewport
+   rather than a glow. Verified against a rendered screenshot, not by reading
+   the token. Hue stays in the warm 28-35 band for consistency with the neutral
+   ramp above, but chroma must stay in single digits. */
 [data-theme="ledger"] {
   --wash: initial;
 }
 [data-theme="broadsheet"] {
-  --wash: color-mix(in srgb, hsl(35 45% 68%) 50%, transparent);
+  --wash: color-mix(in srgb, hsl(30 6% 75%) 55%, transparent);
 }
 .dark[data-theme="ledger"],
 .dark [data-theme="ledger"] {
@@ -623,7 +628,7 @@
 }
 .dark[data-theme="broadsheet"],
 .dark [data-theme="broadsheet"] {
-  --wash: color-mix(in srgb, hsl(28 38% 42%) 40%, transparent);
+  --wash: color-mix(in srgb, hsl(30 4% 38%) 50%, transparent);
 }
 
 /* body is a single, non-repeating element — it can never itself sit nested
