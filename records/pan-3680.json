@@ -354,7 +354,7 @@
     "recordedAt": "2026-08-14T13:10:06.393Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T13:12:54.651Z",
+  "updated": "2026-08-14T13:12:57.508Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -365,7 +365,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T13:11:30.954Z",
-    "updatedAt": "2026-08-14T13:12:49.396Z",
+    "updatedAt": "2026-08-14T13:12:51.559Z",
     "testNotes": "Verification of reviewed commit 054f0f9c could not complete: workspace entered an in-progress merge of origin/main mid-run (MERGE_HEAD present, UU conflicts in spawn-prep.ts, deacon-swarm-types.ts, deacon-swarm.ts with literal <<<<<<< HEAD markers). Still-live work agent agent-pan-3680 is actively resolving this conflict in the same worktree right now -- a concurrency race, not a defect at the reviewed commit. npm run typecheck passed before the merge began. npm run lint failed reproducibly (2 runs) on the conflict markers. npm test not run against the unstable tree. Prior recorded npm test run in pipeline.testNotes also failed deterministically (tests/integration/swarm-foreman-polyrepo.test.ts), no verified fix landed since. Branch needs conflict resolution + fresh review before re-test. Full evidence in .pan/test/result.json.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "054f0f9ce288b8c2fba53b6c2fb7ef4aa278171f",
@@ -573,7 +573,7 @@
       },
       "costAtCloseOut": {
         "usd": 168.081739,
-        "pricingAsOf": "2026-08-14T13:12:49.505Z"
+        "pricingAsOf": "2026-08-14T13:12:57.497Z"
       }
     },
     "merges": [
