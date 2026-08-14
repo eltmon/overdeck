@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-14T12:07:05.423Z",
+  "updated": "2026-08-14T12:15:10.181Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
@@ -13,15 +13,13 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T04:27:56.474Z",
+    "updatedAt": "2026-08-14T12:15:10.150Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs panopticon-cli:origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
-    "mergeNotes": "Post-rebase verification failed at empty-changeset",
-    "strikeReadyHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
-    "strikeReadyAt": "2026-08-13T23:06:49.965Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3690 after its harness exited before push.",
+    "strikeReadyHead": "84d57b5df14ae4db3f2d0c32edda0dd09593046f",
+    "strikeReadyAt": "2026-08-14T12:15:10.149Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-08-13T23:16:20.116Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-13T22:33:17.295Z",
@@ -44,22 +42,22 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 572556,
-            "output": 1348,
-            "cacheRead": 276480,
+            "input": 662128,
+            "output": 1670,
+            "cacheRead": 291072,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 42242817,
-            "output": 23162,
-            "cacheRead": 41315840,
+            "input": 52448409,
+            "output": 31638,
+            "cacheRead": 50525184,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 787,
-            "output": 90,
+            "input": 1574,
+            "output": 199,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -67,27 +65,27 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 572556,
-          "output": 1348,
-          "cacheRead": 276480,
+          "input": 662128,
+          "output": 1670,
+          "cacheRead": 291072,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 42242817,
-          "output": 23162,
-          "cacheRead": 41315840,
+          "input": 52448409,
+          "output": 31638,
+          "cacheRead": 50525184,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 787,
-          "output": 90,
+          "input": 1574,
+          "output": 199,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.988902,
-        "pricingAsOf": "2026-08-14T04:27:56.482Z"
+        "usd": 35.830426,
+        "pricingAsOf": "2026-08-14T12:15:10.171Z"
       }
     },
     "merges": [],
