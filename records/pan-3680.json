@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T03:45:40.824Z",
+  "updated": "2026-08-14T03:45:54.174Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 26,
-    "claims": {},
+    "sequence": 27,
+    "claims": {
+      "docs-audit-sweep": {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 2225679,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T03:45:54.174Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -330,6 +338,7 @@
     "polyrepo-integration-test": "completed",
     "polyrepo-integration-test.ac1": "completed",
     "polyrepo-integration-test.ac2": "completed",
-    "polyrepo-integration-test.ac3": "completed"
+    "polyrepo-integration-test.ac3": "completed",
+    "docs-audit-sweep": "running"
   }
 }
