@@ -35,9 +35,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 import {
   writeSwarmSlotCompletion,
   clearSwarmSlotCompletion,
+  clearSupersededSwarmAttempts,
   persistAndVerifySwarmSlotCompletion,
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 import { clearAllSlotAssignments, recordSlotAssignment } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { applySupersededSlotHighWater } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import { getIssueRecordPathForWorkspace } from '../../../../src/lib/pan-dir/record.js';
 import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
@@ -281,6 +283,40 @@ describe('PAN-3690 slot ownership replacement', () => {
       slotAssignments: [],
       slotCompletions: {},
     }));
+  });
+
+  it('PAN-3694: clears the superseded-attempt high-water so a fresh swarm reuses indexes 1..N', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    // The MIN-888 post-reset state: superseded slot 3 retained in the record.
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [],
+        supersededAttempts: [{
+          slotIndex: 3,
+          itemId: 'item-c',
+          agentId: 'agent-pan-3690-slot-3',
+          branch: 'feature/pan-3690-slot-3',
+          archivedBranch: 'feature/pan-3690-slot-3-failed-20260814000000',
+          reason: 'failed swarm slot',
+          supersededAt: '2026-08-14T00:00:00.000Z',
+        }],
+      },
+    }));
+
+    // Pre-fix behavior: the retained attempt reserves indexes 1..3, so only
+    // slot 4 is dispatchable.
+    const before = new Set<number>();
+    expect(applySupersededSlotHighWater(before, { superseded: readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts } as never, 1)).toBe(4);
+    expect([...before].sort()).toEqual([1, 2, 3]);
+
+    await clearSupersededSwarmAttempts(workspacePath, 'PAN-3690');
+
+    expect(readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts).toEqual([]);
+    // Post-reset reuse: no index is reserved and the configured max stands.
+    const after = new Set<number>();
+    expect(applySupersededSlotHighWater(after, { superseded: readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts } as never, 1)).toBe(1);
+    expect(after.size).toBe(0);
   });
 });
 
