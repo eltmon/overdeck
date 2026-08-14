@@ -482,15 +482,27 @@ describe('parseSummaryForkFocus', () => {
     expect(parseSummaryForkFocus(42)).toEqual({ ok: false, error: 'focus must be a string' });
   });
 
-  it('rejects focus values longer than 500 characters', async () => {
-    expect(parseSummaryForkFocus('a'.repeat(501))).toEqual({
+  it('accepts focus values up to 10000 characters and rejects beyond (PAN-3737)', async () => {
+    expect(parseSummaryForkFocus('a'.repeat(10_000))).toEqual({
+      ok: true,
+      focus: 'a'.repeat(10_000),
+    });
+    expect(parseSummaryForkFocus('a'.repeat(10_001))).toEqual({
       ok: false,
-      error: 'focus must be 500 characters or fewer',
+      error: 'focus must be 10000 characters or fewer',
     });
   });
 
-  it('rejects control characters in focus', async () => {
-    expect(parseSummaryForkFocus('continue\nthen ship')).toEqual({
+  it('accepts multi-line focus but rejects other control characters (PAN-3737)', async () => {
+    expect(parseSummaryForkFocus('continue\nthen ship\twith tabs')).toEqual({
+      ok: true,
+      focus: 'continue\nthen ship\twith tabs',
+    });
+    expect(parseSummaryForkFocus('continue\x00then ship')).toEqual({
+      ok: false,
+      error: 'focus must not contain control characters',
+    });
+    expect(parseSummaryForkFocus('continue\x1bthen ship')).toEqual({
       ok: false,
       error: 'focus must not contain control characters',
     });
