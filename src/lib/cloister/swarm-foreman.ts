@@ -13,7 +13,9 @@ export interface EnsureSwarmForemanDeps {
 }
 
 const defaultDeps: EnsureSwarmForemanDeps = {
-  listSessionNamesSync,
+  // Keep the binding lazy so importing Deacon does not force unrelated tests
+  // with focused tmux mocks to provide this foreman-only dependency.
+  listSessionNamesSync: () => listSessionNamesSync(),
   messageAgent,
   buildWorkAgentPrompt,
   spawnRun,

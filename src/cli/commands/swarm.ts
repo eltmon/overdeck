@@ -267,7 +267,7 @@ export async function swarmRecoverCommand(
   }
   if (!block) {
     if (action === 'retry') {
-      const actions = await deps.coordinateSwarmSlots({ issueId: issue });
+      const actions = await deps.coordinateSwarmSlots({ issueId: issue, manual: true });
       const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
       if (retried) {
         const itemId = actions.find(line => line.includes(`archived failed slot ${slotIndex} `))?.match(/\(item ([^)]+)\)/)?.[1];
