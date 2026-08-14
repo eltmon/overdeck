@@ -1,0 +1,552 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T12:48:30.051Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3727: Sweeper ghost escalations for closed issues — close-out leaves open recovery trips + stop gates; parked resolver's closed-check fails open on tracker blips",
+    "updated": "2026-08-14T12:54:13.505Z"
+  },
+  "plan": {
+    "id": "pan-3727",
+    "title": "Sweeper ghost escalations for closed issues — close-out residue + resolver record-terminal evidence",
+    "status": "proposed",
+    "uid": "09d19a3e-8b77-4e58-938b-54e62231427d",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-14T12:48:30.051Z",
+    "updated": "2026-08-14T12:54:13.505Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3727",
+        "label": "PAN-3727",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "parked-resolver",
+      "stall-sweeper",
+      "close-out",
+      "recovery-trips",
+      "operator-gate"
+    ],
+    "metadata": {
+      "sizeJustification": "One behavioral fix whose writes live in single-responsibility door modules (recovery-trip, agent-state, record-update) and whose reads live in the parked resolver; the ghost-escalation class stays open unless close-out ack, resolver hardening, reopen truth, and the backlog sweep land together, so sibling-issue decomposition would strand half-fixes behind separate review cycles.",
+      "canonicalFilename": "2026-08-14-PAN-3727-sweeper-ghost-escalations-for-closed-issues-close-out-residue-resolver-record-terminal-evidence.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The stall sweeper escalates parked rows for issues that are already merged and closed (observed on MIN-941, Done in Linear since 2026-08-06: ghost sweep.escalated events on 2026-08-10 and 2026-08-14). Close-out never acknowledges open recovery trips and leaves stoppedByUser flags on preserved agent rows; the parked resolver's only terminality evidence for non-live issues is a live tracker call that fails open toward 'open' and negative-caches for 5 minutes, so one Linear blip resurrects a closed issue into the parked population long enough for the 24h re-surface TTL to fire an operator escalation.",
+      "Proposal": "Four changes behind existing door patterns: (1) closeOut() gains a residue-ack step that acknowledges every open recovery trip (new acknowledgeAllOpenRecoveryTrips door extracted from pan parked ack) and clears operator-gate flags on the issue's stopped agent rows (new clearAgentOperatorGatesForIssueSync door); (2) resolveParkedPopulation treats record-level terminality (pipeline.closedOut === true, or pipeline.mergeStatus === 'merged' with reopenedAt unset) as decisive — no tracker call, non-zombie orbits suppressed; (3) clearRecordPipelineClosedOut(Sync) also drops a stale mergeStatus='merged' so reopened issues are never record-terminal; (4) a new reconcileTerminalIssueResidue patrol in the deacon (hourly, beside the state-plane patrol) cleans existing terminal-issue residue across all projects.",
+      "NonGoals": "- Changing isLinearIssueClosed / isTrackerIssueClosed fail-closed posture (protects the destructive reaper; deliberately untouched)\n- Changing the sweeper's 24h re-surface TTL or escalation copy\n- Pruning or deleting preserved agent state dirs / retained transcripts (only gate flags are cleared)\n- A one-time operator-run cleanup CLI (the recurring patrol's first run covers the backlog)\n- Zombie-session reap semantics (record-terminal issues still produce zombie rows for live agents)\n- Review-status door changes (reviewStatus rows do not survive close-out and are not the durable source)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Residue sweep implemented as a recurring deacon patrol instead of a one-time CLI command",
+        "rationale": "The issue asks for a one-time sweep of existing residue; a patrol wired beside reconcileProjectStatePlanes (deacon.ts:3113) performs that sweep on its first run after deploy and self-heals any future leak path without operator action, matching the 'fix the system, not the symptom' engineering rule."
+      },
+      {
+        "summary": "Terminal predicate includes a reopenedAt guard in addition to fixing the reopen door",
+        "rationale": "Records written before this fix can hold a stale mergeStatus='merged' on an already-reopened issue (reopen cleared closedOut but not mergeStatus). The guard keeps those issues visible; the door fix (WI-5) stops new staleness. Both are one-line defenses against the same hazard."
+      },
+      {
+        "summary": "Close-out clears all three operator-gate flags (stoppedByUser, troubled, operator paused), not only stoppedByUser",
+        "rationale": "The operator-gate orbit groups all three gates (resolver.ts:276-309); clearing only stoppedByUser would leave the same ghost class reachable via a paused or troubled residue row. Scheduler yields and live agents are explicitly excluded."
+      },
+      {
+        "summary": "Residue-ack failure inside closeOut() is non-blocking (stepSkipped)",
+        "rationale": "Close-out is the terminal ceremony for an already-merged issue; a bookkeeping ack failure must not strand it. The recurring patrol is the backstop that retries the cleanup."
+      }
+    ],
+    "items": [
+      {
+        "id": "ack-all-trips-door",
+        "title": "Extract acknowledgeAllOpenRecoveryTrips door into recovery-trip.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/recovery-trip.ts",
+            "src/cli/commands/parked.ts",
+            "src/lib/cloister/__tests__/recovery-trip-all.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/recovery-trip-all.test.ts tests/unit/cli/parked-ack.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new door tests pass (2 open trips acked of 3, unresolvable issue returns 0)",
+            "parked-ack suite still green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the per-issue ack loop from ackIssueTripsDefault (src/cli/commands/parked.ts:96-115) into src/lib/cloister/recovery-trip.ts as `export async function acknowledgeAllOpenRecoveryTrips(issueId: string): Promise<number>` — resolve the project via resolveProjectFromIssueSync/getProjectSync, read the record, acknowledge each open trip through the existing acknowledgeRecoveryTrip door, return the count acked (0 for unresolvable/unreadable). pan parked ack imports the door in place of its local copy with no behavior change. Add src/lib/cloister/__tests__/recovery-trip-all.test.ts covering: record with two open + one closed trip returns 2 and removes only the open trips; unresolvable issue id returns 0."
+        },
+        "items": [
+          {
+            "id": "ack-all-trips-door.ac1",
+            "title": "Given a record with two open trips and one closed trip, acknowledgeAllOpenRecoveryTrips returns 2 and the persisted record retains only the closed trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ack-all-trips-door.ac2",
+            "title": "Given an issue id that resolves to no project, acknowledgeAllOpenRecoveryTrips returns 0 and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ack-all-trips-door.ac3",
+            "title": "pan parked ack produces identical output to before the extraction (existing parked-ack tests pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clear-operator-gates-door",
+        "title": "Add clearAgentOperatorGatesForIssueSync door to agent-state.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/agent-state.ts",
+            "tests/unit/lib/agents/agent-state-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/agent-state-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gate suite passes including the three new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "New export in src/lib/agents/agent-state.ts beside clearAgentPausedSync/clearAgentTroubledSync: `export function clearAgentOperatorGatesForIssueSync(issueId: string): string[]`. For every agent row whose issueId matches case-insensitively AND whose status === 'stopped': delete stoppedByUser; if paused === true && yieldedByScheduler !== true apply the existing applyAgentUnpaused helper; if troubled === true apply the existing untroubled helper; persist each mutated row via saveAgentStateSync. Return the mutated agent ids. Never touch running/starting agents or scheduler yields. Add tests to tests/unit/lib/agents/agent-state-gate.test.ts: stopped row with stoppedByUser gets cleared and its id returned; running row with stoppedByUser is untouched; yielded pause is untouched."
+        },
+        "items": [
+          {
+            "id": "clear-operator-gates-door.ac1",
+            "title": "Given a stopped agent row with stoppedByUser=true, the door deletes the flag, persists via saveAgentStateSync, and returns the agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-operator-gates-door.ac2",
+            "title": "Given a running agent row with stoppedByUser=true, the door preserves the row unchanged and omits it from the returned ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-operator-gates-door.ac3",
+            "title": "Given a stopped agent row paused by the scheduler (yieldedByScheduler=true), the door preserves paused and yieldedByScheduler unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-acks-residue",
+        "title": "closeOut() acknowledges open trips and clears operator gates (close-out:ack-parked-residue step)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workflows suite passes with the new residue-step case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In closeOut() (src/lib/lifecycle/workflows.ts), immediately after the close-out:prune-agent-rows block (lines 416-421), add a step named close-out:ack-parked-residue that calls acknowledgeAllOpenRecoveryTrips(ctx.issueId) and clearAgentOperatorGatesForIssueSync(ctx.issueId) and pushes stepOk with `Acked N open trip(s); cleared operator gates on M agent row(s)`. On failure push stepSkipped with the error message — non-blocking, matching the posture of neighboring steps (a completed merge must never be un-closable over bookkeeping). Test in tests/unit/lib/lifecycle/workflows.test.ts: a close-out fixture with an open trip and a preserved stoppedByUser row completes with success=true, the trip removed from the record, the gate flag cleared, and a close-out:ack-parked-residue step present in result.steps."
+        },
+        "items": [
+          {
+            "id": "closeout-acks-residue.ac1",
+            "title": "Given a close-out fixture with an open recovery trip, closeOut() completes with the trip removed from the record and result.steps contains a passing close-out:ack-parked-residue step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-acks-residue.ac2",
+            "title": "Given a preserved stopped agent row with stoppedByUser=true, closeOut() completes with the flag cleared while the row and its retained transcripts survive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-acks-residue.ac3",
+            "title": "Given the ack door throws, closeOut() still returns success=true and records close-out:ack-parked-residue as skipped with the error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-record-terminal",
+        "title": "resolveParkedPopulation treats record-terminal issues as closed without a tracker call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/parked/__tests__/resolver.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolver suite passes including the record-terminal and tracker-blip regression cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/parked/resolver.ts add an optional `readRecordTerminal?: (issueId: string) => Promise<boolean>` to ResolveParkedOptions (keep readOpenTrips and isClosed signatures unchanged — tests inject them). Default `defaultReadRecordTerminal`: resolve project via resolveProjectFromIssueSync/getProjectSync, readIssueRecord, return `record.pipeline.closedOut === true || (record.pipeline.mergeStatus === 'merged' && !record.pipeline.reopenedAt)`; any throw or missing record returns false. In classifyOne (resolver.ts:459-480): when readRecordTerminal(issueId) is true, set issueClosed = true, store it in closedByIssue, skip the isClosed tracker call, and skip the trips read (trips = []). Pass 2 needs no change — closedByIssue already carries the verdict. Tests in src/lib/parked/__tests__/resolver.test.ts: (1) record-terminal issue with an open trip and a stoppedByUser row produces zero rows and an injected isClosed spy fails if called; (2) record-terminal + isClosed returning false still produces zero non-zombie rows (tracker-blip regression); (3) mergeStatus='merged' with reopenedAt set and closedOut unset is NOT terminal and classifies normally; (4) no record evidence falls back to the tracker check exactly as today."
+        },
+        "items": [
+          {
+            "id": "resolver-record-terminal.ac1",
+            "title": "Given a record-terminal issue (closedOut=true) with an open trip and a stoppedByUser row, resolveParkedPopulation returns zero rows for it and the injected isClosed spy is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-record-terminal.ac2",
+            "title": "Given a record-terminal issue and an isClosed that returns false (tracker blip), resolveParkedPopulation still returns zero non-zombie rows for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-record-terminal.ac3",
+            "title": "Given a record with mergeStatus='merged' and reopenedAt set and closedOut unset, the resolver falls back to the tracker check and classifies the issue's rows normally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-record-terminal.ac4",
+            "title": "Given a record with no terminal evidence, the resolver invokes the tracker closed-check exactly as before (fallback preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reopen-clears-record-merge",
+        "title": "clearRecordPipelineClosedOut drops stale mergeStatus='merged' on reopen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/__tests__/record-update.test.ts",
+            "tests/lib/reopen.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/record-update.test.ts tests/lib/reopen.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-update and reopen suites pass with the new mergeStatus-clearing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In clearRecordPipelineClosedOutSync and clearRecordPipelineClosedOut (src/lib/pan-dir/record-update.ts:127-158): inside the same mutation that clears closedOut/closedOutAt and stamps reopenedAt, delete record.pipeline.mergeStatus when it === 'merged'. Both reopen callers (src/lib/reopen.ts:90 and the state-plane patrol door at src/lib/cloister/state-plane-patrol.ts:36-40) inherit the fix. Tests: record-update.test.ts gains a case where a closed-out record with mergeStatus='merged' comes out of the door with no mergeStatus and reopenedAt stamped; tests/lib/reopen.test.ts gains a case where reopening a closed-out issue leaves the record without mergeStatus='merged'."
+        },
+        "items": [
+          {
+            "id": "reopen-clears-record-merge.ac1",
+            "title": "Given a record with closedOut=true and mergeStatus='merged', clearRecordPipelineClosedOutSync persists the record with closedOut cleared, reopenedAt stamped, and no mergeStatus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reopen-clears-record-merge.ac2",
+            "title": "Given a closed-out issue, pan reopen leaves the record with no pipeline.mergeStatus='merged' (reopen suite proves it end-to-end)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "residue-sweep-patrol",
+        "title": "Deacon patrol reconciles terminal-issue residue across all projects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/parked-residue.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/parked-residue.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/parked-residue.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "parked-residue suite passes (terminal cleaned, non-terminal untouched, door failure warns and continues)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "New module src/lib/cloister/parked-residue.ts exporting `reconcileTerminalIssueResidue(projects: Array<{ config: ProjectConfig }>, deps = defaultDeps()): Promise<StatePlaneReconcileAction[]>`, mirroring the deps-injection shape of reconcileProjectStatePlanes (src/lib/cloister/state-plane-patrol.ts:22-42). Default deps: listIssueRecords (src/lib/pan-dir/record-list.ts:29), acknowledgeAllOpenRecoveryTrips, clearAgentOperatorGatesForIssueSync. For each record matching the terminal predicate (closedOut === true, or mergeStatus === 'merged' with reopenedAt unset — export a shared isRecordPipelineTerminal(record) helper from the new module and reuse it in the resolver default): ack its open trips, clear its stopped rows' gates, and emit one action-level message per cleaned issue naming issue id, trips acked, and rows cleared. A door failure produces a warn action and does not stop other issues. Wire into the deacon beside the state-plane patrol call (src/lib/cloister/deacon.ts:3113) on the same statePlaneReconcileEveryCycles cadence, pushing messages into actions and addLog exactly like the neighboring patrol. Tests in src/lib/cloister/__tests__/parked-residue.test.ts with injected deps cover: terminal record with an open trip gets acked and logged; non-terminal record untouched; ack failure emits warn and later issues still process."
+        },
+        "items": [
+          {
+            "id": "residue-sweep-patrol.ac1",
+            "title": "Given a project with a terminal record carrying an open trip, reconcileTerminalIssueResidue acknowledges the trip, clears its stopped rows' gates, and emits an action message naming the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-sweep-patrol.ac2",
+            "title": "Given a non-terminal record, reconcileTerminalIssueResidue calls no write doors for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-sweep-patrol.ac3",
+            "title": "Given the ack door throws for one issue, the patrol emits a warn action for that issue and still processes the remaining issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-sweep-patrol.ac4",
+            "title": "The deacon patrol loop invokes reconcileTerminalIssueResidue on the state-plane cadence (grep deacon.ts shows the call beside reconcileProjectStatePlanes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-terminal-residue",
+        "title": "Document record-first terminality and the close-out residue step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T12:48:30.051Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PARKED-POPULATION.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors",
+            "the three docs name the new terminality order and residue step"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/PARKED-POPULATION.md: extend the 'Terminal residue' bullet (lines 30-31) and the resolver paragraph (lines 71-72) to state that terminality evidence is record-first (pipeline.closedOut, or mergeStatus='merged' with no reopenedAt) with the tracker call as fallback, and that the reaper's fail-closed posture is unchanged. docs/DEFINITION-OF-DONE.md row 9 (teardown): add that close-out acknowledges open recovery trips and clears operator-gate flags on the issue's stopped agent rows. docs/MERGE-WORKFLOW.md close-out paragraph (line 303): one sentence naming the residue-ack step and the hourly reconciliation patrol."
+        },
+        "items": [
+          {
+            "id": "docs-terminal-residue.ac1",
+            "title": "docs/PARKED-POPULATION.md contains a terminality-evidence note showing the resolver checks record-level terminality before any tracker call, so a tracker blip cannot resurrect a record-terminal issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-residue.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md row 9 contains trip acknowledgement and operator-gate clearing as close-out teardown behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-residue.ac3",
+            "title": "docs/MERGE-WORKFLOW.md contains a sentence naming the close-out residue-ack step and the deacon reconciliation patrol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ack-all-trips-door",
+        "to": "closeout-acks-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-operator-gates-door",
+        "to": "closeout-acks-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "ack-all-trips-door",
+        "to": "residue-sweep-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-operator-gates-door",
+        "to": "residue-sweep-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-record-terminal",
+        "to": "residue-sweep-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "reopen-clears-record-merge",
+        "to": "resolver-record-terminal",
+        "type": "informs"
+      },
+      {
+        "from": "closeout-acks-residue",
+        "to": "docs-terminal-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-record-terminal",
+        "to": "docs-terminal-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "residue-sweep-patrol",
+        "to": "docs-terminal-residue",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
