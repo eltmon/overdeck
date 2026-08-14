@@ -207,6 +207,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-14T12:49:23.422Z"
+    },
+    {
+      "timestamp": "2026-08-14T13:10:12.991Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -349,7 +354,7 @@
     "recordedAt": "2026-08-14T13:10:06.393Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T13:10:07.623Z",
+  "updated": "2026-08-14T13:10:13.081Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -359,13 +364,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T13:10:07.619Z",
+    "updatedAt": "2026-08-14T13:10:12.979Z",
     "testNotes": "Verification of reviewed commit 054f0f9c could not complete: workspace entered an in-progress merge of origin/main mid-run (MERGE_HEAD present, UU conflicts in spawn-prep.ts, deacon-swarm-types.ts, deacon-swarm.ts with literal <<<<<<< HEAD markers). Still-live work agent agent-pan-3680 is actively resolving this conflict in the same worktree right now -- a concurrency race, not a defect at the reviewed commit. npm run typecheck passed before the merge began. npm run lint failed reproducibly (2 runs) on the conflict markers. npm test not run against the unstable tree. Prior recorded npm test run in pipeline.testNotes also failed deterministically (tests/integration/swarm-foreman-polyrepo.test.ts), no verified fix landed since. Branch needs conflict resolution + fresh review before re-test. Full evidence in .pan/test/result.json.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "054f0f9ce288b8c2fba53b6c2fb7ef4aa278171f",
     "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
-    "reviewSpawnedAt": "2026-08-14T12:49:18.011Z",
     "reviewRequestedAt": "2026-08-14T13:10:07.619Z",
+    "reviewSpawnedAt": "2026-08-14T12:49:18.011Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -510,15 +515,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 27980541,
-            "output": 13278,
-            "cacheRead": 22062336,
+            "input": 28293612,
+            "output": 13500,
+            "cacheRead": 22272512,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 244363714,
-            "output": 321687,
-            "cacheRead": 238291712,
+            "input": 245013495,
+            "output": 322673,
+            "cacheRead": 238920704,
             "cacheWrite": 0
           }
         },
@@ -532,24 +537,24 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 358,
-            "output": 67019,
-            "cacheRead": 25170037,
-            "cacheWrite": 660541
+            "input": 362,
+            "output": 67779,
+            "cacheRead": 25506712,
+            "cacheWrite": 662958
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 27980541,
-          "output": 13278,
-          "cacheRead": 22062336,
+          "input": 28293612,
+          "output": 13500,
+          "cacheRead": 22272512,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 244363714,
-          "output": 321687,
-          "cacheRead": 238291712,
+          "input": 245013495,
+          "output": 322673,
+          "cacheRead": 238920704,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -559,15 +564,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 358,
-          "output": 67019,
-          "cacheRead": 25170037,
-          "cacheWrite": 660541
+          "input": 362,
+          "output": 67779,
+          "cacheRead": 25506712,
+          "cacheWrite": 662958
         }
       },
       "costAtCloseOut": {
-        "usd": 166.565278,
-        "pricingAsOf": "2026-08-14T13:08:39.572Z"
+        "usd": 167.09428400000002,
+        "pricingAsOf": "2026-08-14T13:10:13.029Z"
       }
     },
     "merges": [
