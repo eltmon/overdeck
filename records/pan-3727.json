@@ -130,17 +130,17 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T15:11:21.416Z",
+  "updated": "2026-08-14T15:11:27.609Z",
   "pipeline": {
     "issueId": "PAN-3727",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-14T15:06:07.507Z",
+    "updatedAt": "2026-08-14T15:11:27.594Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
@@ -206,9 +206,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.6-sol": {
-            "input": 2902598,
-            "output": 13828,
-            "cacheRead": 2573568,
+            "input": 6378354,
+            "output": 23872,
+            "cacheRead": 5897472,
             "cacheWrite": 0
           }
         },
@@ -222,18 +222,18 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 960,
-            "output": 192481,
-            "cacheRead": 187457420,
-            "cacheWrite": 2593299
+            "input": 964,
+            "output": 193797,
+            "cacheRead": 188803178,
+            "cacheWrite": 2597780
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2902598,
-          "output": 13828,
-          "cacheRead": 2573568,
+          "input": 6378354,
+          "output": 23872,
+          "cacheRead": 5897472,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -243,15 +243,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 960,
-          "output": 192481,
-          "cacheRead": 187457420,
-          "cacheWrite": 2593299
+          "input": 964,
+          "output": 193797,
+          "cacheRead": 188803178,
+          "cacheWrite": 2597780
         }
       },
       "costAtCloseOut": {
-        "usd": 49.257796,
-        "pricingAsOf": "2026-08-14T15:06:15.057Z"
+        "usd": 52.27385,
+        "pricingAsOf": "2026-08-14T15:11:27.598Z"
       }
     },
     "merges": [
