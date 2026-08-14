@@ -200,7 +200,7 @@
     }
   ],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-14T05:15:19.833Z",
+  "updated": "2026-08-14T05:33:58.902Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "blocked",
@@ -493,5 +493,15 @@
     "e2e-pi-local-gemma.ac1": "completed",
     "e2e-pi-local-gemma.ac2": "completed",
     "e2e-pi-local-gemma.ac3": "completed"
-  }
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1641",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-14T05:33:58.880Z"
+    }
+  ]
 }
