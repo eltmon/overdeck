@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T05:02:55.339Z",
+  "updated": "2026-08-14T05:05:42.010Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -28,14 +28,12 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T05:02:55.314Z",
-    "mergeNotes": "Post-rebase verification failed at lint",
-    "strikeReadyHead": "974200adf8bc698b4f2d138c8417bf73a67c6abb",
-    "strikeReadyAt": "2026-08-14T04:13:29.298Z",
+    "updatedAt": "2026-08-14T05:05:29.152Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3695 after its harness exited before push.",
+    "strikeReadyHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
+    "strikeReadyAt": "2026-08-14T05:05:29.152Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-08-14T04:19:53.987Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-14T04:18:53.987Z",
@@ -94,7 +92,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.0659170000000002,
-        "pricingAsOf": "2026-08-14T05:02:55.321Z"
+        "pricingAsOf": "2026-08-14T05:05:29.186Z"
       }
     },
     "merges": [],
