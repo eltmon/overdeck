@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:07:08.628Z",
+  "updated": "2026-08-14T13:14:07.148Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "clear-operator-gates-door": {
-        "writerId": "agent-pan-3727",
-        "agentId": "agent-pan-3727",
-        "pid": 568459,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T13:07:08.627Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Extracted acknowledgeAllOpenRecoveryTrips door from parked.ts into recovery-trip.ts; pan parked ack now calls the door. Added recovery-trip-all.test.ts covering happy path (2 acked, 1 closed retained) and unresolvable-issue path (0). Typecheck and tests green.",
         "releasedAt": "2026-08-14T13:06:50.903Z"
+      },
+      {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 568459,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:07:08.627Z",
+        "itemId": "clear-operator-gates-door",
+        "outcome": "completed",
+        "reason": "Added clearAgentOperatorGatesForIssueSync to agent-state.ts: clears stoppedByUser/paused/troubled on an issue's stopped agent rows, skips running/starting agents and scheduler yields. Added 3 test cases to agent-state-gate.test.ts. Typecheck and tests green.",
+        "releasedAt": "2026-08-14T13:14:07.148Z"
       }
     ],
     "statusReasons": {
       "ack-all-trips-door": {
         "reason": "Extracted acknowledgeAllOpenRecoveryTrips door from parked.ts into recovery-trip.ts; pan parked ack now calls the door. Added recovery-trip-all.test.ts covering happy path (2 acked, 1 closed retained) and unresolvable-issue path (0). Typecheck and tests green.",
         "updatedAt": "2026-08-14T13:06:50.903Z"
+      },
+      "clear-operator-gates-door": {
+        "reason": "Added clearAgentOperatorGatesForIssueSync to agent-state.ts: clears stoppedByUser/paused/troubled on an issue's stopped agent rows, skips running/starting agents and scheduler yields. Added 3 test cases to agent-state-gate.test.ts. Typecheck and tests green.",
+        "updatedAt": "2026-08-14T13:14:07.148Z"
       }
     }
   },
@@ -104,6 +111,9 @@
     "ack-all-trips-door.ac1": "completed",
     "ack-all-trips-door.ac2": "completed",
     "ack-all-trips-door.ac3": "completed",
-    "clear-operator-gates-door": "running"
+    "clear-operator-gates-door": "completed",
+    "clear-operator-gates-door.ac1": "completed",
+    "clear-operator-gates-door.ac2": "completed",
+    "clear-operator-gates-door.ac3": "completed"
   }
 }
