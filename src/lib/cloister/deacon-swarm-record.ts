@@ -140,6 +140,7 @@ export async function releaseBlockedSwarmSlot(
   slotIndex: number,
   itemId: string,
   branch?: string,
+  archived?: { archivedBranch: string; archivedWorktree: string; replacementBranch: string; releasedAt: string },
 ): Promise<void> {
   const normalizedIssueId = issueId.toUpperCase();
   await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
@@ -157,10 +158,28 @@ export async function releaseBlockedSwarmSlot(
         slotCompletions,
         releasedBlockedSlots: {
           ...(swarm.releasedBlockedSlots ?? {}),
-          [String(slotIndex)]: { slotIndex, itemId, branch, releasedAt: new Date().toISOString() },
+          [String(slotIndex)]: {
+            slotIndex,
+            itemId,
+            branch,
+            ...archived,
+            releasedAt: archived?.releasedAt ?? new Date().toISOString(),
+          },
         },
       },
     };
+  });
+}
+
+export async function clearReleasedBlockedSwarmSlot(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
+    const releasedBlockedSlots = { ...(record.swarm?.releasedBlockedSlots ?? {}) };
+    delete releasedBlockedSlots[String(slotIndex)];
+    return { ...record, swarm: { ...(record.swarm ?? {}), releasedBlockedSlots } };
   });
 }
 

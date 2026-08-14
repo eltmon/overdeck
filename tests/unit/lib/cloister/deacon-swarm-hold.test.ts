@@ -414,7 +414,12 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     expect(actions).toContain('[swarm] merged slot 2 (item wi-2) for PAN-201');
     expect(deps.verifyAndMergeSlot).toHaveBeenCalledTimes(1);
     expect(deps.verifyAndMergeSlot).toHaveBeenCalledWith(
-      { issueId: 'PAN-201', featureWorkspace: workspacePath },
+      {
+        issueId: 'PAN-201',
+        featureWorkspace: workspacePath,
+        slotBranch: 'feature/pan-201-slot-2',
+        slotWorkspace: `${workspacePath}-slot-2`,
+      },
       2,
       expect.objectContaining({ id: 'wi-2' }),
     );

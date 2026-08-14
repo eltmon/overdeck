@@ -238,7 +238,7 @@ function resolveSlotItemOwnership(
 }
 
 function slotIndexFromBranch(issueLower: string, branch: string): number | null {
-  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}-slot-(\\d+)$`).exec(branch);
+  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}-slot-(\\d+)(?:-attempt-\\d+)?$`).exec(branch);
   if (!match) return null;
   return Number(match[1]);
 }

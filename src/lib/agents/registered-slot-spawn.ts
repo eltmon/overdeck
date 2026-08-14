@@ -75,7 +75,7 @@ export async function ensureRegisteredSlotWorktree(issueId: string, baseWorkspac
         const branchExists = await gitBranchExists(root.dir, slot.branch);
         const command = branchExists
           ? `git worktree add ${JSON.stringify(root.target)} ${JSON.stringify(slot.branch)}`
-          : `git worktree add -b ${JSON.stringify(slot.branch)} ${JSON.stringify(root.target)} HEAD`;
+          : `git worktree add -b ${JSON.stringify(slot.branch)} ${JSON.stringify(root.target)} ${JSON.stringify(root.sourceBranch)}`;
         await execAsync(command, { cwd: root.dir });
       }
     } catch (error) {
@@ -84,14 +84,24 @@ export async function ensureRegisteredSlotWorktree(issueId: string, baseWorkspac
     return;
   }
 
-  if (existsSync(slot.workspace)) return;
+  if (existsSync(slot.workspace)) {
+    let branch = '';
+    try {
+      branch = (await execAsync('git branch --show-current', { cwd: slot.workspace })).stdout.trim();
+    } catch { /* handled by the stale-workspace error below */ }
+    if (branch === slot.branch) return;
+    throw new Error(`Registered slot workspace is incomplete at ${slot.workspace}; run pan swarm reset before dispatching it.`);
+  }
   await mkdir(dirname(slot.workspace), { recursive: true });
   const branchExists = await gitBranchExists(baseWorkspace, slot.branch);
+  if (branchExists && !(await gitRefsEqual(baseWorkspace, slot.branch, repoRoots[0].sourceBranch))) {
+    throw new Error(`Registered slot branch ${slot.branch} is not at ${repoRoots[0].sourceBranch}; refusing to reuse stale work.`);
+  }
   const target = JSON.stringify(slot.workspace);
   const branch = JSON.stringify(slot.branch);
   const command = branchExists
     ? `git worktree add ${target} ${branch}`
-    : `git worktree add -b ${branch} ${target} HEAD`;
+    : `git worktree add -b ${branch} ${target} ${JSON.stringify(repoRoots[0].sourceBranch)}`;
   await execAsync(command, { cwd: baseWorkspace });
 }
 
@@ -99,6 +109,18 @@ async function gitBranchExists(workspace: string, branch: string): Promise<boole
   try {
     await execAsync(`git show-ref --verify --quiet ${JSON.stringify(`refs/heads/${branch}`)}`, { cwd: workspace });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function gitRefsEqual(workspace: string, left: string, right: string): Promise<boolean> {
+  try {
+    const [leftResult, rightResult] = await Promise.all([
+      execAsync(`git rev-parse ${JSON.stringify(left)}`, { cwd: workspace }),
+      execAsync(`git rev-parse ${JSON.stringify(right)}`, { cwd: workspace }),
+    ]);
+    return leftResult.stdout.trim() === rightResult.stdout.trim();
   } catch {
     return false;
   }
