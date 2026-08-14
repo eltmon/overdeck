@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T04:19:26.263Z",
+  "updated": "2026-08-14T04:27:00.353Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -74,6 +74,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "k3[1m]"
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
