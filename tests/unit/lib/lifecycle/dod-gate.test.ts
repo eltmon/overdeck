@@ -470,16 +470,35 @@ describe('Definition-of-Done merged row', () => {
     });
   });
 
-  it('does not gather containment when merge evidence already passes', async () => {
-    const readBranchContainment = vi.fn();
+  it('records containment evidence when git verification passes without a merged PR', async () => {
+    const readBranchContainment = vi.fn(async () => ({
+      mergedWorkRefs: ['frontend:feature/pan-2715'],
+      unmergedRefs: [],
+      pointerRefs: [],
+    }));
     const row = await checkMergedRow(ctx, {
       verifyMerged: async () => stepOk('close-out:verify-merged', ['All commits merged to main']),
       readPullRequest: async () => ({}),
       readBranchContainment,
     });
 
+    expect(row).toMatchObject({ status: 'pass', evidence: 'branch-containment' });
+    expect(readBranchContainment).toHaveBeenCalledOnce();
+  });
+
+  it('does not record containment evidence when git verification passes with unmerged work', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['Remote branch fully merged']),
+      readPullRequest: async () => ({}),
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/pan-2715'],
+        unmergedRefs: ['api:feature/pan-2715'],
+        pointerRefs: [],
+      }),
+    });
+
     expect(row.status).toBe('pass');
-    expect(readBranchContainment).not.toHaveBeenCalled();
+    expect(row.evidence).toBeUndefined();
   });
 
   it('describes branch containment as accepted merged-row evidence', () => {
@@ -1120,14 +1139,17 @@ describe('assembled Definition-of-Done gate', () => {
     });
   });
 
-  it('leaves only review, tests, and verification missing for a quiescent non-PR landing', async () => {
-    const nonPrCtx = { issueId: 'MIN-305', projectPath: '/myn' };
+  it('resolves post-merge when git verification passes for a contained branch without a merged PR', async () => {
+    const nonPrCtx = {
+      issueId: 'PAN-3702',
+      projectPath: '/overdeck',
+      github: { owner: 'eltmon', repo: 'overdeck', number: 3702 },
+    };
     const merged = await checkMergedRow(nonPrCtx, {
-      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['Remote branch fully merged']),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
       readBranchContainment: async () => ({
-        mergedWorkRefs: ['frontend:feature/min-305'],
+        mergedWorkRefs: ['overdeck:feature/pan-3702'],
         unmergedRefs: [],
         pointerRefs: [],
       }),
@@ -1150,7 +1172,10 @@ describe('assembled Definition-of-Done gate', () => {
     });
 
     expect(gate.misses).toEqual(['review', 'tests', 'verification']);
-    expect(gate.rows.find(row => row.id === 'merged')).toMatchObject({ status: 'pass' });
+    expect(gate.rows.find(row => row.id === 'merged')).toMatchObject({
+      status: 'pass',
+      evidence: 'branch-containment',
+    });
     expect(gate.rows.find(row => row.id === 'post-merge')).toMatchObject({ status: 'pass' });
   });
 

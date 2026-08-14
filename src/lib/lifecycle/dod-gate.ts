@@ -514,7 +514,14 @@ export async function checkMergedRow(
     }
   }
 
-  if (merged.status === 'miss') {
+  // A successful ancestry check proves that the branch head reached main, but
+  // only containment can identify that result as a non-PR landing for row 5.
+  const needsContainmentEvidence = merged.status === 'miss' || (
+    verified.success &&
+    ctx.github !== undefined &&
+    pullRequestState?.toUpperCase() !== 'MERGED'
+  );
+  if (needsContainmentEvidence) {
     try {
       const containment = await (deps.readBranchContainment ?? defaultMergedRowDeps.readBranchContainment!)(ctx);
       if (containment.mergedWorkRefs.length > 0 && containment.unmergedRefs.length === 0) {
