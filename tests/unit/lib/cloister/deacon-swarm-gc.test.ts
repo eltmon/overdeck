@@ -21,6 +21,10 @@ function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean }
       if (command === 'git worktree list --porcelain') {
         return { stdout: `worktree ${cwd}\n\nworktree ${cwd}-slot-1\n\nworktree ${cwd}-slot-4\n\nworktree ${cwd}-slot-9\n` };
       }
+      // The monorepo outer workspace holds every slot branch locally.
+      if (command.startsWith('git branch --list')) {
+        return { stdout: `${JSON.parse(command.slice('git branch --list '.length))}\n` };
+      }
       return undefined;
     }),
     clearSlotAssignment: vi.fn(),
@@ -157,7 +161,11 @@ describe('deacon-swarm merged slot GC', () => {
     await expect(gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps))
       .resolves.toEqual(['[swarm] gc slot 1 (item wi-1) for PAN-2203']);
 
-    expect(fakeDeps.runGitCommand).toHaveBeenCalledTimes(1);
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledTimes(2);
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      'git branch --list "feature/pan-2203-slot-1"',
+      '/repo/workspaces/feature-pan-2203',
+    );
     expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
       'git branch -D "feature/pan-2203-slot-1"',
       '/repo/workspaces/feature-pan-2203',
@@ -189,7 +197,10 @@ describe('deacon-swarm merged slot GC', () => {
 
   it('keeps the assignment when the branch delete fails so reconcile still sees the slot', async () => {
     const fakeDeps = deps([], { worktreeExists: false });
-    fakeDeps.runGitCommand = vi.fn(async () => {
+    fakeDeps.runGitCommand = vi.fn(async (command: string) => {
+      if (command.startsWith('git branch --list')) {
+        return { stdout: `${JSON.parse(command.slice('git branch --list '.length))}\n` };
+      }
       throw new Error('branch is checked out');
     });
 
@@ -197,6 +208,35 @@ describe('deacon-swarm merged slot GC', () => {
 
     expect(actions).toEqual([
       '[swarm] gc deferred slot 1 (item wi-1) for PAN-2203: branch delete failed: branch is checked out',
+    ]);
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('treats an absent outer slot branch as idempotent success (polyrepo wrapper holds no slot branch)', async () => {
+    const fakeDeps = deps([], { worktreeExists: false });
+    fakeDeps.runGitCommand = vi.fn(async (command: string) => {
+      if (command.startsWith('git branch --list')) return { stdout: '' };
+      return undefined;
+    });
+
+    const actions = await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps);
+
+    expect(actions).toEqual(['[swarm] gc slot 1 (item wi-1) for PAN-2203']);
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalled();
+  });
+
+  it('defers when the outer branch state cannot be determined', async () => {
+    const fakeDeps = deps([], { worktreeExists: false });
+    fakeDeps.runGitCommand = vi.fn(async () => {
+      throw new Error('not a git repository');
+    });
+
+    const actions = await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps);
+
+    expect(actions).toEqual([
+      '[swarm] gc deferred slot 1 (item wi-1) for PAN-2203: branch state of feature/pan-2203-slot-1 could not be determined',
     ]);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
@@ -210,6 +250,10 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     { repoKey: 'fe', dir: `${slotWorkspace}/fe`, parentRepo: '/myn/frontend', featureBranch: 'feature/min-888' },
     { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/myn/api', featureBranch: 'feature/min-888' },
   ];
+  const baseRoots = [
+    { repoKey: 'fe', dir: `${workspacePath}/fe`, sourceBranch: 'feature/min-888', targetBranch: 'main', isPolyrepo: true },
+    { repoKey: 'api', dir: `${workspacePath}/api`, sourceBranch: 'feature/min-888', targetBranch: 'main', isPolyrepo: true },
+  ];
 
   function polyrepoDeps(options: {
     aheadByRepo?: Record<string, string>;
@@ -220,16 +264,56 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     unregisteredRepo?: string;
     aggregateRegistered?: boolean;
     worktreeListThrows?: boolean;
+    /** Repo whose `git merge --no-ff` into the base feature checkout fails. */
+    mergeFailsRepo?: string;
+    /** Repo whose `git push origin` from the base feature checkout fails. */
+    pushFailsRepo?: string;
+    /** Repo whose base feature checkout has tracked local modifications. */
+    dirtyBaseByRepo?: Record<string, string>;
+    /** Unpushed origin..feature commit count per repo (checked in the base checkout). */
+    unpushedByRepo?: Record<string, string>;
+    /** When false, a merge does not reduce the ahead count (verification fails). */
+    mergeSticks?: boolean;
+    /** Whether the outer wrapper holds a local slot branch (polyrepo: usually not). */
+    outerBranchPresent?: boolean;
+    /** Base feature-workspace roots override (e.g. to simulate a missing checkout). */
+    featureRoots?: typeof baseRoots;
   } = {}) {
     const removeDirectory = vi.fn(async () => undefined);
+    // Stateful ahead counts: a successful merge into a repo's base checkout
+    // drops that repo's count to 0 (unless mergeSticks disables it).
+    const ahead = new Map(Object.entries(options.aheadByRepo ?? {}));
     const fakeDeps = {
       runGitCommand: vi.fn(async (command: string, cwd: string) => {
         if (command.startsWith('git rev-list --count')) {
           if (options.aheadThrows) throw new Error('unknown revision');
+          // Slot ancestry counts run in the parent repo; the unpushed
+          // origin..feature count runs in the base feature checkout.
+          const baseRoot = baseRoots.find(r => r.dir === cwd);
+          if (baseRoot && command.includes('origin/')) {
+            return { stdout: `${options.unpushedByRepo?.[baseRoot.repoKey] ?? '0'}\n` };
+          }
           const repo = nested.find(wt => wt.parentRepo === cwd);
-          return { stdout: `${options.aheadByRepo?.[repo?.repoKey ?? ''] ?? '0'}\n` };
+          return { stdout: `${ahead.get(repo?.repoKey ?? '') ?? '0'}\n` };
+        }
+        if (command.startsWith('git push origin')) {
+          const root = baseRoots.find(r => r.dir === cwd);
+          if (root?.repoKey === options.pushFailsRepo) throw new Error('failed to push some refs');
+          return undefined;
+        }
+        if (command.startsWith('git merge --no-ff')) {
+          const root = baseRoots.find(r => r.dir === cwd);
+          if (root?.repoKey === options.mergeFailsRepo) throw new Error('CONFLICT (content): merge conflict');
+          if (root && options.mergeSticks !== true) ahead.set(root.repoKey, '0');
+          return undefined;
+        }
+        if (command === 'git merge --abort') return undefined;
+        if (command.startsWith('git branch --list')) {
+          return { stdout: options.outerBranchPresent === false ? '' : `${slotBranch}\n` };
         }
         if (command.startsWith('git status --porcelain')) {
+          const baseRoot = baseRoots.find(r => r.dir === cwd);
+          if (baseRoot) return { stdout: options.dirtyBaseByRepo?.[baseRoot.repoKey] ?? '' };
           const repo = nested.find(wt => wt.dir === cwd);
           return { stdout: options.dirtyByRepo?.[repo?.repoKey ?? ''] ?? '' };
         }
@@ -261,6 +345,7 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
       listSessionNames: vi.fn(async () => [] as string[]),
       slotWorktreeExists: vi.fn(() => true),
       listSlotWorkspaceWorktrees: () => ({ isPolyrepo: true, nested }),
+      listFeatureWorkspaceRepoRoots: () => options.featureRoots ?? baseRoots,
       removeDirectory,
     };
     return fakeDeps;
@@ -302,15 +387,191 @@ describe('deacon-swarm merged slot GC (polyrepo, PAN-3686)', () => {
     expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'MIN-888', 2, 'wi-36');
   });
 
-  it('preserves a slot whose nested branch has unmerged commits', async () => {
-    const fakeDeps = polyrepoDeps({ aheadByRepo: { api: '3' } });
+  it('merges every unmerged nested slot branch before reaping, with no outer slot branch (PAN-3695)', async () => {
+    const fakeDeps = {
+      ...polyrepoDeps({ aheadByRepo: { api: '3', fe: '2' }, outerBranchPresent: false }),
+      listSessionNames: vi.fn(async () => ['agent-min-888-slot-2']),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [
+      { ...polySlot(), mergedVia: 'completed-status' as const },
+    ], fakeDeps);
+
+    // Both nested branches merged through their base feature-workspace checkouts.
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/api`,
+    );
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/fe`,
+    );
+    // Ancestry verification ran per repo AFTER the merge (rev-list before + after).
+    const revListCalls = vi.mocked(fakeDeps.runGitCommand).mock.calls
+      .filter(([command]) => command.startsWith('git rev-list --count'));
+    expect(revListCalls.filter(([, cwd]) => cwd === '/myn/api')).toHaveLength(2);
+    expect(revListCalls.filter(([, cwd]) => cwd === '/myn/frontend')).toHaveLength(2);
+    // Every merge precedes every removal and the reap — nothing is reaped early.
+    const calls = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    const lastMerge = Math.max(...calls
+      .map((command, index) => command.startsWith('git merge --no-ff') ? index : -1));
+    const firstRemove = calls.findIndex(command => command.includes('worktree remove') || command.includes('branch -D'));
+    expect(lastMerge).toBeGreaterThanOrEqual(0);
+    expect(firstRemove).toBeGreaterThan(lastMerge);
+    // Each verified merge is pushed to origin before any removal.
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/min-888"', `${workspacePath}/api`);
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/min-888"', `${workspacePath}/fe`);
+    const lastPush = Math.max(...calls
+      .map((command, index) => command.startsWith('git push origin') ? index : -1));
+    expect(lastPush).toBeGreaterThan(lastMerge);
+    expect(firstRemove).toBeGreaterThan(lastPush);
+    expect(fakeDeps.stopSlotAgent).toHaveBeenCalledWith('agent-min-888-slot-2');
+    const stopOrder = fakeDeps.stopSlotAgent.mock.invocationCallOrder[0];
+    const lastMergeOrder = vi.mocked(fakeDeps.runGitCommand).mock.invocationCallOrder[lastMerge];
+    expect(stopOrder).toBeGreaterThan(lastMergeOrder);
+    // The absent outer slot branch is an idempotent success: no branch -D in
+    // the wrapper, yet the slot still frees.
+    expect(calls.some(command => command.includes('branch -D') )).toBe(true); // nested repos only
+    expect(vi.mocked(fakeDeps.runGitCommand).mock.calls
+      .some(([command, cwd]) => command.includes('branch -D') && cwd === workspacePath)).toBe(false);
+    expect(actions).toContain('[swarm] gc slot 2 (item wi-36) for MIN-888');
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'MIN-888', 2, 'wi-36');
+  });
+
+  it('keeps a partially-merged slot unmerged and retryable when one nested merge fails (PAN-3695)', async () => {
+    const fakeDeps = {
+      ...polyrepoDeps({ aheadByRepo: { api: '3', fe: '2' }, mergeFailsRepo: 'fe' }),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
 
     const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
 
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toContain('preserving nested work');
+    expect(actions[0]).toContain('nested merge incomplete');
+    expect(actions[0]).toContain('fe');
+    expect(actions[0]).toContain('did not merge cleanly');
+    // The failed merge is aborted in the fe base checkout; the successful api
+    // merge is preserved (no rollback), and nothing is removed or reaped.
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith('git merge --abort', `${workspacePath}/fe`);
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/api`,
+    );
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(commands.some(command => command.includes('reset'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+    expect(fakeDeps.stopSlotAgent).not.toHaveBeenCalled();
+
+    // Retry: the already-merged api repo is not re-merged; the failed fe repo is.
+    vi.mocked(fakeDeps.runGitCommand).mockClear();
+    const retryDeps = {
+      ...polyrepoDeps({ aheadByRepo: { fe: '2' } }),
+      stopSlotAgent: fakeDeps.stopSlotAgent,
+    };
+    const retryActions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], retryDeps);
+    expect(retryDeps.runGitCommand).not.toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/api`,
+    );
+    expect(retryDeps.runGitCommand).toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/fe`,
+    );
+    expect(retryActions).toContain('[swarm] gc slot 2 (item wi-36) for MIN-888');
+  });
+
+  it('verifies ancestry for every changed nested repo before completing the slot (PAN-3695)', async () => {
+    // The merge command exits 0 but the slot head never lands — verification
+    // must catch it and keep the slot occupied.
+    const fakeDeps = polyrepoDeps({ aheadByRepo: { api: '3' }, mergeSticks: true });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
     expect(actions[0]).toContain('api');
-    expect(actions[0]).toContain('3 unmerged commit(s)');
+    expect(actions[0]).toContain('ancestry verification failed');
+    expect(actions[0]).toContain('3 commit(s)');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('refuses to merge into a dirty base feature checkout, then retries once clean (PAN-3695)', async () => {
+    const fakeDeps = {
+      ...polyrepoDeps({ aheadByRepo: { api: '3' }, dirtyBaseByRepo: { api: ' M src/hot.ts\n' } }),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('nested merge incomplete');
+    expect(actions[0]).toContain('api');
+    expect(actions[0]).toContain('base feature checkout');
+    expect(actions[0]).toContain('uncommitted changes');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('git merge'))).toBe(false);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+    expect(fakeDeps.stopSlotAgent).not.toHaveBeenCalled();
+
+    // Retry with a clean base: the merge, verification, and push all run.
+    const retryDeps = polyrepoDeps({ aheadByRepo: { api: '3' } });
+    const retryActions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], retryDeps);
+    expect(retryDeps.runGitCommand).toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/api`,
+    );
+    expect(retryDeps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/min-888"', `${workspacePath}/api`);
+    expect(retryActions).toContain('[swarm] gc slot 2 (item wi-36) for MIN-888');
+  });
+
+  it('keeps the slot retryable when the push after a verified merge fails (PAN-3695)', async () => {
+    const fakeDeps = {
+      ...polyrepoDeps({ aheadByRepo: { api: '3' }, pushFailsRepo: 'api' }),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('nested merge incomplete');
+    expect(actions[0]).toContain('api');
+    expect(actions[0]).toContain('push to origin failed');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+    expect(fakeDeps.stopSlotAgent).not.toHaveBeenCalled();
+
+    // Retry: the local merge is already an ancestor, but the unpushed count
+    // proves remote durability is still owed — push is retried, then GC frees.
+    const retryDeps = polyrepoDeps({ unpushedByRepo: { api: '4' } });
+    const retryActions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], retryDeps);
+    expect(retryDeps.runGitCommand).not.toHaveBeenCalledWith(
+      `git merge --no-ff ${JSON.stringify(slotBranch)}`,
+      `${workspacePath}/api`,
+    );
+    expect(retryDeps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/min-888"', `${workspacePath}/api`);
+    expect(retryActions).toContain('[swarm] gc slot 2 (item wi-36) for MIN-888');
+  });
+
+  it('fails an already-merged-local repo whose base checkout is missing — remote durability unverifiable (PAN-3695)', async () => {
+    const fakeDeps = polyrepoDeps({
+      featureRoots: baseRoots.filter(root => root.repoKey !== 'api'),
+    });
+
+    const actions = await gcMergedSlots('MIN-888', workspacePath, [polySlot()], fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('nested merge incomplete');
+    expect(actions[0]).toContain('api');
+    expect(actions[0]).toContain('no base feature-workspace checkout');
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
     expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
