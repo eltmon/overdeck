@@ -63,6 +63,7 @@ interface PaletteAction {
   meta?: Array<{ icon?: React.ElementType; text: string; pill?: boolean }>;
   // Sort hint within group: lower = earlier.
   rank?: number;
+  sortTs?: string | null;
   /**
    * Run the action without closing the palette. For in-palette affordances that
    * change what is listed rather than navigating away — e.g. expanding the
@@ -151,6 +152,7 @@ interface PaletteSearchResponse {
 const EMPTY_AGENTS: Agent[] = [];
 const EMPTY_ISSUES: Issue[] = [];
 const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [], conversations: [] };
+export const PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY = 'overdeck.ui.paletteConversationsNewestFirst';
 
 // ─── Display helpers ────────────────────────────────────────────────────────────
 
@@ -384,6 +386,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
+  const [conversationsNewestFirst, setConversationsNewestFirst] = useState(
+    () => localStorage.getItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY) !== 'false',
+  );
+  const toggleConversationsNewestFirst = useCallback(() => {
+    setConversationsNewestFirst((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   // Reset query when opened, and lazy-load the pan command catalog the first
   // time the palette is shown. Workspaces are re-fetched every open — most-
@@ -783,6 +795,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         icon: MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
+        sortTs: hit.ts,
         excerptSegments: hit.excerptSegments.map((seg) => ({
           kind: seg.match ? 'match' : 'text',
           value: seg.text,
