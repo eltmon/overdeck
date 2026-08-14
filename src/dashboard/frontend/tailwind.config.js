@@ -10,7 +10,28 @@ export default {
   // theme-token-scope lands the vocabulary; broadsheet-mechanical-migration
   // adopts it). Without a safelist entry Tailwind's content-based purge drops
   // them from the build since no scanned file contains the class name token.
-  safelist: ['display-xl', 'display-lg', 'eyebrow'],
+  // chip/chip-dashed/chip-selected/soft-card/soft-card-bordered/large-cta/
+  // keycap/dot-metadata (PAN-3706 F-11) and shadow-floating/shadow-overlay
+  // (PAN-3706 F-4) are the same situation: authored, not yet consumed.
+  // shadow-card is already referenced (SimpleQuestionCard.tsx) so it would
+  // survive the scan on its own, but it's listed too for clarity/parity with
+  // its shadow-floating/shadow-overlay siblings.
+  safelist: [
+    'display-xl',
+    'display-lg',
+    'eyebrow',
+    'chip',
+    'chip-dashed',
+    'chip-selected',
+    'soft-card',
+    'soft-card-bordered',
+    'large-cta',
+    'keycap',
+    'dot-metadata',
+    'shadow-card',
+    'shadow-floating',
+    'shadow-overlay',
+  ],
   theme: {
     extend: {
       colors: {
@@ -69,11 +90,24 @@ export default {
           DEFAULT: 'var(--signal-cost)',
           foreground: 'var(--signal-cost-foreground)',
         },
+        // PAN-3706 F-8/F-5 — new tokens that need a Tailwind color entry so
+        // components can actually reach them (text-primary-ink,
+        // text-body-foreground, text-faint-foreground, bg-wash, ...).
+        'primary-ink': 'var(--primary-ink)',
+        'body-foreground': 'var(--body-foreground)',
+        'faint-foreground': 'var(--faint-foreground)',
+        wash: 'var(--wash)',
       },
       fontFamily: {
         display: ['var(--font-display)', 'system-ui', 'sans-serif'],
         body: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', '"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
+        // PAN-3706 F-10 — chrome/UI monospace role, split out from `mono`
+        // (reserved for code/terminal output). Fallback stack mirrors the
+        // `mono` entry's own convention: repeat the CSS variable's Ledger
+        // fallback stack so the generated class still degrades sanely if
+        // the custom property is ever unavailable.
+        'mono-ui': ['var(--font-mono-ui)', '"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
       },
       borderRadius: {
         sm: 'calc(var(--radius) - 4px)',
@@ -83,6 +117,24 @@ export default {
         '2xl': 'calc(var(--radius) + 8px)',
         '3xl': 'calc(var(--radius) + 12px)',
         '4xl': 'calc(var(--radius) + 16px)',
+      },
+      // PAN-3706 F-4 — role-named, dark-mode-aware shadow scale. sm/md/lg/xl
+      // override Tailwind's stock boxShadow keys (theme.extend deep-merges
+      // per named key, same mechanism borderRadius above already relies on
+      // to fully override Tailwind's stock radius scale); card/floating/
+      // overlay are new keys. Every value is var(--shadow-*, <stock-or-new
+      // literal fallback>) — same var()-with-literal-fallback shape
+      // index.css already uses for --badge-radius. --shadow-* is always
+      // defined (see index.css's :root and the four data-theme scopes), so
+      // the fallback here is defense-in-depth, not the primary path.
+      boxShadow: {
+        sm: 'var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05))',
+        md: 'var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1))',
+        lg: 'var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1))',
+        xl: 'var(--shadow-xl, 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1))',
+        card: 'var(--shadow-card, 0 1px 1px rgba(0, 0, 0, 0.05))',
+        floating: 'var(--shadow-floating, 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08))',
+        overlay: 'var(--shadow-overlay, 0 16px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1))',
       },
       keyframes: {
         'fade-in': {
