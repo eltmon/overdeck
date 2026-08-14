@@ -57,6 +57,12 @@ Two clearing rules keep the gate from wedging:
   `pending`), and later requests could never be approved. A *live* claim is
   never dropped this way — the claimant is restarting, not polling.
 
+  That drop also records `lastOutcome: { type: 'pruned-unclaimed', at }` on the
+  projection for 15s (PAN-3731, additive — not part of the pinned PAN-3729 wire
+  contract). The banner uses it to say the approval restarted nothing instead
+  of silently vanishing; the notice window is measured from `at`, so a late
+  connect shows only what is left of it.
+
 ## Boot resolution
 
 On startup the server reads `~/.overdeck/restart-gate.json`:
