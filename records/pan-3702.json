@@ -3,21 +3,32 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-14T05:17:32.967Z",
-  "updated": "2026-08-14T06:17:48.116Z",
+  "updated": "2026-08-14T06:24:32.498Z",
   "pipeline": {
     "issueId": "PAN-3702",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:17:28.167Z",
+    "updatedAt": "2026-08-14T06:24:32.475Z",
     "strikeReadyHead": "8fe13520094f0932676f910dd2026f4cf263baf6",
     "strikeReadyAt": "2026-08-14T06:06:59.047Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-14T06:25:32.466Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-14T06:24:32.466Z",
+        "strikeHead": "8fe13520094f0932676f910dd2026f4cf263baf6",
+        "mainHead": "24936d87502955f0f7efeb2a426f7958e19ecc2d",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -30,9 +41,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 28957979,
-            "output": 15475,
-            "cacheRead": 28632576,
+            "input": 29176170,
+            "output": 15541,
+            "cacheRead": 28643584,
             "cacheWrite": 0
           }
         },
@@ -53,9 +64,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28957979,
-          "output": 15475,
-          "cacheRead": 28632576,
+          "input": 29176170,
+          "output": 15541,
+          "cacheRead": 28643584,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -66,8 +77,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 16.40888,
-        "pricingAsOf": "2026-08-14T06:17:43.216Z"
+        "usd": 17.452279,
+        "pricingAsOf": "2026-08-14T06:24:32.480Z"
       }
     },
     "merges": [],
