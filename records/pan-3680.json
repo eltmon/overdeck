@@ -242,18 +242,18 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T06:04:09.400Z",
+  "updated": "2026-08-14T06:04:16.783Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T06:04:07.950Z",
+    "updatedAt": "2026-08-14T06:04:09.664Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All four ACs met. AC1: ensureSwarmForeman spawns bare agent-<issue> (no slotIndex -> resolveRegisteredSlotSpawn returns null, spawn.ts:556 derives agent-<issue>) with foreman:true persisted to AgentState, and swarmCommand no longer calls coordinateSwarmSlots. AC2: live tmux session -> messageAgent, spawnRun not called. AC3/FR-16 now fixed: start.ts:822-824 computes swarmActive from the issue record swarm.policy.mode==='always' via getIssueWorkspacePath (record.ts:261, canonical/migration-aware read), start.ts:833 passes ignoreRegisteredSlots so work-agent-conflicts.ts:14 drops agents with slotIndex !== undefined (slotIndex is on AgentState and survives listRunningAgentsSync), and start.ts:961 skips assertCanStartFreshSync on the swarm path, so foreman-dead + slots-live now respawns instead of exiting 1. Covered by tests/cli/commands/start-conflicting-work.test.ts (slot ignored, non-slot helper still conflicts) and tests/unit/cli/commands/swarm-foreman-spawn.test.ts. AC4: no model argument anywhere in the path; projectRoot now from resolveProjectFromIssueSync instead of the join('..','..') layout guess. Two non-blocking follow-ups: (1) swarmActive reads ONLY the issue record layer, so an issue made swarm-active by a project- or global-level swarm.mode of auto/always (resolveSwarmPolicy layering, swarm-policy.ts:14-33; swarmCommand persists 'always' only when the resolved mode is off) would still hit the conflict refusal — resolveSwarmPolicy(id).mode !== 'off' would close it; current live config is global mode: off so every active swarm goes through pan swarm and is detected. (2) skipping assertCanStartFreshSync on the swarm path also drops the PAN-3555 warm-session/owes-rework protection, so a foreman with a resumable transcript is silently replaced rather than resumed — allowed by AC3 ('respawns'), but worth a deliberate resume-first branch later.",
@@ -402,15 +402,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 19785516,
-            "output": 10068,
-            "cacheRead": 16004352,
+            "input": 20242157,
+            "output": 10292,
+            "cacheRead": 16311808,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 179853534,
-            "output": 237999,
-            "cacheRead": 177375232,
+            "input": 180887564,
+            "output": 239453,
+            "cacheRead": 178395136,
             "cacheWrite": 0
           }
         },
@@ -433,15 +433,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 19785516,
-          "output": 10068,
-          "cacheRead": 16004352,
+          "input": 20242157,
+          "output": 10292,
+          "cacheRead": 16311808,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 179853534,
-          "output": 237999,
-          "cacheRead": 177375232,
+          "input": 180887564,
+          "output": 239453,
+          "cacheRead": 178395136,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -458,8 +458,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 108.781339,
-        "pricingAsOf": "2026-08-14T06:04:08.523Z"
+        "usd": 109.405541,
+        "pricingAsOf": "2026-08-14T06:04:15.935Z"
       }
     },
     "merges": [
