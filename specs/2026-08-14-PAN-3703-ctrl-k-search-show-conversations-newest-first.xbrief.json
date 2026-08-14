@@ -4,17 +4,17 @@
     "created": "2026-08-14T06:20:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3703: Ctrl-K search: show conversations newest first",
-    "updated": "2026-08-14T06:21:36.904Z"
+    "updated": "2026-08-14T06:24:43.521Z"
   },
   "plan": {
     "id": "pan-3703",
     "title": "Ctrl-K search: show conversations newest first",
-    "status": "proposed",
+    "status": "running",
     "uid": "2797e4d6-d9c7-4d74-b9a6-bd98e2472fbf",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-14T06:20:00.000Z",
-    "updated": "2026-08-14T06:21:36.904Z",
+    "updated": "2026-08-14T06:24:43.521Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3703",
@@ -143,5 +143,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
