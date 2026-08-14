@@ -292,7 +292,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T11:26:33.876Z",
+  "updated": "2026-08-14T11:26:44.078Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -303,9 +303,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T11:26:33.580Z",
+    "updatedAt": "2026-08-14T11:26:43.888Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3680-review already running. Use 'pan tell' to message it.",
-    "testNotes": "npm run typecheck: passed (tsc --noEmit, hooks, evals, dashboard, frontend, acp all clean). npm run lint: passed (eslint + all 18 project guard scripts, exit 0). npm test: FAILED. Configured gate is `vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- issueActions.test.ts issueActions.no-actions-lost.test.ts issueActions.parity.test.tsx fr7-conversation-pending-input.test.tsx`. Root vitest run: 1 failed | 1459 passed | 3 skipped (1463 files), 1 failed | 13777 passed | 50 skipped (13835 tests). Failing test: tests/integration/swarm-foreman-polyrepo.test.ts > 'drives dispatch, wait, merge, stall notification, isolation failure, and reclaim' - AssertionError: expected [] to include '[swarm] merged slot 1 (item schema) for ...' at tests/integration/swarm-foreman-polyrepo.test.ts:82. Reproduced deterministically in isolation (npx vitest run tests/integration/swarm-foreman-polyrepo.test.ts, same failure). Not present in scripts/flaky-quarantine.txt. Because the configured gate uses `&&`, the root failure short-circuits the frontend test step, which never executes under the configured command; run standalone for evidence it is otherwise healthy: 4 files passed, 64/64 tests passed.",
+    "testNotes": "typecheck passed; lint passed; npm test FAILED — tests/integration/swarm-foreman-polyrepo.test.ts fails deterministically (AssertionError at line 82, expected [] to include merge message; reproduced in isolation, not in flaky-quarantine.txt). Configured gate's && chain means the frontend test step never ran under the gate (standalone: 4 files/64 tests passed). UAT not required — pure CLI/backend swarm orchestration, no dashboard/UI acceptance criteria.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "9e08f98c567dd80f4e3c495a1971d500852c7672",
     "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
@@ -338,10 +338,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 268,
-            "output": 46556,
-            "cacheRead": 19022521,
-            "cacheWrite": 489829
+            "input": 270,
+            "output": 46651,
+            "cacheRead": 19199920,
+            "cacheWrite": 490812
           }
         }
       },
@@ -365,15 +365,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 268,
-          "output": 46556,
-          "cacheRead": 19022521,
-          "cacheWrite": 489829
+          "input": 270,
+          "output": 46651,
+          "cacheRead": 19199920,
+          "cacheWrite": 490812
         }
       },
       "costAtCloseOut": {
-        "usd": 133.300853,
-        "pricingAsOf": "2026-08-14T11:26:33.715Z"
+        "usd": 133.339744,
+        "pricingAsOf": "2026-08-14T11:26:43.907Z"
       }
     },
     "merges": [
