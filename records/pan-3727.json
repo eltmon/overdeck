@@ -2,7 +2,7 @@
   "issueId": "PAN-3727",
   "schemaVersion": 2,
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T12:27:32.906Z",
+  "updated": "2026-08-14T12:27:41.091Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -26,5 +26,7 @@
       "note": "Planning session started for PAN-3727: Sweeper ghost escalations for closed issues — close-out leaves open recovery trips + stop gates; parked resolver's closed-check fails open on tracker blips",
       "timestamp": "2026-08-14T12:27:32.906Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
