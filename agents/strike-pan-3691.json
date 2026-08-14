@@ -9,12 +9,18 @@
     "overdeckHome": "/home/eltmon/.overdeck"
   },
   "launch": {
-    "harness": "codex",
-    "model": "gpt-5.6-sol",
+    "harness": "claude-code",
+    "model": "k3[1m]",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3691-strike",
     "branch": null
   },
-  "sessions": [],
+  "sessions": [
+    {
+      "id": "1a845c54-a666-41c8-a645-8dd7854f5910",
+      "startedAt": "2026-08-14T00:32:31.013Z",
+      "reason": "spawn"
+    }
+  ],
   "lifecycle": [
     {
       "at": "2026-08-13T22:26:54.969Z",
@@ -31,6 +37,10 @@
     {
       "at": "2026-08-14T00:32:25.717Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-14T00:32:31.013Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
