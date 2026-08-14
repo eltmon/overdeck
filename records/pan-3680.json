@@ -187,6 +187,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-14T12:49:19.383Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-14T12:49:23.370Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-14T12:49:23.382Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-14T12:49:23.409Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-14T12:49:23.422Z"
     }
   ],
   "feedback": [],
@@ -329,10 +349,10 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T12:49:19.920Z",
+  "updated": "2026-08-14T12:49:24.749Z",
   "pipeline": {
     "issueId": "PAN-3680",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -340,10 +360,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z",
-    "updatedAt": "2026-08-14T12:49:17.987Z",
+    "updatedAt": "2026-08-14T12:49:18.012Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
-    "reviewSpawnedAt": "2026-08-14T12:13:03.032Z"
+    "reviewSpawnedAt": "2026-08-14T12:49:18.011Z"
   },
   "closeOut": {
     "usage": {
@@ -407,7 +427,7 @@
       },
       "costAtCloseOut": {
         "usd": 151.139762,
-        "pricingAsOf": "2026-08-14T12:49:19.904Z"
+        "pricingAsOf": "2026-08-14T12:49:23.451Z"
       }
     },
     "merges": [
