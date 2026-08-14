@@ -3,29 +3,40 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-14T10:08:01.581Z",
-  "updated": "2026-08-14T10:27:14.072Z",
+  "updated": "2026-08-14T10:32:30.614Z",
   "pipeline": {
     "issueId": "PAN-3720",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T10:27:01.729Z",
+    "updatedAt": "2026-08-14T10:32:30.599Z",
     "strikeReadyHead": "09da2e1f8b8116352190cf0f36539cb3bc7c5188",
     "strikeReadyAt": "2026-08-14T10:25:25.755Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-14T10:33:30.591Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-14T10:32:30.591Z",
+        "strikeHead": "09da2e1f8b8116352190cf0f36539cb3bc7c5188",
+        "mainHead": "bca1d8f0ce697522e6e58792179147be06b383bd",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 787,
-            "output": 102,
+            "input": 1574,
+            "output": 194,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -33,15 +44,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 787,
-          "output": 102,
+          "input": 1574,
+          "output": 194,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0.001297,
-        "pricingAsOf": "2026-08-14T10:27:14.065Z"
+        "usd": 0.0025440000000000003,
+        "pricingAsOf": "2026-08-14T10:32:30.601Z"
       }
     },
     "merges": [],
