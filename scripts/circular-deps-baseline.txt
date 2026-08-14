@@ -38,8 +38,6 @@ src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts > 
 src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts
 src/lib/cloister/auto-resume-config.ts > src/lib/projects.ts
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/deacon-swarm-gc.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/deacon-swarm-orphan-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
 src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts

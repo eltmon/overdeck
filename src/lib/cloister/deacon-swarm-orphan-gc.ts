@@ -1,5 +1,5 @@
 import { listSlotAssignments as listDurableSlotAssignments, type SlotReconcileResult } from '../agents/slot-reconcile.js';
-import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 
 type OrphanGcDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'listSessionNames' | 'listSlotAssignments'>;
 
