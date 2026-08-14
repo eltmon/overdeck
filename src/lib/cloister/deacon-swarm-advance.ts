@@ -1,7 +1,7 @@
 import type { SlotReconcileResult } from '../agents/slot-reconcile.js';
 import { gcMergedSlotsWithStatus } from './deacon-swarm-gc.js';
 import { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
-import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 
 /**
  * Merged-slot GC + orphan GC, then the patrol's downstream advance

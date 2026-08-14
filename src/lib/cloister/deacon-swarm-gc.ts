@@ -11,7 +11,7 @@ import {
   type SlotWorkspaceWorktrees,
   type WorkspaceRepoRoot,
 } from '../project-repos.js';
-import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 
 const MERGED_LIVE_SLOT_IDLE_MS = 30 * 60 * 1000;
 

@@ -4,10 +4,8 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
-import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { spawnRun } from '../agents/spawn.js';
-import type { SpawnRunOptions } from '../agents/spawn-prep.js';
-import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
+import { verifyAndMergeSlot } from '../agents/slot-merge.js';
 import {
   listSlotAssignments as listDurableSlotAssignments,
   reconcileSlotState,
@@ -28,7 +26,6 @@ import {
   blockingParentCount,
   createActiveSlice,
   getDispatchableItems,
-  type PersistedTaskOperation,
 } from '../xbrief/dag.js';
 import { applyTaskStatusChange } from '../pan-dir/task-door.js';
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../pan-dir/record.js';
@@ -61,8 +58,9 @@ import {
 import {
   defaultRequestIssueReview,
   finalizeSwarmIssueIfComplete,
-  type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
+import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
+export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
 import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
@@ -96,74 +94,6 @@ export interface CoordinateSwarmSlotsOptions {
   issueId?: string;
   /** Explicit `pan swarm` bypasses the automatic-selection policy. */
   manual?: boolean;
-}
-
-export interface CoordinateSwarmSlotsDeps {
-  listFeatureWorkspaces: () => FeatureWorkspace[];
-  reconcileSlotState: (
-    issueId: string,
-    workspace: string,
-    doc: XBriefDocument,
-  ) => Promise<SlotReconcileResult>;
-  listSessionNames: () => Promise<readonly string[]>;
-  isPaneDead: (sessionName: string) => Promise<boolean>;
-  getPaneExitStatus: (sessionName: string) => Promise<number | null>;
-  getAgentRuntimeState: (agentId: string) => Promise<Pick<AgentRuntimeSnapshot, 'resolution'> | null>;
-  getPaneOutputDigest: (sessionName: string) => Promise<string>;
-  getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
-  getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
-  isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
-  sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
-  slotWorktreeExists: (slotWorkspacePath: string) => boolean;
-  verifyAndMergeSlot: (
-    issue: { issueId: string; featureWorkspace: string },
-    slotIndex: number,
-    item: XBriefItem,
-  ) => Promise<SlotMergeResult>;
-  applyTaskOperationToPlanFile: (issueId: string, operation: PersistedTaskOperation, workspacePath?: string) => Promise<unknown>;
-  /** PAN-2385: fire the tiered commit feed + supervisor review after a slot merges. */
-  fireTieredCommitHooks: (
-    options: { issueId: string; workspacePath: string; item: XBriefItem; doc: XBriefDocument },
-  ) => Promise<string[]>;
-  recordSlotAssignment: (workspacePath: string, issueId: string, assignment: SlotAssignment) => Promise<void>;
-  clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
-  runGitCommand: (command: string, cwd: string) => Promise<unknown>;
-  registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
-  tryReserveSwarmSlot: () => boolean;
-  releaseSwarmSlot: () => void;
-  spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
-  /** Per-issue hold: deaconIgnored (operator) suppresses all swarm coordination (PAN-2214);
-   *  system-set `stuck` is logged but no longer halts coordination (PAN-2469). */
-  getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null;
-  /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
-  readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
-  /**
-   * PAN-2372 WI-4 / FR-6: durable per-slot completion marker (written by slot
-   * `pan done`). When present for a slot, it beats every other classification —
-   * even a vanished session or missing agent — because it is the durable record
-   * that the slot finished; the runtime plane is rebuildable and may be absent.
-   */
-  readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
-  /** Delete a stale durable marker that does not belong to the active item. */
-  clearSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
-  getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
-  setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
-  /**
-   * Re-evaluated immediately before EVERY slot spawn: global freeze + per-issue hold.
-   * The cycle-start checks alone let an in-flight wave keep dispatching after a freeze
-   * activates mid-patrol (PAN-2214 slot-20 regression).
-   */
-  shouldDispatch?: (issueId: string) => boolean;
-  /**
-   * Inclusive upper bound for slot index allocation — the swarm reserve.
-   * Unbounded allocation climbed slot-5..slot-20 under an inconsistent
-   * registry (PAN-2214).
-   */
-  getMaxSlotIndex?: () => number;
-  /** Durable slot assignments from the issue record; they survive registry resets (PAN-2214). */
-  listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
-  /** Request issue-level review once every swarm item has been assembled into the feature branch. */
-  requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
