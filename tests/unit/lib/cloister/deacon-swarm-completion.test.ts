@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyInFlightSlots,
   getFailedMergeBlock,
+  mergeReadySlots,
   recordStalledSlotRecovery,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { ReconciledSlotItem } from '../../../../src/lib/agents/slot-reconcile.js';
+import type { PanIssueSwarmSlotCompletion } from '../../../../src/lib/pan-dir/record.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
 function slot(slotIndex: number, agentId = `agent-pan-2203-slot-${slotIndex}`): ReconciledSlotItem {
@@ -24,6 +27,7 @@ function deps(options: {
   dead?: Record<string, boolean>;
   exitStatus?: Record<string, number | null>;
   runtime?: Record<string, Pick<AgentRuntimeSnapshot, 'resolution'>>;
+  slotCompletions?: Record<number, PanIssueSwarmSlotCompletion>;
   outputDigest?: string;
   commitTime?: number | null;
   aheadCount?: number;
@@ -40,6 +44,8 @@ function deps(options: {
   | 'getSlotBranchAheadCount'
   | 'isSlotWorktreeClean'
   | 'sendCompletionNudge'
+  | 'readSlotCompletion'
+  | 'clearSlotCompletion'
 > {
   return {
     listSessionNames: vi.fn(async () => options.sessions ?? []),
@@ -51,6 +57,29 @@ function deps(options: {
     getSlotBranchAheadCount: vi.fn(async () => options.aheadCount ?? 0),
     isSlotWorktreeClean: vi.fn(async () => options.clean ?? false),
     sendCompletionNudge: options.sendCompletionNudge ?? vi.fn(async () => undefined),
+    readSlotCompletion: vi.fn((_workspacePath: string, _issueId: string, slotIndex: number) => options.slotCompletions?.[slotIndex]),
+    clearSlotCompletion: vi.fn(async () => undefined),
+  };
+}
+
+function doc(): XBriefDocument {
+  return {
+    xBRIEFInfo: {
+      version: '0.6',
+      created: '2026-07-01T00:00:00.000Z',
+      updated: '2026-07-01T00:00:00.000Z',
+      author: 'test',
+      description: 'test plan',
+    },
+    plan: {
+      id: 'pan-2203',
+      title: 'test plan',
+      status: 'active',
+      created: '2026-07-01T00:00:00.000Z',
+      updated: '2026-07-01T00:00:00.000Z',
+      items: [],
+      edges: [],
+    },
   };
 }
 
@@ -78,10 +107,34 @@ describe('deacon-swarm completion classification', () => {
     ]);
   });
 
-  it('classifies a slot with persisted pan done completion as ready-to-merge even while the pane is live', async () => {
+  it('classifies a slot with a durable slot completion marker as ready-to-merge even while the pane is live', async () => {
     const agentId = 'agent-pan-2203-slot-1';
 
     await expect(classifyInFlightSlots([slot(1, agentId)], deps({
+      sessions: [agentId],
+      dead: { [agentId]: false },
+      slotCompletions: {
+        1: {
+          slotIndex: 1,
+          itemId: 'wi-1',
+          agentId,
+          completedAt: '2026-07-01T00:00:00.000Z',
+        },
+      },
+    }), {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    })).resolves.toEqual([
+      expect.objectContaining({ slotIndex: 1, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' }),
+    ]);
+  });
+
+  it('PAN-3720: a live session reusing a slot id ignores the prior assignment terminal runtime resolution and stays out of the merge queue', async () => {
+    // MIN-888 regression: the Deacon reassigned static id agent-min-888-slot-1
+    // from completed WI-56 to fresh WI-57; the live WI-57 session inherited the
+    // terminal runtime snapshot and classified ready-to-merge while orienting.
+    const agentId = 'agent-pan-2203-slot-1';
+    const fakeDeps = deps({
       sessions: [agentId],
       dead: { [agentId]: false },
       runtime: {
@@ -89,7 +142,43 @@ describe('deacon-swarm completion classification', () => {
           resolution: 'completed',
         },
       },
-    }))).resolves.toEqual([
+      // No durable slotCompletion marker for the current assignment.
+    });
+
+    const classified = await classifyInFlightSlots([slot(1, agentId)], fakeDeps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    });
+
+    expect(classified).toEqual([
+      expect.objectContaining({ slotIndex: 1, lifecycle: 'running' }),
+    ]);
+
+    // A running slot must never reach the merge door.
+    const verifyAndMergeSlot = vi.fn();
+    const mergeActions = await mergeReadySlots('PAN-2203', '/workspace', doc(), classified, {
+      verifyAndMergeSlot,
+      applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+      fireTieredCommitHooks: vi.fn(async () => []),
+    });
+    expect(verifyAndMergeSlot).not.toHaveBeenCalled();
+    expect(mergeActions).toEqual([]);
+  });
+
+  it('still honors a terminal runtime resolution when the session is gone', async () => {
+    const agentId = 'agent-pan-2203-slot-1';
+
+    await expect(classifyInFlightSlots([slot(1, agentId)], deps({
+      sessions: [],
+      runtime: {
+        [agentId]: {
+          resolution: 'done',
+        },
+      },
+    }), {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    })).resolves.toEqual([
       expect.objectContaining({ slotIndex: 1, lifecycle: 'ready-to-merge', exitStatus: 0 }),
     ]);
   });
