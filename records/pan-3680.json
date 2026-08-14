@@ -54,22 +54,7 @@
       "timestamp": "2026-08-14T05:42:36.868Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-14T05:29:06Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3680\n\n# Review Synthesis — PAN-3680 — 2026-08-14T05:30:00Z\n\n## Verdict: CHANGES REQUESTED — `pan swarm` still promises autonomous Deacon coordination\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.pan/review/agent-pan-3680-review-b18452d6/context.json`\n- Branch: `feature/pan-3680`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3680`\n- HEAD reviewed: `b18452d67ea00add8b575b07cdf659069146aa3d`\n- Cycle number: 2\n- Prior cycle SHA: `ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] `pan swarm` still promises autonomous Deacon coordination — `src/cli/commands/swarm.ts:203`\nThis in-PR-scope gap violates FR-8, FR-9, NFR-3, and NFR-7. Runtime patrols correctly retain bounded janitor, liveness, classification, and event-delivery duties, but the changed policy-persistence comment and message say mode `off` would stop Deacon from coordinating the swarm (`src/cli/commands/swarm.ts:193-205`). Rewrite both to explain that mode `off` would prevent automatic foreman lifecycle management, and add an output assertion that rejects the old Deacon-coordinator wording.\n\n## Non-blocking Findings\n\n### [performance] Full Git-backed slot classification runs on every wait poll — `src/cli/commands/swarm-status.ts:96`\nThe one-second loop rebuilds a full snapshot and performs serial Git probes for each in-flight slot. Larger swarms can generate sustained subprocess load, while snapshot work extends the effective timeout. Consider a lightweight wait snapshot or cached, rate-limited classification, and measure timeout from a monotonic deadline.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Correctness found the prior status-override and removed-slot failures fixed, with targeted regression tests passing.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.pan/review/agent-pan-3680-review-b18452d6/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3680 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-14T05:42:36Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-3680 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/deacon-swarm.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-3680 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -207,10 +192,10 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:42:46.085Z",
+  "updated": "2026-08-14T05:47:48.023Z",
   "pipeline": {
     "issueId": "PAN-3680",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -218,14 +203,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T05:42:37.216Z",
+    "updatedAt": "2026-08-14T05:47:47.949Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All four ACs met. AC1: ensureSwarmForeman spawns bare agent-<issue> (no slotIndex -> resolveRegisteredSlotSpawn returns null, spawn.ts:556 derives agent-<issue>) with foreman:true persisted to AgentState, and swarmCommand no longer calls coordinateSwarmSlots. AC2: live tmux session -> messageAgent, spawnRun not called. AC3/FR-16 now fixed: start.ts:822-824 computes swarmActive from the issue record swarm.policy.mode==='always' via getIssueWorkspacePath (record.ts:261, canonical/migration-aware read), start.ts:833 passes ignoreRegisteredSlots so work-agent-conflicts.ts:14 drops agents with slotIndex !== undefined (slotIndex is on AgentState and survives listRunningAgentsSync), and start.ts:961 skips assertCanStartFreshSync on the swarm path, so foreman-dead + slots-live now respawns instead of exiting 1. Covered by tests/cli/commands/start-conflicting-work.test.ts (slot ignored, non-slot helper still conflicts) and tests/unit/cli/commands/swarm-foreman-spawn.test.ts. AC4: no model argument anywhere in the path; projectRoot now from resolveProjectFromIssueSync instead of the join('..','..') layout guess. Two non-blocking follow-ups: (1) swarmActive reads ONLY the issue record layer, so an issue made swarm-active by a project- or global-level swarm.mode of auto/always (resolveSwarmPolicy layering, swarm-policy.ts:14-33; swarmCommand persists 'always' only when the resolved mode is off) would still hit the conflict refusal — resolveSwarmPolicy(id).mode !== 'off' would close it; current live config is global mode: off so every active swarm goes through pan swarm and is detected. (2) skipping assertCanStartFreshSync on the swarm path also drops the PAN-3555 warm-session/owes-rework protection, so a foreman with a resumable transcript is silently replaced rather than resumed — allowed by AC3 ('respawns'), but worth a deliberate resume-first branch later.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "b18452d67ea00add8b575b07cdf659069146aa3d",
     "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
-    "reviewSpawnedAt": "2026-08-14T05:24:59.708Z",
+    "reviewSpawnedAt": "2026-08-14T05:47:47.948Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -368,15 +353,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 18986512,
-            "output": 9606,
-            "cacheRead": 15484672,
+            "input": 19365239,
+            "output": 9867,
+            "cacheRead": 15729664,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 165426469,
-            "output": 211120,
-            "cacheRead": 163221504,
+            "input": 169360611,
+            "output": 220303,
+            "cacheRead": 167112704,
             "cacheWrite": 0
           }
         },
@@ -391,15 +376,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 18986512,
-          "output": 9606,
-          "cacheRead": 15484672,
+          "input": 19365239,
+          "output": 9867,
+          "cacheRead": 15729664,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 165426469,
-          "output": 211120,
-          "cacheRead": 163221504,
+          "input": 169360611,
+          "output": 220303,
+          "cacheRead": 167112704,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -410,8 +395,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 99.020026,
-        "pricingAsOf": "2026-08-14T05:42:46.068Z"
+        "usd": 101.455826,
+        "pricingAsOf": "2026-08-14T05:47:47.963Z"
       }
     },
     "merges": [
