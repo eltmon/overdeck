@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T02:58:48.470Z",
+  "updated": "2026-08-14T03:04:57.904Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "recover-reclaim": {
-        "writerId": "agent-pan-3680",
-        "agentId": "agent-pan-3680",
-        "pid": 1554066,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T02:58:48.470Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -173,6 +165,17 @@
         "outcome": "completed",
         "reason": "Implemented and verified in pushed commit a4de98ba49",
         "releasedAt": "2026-08-14T02:50:36.425Z"
+      },
+      {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 1554066,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T02:58:48.470Z",
+        "itemId": "recover-reclaim",
+        "outcome": "completed",
+        "reason": "Implemented and verified in pushed commit 10f6d90754",
+        "releasedAt": "2026-08-14T03:04:57.904Z"
       }
     ],
     "statusReasons": {
@@ -199,6 +202,10 @@
       "foreman-spawn": {
         "reason": "Implemented and verified in pushed commit a4de98ba49",
         "updatedAt": "2026-08-14T02:50:36.425Z"
+      },
+      "recover-reclaim": {
+        "reason": "Implemented and verified in pushed commit 10f6d90754",
+        "updatedAt": "2026-08-14T03:04:57.904Z"
       }
     }
   },
@@ -231,6 +238,9 @@
     "foreman-spawn.ac2": "completed",
     "foreman-spawn.ac3": "completed",
     "foreman-spawn.ac4": "completed",
-    "recover-reclaim": "running"
+    "recover-reclaim": "completed",
+    "recover-reclaim.ac1": "completed",
+    "recover-reclaim.ac2": "completed",
+    "recover-reclaim.ac3": "completed"
   }
 }
