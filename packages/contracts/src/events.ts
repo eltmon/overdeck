@@ -12,6 +12,7 @@ import {
   IssueId,
   ProjectCiSuite,
   ResourceStats,
+  RestartGateSnapshot,
   ReviewStatusSnapshot,
   Role,
   SequenceNumber,
@@ -102,6 +103,27 @@ export const ProjectCiHeadObservedEvent = Schema.Struct({
   }),
 })
 export type ProjectCiHeadObservedEvent = typeof ProjectCiHeadObservedEvent.Type
+
+/**
+ * The restart gate changed (PAN-3729).
+ *
+ * The payload is the COMPLETE gate projection, not a delta, so the reducer is a
+ * plain replace and no ordering logic is needed. Emitted by the gate writer
+ * (`src/dashboard/server/services/restart-gate.ts`) on every mutation and on
+ * every sweep tick that drops an expired request, so the approval banner clears
+ * itself when a requester dies without polling again.
+ *
+ * The gate is runtime-plane state (like `~/.overdeck/dashboard-restarting.json`),
+ * so this event is emitted in-memory only — it is never persisted to the event
+ * log and never replayed at boot.
+ */
+export const RestartGateChangedEvent = Schema.Struct({
+  type: Schema.Literal("restart_gate.changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: RestartGateSnapshot,
+})
+export type RestartGateChangedEvent = typeof RestartGateChangedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -1430,6 +1452,7 @@ export const DomainEvent = Schema.Union([
   BeadsFreshnessChangedEvent,
   ProjectCiSuiteObservedEvent,
   ProjectCiHeadObservedEvent,
+  RestartGateChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
