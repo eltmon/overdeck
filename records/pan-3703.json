@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T06:49:21.070Z",
+  "updated": "2026-08-14T06:49:34.447Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "pending",
@@ -98,5 +98,21 @@
     "conversations-newest-first.ac3": "completed",
     "conversations-newest-first.ac4": "completed",
     "conversations-newest-first.ac5": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+    ],
+    "recordedAt": "2026-08-14T06:49:34.446Z"
   }
 }
