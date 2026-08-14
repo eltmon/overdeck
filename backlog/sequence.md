@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-14T16:33:00Z · model: claude-opus-5 · open: 860_
+_Last sequenced: 2026-08-14T16:33:32Z · model: claude-opus-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -56,8 +56,8 @@ _Last sequenced: 2026-08-14T16:33:00Z · model: claude-opus-5 · open: 860_
 | 49 | PAN-3078 | S | high | ok |  |  | The inspect verdict is never delivered to the work agent, so an agent that waits for it deadlocks forever |
 | 50 | PAN-3040 | M | high | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects |
 | 51 | PAN-3580 | M | high | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
-| 52 | PAN-2995 | S | high | ok |  | PAN-3047 | pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry |
 | 52 | PAN-3677 | S | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
+| 53 | PAN-2995 | S | high | ok |  | PAN-3047 | pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry |
 | 54 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering: 11 duplicate ranks and 11 gaps persisted |
 | 55 | PAN-3560 | M | high | ok |  |  | PTY supervisor overloads under concurrent convoys; fleet-wide 502s kill resumes and feedback delivery |
 | 56 | PAN-3571 | S | high | ok |  |  | Stop-hook completion check exits silently on timeout: 334 stranded turn-ends, agents idle until a patrol notices |
@@ -597,8 +597,8 @@ _Last sequenced: 2026-08-14T16:33:00Z · model: claude-opus-5 · open: 860_
 | 590 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
 | 591 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
 | 592 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 593 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
 | 594 | PAN-3684 | XS | medium | ok |  |  | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
-| 594 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
 | 595 | PAN-2356 | XL | medium | ok |  | PAN-2352 | Overdeck Anywhere P3: outbound-only relay service with GitHub OAuth, push origin and a multi-tenant front door |
 | 596 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 597 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
@@ -1072,13 +1072,13 @@ pan strike is monorepo-shaped end to end and fails immediately on polyrepo proje
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
 
-### PAN-2995 (rank 52)
-
-pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.
-
 ### PAN-3677 (rank 52)
 
 Planning agents wedge after a background Explore task finishes; parent never consumes the result. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
+
+### PAN-2995 (rank 53)
+
+pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.
 
 ### PAN-3498 (rank 54)
 
@@ -1195,7 +1195,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-14T16:33:00Z",
+  "generatedAt": "2026-08-14T16:33:32Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 860,
@@ -1891,21 +1891,6 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "auto"
     },
     {
-      "issue": "PAN-2995",
-      "rank": 52,
-      "size": "S",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3047"
-      ],
-      "why": "pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry",
-      "rationale": "pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3677",
       "rank": 52,
       "size": "S",
@@ -1915,6 +1900,21 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "dependsOn": [],
       "why": "Planning agents wedge after a background Explore task finishes; parent never consumes the result",
       "rationale": "Planning agents wedge after a background Explore task finishes; parent never consumes the result. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2995",
+      "rank": 53,
+      "size": "S",
+      "importance": "high",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3047"
+      ],
+      "why": "pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry",
+      "rationale": "pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8615,20 +8615,8 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "skip"
     },
     {
-      "issue": "PAN-3684",
-      "rank": 594,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3322",
-      "rank": 594,
+      "rank": 593,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8639,6 +8627,18 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "why": "The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-3684",
+      "rank": 594,
+      "size": "XS",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-2356",
