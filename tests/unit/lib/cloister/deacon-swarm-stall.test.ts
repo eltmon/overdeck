@@ -417,7 +417,7 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
     }
   });
 
-  it('PAN-3691: auto mode nudges but never completes without an item-bound durable signal', async () => {
+  it('AC2: auto mode nudges exactly once and never infers ready-to-merge for a live agent (PAN-3691)', async () => {
     const deps = doneDeps();
     const options = opts('auto');
 
@@ -425,10 +425,13 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
     expect(first).toEqual(expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }));
     expect(deps.sendCompletionNudge).toHaveBeenCalledTimes(1);
 
-    // Same signature (stable commit + output) ⇒ second consecutive stable observation.
+    // PAN-3691: stable clean/ahead observations alone must NOT converge a live
+    // slot to ready-to-merge — that inference falsely completed untouched
+    // polyrepo items. Live slots converge only via their durable completion
+    // signal, so the second stable observation still awaits the signal.
     const second = await classifyDoneWithoutSignal(slot(), deps, options, observation());
     expect(second).toEqual(expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }));
-    // No second nudge on the converging pass — exactly one nudge across the two observations.
+    // No second nudge on the stable pass — exactly one nudge across the two observations.
     expect(deps.sendCompletionNudge).toHaveBeenCalledTimes(1);
   });
 

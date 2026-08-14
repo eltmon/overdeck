@@ -136,7 +136,7 @@ async function spawnRunWithoutConsentClaim(
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
-      await ensureRegisteredSlotWorktree(workspace, slot);
+      await ensureRegisteredSlotWorktree(issueId, workspace, slot);
     }
     const prompt = slot
       ? buildRegisteredSlotPrompt(issueId, workspace, slot, options.prompt)
