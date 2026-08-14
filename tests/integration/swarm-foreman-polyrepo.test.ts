@@ -72,6 +72,7 @@ describe('scripted swarm foreman over a sparse polyrepo', () => {
     expect(running[0]?.status).not.toBe('merged');
 
     const ready = await classifyInFlightSlots([liveSchema], classificationDeps('done'), { workspacePath: workspace, issueId });
+    expect(ready[0]?.lifecycle).toBe('ready-to-merge');
     const mergeDeps = {
       verifyAndMergeSlot: vi.fn(async () => ({ verified: true, merged: true, conflicts: false, evidence: { verifyCommands: [], expectedOutputs: [], commandOutputs: [] } })),
       applyTaskOperationToPlanFile: vi.fn(async () => undefined),
@@ -141,7 +142,9 @@ function dispatchDeps(spawnedItems: string[]): CoordinateSwarmSlotsDeps {
 
 function classificationDeps(resolution: 'done' | null): CoordinateSwarmSlotsDeps {
   return {
-    listSessionNames: vi.fn(async () => ['agent-pan-3680-slot-1']), isPaneDead: vi.fn(async () => false), getPaneExitStatus: vi.fn(async () => null),
+    // A terminal runtime resolution becomes authoritative only after the slot
+    // session exits; a live reused slot id may still carry stale resolution.
+    listSessionNames: vi.fn(async () => resolution ? [] : ['agent-pan-3680-slot-1']), isPaneDead: vi.fn(async () => false), getPaneExitStatus: vi.fn(async () => null),
     getAgentRuntimeState: vi.fn(async () => resolution ? ({ resolution } as never) : null), readSlotCompletion: vi.fn(() => undefined), clearCompletionObservation: vi.fn(async () => undefined),
   } as unknown as CoordinateSwarmSlotsDeps;
 }
