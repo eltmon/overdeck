@@ -76,7 +76,7 @@ export default function MetricTile({
         className,
       )}
     >
-      <div className="flex items-center gap-[6px] text-[11px] font-medium uppercase leading-none tracking-[0.06em] text-muted-foreground">
+      <div className="flex items-center gap-[6px] leading-none">
         <span
           data-component="metric-tile-icon"
           className={cn(
@@ -86,7 +86,7 @@ export default function MetricTile({
         >
           {icon}
         </span>
-        <span className="truncate">{eyebrow}</span>
+        <span className="eyebrow truncate">{eyebrow}</span>
       </div>
       <div className="mt-[12px] flex items-end gap-[8px]">
         <span
