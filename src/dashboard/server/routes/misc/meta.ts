@@ -16,6 +16,7 @@ import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
 import { getRestartGate } from '../../services/restart-gate.js';
+import { RESTART_GATE_CLAIMED_ENV } from '../../../../lib/restart-gate-client.js';
 import { jsonResponse } from '../../http-helpers.js';
 import {
   getOverdeckVersion,
@@ -527,10 +528,10 @@ const postDevRebuildRoute = HttpRouter.add(
 //   1. Every request waiting in the restart gate is folded into an epoch this
 //      restart claims, so the next boot marks them satisfied and the blocked
 //      requesters exit instead of waiting for an approval that already happened.
-//   2. The spawned CLI runs with `--now`, the explicit bypass. Without it the
-//      spawned `pan restart` would register its own request, find a claimed
-//      epoch it is not a member of, and block forever — the restart the
-//      operator just asked for would never happen.
+//   2. The spawned CLI carries OVERDECK_RESTART_GATE_CLAIMED=1: it performs the
+//      restart as the claimant of the epoch created in (1) instead of
+//      re-negotiating the gate (which would register a request the new server
+//      has to expire). Same pattern as the deploy script's `pan restart` child.
 const postRestartDashboardRoute = HttpRouter.add(
   'POST',
   '/api/system/restart-dashboard',
@@ -543,10 +544,11 @@ const postRestartDashboardRoute = HttpRouter.add(
       console.error('[restart-dashboard] restart-gate implicit approval failed:', error);
     }
     try {
-      const invocation = panCliInvocation(['restart', '--dashboard', '--now']);
+      const invocation = panCliInvocation(['restart', '--dashboard']);
       const child = spawn(invocation.command, invocation.args, {
         detached: true,
         stdio: 'ignore',
+        env: { ...process.env, [RESTART_GATE_CLAIMED_ENV]: '1' },
       });
       child.on('error', (err) => {
         console.error('[restart-dashboard] pan restart spawn failed:', err);
