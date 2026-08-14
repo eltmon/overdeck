@@ -14,9 +14,7 @@ import {
   summarizeParked,
   type ParkedRow,
 } from '../../lib/parked/resolver.js';
-import { readIssueRecord } from '../../lib/pan-dir/record.js';
-import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { acknowledgeAllOpenRecoveryTrips } from '../../lib/cloister/recovery-trip.js';
 
 interface ParkedOptions {
   json?: boolean;
@@ -86,26 +84,6 @@ export interface ParkedAckDeps {
   now?: number;
 }
 
-/** Acknowledge every open recovery trip on one issue via the record door. Returns trips acked. */
-async function ackIssueTripsDefault(issueId: string): Promise<number> {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return 0;
-  const project = getProjectSync(resolved.projectKey);
-  if (!project) return 0;
-  const record = await readIssueRecord(project, issueId);
-  const openTrips = (record?.recoveryTrips ?? []).filter((trip) => trip.open === true);
-  let acked = 0;
-  for (const trip of openTrips) {
-    try {
-      await acknowledgeRecoveryTrip(resolved.projectPath, issueId, trip.recoveryPath, trip.obligationGeneration);
-      acked++;
-    } catch (error) {
-      console.warn(chalk.yellow(`  ! failed to ack ${issueId} trip ${trip.recoveryPath}: ${error instanceof Error ? error.message : String(error)}`));
-    }
-  }
-  return acked;
-}
-
 /**
  * Batch-acknowledge parked rows (operator-approved drain for the needs-you
  * mass, PAN-3485 follow-up). Acknowledging a trip silences the escalation;
@@ -122,7 +100,7 @@ export async function runParkedAck(options: ParkedAckOptions = {}, deps: ParkedA
     throw new Error(`--older-than must be a non-negative number of days, got "${options.olderThan}"`);
   }
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const ackTrips = deps.ackIssueTrips ?? ackIssueTripsDefault;
+  const ackTrips = deps.ackIssueTrips ?? acknowledgeAllOpenRecoveryTrips;
 
   const rows = (await resolveRows()).filter((row) => {
     if (row.orbit !== orbit) return false;

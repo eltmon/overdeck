@@ -71,3 +71,29 @@ export async function acknowledgeRecoveryTrip(workspacePath: string, issue: stri
     recoveryTrips: (record.recoveryTrips ?? []).filter(trip => !(trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration)),
   }));
 }
+
+/**
+ * Acknowledge every open recovery trip on one issue via the record door.
+ * Returns the count acked; unresolvable/unreadable issues return 0. A
+ * per-trip ack failure is warned and skipped rather than thrown, so one
+ * broken trip cannot block acknowledging the rest.
+ */
+export async function acknowledgeAllOpenRecoveryTrips(issueId: string): Promise<number> {
+  const normalized = issueId.toUpperCase();
+  const resolved = resolveProjectFromIssueSync(normalized);
+  if (!resolved) return 0;
+  const project = getProjectSync(resolved.projectKey);
+  if (!project) return 0;
+  const record = await readIssueRecord(project, normalized);
+  const openTrips = (record?.recoveryTrips ?? []).filter(trip => trip.open === true);
+  let acked = 0;
+  for (const trip of openTrips) {
+    try {
+      await acknowledgeRecoveryTrip(resolved.projectPath, normalized, trip.recoveryPath, trip.obligationGeneration);
+      acked++;
+    } catch (error) {
+      console.warn(`  ! failed to ack ${normalized} trip ${trip.recoveryPath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return acked;
+}
