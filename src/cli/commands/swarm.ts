@@ -190,18 +190,17 @@ export async function swarmCommand(
     deps.console.error(chalk.red(swarmHoldMessage(issue, hold.reason)));
     return { ok: false, actions: [], workspacePath };
   }
-  // PAN-3459: an explicit start is the issue-level opt-in. Deacon patrols
-  // re-resolve the swarm policy with manual=false, so under the default
-  // global `swarm.mode: off` they would skip this issue after wave 1 —
-  // completed slot branches would never merge and remaining items would
-  // never dispatch. Persist the opt-in before coordinating so the promise
-  // below ("coordination will continue in Deacon") is actually true.
+  // PAN-3459: an explicit start is the issue-level opt-in. Foreman lifecycle
+  // management re-resolves the swarm policy with manual=false, so under the
+  // default global `swarm.mode: off` the foreman would not be managed after
+  // this command. Persist the opt-in before starting the foreman so its
+  // automatic lifecycle remains enabled.
   const policy = deps.resolveSwarmPolicy(issue);
   if (policy.mode === 'off') {
     await deps.writeSwarmPolicyMode(workspacePath, issue, 'always');
     deps.console.log(chalk.dim(
       `Persisted swarm.policy.mode=always for ${issue} — the effective swarm mode was off (from ${policy.source.mode} config), `
-      + 'which would otherwise stop the Deacon from coordinating this swarm after this command.',
+      + 'which would otherwise prevent automatic foreman lifecycle management after this command.',
     ));
   }
   const actions = await deps.ensureSwarmForeman(issue, workspacePath, { startedBy: 'cli:swarm' });
@@ -649,8 +648,9 @@ export async function swarmResetCommand(
     + `${skippedLiveAgents.length > 0 ? `. Skipped live slot agent session(s): ${skippedLiveAgents.join(', ')}` : ''}.`,
   );
   deps.console.log(
-    `The swarm hold REMAINS SET — the Deacon still skips all swarm coordination for ${issue}, so nothing can `
-    + `re-spawn behind this cleanup. Run \`pan swarm resume ${issue}\` to re-enable coordination `
+    `The swarm hold REMAINS SET — the ${issue} foreman cannot run gated dispatch, merge, or recovery actions, `
+    + `so no slot can re-spawn behind this cleanup. Deacon patrols preserve the hold while continuing janitor, `
+    + `liveness, and event-delivery backstops. Run \`pan swarm resume ${issue}\` to re-enable foreman actions `
     + `(then \`pan swarm ${issue}\` to dispatch a fresh wave immediately).`,
   );
   return { ok: true };

@@ -159,7 +159,10 @@ describe('pan swarm command', () => {
     const writeOrder = vi.mocked(deps.writeSwarmPolicyMode).mock.invocationCallOrder[0];
     const foremanOrder = vi.mocked(deps.ensureSwarmForeman).mock.invocationCallOrder[0];
     expect(writeOrder).toBeLessThan(foremanOrder);
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('swarm.policy.mode=always'));
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('swarm.policy.mode=always');
+    expect(output).toContain('prevent automatic foreman lifecycle management');
+    expect(output).not.toContain('stop the Deacon from coordinating this swarm');
   });
 
   it('does not touch the issue-level swarm policy when the effective mode already coordinates (PAN-3459)', async () => {
@@ -981,6 +984,9 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deps.clearSwarmHold).not.toHaveBeenCalled();
     expect(loggedText(deps)).toContain('hold REMAINS SET');
     expect(loggedText(deps)).toContain('pan swarm resume PAN-2203');
+    expect(loggedText(deps)).toContain('foreman cannot run gated dispatch, merge, or recovery actions');
+    expect(loggedText(deps)).toContain('Deacon patrols preserve the hold');
+    expect(loggedText(deps)).not.toContain('Deacon still skips all swarm coordination');
   });
 
   it('is idempotent on a clean issue and deletes merged branches without pushing', async () => {
