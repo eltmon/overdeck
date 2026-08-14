@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-3704",
   "schemaVersion": 2,
-  "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:21:28.469Z",
-  "pipeline": {
-    "issueId": "PAN-3704",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:01:28.823Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,8 +9,49 @@
       "timestamp": "2026-08-14T06:01:28.823Z"
     }
   ],
-  "harness": "claude-code",
-  "model": "k3[1m]",
+  "feedback": [],
+  "created": "2026-08-14T06:01:28.823Z",
+  "updated": "2026-08-14T06:21:32.058Z",
+  "pipeline": {
+    "issueId": "PAN-3704",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-14T06:21:32.026Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 8237,
+            "output": 78,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 8237,
+          "output": 78,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.008627,
+        "pricingAsOf": "2026-08-14T06:21:32.047Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3704",
