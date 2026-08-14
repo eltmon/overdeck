@@ -649,6 +649,10 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
+  if (state.foreman === true) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — swarm janitor owns foreman liveness`);
+    return null;
+  }
   // PAN-3479: tombstoned rows keep their session_id for transcript linkage —
   // the phase, not a nulled session, is what makes them non-resumable.
   if (state.phase === RETAINED_TRANSCRIPTS_PHASE) {

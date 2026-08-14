@@ -60,10 +60,11 @@ import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { clearSwarmCompletionObservationRecord, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmCompletionObservation, readSwarmHold, writeSwarmCompletionObservation, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
+import { ensureSwarmForeman } from './swarm-foreman.js';
+import { maintainSwarmForeman, resetForemanRespawnFailuresForTests, type SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
-
 const execAsync = promisify(exec);
 const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5_000;
 const SWARM_ADVANCE_FAILURE_THRESHOLD = 3;
@@ -158,8 +159,11 @@ export interface CoordinateSwarmSlotsDeps {
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record; they survive registry resets (PAN-2214). */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
-  /** Request issue-level review once every swarm item has been assembled into the feature branch. */
   recordForemanTakeover?: typeof writeSwarmForemanTakeover;
+  ensureSwarmForeman?: typeof ensureSwarmForeman;
+  workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
+  writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
+  emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -213,6 +217,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   recordForemanTakeover: writeSwarmForemanTakeover,
+  ensureSwarmForeman,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -399,6 +404,7 @@ export async function coordinateSwarmSlots(
 /** Deacon backstop: enumerate active swarms and garbage-collect merged/orphaned slots only. */
 export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultDeps): Promise<string[]> {
   const actions: string[] = [];
+  const sessions = await deps.listSessionNames();
   for (const workspace of deps.listFeatureWorkspaces()) {
     const issueId = workspace.issueId.toUpperCase();
     const spec = await Effect.runPromise((deps.findSpecByIssue ?? findSpecByIssue)(workspace.projectPath, issueId));
@@ -407,10 +413,19 @@ export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultD
     actions.push(`[swarm-janitor] enumerated ${issueId}`);
     actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
     actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
+    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, {
+      ...(deps.listSlotAssignments ? { listSlotAssignments: deps.listSlotAssignments } : {}),
+      ...(deps.readSwarmHold ? { readSwarmHold: deps.readSwarmHold } : {}),
+      ...(deps.workResumeSlotsAvailable ? { workResumeSlotsAvailable: deps.workResumeSlotsAvailable } : {}),
+      ...(deps.ensureSwarmForeman ? { ensureSwarmForeman: deps.ensureSwarmForeman } : {}),
+      ...(deps.writeSwarmHold ? { writeSwarmHold: deps.writeSwarmHold } : {}),
+      ...(deps.emitActivityEntry ? { emitActivityEntry: deps.emitActivityEntry } : {}),
+    }));
   }
   return actions;
 }
 
+export { resetForemanRespawnFailuresForTests };
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>

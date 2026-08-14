@@ -36,9 +36,7 @@ import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
-import { spawnRun } from '../../lib/agents/spawn.js';
-import { messageAgent } from '../../lib/agents/messaging.js';
-import { buildWorkAgentPrompt } from '../../lib/cloister/work-agent-prompt.js';
+import { ensureSwarmForeman } from '../../lib/cloister/swarm-foreman.js';
 import {
   swarmDispatchCommand,
   swarmMergeCommand,
@@ -210,48 +208,7 @@ export async function swarmCommand(
   return { ok: true, actions, workspacePath };
 }
 
-export interface EnsureSwarmForemanDeps {
-  listSessionNamesSync: () => string[];
-  messageAgent: typeof messageAgent;
-  buildWorkAgentPrompt: typeof buildWorkAgentPrompt;
-  spawnRun: typeof spawnRun;
-  resolveProjectFromIssueSync: typeof resolveProjectFromIssueSync;
-}
-
-const defaultForemanDeps: EnsureSwarmForemanDeps = {
-  listSessionNamesSync,
-  messageAgent,
-  buildWorkAgentPrompt,
-  spawnRun,
-  resolveProjectFromIssueSync,
-};
-
-export async function ensureSwarmForeman(
-  issueId: string,
-  workspacePath: string,
-  options: { startedBy: string },
-  deps: EnsureSwarmForemanDeps = defaultForemanDeps,
-): Promise<string[]> {
-  const issue = issueId.toUpperCase();
-  const agentId = `agent-${issue.toLowerCase()}`;
-  if (deps.listSessionNamesSync().includes(agentId)) {
-    await deps.messageAgent(agentId, `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, 'pan-swarm');
-    return [`[swarm] attached to live foreman ${agentId} for ${issue}`];
-  }
-  const prompt = await deps.buildWorkAgentPrompt({
-    issueId: issue,
-    env: 'LOCAL',
-    workspacePath,
-    projectRoot: deps.resolveProjectFromIssueSync(issue)?.projectPath,
-  });
-  const state = await deps.spawnRun(issue, 'work', {
-    workspace: workspacePath,
-    prompt,
-    foreman: true,
-    startedBy: options.startedBy,
-  });
-  return [`[swarm] spawned foreman ${state.id} for ${issue}`];
-}
+export { ensureSwarmForeman, type EnsureSwarmForemanDeps } from '../../lib/cloister/swarm-foreman.js';
 
 export async function swarmRecoverCommand(
   issueId: string,
