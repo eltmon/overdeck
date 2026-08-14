@@ -15,17 +15,34 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+    ],
+    "recordedAt": "2026-08-14T06:49:34.446Z"
+  },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T06:49:38.225Z",
+  "updated": "2026-08-14T06:49:41.004Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:49:38.223Z",
+    "updatedAt": "2026-08-14T06:49:40.298Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
     "reviewRequestedAt": "2026-08-14T06:49:38.223Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -42,12 +59,25 @@
         "src/dashboard/frontend/src/components/command-palette-sorting.ts"
       ],
       "recordedAt": "2026-08-14T06:49:34.446Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3709"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 256498,
+            "output": 645,
+            "cacheRead": 107008,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 11413646,
+            "output": 12064,
+            "cacheRead": 11186944,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
             "input": 8205,
@@ -58,6 +88,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 256498,
+          "output": 645,
+          "cacheRead": 107008,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 11413646,
+          "output": 12064,
+          "cacheRead": 11186944,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5": {
           "input": 8205,
           "output": 76,
@@ -66,11 +108,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 0.008585,
-        "pricingAsOf": "2026-08-14T06:24:38.624Z"
+        "usd": 7.097487,
+        "pricingAsOf": "2026-08-14T06:49:40.336Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3709"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -116,21 +160,5 @@
     "conversations-newest-first.ac3": "completed",
     "conversations-newest-first.ac4": "completed",
     "conversations-newest-first.ac5": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
-      "src/dashboard/frontend/src/components/CommandPalette.tsx"
-    ],
-    "actualChangedFiles": [
-      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
-      "src/dashboard/frontend/src/components/CommandPalette.tsx",
-      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
-    ],
-    "recordedAt": "2026-08-14T06:49:34.446Z"
   }
 }
