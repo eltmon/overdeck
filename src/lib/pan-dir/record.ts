@@ -85,13 +85,6 @@ export interface PanIssueSwarmSlotAssignment {
   assignedAt?: string;
 }
 
-export interface PanIssueSwarmReleasedSlot {
-  slotIndex: number;
-  itemId: string;
-  branch?: string;
-  releasedAt: string;
-}
-
 export interface PanIssueSwarmSupersededAttempt {
   slotIndex: number;
   itemId: string;
@@ -131,8 +124,7 @@ export interface PanIssueSwarmRecord {
    */
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
-  /** Clean, pushed blocked work whose runtime ownership was released for reuse. */
-  releasedBlockedSlots?: Record<string, PanIssueSwarmReleasedSlot>;
+  releasedBlockedSlots?: Record<string, { slotIndex: number; itemId: string; branch?: string; releasedAt: string }>;
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
   /**
    * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark
