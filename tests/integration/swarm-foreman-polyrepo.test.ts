@@ -67,11 +67,11 @@ describe('scripted swarm foreman over a sparse polyrepo', () => {
     expect(firstWave.some(action => action.includes('(item schema)'))).toBe(true);
 
     const liveSchema = { itemId: 'schema', slotIndex: 1, status: 'in_flight' as const, branch: 'feature/pan-3680-slot-1', agentId: 'agent-pan-3680-slot-1' };
-    const running = await classifyInFlightSlots([liveSchema], classificationDeps(null), { workspacePath: workspace, issueId });
+    const running = await classifyInFlightSlots([liveSchema], classificationDeps(false), { workspacePath: workspace, issueId });
     expect(running[0]?.lifecycle).toBe('running');
     expect(running[0]?.status).not.toBe('merged');
 
-    const ready = await classifyInFlightSlots([liveSchema], classificationDeps('done'), { workspacePath: workspace, issueId });
+    const ready = await classifyInFlightSlots([liveSchema], classificationDeps(true), { workspacePath: workspace, issueId });
     expect(ready[0]?.lifecycle).toBe('ready-to-merge');
     const mergeDeps = {
       verifyAndMergeSlot: vi.fn(async () => ({ verified: true, merged: true, conflicts: false, evidence: { verifyCommands: [], expectedOutputs: [], commandOutputs: [] } })),
@@ -140,12 +140,17 @@ function dispatchDeps(spawnedItems: string[]): CoordinateSwarmSlotsDeps {
   } as unknown as CoordinateSwarmSlotsDeps;
 }
 
-function classificationDeps(resolution: 'done' | null): CoordinateSwarmSlotsDeps {
+function classificationDeps(completed: boolean): CoordinateSwarmSlotsDeps {
   return {
-    // A terminal runtime resolution becomes authoritative only after the slot
-    // session exits; a live reused slot id may still carry stale resolution.
-    listSessionNames: vi.fn(async () => resolution ? [] : ['agent-pan-3680-slot-1']), isPaneDead: vi.fn(async () => false), getPaneExitStatus: vi.fn(async () => null),
-    getAgentRuntimeState: vi.fn(async () => resolution ? ({ resolution } as never) : null), readSlotCompletion: vi.fn(() => undefined), clearCompletionObservation: vi.fn(async () => undefined),
+    listSessionNames: vi.fn(async () => ['agent-pan-3680-slot-1']), isPaneDead: vi.fn(async () => false), getPaneExitStatus: vi.fn(async () => null),
+    getAgentRuntimeState: vi.fn(async () => null),
+    readSlotCompletion: vi.fn(() => completed ? ({
+      slotIndex: 1,
+      itemId: 'schema',
+      agentId: 'agent-pan-3680-slot-1',
+      completedAt: '2026-08-14T00:00:00.000Z',
+    }) : undefined),
+    clearCompletionObservation: vi.fn(async () => undefined),
   } as unknown as CoordinateSwarmSlotsDeps;
 }
 
