@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T06:17:43.178Z",
+  "updated": "2026-08-14T06:17:50.546Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -28,12 +28,12 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:17:23.334Z",
-    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3695 after its harness exited before push.",
+    "updatedAt": "2026-08-14T06:17:23.393Z",
+    "mergeNotes": "Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent was stopped by the operator",
     "strikeReadyHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
     "strikeReadyAt": "2026-08-14T05:05:29.152Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-08-14T04:18:53.987Z",
@@ -41,6 +41,13 @@
         "mainHead": "16b8b19f89adfc52bc03e694208369f914dc9f75",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-08-14T06:17:23.390Z",
+        "strikeHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
+        "mainHead": "24936d87502955f0f7efeb2a426f7958e19ecc2d",
+        "outcome": "failed",
+        "detail": "Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent was stopped by the operator"
       }
     ]
   },
@@ -92,7 +99,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.0659170000000002,
-        "pricingAsOf": "2026-08-14T06:17:23.350Z"
+        "pricingAsOf": "2026-08-14T06:17:45.685Z"
       }
     },
     "merges": [],
