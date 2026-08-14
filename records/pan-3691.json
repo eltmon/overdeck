@@ -18,33 +18,22 @@
     }
   ],
   "created": "2026-08-13T22:26:54.990Z",
-  "updated": "2026-08-14T03:11:13.276Z",
+  "updated": "2026-08-14T03:14:45.302Z",
   "pipeline": {
     "issueId": "PAN-3691",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T03:11:13.251Z",
-    "testNotes": "Skipped: issue is already merged",
-    "verificationNotes": "Verification FAILED at test (727851ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3691-strike/.overdeck/verification-latest.json",
-    "lastVerifiedCommit": "7351d6477a68d5742fdfcc96217d0691a85c62c1",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [
-      {
-        "timestamp": "2026-08-14T01:49:39.661Z",
-        "strikeHead": "7351d6477a68d5742fdfcc96217d0691a85c62c1",
-        "mainHead": "35598b91dc96cf2dded6b0f8ee784aefe80b18b6",
-        "outcome": "transport-failed",
-        "detail": "Strike merge request failed: fetch failed"
-      }
-    ],
     "closedOut": true,
-    "closedOutAt": "2026-08-14T03:11:13.251Z"
+    "closedOutAt": "2026-08-14T03:11:13.251Z",
+    "updatedAt": "2026-08-14T03:14:39.011Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3691 after its harness exited before push.",
+    "strikeReadyHead": "7351d6477a68d5742fdfcc96217d0691a85c62c1",
+    "strikeReadyAt": "2026-08-14T03:14:39.010Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -94,92 +83,11 @@
       },
       "costAtCloseOut": {
         "usd": 3.5904380000000002,
-        "pricingAsOf": "2026-08-14T02:09:28.531Z"
+        "pricingAsOf": "2026-08-14T03:14:39.046Z"
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-14T03:11:13.269Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at 7351d6477a68d5742fdfcc96217d0691a85c62c1",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3693 MERGED at 2026-08-14T02:05:49Z",
-          "status": "pass",
-          "mergedAt": "2026-08-14T02:05:49Z",
-          "mergeCommit": "4c54f893bb61d71e91615c5a78dc7214e55b99c9"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "required checks concluded successfully on 4c54f893bb61d71e91615c5a78dc7214e55b99c9: test, lint, build (22), guard",
-          "status": "pass"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit 16b8b19f contains merge 4c54f893",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3691 not merged to main; Cleaned 8 agent state directories (6 transcript files preserved); Preserved local branch strike/pan-3691 — not merged to main; Preserved remote branch strike/pan-3691 — not merged to main; Pruned 169 checkpoint ref(s) for agent-pan-3691, planning-pan-3691, strike-pan-3691; No specialist registry entries for PAN-3691"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
   "model": "k3[1m]"
