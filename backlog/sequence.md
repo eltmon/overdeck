@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-14T16:31:38Z · model: claude-opus-5 · open: 860_
+_Last sequenced: 2026-08-14T16:33:00Z · model: claude-opus-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -55,45 +55,45 @@ _Last sequenced: 2026-08-14T16:31:38Z · model: claude-opus-5 · open: 860_
 | 48 | PAN-3084 | S | high | ok |  | PAN-3566 | A review session spawned but never briefed sits at zero context forever and blocks its own replacement |
 | 49 | PAN-3078 | S | high | ok |  |  | The inspect verdict is never delivered to the work agent, so an agent that waits for it deadlocks forever |
 | 50 | PAN-3040 | M | high | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects |
-| 51 | PAN-2995 | S | high | ok |  | PAN-3047 | pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry |
 | 51 | PAN-3580 | M | high | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
+| 52 | PAN-2995 | S | high | ok |  | PAN-3047 | pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry |
 | 52 | PAN-3677 | S | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
-| 53 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering: 11 duplicate ranks and 11 gaps persisted |
-| 54 | PAN-3560 | M | high | ok |  |  | PTY supervisor overloads under concurrent convoys; fleet-wide 502s kill resumes and feedback delivery |
-| 55 | PAN-3571 | S | high | ok |  |  | Stop-hook completion check exits silently on timeout: 334 stranded turn-ends, agents idle until a patrol notices |
-| 56 | PAN-3496 | XS | high | ok |  |  | Review and inspect agents must decide review depth themselves instead of parking the convoy on an operator AUQ |
-| 57 | PAN-3329 | M | high | ok |  |  | Deployment generation node_modules and tracked packages files are deleted while a dev-checkout build runs |
-| 58 | PAN-3274 | S | high | ok |  | PAN-3566 | A test-role agent spawned, never ran a turn, and strands its issue behind a verdict never produced |
-| 59 | PAN-3236 | S | high | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so review feedback never lands |
-| 60 | PAN-3234 | S | high | ok |  |  | Agents freeze on blocking choice menus and no health surface notices; the detector exists but is unwired |
-| 61 | PAN-3168 | XS | high | ok |  |  | DoD row 5 counts an agent paused for close-out as running, deadlocking the issue in verifying_on_main forever |
-| 62 | PAN-3103 | S | high | ok |  |  | A transient merge_status failed permanently skips close-out, so merged work stays open and pickup-eligible |
-| 63 | PAN-3100 | S | high | ok |  |  | The test role evaluates the dirty working tree, so a live work agent uncommitted edits produce false failures |
-| 64 | PAN-3043 | M | high | ok |  |  | Mid-run provider quota exhaustion is undetected: an agent stayed running for days holding an advancing slot |
-| 65 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 66 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 67 | PAN-3640 | S | high | ok |  | PAN-3651 | Agent GC keeps terminal rows because a lost state push race aborts before drift reconciliation |
-| 68 | PAN-3565 | M | high | ok |  | PAN-3564 | Review lifecycle: failed spawn wedges starting, infra failure synthesized as a real CHANGES REQUESTED verdict |
-| 69 | PAN-3557 | S | high | ok |  |  | Post-merge label writes have no retry; a rate-limited 403 hides a merged issue from the verify-on-main sweep |
-| 70 | PAN-3464 | XS | high | ok |  |  | pan swarm reset never clears slotCompletions, so the coordinator re-arms the exact wedge reset was run to escape |
-| 71 | PAN-3257 | S | high | ok |  |  | Crash-resume does not re-wire the PTY supervisor; a stale socket refuses every delivery and state loses the flag |
-| 72 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main waypoint, so an already-done issue can never close out |
-| 73 | PAN-3118 | M | high | ok |  | PAN-3043 | Model quota exhaustion halts agents invisibly: four planning agents read running at zero cost with no fallback |
-| 74 | PAN-3104 | S | high | ok |  | PAN-3100 | A stale test result artifact is re-applied with no freshness check and keeps re-failing an issue after the fix landed |
-| 75 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against closed issues, resurrecting agents and raising needs-you 12 days after close-out |
-| 76 | PAN-3023 | S | high | ok |  |  | Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 1/3 never retries |
-| 77 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
-| 78 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
-| 79 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 80 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
-| 81 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
-| 82 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
-| 83 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
-| 84 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
-| 85 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
-| 86 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers cannot run their install gate |
-| 87 | PAN-3621 | S | high | ok |  |  | pan start dies resolving a chunk graph spliced across two builds: old importer name, live generation root |
-| 88 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics executed a squatted npm package via npx registry fallback — supply-chain exposure |
+| 54 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering: 11 duplicate ranks and 11 gaps persisted |
+| 55 | PAN-3560 | M | high | ok |  |  | PTY supervisor overloads under concurrent convoys; fleet-wide 502s kill resumes and feedback delivery |
+| 56 | PAN-3571 | S | high | ok |  |  | Stop-hook completion check exits silently on timeout: 334 stranded turn-ends, agents idle until a patrol notices |
+| 57 | PAN-3496 | XS | high | ok |  |  | Review and inspect agents must decide review depth themselves instead of parking the convoy on an operator AUQ |
+| 58 | PAN-3329 | M | high | ok |  |  | Deployment generation node_modules and tracked packages files are deleted while a dev-checkout build runs |
+| 59 | PAN-3274 | S | high | ok |  | PAN-3566 | A test-role agent spawned, never ran a turn, and strands its issue behind a verdict never produced |
+| 60 | PAN-3236 | S | high | ok |  |  | ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so review feedback never lands |
+| 61 | PAN-3234 | S | high | ok |  |  | Agents freeze on blocking choice menus and no health surface notices; the detector exists but is unwired |
+| 62 | PAN-3168 | XS | high | ok |  |  | DoD row 5 counts an agent paused for close-out as running, deadlocking the issue in verifying_on_main forever |
+| 63 | PAN-3103 | S | high | ok |  |  | A transient merge_status failed permanently skips close-out, so merged work stays open and pickup-eligible |
+| 64 | PAN-3100 | S | high | ok |  |  | The test role evaluates the dirty working tree, so a live work agent uncommitted edits produce false failures |
+| 65 | PAN-3043 | M | high | ok |  |  | Mid-run provider quota exhaustion is undetected: an agent stayed running for days holding an advancing slot |
+| 66 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 67 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 68 | PAN-3640 | S | high | ok |  | PAN-3651 | Agent GC keeps terminal rows because a lost state push race aborts before drift reconciliation |
+| 69 | PAN-3565 | M | high | ok |  | PAN-3564 | Review lifecycle: failed spawn wedges starting, infra failure synthesized as a real CHANGES REQUESTED verdict |
+| 70 | PAN-3557 | S | high | ok |  |  | Post-merge label writes have no retry; a rate-limited 403 hides a merged issue from the verify-on-main sweep |
+| 71 | PAN-3464 | XS | high | ok |  |  | pan swarm reset never clears slotCompletions, so the coordinator re-arms the exact wedge reset was run to escape |
+| 72 | PAN-3257 | S | high | ok |  |  | Crash-resume does not re-wire the PTY supervisor; a stale socket refuses every delivery and state loses the flag |
+| 73 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main waypoint, so an already-done issue can never close out |
+| 74 | PAN-3118 | M | high | ok |  | PAN-3043 | Model quota exhaustion halts agents invisibly: four planning agents read running at zero cost with no fallback |
+| 75 | PAN-3104 | S | high | ok |  | PAN-3100 | A stale test result artifact is re-applied with no freshness check and keeps re-failing an issue after the fix landed |
+| 76 | PAN-3044 | S | high | ok |  |  | Review feedback delivery runs against closed issues, resurrecting agents and raising needs-you 12 days after close-out |
+| 77 | PAN-3023 | S | high | ok |  |  | Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 1/3 never retries |
+| 78 | PAN-2700 | S | high | ok |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
+| 79 | PAN-2733 | S | high | ok |  |  | substrate-bug-poller has never run |
+| 80 | PAN-1560 | XS | high | ok |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
+| 81 | PAN-2769 | S | high | ok |  |  | review_status rows are never reconciled when an issue closes |
+| 82 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
+| 83 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
+| 84 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
+| 85 | PAN-2796 | S | high | ok |  |  | idle nudge must not advance after failed mandatory inspection |
+| 86 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
+| 87 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers cannot run their install gate |
+| 88 | PAN-3621 | S | high | ok |  |  | pan start dies resolving a chunk graph spliced across two builds: old importer name, live generation root |
+| 89 | PAN-3605 | XS | high | ok |  |  | lint-effect-diagnostics executed a squatted npm package via npx registry fallback — supply-chain exposure |
 | 90 | PAN-2759 | S | high | ok |  |  | Dead flywheel with an active run sat idle 2h after reboot while its exempt reconciler was wired and enabled |
 | 91 | PAN-3569 | S | high | ok |  |  | Deploy gate deadlocks on a stale pending-post-merge.json when the deacon is paused; no staleness rule |
 | 92 | PAN-3522 | M | high | ok |  |  | Supervisor watchdog restart-churns under CPU storm: the probe budget ignores the boot warm phase |
@@ -180,73 +180,73 @@ _Last sequenced: 2026-08-14T16:31:38Z · model: claude-opus-5 · open: 860_
 | 173 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is fully broken: Commander passes its options object into the fetchImpl injection slot |
 | 174 | PAN-3174 | M | high | ok |  | PAN-3032 | Every polyrepo UAT stack 504s: stale myn- Traefik labels, unattached devnet, and a frontend port mismatch |
 | 175 | PAN-3129 | M | high | ok |  |  | Canonical writes under agent-controlled paths have no symlink or TOCTOU containment check |
-| 176 | PAN-3048 | XS | high | ok |  |  | Pipeline auto-commit lands .pan/drafts PRDs in product feature branches; the duplicated exclusion list has drifted |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
-| 177 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 178 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 179 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 180 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 181 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 182 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 183 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 184 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 185 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
-| 186 | PAN-3553 | XS | high | ok |  |  | Census reads a zero-session tmux server as unavailable, so post-reboot conversations sit on Starting for minutes |
-| 187 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
-| 188 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
-| 189 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
-| 190 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
-| 191 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
-| 192 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
-| 193 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
-| 194 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 195 | PAN-3617 | S | high | needs-refinement |  |  | One strike died on every dispatch with zero output while a sibling minutes later worked normally |
-| 196 | PAN-3596 | S | high | ok |  |  | Deacon patrol has no per-step timing, so a 481-GET reconciler ran undetected and overruns are unattributable |
-| 197 | PAN-3570 | S | high | ok |  |  | Devcontainer leaves root-owned node_modules subtrees; init-fe EACCES blocks pan start and rebuild cannot heal it |
-| 198 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache: launch-injection byte drift plus a dropped cache-scope header |
-| 199 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link targets, so the CLI vanishes for the rebuild window |
-| 200 | PAN-1711 | L | high | ok |  |  | Root-cause the dashboard event-loop stalls that force watchdog restarts and 502s under pipeline load |
-| 201 | PAN-3355 | XS | high | ok |  |  | sessionExists maps a probe failure to absence, so callers read not-running when liveness is genuinely unknown |
-| 202 | PAN-3306 | S | high | ok |  | PAN-3317 | Strike prompt instructs a rebase the launcher guard blocks while sync-main resolves the wrong worktree |
-| 203 | PAN-3289 | S | high | ok |  | PAN-3631 | The sequencer ran a full pass on an empty manifest while the read model held 1120 issues |
-| 204 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab process per repo and head, stalling every membership refresh |
-| 205 | PAN-3210 | S | high | ok |  |  | Close-out teardown scopes by compose project while an unprefixed devcontainer init container blocks it |
-| 206 | PAN-3186 | XS | high | ok |  |  | Pipeline membership blanks a whole project because one configured member path is not a git repository |
-| 207 | PAN-3185 | S | high | ok |  |  | pan start reports a hard failure after a successful spawn: 266 lines run between the duplicate check and create |
-| 208 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time; nothing verifies the change reached production before members read shipped |
-| 209 | PAN-3176 | S | high | ok |  |  | UAT batch promotion takes no stack health evidence, so a batch never exercised can be promoted |
-| 210 | PAN-3096 | S | high | ok |  |  | pan done fails on the generated devcontainer harness and agents infer deleting workspace infrastructure |
-| 211 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit xhigh, recurring once per xBRIEF item |
-| 212 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard audits the dirty working tree, so another session edits block unrelated pushes |
-| 213 | PAN-2971 | S | high | ok |  |  | The flywheel orchestrator finalized its own run and kept ticking for 19h while Pause and Stop were disabled |
-| 214 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 215 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 216 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
-| 217 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 218 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 219 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 220 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 221 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
-| 222 | PAN-3579 | S | high | ok |  |  | Around 20 frontend mutation fetches hand-write JSON headers and 403 on CSRF-guarded routes |
-| 223 | PAN-3510 | S | high | ok |  |  | Stopped agents can leave detached docker-run test containers alive for hours, contending with other gates |
-| 224 | PAN-3245 | XS | high | ok |  |  | The pan done completion gate flags workspace .pan/drafts as uncommitted work despite its own .pan exclusion |
-| 225 | PAN-3243 | XS | high | ok |  | PAN-1824 | An auto-commit test bounds a real git subprocess by 20 setImmediate turns and reddened main |
-| 226 | PAN-3171 | S | high | ok |  |  | The pipeline reports merge failed after a successful merge and leaves the issue Todo with no label |
-| 227 | PAN-3167 | S | high | ok |  |  | Two projects are permanently unreadable through the membership door: an uninstalled GitHub App 404 typed as unavailable |
-| 228 | PAN-3050 | XS | high | ok |  |  | The idle-stack reaper regex only matches Overdeck container names, so other projects stacks are never reaped |
-| 229 | PAN-3032 | M | high | ok |  |  | Stack rebuild composes under one prefix while Traefik labels reference another, and devnet attaches are runtime-only |
-| 230 | PAN-3652 | XS | high | ok |  |  | Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified |
-| 231 | PAN-3536 | XS | high | ok |  |  | pan tell cannot reach ohmypi conversations: expectedHarness defaults to claude-code when state.json is absent |
-| 232 | PAN-3518 | M | high | ok |  | PAN-3517 | TTL-aware re-review payload policy: fresh-spawn-with-digest when a reviewer history is cold and large |
-| 233 | PAN-3303 | S | high | ok |  |  | Command Deck latches Unknown project after reconnect: an empty registered-projects response is taken as truth |
-| 234 | PAN-3280 | S | high | needs-refinement |  |  | One issue lost its agent session four times in a run and its reviewer died writing no artifact |
-| 235 | PAN-3218 | S | high | ok |  |  | No release-drift signal: a user-facing fix can sit merged on main for hours while every published version is broken |
-| 236 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment gate, so a crafted id could redirect a canonical write |
-| 237 | PAN-3094 | XS | high | ok |  |  | The pan done merge fallback force-pushes a branch that is fast-forward pushable and leaves the command half-done |
-| 238 | PAN-3015 | L | high | ok |  |  | pan monitor: pull-based background inbox transport replacing keystroke injection for Claude Code sessions |
-| 239 | PAN-3014 | XS | high | ok |  |  | Background AI title and about spawns fail because --bare skips credential reads in current Claude Code |
-| 240 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty backlog, so a fresh npx install prints a stack trace |
-| 241 | PAN-3533 | L | high | ok |  | PAN-3344 | Resource segregation: per-project isolation classes so one project cannot starve another project pipeline |
+| 177 | PAN-3048 | XS | high | ok |  |  | Pipeline auto-commit lands .pan/drafts PRDs in product feature branches; the duplicated exclusion list has drifted |
+| 178 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 179 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 180 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 181 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 182 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 183 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 184 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 185 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 186 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
+| 187 | PAN-3553 | XS | high | ok |  |  | Census reads a zero-session tmux server as unavailable, so post-reboot conversations sit on Starting for minutes |
+| 188 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
+| 189 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
+| 190 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
+| 191 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
+| 192 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
+| 193 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
+| 194 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 195 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 196 | PAN-3617 | S | high | needs-refinement |  |  | One strike died on every dispatch with zero output while a sibling minutes later worked normally |
+| 197 | PAN-3596 | S | high | ok |  |  | Deacon patrol has no per-step timing, so a 481-GET reconciler ran undetected and overruns are unattributable |
+| 198 | PAN-3570 | S | high | ok |  |  | Devcontainer leaves root-owned node_modules subtrees; init-fe EACCES blocks pan start and rebuild cannot heal it |
+| 199 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache: launch-injection byte drift plus a dropped cache-scope header |
+| 200 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link targets, so the CLI vanishes for the rebuild window |
+| 201 | PAN-1711 | L | high | ok |  |  | Root-cause the dashboard event-loop stalls that force watchdog restarts and 502s under pipeline load |
+| 202 | PAN-3355 | XS | high | ok |  |  | sessionExists maps a probe failure to absence, so callers read not-running when liveness is genuinely unknown |
+| 203 | PAN-3306 | S | high | ok |  | PAN-3317 | Strike prompt instructs a rebase the launcher guard blocks while sync-main resolves the wrong worktree |
+| 204 | PAN-3289 | S | high | ok |  | PAN-3631 | The sequencer ran a full pass on an empty manifest while the read model held 1120 issues |
+| 205 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab process per repo and head, stalling every membership refresh |
+| 206 | PAN-3210 | S | high | ok |  |  | Close-out teardown scopes by compose project while an unprefixed devcontainer init container blocks it |
+| 207 | PAN-3186 | XS | high | ok |  |  | Pipeline membership blanks a whole project because one configured member path is not a git repository |
+| 208 | PAN-3185 | S | high | ok |  |  | pan start reports a hard failure after a successful spawn: 266 lines run between the duplicate check and create |
+| 209 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time; nothing verifies the change reached production before members read shipped |
+| 210 | PAN-3176 | S | high | ok |  |  | UAT batch promotion takes no stack health evidence, so a batch never exercised can be promoted |
+| 211 | PAN-3096 | S | high | ok |  |  | pan done fails on the generated devcontainer harness and agents infer deleting workspace infrastructure |
+| 212 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit xhigh, recurring once per xBRIEF item |
+| 213 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard audits the dirty working tree, so another session edits block unrelated pushes |
+| 214 | PAN-2971 | S | high | ok |  |  | The flywheel orchestrator finalized its own run and kept ticking for 19h while Pause and Stop were disabled |
+| 215 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 216 | PAN-1868 | XS | high | ok |  | PAN-2466 | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 217 | PAN-2466 | S | high | ok |  |  | close-out/record writer clobbers closeOut.usage with EMPTY data |
+| 218 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 219 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 220 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 221 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 222 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
+| 223 | PAN-3579 | S | high | ok |  |  | Around 20 frontend mutation fetches hand-write JSON headers and 403 on CSRF-guarded routes |
+| 224 | PAN-3510 | S | high | ok |  |  | Stopped agents can leave detached docker-run test containers alive for hours, contending with other gates |
+| 225 | PAN-3245 | XS | high | ok |  |  | The pan done completion gate flags workspace .pan/drafts as uncommitted work despite its own .pan exclusion |
+| 226 | PAN-3243 | XS | high | ok |  | PAN-1824 | An auto-commit test bounds a real git subprocess by 20 setImmediate turns and reddened main |
+| 227 | PAN-3171 | S | high | ok |  |  | The pipeline reports merge failed after a successful merge and leaves the issue Todo with no label |
+| 228 | PAN-3167 | S | high | ok |  |  | Two projects are permanently unreadable through the membership door: an uninstalled GitHub App 404 typed as unavailable |
+| 229 | PAN-3050 | XS | high | ok |  |  | The idle-stack reaper regex only matches Overdeck container names, so other projects stacks are never reaped |
+| 230 | PAN-3032 | M | high | ok |  |  | Stack rebuild composes under one prefix while Traefik labels reference another, and devnet attaches are runtime-only |
+| 231 | PAN-3652 | XS | high | ok |  |  | Add workflow_dispatch to ci.yml and state-plane-branches.yml so an unverified main tip can be verified |
+| 232 | PAN-3536 | XS | high | ok |  |  | pan tell cannot reach ohmypi conversations: expectedHarness defaults to claude-code when state.json is absent |
+| 233 | PAN-3518 | M | high | ok |  | PAN-3517 | TTL-aware re-review payload policy: fresh-spawn-with-digest when a reviewer history is cold and large |
+| 234 | PAN-3303 | S | high | ok |  |  | Command Deck latches Unknown project after reconnect: an empty registered-projects response is taken as truth |
+| 235 | PAN-3280 | S | high | needs-refinement |  |  | One issue lost its agent session four times in a run and its reviewer died writing no artifact |
+| 236 | PAN-3218 | S | high | ok |  |  | No release-drift signal: a user-facing fix can sit merged on main for hours while every published version is broken |
+| 237 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment gate, so a crafted id could redirect a canonical write |
+| 238 | PAN-3094 | XS | high | ok |  |  | The pan done merge fallback force-pushes a branch that is fast-forward pushable and leaves the command half-done |
+| 239 | PAN-3015 | L | high | ok |  |  | pan monitor: pull-based background inbox transport replacing keystroke injection for Claude Code sessions |
+| 240 | PAN-3014 | XS | high | ok |  |  | Background AI title and about spawns fail because --bare skips credential reads in current Claude Code |
+| 241 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty backlog, so a fresh npx install prints a stack trace |
+| 242 | PAN-3533 | L | high | ok |  | PAN-3344 | Resource segregation: per-project isolation classes so one project cannot starve another project pipeline |
 | 243 | PAN-3332 | S | high | ok |  |  | Dashboard slash-command activities keep saying running in background after the detached spawn already died |
 | 244 | PAN-3321 | XS | high | needs-refinement |  |  | Escalation copy and CLAUDE.md tell operators to run pan unstick, which the CLI did not expose |
 | 245 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so two of three agents raised the ceiling |
@@ -275,141 +275,141 @@ _Last sequenced: 2026-08-14T16:31:38Z · model: claude-opus-5 · open: 860_
 | 268 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 269 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 270 | PAN-3420 | M | high | ok |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 270 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 271 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
-| 272 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 273 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 274 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
-| 275 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
-| 276 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
-| 277 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 278 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
-| 279 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 280 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
-| 281 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
-| 282 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
-| 283 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 284 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 285 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 286 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 287 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
-| 288 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 289 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 290 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 291 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 292 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 293 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 294 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 295 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 296 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 297 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 298 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
-| 299 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 300 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
-| 301 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
-| 302 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 303 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 304 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 305 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 306 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 307 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 308 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 309 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
-| 310 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 311 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
-| 312 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 313 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
-| 314 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
-| 315 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 316 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 317 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 318 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 319 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 320 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 321 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 322 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
-| 323 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 324 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 325 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 326 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 327 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 328 | PAN-1253 | M | high | ok |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 329 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 330 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 331 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 332 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 333 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 334 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 335 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 336 | PAN-1218 | M | high | ok |  |  | Bead inspect: drop Check 3 (compile/lint), restrict to foundation beads, add end-of-batch mode |
-| 337 | PAN-1219 | M | high | ok |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 338 | PAN-1209 | S | high | ok |  |  | PAN-1052 bead projection disagrees with bd state |
-| 339 | PAN-1451 | M | high | ok |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 340 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 341 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
-| 342 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 343 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 344 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 345 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 346 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 347 | PAN-2837 | M | high | needs-refinement |  |  | Distributed agent presence: record which machine runs each issue's agents on overdeck-state (claim/release, no heartbeats) |
-| 348 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
-| 349 | PAN-2830 | M | high | needs-refinement |  |  | Shared Logbook: make the overdeck-state branch opt-in |
-| 350 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 351 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
-| 352 | PAN-2549 | M | high | ok |  |  | Fly remote workspaces: sync overdeck-state before re-enabling migrated projects |
-| 353 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 354 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 355 | PAN-2308 | M | high | ok |  |  | hardening(workspaces): migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic container boot refusal… |
-| 356 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 357 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 358 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 359 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 360 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 361 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 362 | PAN-813 | M | high | ok |  |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
-| 363 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 364 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 365 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 366 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 367 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 368 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 369 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 370 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 371 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 372 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 373 | PAN-2805 | S | medium | ok |  |  | FlywheelPage shows 'No active run' while /api/flywheel/current returns a live run |
-| 374 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 375 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 376 | PAN-2739 | S | medium | ok |  |  | first-completion detection throws every patrol cycle |
-| 377 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 378 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 379 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 380 | PAN-2696 | XS | medium | ok |  |  | Task views still speak beads vocabulary |
-| 381 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 382 | PAN-2686 | XS | medium | ok |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
-| 383 | PAN-3661 | XS | medium | ok |  |  | issueActions review-mode tests fail locally: semantic rejection no longer toasts since secure dispatch |
-| 384 | PAN-2350 | XL | medium | ok | ✓ |  | Epic: Overdeck Anywhere — reachability, identity and a remote-safe API behind remote, mobile and shared access |
-| 385 | PAN-3455 | XS | medium | ok |  |  | isCliproxyUpToDate always returns false because --version exits 2, so every ensure re-downloads the release |
-| 386 | PAN-3235 | S | medium | ok |  |  | Dashboard decision card should render and answer agent pane-choice menus in one click |
-| 387 | PAN-3181 | L | medium | ok |  |  | Own agent memories in Overdeck: migrate harness project memories onto a per-repo overdeck-memory orphan branch |
-| 388 | PAN-3137 | XS | medium | ok |  |  | UAT generation member titles come from the flywheel status snapshot, putting orchestrator prose on a merge surface |
-| 389 | PAN-3117 | S | medium | ok |  |  | The failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed |
-| 390 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
-| 391 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 392 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 393 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 394 | PAN-2659 | S | medium | ok |  |  | fs-lock: crash between mkdir(lock) and owner.json write leaves an unreclaimable record lock (successor to #2623) |
-| 395 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 396 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
-| 397 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 398 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 399 | PAN-2560 | M | medium | ok |  |  | resolveStateReadHomeSync (state-read-home.ts) resolves state dir by path basename, not registry key |
-| 400 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 401 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 402 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 403 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 404 | PAN-2506 | M | medium | ok |  |  | flywheel-primary-root.test.ts fails on macOS: /var vs /private/var symlink not canonicalized |
+| 271 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 272 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
+| 273 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 274 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 275 | PAN-2526 | M | high | ok |  |  | Refactor deacon.ts below file-size baseline |
+| 276 | PAN-2008 | XS | high | ok |  | PAN-1936 | store-access guard |
+| 277 | PAN-1936 | M | high | ok |  |  | Single source-of-truth reads |
+| 278 | PAN-1988 | M | high | ok |  | PAN-1936 | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
+| 279 | PAN-1910 | XS | high | ok |  | PAN-1936 | fast-follow(PAN-1908): collapse issue status to ONE canonical field |
+| 280 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 281 | PAN-1728 | S | high | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations |
+| 282 | PAN-2651 | S | high | ok |  |  | simplify lifecycle reconciliation and add a safe post-planning reset |
+| 283 | PAN-2678 | M | high | ok |  |  | Ops: clean blocked state worktrees, fix auricle git-status failure, restore the Deacon (2026-07-14 review outage) |
+| 284 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 285 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 286 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 287 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 288 | PAN-2244 | S | high | ok |  |  | Recurring [pan-dir/auto-commit] GitError on main |
+| 289 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 290 | PAN-2195 | M | high | ok |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 291 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 292 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 293 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 294 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 295 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 296 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 297 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 298 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 299 | PAN-2718 | M | high | ok |  |  | pan restart needs a first-class no-dialog reconciliation flag |
+| 300 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 301 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
+| 302 | PAN-2667 | M | high | ok |  |  | Reimplement the task-progress admission signal in resource discovery |
+| 303 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 304 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 305 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 306 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 307 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 308 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 309 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 310 | PAN-1720 | S | high | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation |
+| 311 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 312 | PAN-1650 | M | high | ok |  |  | Split readyForMerge → gatesPassed (derived/event-driven) + shipComplete; auto-dispatch ship on gates-green |
+| 313 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 314 | PAN-1770 | S | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues writes |
+| 315 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
+| 316 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 317 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 318 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 319 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 320 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 321 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 322 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 323 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
+| 324 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 325 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 326 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 327 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 328 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 329 | PAN-1253 | M | high | ok |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 330 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
+| 331 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 332 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 333 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 334 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 335 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 336 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 337 | PAN-1218 | M | high | ok |  |  | Bead inspect: drop Check 3 (compile/lint), restrict to foundation beads, add end-of-batch mode |
+| 338 | PAN-1219 | M | high | ok |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 339 | PAN-1209 | S | high | ok |  |  | PAN-1052 bead projection disagrees with bd state |
+| 340 | PAN-1451 | M | high | ok |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 341 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 342 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
+| 343 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 344 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 345 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 346 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 347 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 348 | PAN-2837 | M | high | needs-refinement |  |  | Distributed agent presence: record which machine runs each issue's agents on overdeck-state (claim/release, no heartbeats) |
+| 349 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
+| 350 | PAN-2830 | M | high | needs-refinement |  |  | Shared Logbook: make the overdeck-state branch opt-in |
+| 351 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 352 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
+| 353 | PAN-2549 | M | high | ok |  |  | Fly remote workspaces: sync overdeck-state before re-enabling migrated projects |
+| 354 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 355 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 356 | PAN-2308 | M | high | ok |  |  | hardening(workspaces): migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic container boot refusal… |
+| 357 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 358 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 359 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 360 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 361 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 362 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 363 | PAN-813 | M | high | ok |  |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
+| 364 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 365 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 366 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 367 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 368 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 369 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 370 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 371 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 372 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 373 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 374 | PAN-2805 | S | medium | ok |  |  | FlywheelPage shows 'No active run' while /api/flywheel/current returns a live run |
+| 375 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 376 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 377 | PAN-2739 | S | medium | ok |  |  | first-completion detection throws every patrol cycle |
+| 378 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 379 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 380 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 381 | PAN-2696 | XS | medium | ok |  |  | Task views still speak beads vocabulary |
+| 382 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 383 | PAN-2686 | XS | medium | ok |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
+| 384 | PAN-3661 | XS | medium | ok |  |  | issueActions review-mode tests fail locally: semantic rejection no longer toasts since secure dispatch |
+| 385 | PAN-2350 | XL | medium | ok | ✓ |  | Epic: Overdeck Anywhere — reachability, identity and a remote-safe API behind remote, mobile and shared access |
+| 386 | PAN-3455 | XS | medium | ok |  |  | isCliproxyUpToDate always returns false because --version exits 2, so every ensure re-downloads the release |
+| 387 | PAN-3235 | S | medium | ok |  |  | Dashboard decision card should render and answer agent pane-choice menus in one click |
+| 388 | PAN-3181 | L | medium | ok |  |  | Own agent memories in Overdeck: migrate harness project memories onto a per-repo overdeck-memory orphan branch |
+| 389 | PAN-3137 | XS | medium | ok |  |  | UAT generation member titles come from the flywheel status snapshot, putting orchestrator prose on a merge surface |
+| 390 | PAN-3117 | S | medium | ok |  |  | The failed-send bubble hides a deterministic 4xx reason and offers a Retry that can never succeed |
+| 391 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
+| 392 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 393 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 394 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 395 | PAN-2659 | S | medium | ok |  |  | fs-lock: crash between mkdir(lock) and owner.json write leaves an unreclaimable record lock (successor to #2623) |
+| 396 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 397 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 398 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 399 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 400 | PAN-2560 | M | medium | ok |  |  | resolveStateReadHomeSync (state-read-home.ts) resolves state dir by path basename, not registry key |
+| 401 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 402 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 403 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 404 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 405 | PAN-2506 | M | medium | ok |  |  | flywheel-primary-root.test.ts fails on macOS: /var vs /private/var symlink not canonicalized |
 | 406 | PAN-3540 | M | medium | ok |  |  | God View shows phantom agent orbs, a dead Hook Bus panel, and a pressure-blind swap header |
 | 407 | PAN-2981 | S | medium | ok |  |  | Ctrl-K palette opens stale conversations that 404 because the search index never prunes deleted sessions |
 | 408 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
@@ -529,193 +529,193 @@ _Last sequenced: 2026-08-14T16:31:38Z · model: claude-opus-5 · open: 860_
 | 522 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
 | 523 | PAN-3704 | S | medium | ok |  | PAN-3703 | Ctrl-K: operator toggle for newest-first conversation ordering |
 | 524 | PAN-3615 | S | medium | ok |  |  | TTS was silent 9+ days across four stacked failures; three fixed, follow-ups remain |
-| 526 | PAN-2355 | L | medium | ok |  | PAN-2352 | Overdeck Anywhere P2: mobile PWA with needs-you feed, conversation view, pipeline board and Web Push |
-| 527 | PAN-3061 | M | medium | ok |  | PAN-3054 | Dispatch-topology advisor: a mechanical start-versus-swarm recommendation at plan finalize |
-| 528 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 529 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 530 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 531 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 532 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 533 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
-| 534 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 535 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 536 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 537 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 538 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 539 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
-| 540 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 541 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 542 | PAN-3335 | XS | medium | ok |  |  | Clicking a pasted conversation image should open it full size instead of rendering a PNG as source text |
-| 543 | PAN-2977 | M | medium | ok |  | PAN-2976 | ACP agent setup UI: detect installed CLIs, show auth status and guide login from Settings |
-| 544 | PAN-2558 | L | medium | ok |  |  | support polyrepo projects |
-| 545 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 546 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 547 | PAN-2548 | XS | medium | ok |  |  | close the PAN-2541 legacy-fallback deprecation window |
-| 548 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 549 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 550 | PAN-3499 | XS | medium | needs-refinement |  |  | pan parked ack references a nonexistent ProjectConfig.projectPath; one-line fix owed directly on main |
-| 551 | PAN-2444 | L | medium | ok |  |  | optional SageOx re-integration |
-| 552 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 553 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 554 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 555 | PAN-2399 | M | medium | ok |  |  | wire replay_threshold/compaction_reroute into the slot-recovery respawn seam |
-| 556 | PAN-2392 | M | medium | ok |  |  | Standing Crew cost panel |
-| 557 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 558 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 559 | PAN-3558 | XS | medium | ok |  |  | Subagent rail: show the provider logo and running model on each agent row |
-| 560 | PAN-3469 | S | medium | ok |  |  | Migrate NewProjectModal to a routed full page under the page-not-modal doctrine |
-| 561 | PAN-3131 | L | medium | ok |  | PAN-3132 | Support xBRIEF planRef sharding across planning authoring and pipeline-wide consumption |
-| 562 | PAN-3058 | M | medium | ok |  |  | Standing-crew templates: ship preset crew configurations selectable from Settings |
-| 563 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 564 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 565 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
-| 566 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
-| 567 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
-| 568 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
-| 569 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 570 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
-| 571 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
-| 572 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
-| 573 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 574 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 575 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
-| 576 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 577 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 578 | PAN-3333 | M | medium | ok |  |  | Model pickers show dollars per token, which says nothing about how fast a sibling model drains plan quota |
-| 579 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: launch one template issue under N configurations and compare cost, time and outcome |
-| 580 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 581 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 582 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 583 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 584 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 585 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 586 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 587 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 588 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 589 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 590 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 591 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 592 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 593 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 525 | PAN-2355 | L | medium | ok |  | PAN-2352 | Overdeck Anywhere P2: mobile PWA with needs-you feed, conversation view, pipeline board and Web Push |
+| 526 | PAN-3061 | M | medium | ok |  | PAN-3054 | Dispatch-topology advisor: a mechanical start-versus-swarm recommendation at plan finalize |
+| 527 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 528 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 529 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 530 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 531 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 532 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
+| 533 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 534 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 535 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 536 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 537 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 538 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
+| 539 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 540 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 541 | PAN-3335 | XS | medium | ok |  |  | Clicking a pasted conversation image should open it full size instead of rendering a PNG as source text |
+| 542 | PAN-2977 | M | medium | ok |  | PAN-2976 | ACP agent setup UI: detect installed CLIs, show auth status and guide login from Settings |
+| 543 | PAN-2558 | L | medium | ok |  |  | support polyrepo projects |
+| 544 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 545 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 546 | PAN-2548 | XS | medium | ok |  |  | close the PAN-2541 legacy-fallback deprecation window |
+| 547 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 548 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 549 | PAN-3499 | XS | medium | needs-refinement |  |  | pan parked ack references a nonexistent ProjectConfig.projectPath; one-line fix owed directly on main |
+| 550 | PAN-2444 | L | medium | ok |  |  | optional SageOx re-integration |
+| 551 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 552 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 553 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 554 | PAN-2399 | M | medium | ok |  |  | wire replay_threshold/compaction_reroute into the slot-recovery respawn seam |
+| 555 | PAN-2392 | M | medium | ok |  |  | Standing Crew cost panel |
+| 556 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 557 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 558 | PAN-3558 | XS | medium | ok |  |  | Subagent rail: show the provider logo and running model on each agent row |
+| 559 | PAN-3469 | S | medium | ok |  |  | Migrate NewProjectModal to a routed full page under the page-not-modal doctrine |
+| 560 | PAN-3131 | L | medium | ok |  | PAN-3132 | Support xBRIEF planRef sharding across planning authoring and pipeline-wide consumption |
+| 561 | PAN-3058 | M | medium | ok |  |  | Standing-crew templates: ship preset crew configurations selectable from Settings |
+| 562 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 563 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 564 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
+| 565 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
+| 566 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
+| 567 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
+| 568 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 569 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
+| 570 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
+| 571 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
+| 572 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 573 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 574 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
+| 575 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 576 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 577 | PAN-3333 | M | medium | ok |  |  | Model pickers show dollars per token, which says nothing about how fast a sibling model drains plan quota |
+| 578 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: launch one template issue under N configurations and compare cost, time and outcome |
+| 579 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 580 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 581 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 582 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 583 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 584 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 585 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 586 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 587 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 588 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 589 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 590 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 591 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 592 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
 | 594 | PAN-3684 | XS | medium | ok |  |  | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
-| 595 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
-| 596 | PAN-2356 | XL | medium | ok |  | PAN-2352 | Overdeck Anywhere P3: outbound-only relay service with GitHub OAuth, push origin and a multi-tenant front door |
-| 597 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 598 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 599 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 600 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 601 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
-| 602 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 603 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 604 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 605 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 606 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 607 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 608 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 609 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 610 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 611 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 612 | PAN-3502 | XS | medium | stale |  |  | tiered-crews blendedCost expectation is stale against the current model-capabilities pricing |
-| 613 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 614 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 615 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 616 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 617 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 618 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
-| 619 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 620 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
-| 621 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 622 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 623 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
-| 624 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 625 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
-| 626 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 627 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 628 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 629 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 630 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 631 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 632 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
-| 633 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 634 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 635 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 636 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 637 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 638 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 639 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 640 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 641 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 642 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
-| 643 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
-| 644 | PAN-3441 | XL | low | ok |  |  | God View River: WebGL pipeline visualization fed by the live hook-event stream |
-| 645 | PAN-2978 | S | low | ok |  | PAN-2976, PAN-2977 | Auto-install ACP agent CLIs from the setup UI with opt-in per-agent install recipes |
-| 646 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 647 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 648 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 649 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 650 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 651 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 652 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 653 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 654 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 655 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 656 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 657 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 658 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 659 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 660 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 661 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 662 | PAN-3034 | XS | low | stale |  |  | Command Deck session tree missed strike-only issues; the fix has already landed on main |
-| 663 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 664 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 665 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 666 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 667 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 668 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 669 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 670 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 671 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 672 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 673 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 674 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 675 | PAN-3504 | XS | medium | stale |  | PAN-3499 | Duplicate report of the parked.ts ProjectConfig.projectPath typecheck break on main |
-| 676 | PAN-3456 | XS | low | stale |  |  | pan swarm treated per-item sequential diagnostics as refusals; already fixed on main |
-| 677 | PAN-3443 | XL | low | ok |  |  | God View Spectrum Deck: Winamp-grade WebGL activity visualizer with mockup and reproduction-grade PRD |
-| 678 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 679 | PAN-2941 | M | low | ok |  |  | OKF v3 |
-| 680 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 681 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
-| 682 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 683 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 684 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 685 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 686 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 687 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 688 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 689 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 690 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 691 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 692 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 693 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 694 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 695 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 696 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
-| 697 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 698 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 699 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 700 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
-| 701 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
-| 702 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 703 | PAN-3011 | M | low | ok |  |  | Support poolside Laguna S 2.1 locally via Ollama or vLLM and hosted via OpenRouter |
-| 704 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 705 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 706 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 707 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 708 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 709 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 710 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 594 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
+| 595 | PAN-2356 | XL | medium | ok |  | PAN-2352 | Overdeck Anywhere P3: outbound-only relay service with GitHub OAuth, push origin and a multi-tenant front door |
+| 596 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 597 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 598 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 599 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 600 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
+| 601 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 602 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 603 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 604 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 605 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 606 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 607 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 608 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 609 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 610 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 611 | PAN-3502 | XS | medium | stale |  |  | tiered-crews blendedCost expectation is stale against the current model-capabilities pricing |
+| 612 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 613 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 614 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 615 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 616 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 617 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
+| 618 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 619 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
+| 620 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 621 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 622 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
+| 623 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 624 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
+| 625 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 626 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 627 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 628 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 629 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 630 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 631 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
+| 632 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 633 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 634 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 635 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 636 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 637 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 638 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 639 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 640 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 641 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
+| 642 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
+| 643 | PAN-3441 | XL | low | ok |  |  | God View River: WebGL pipeline visualization fed by the live hook-event stream |
+| 644 | PAN-2978 | S | low | ok |  | PAN-2976, PAN-2977 | Auto-install ACP agent CLIs from the setup UI with opt-in per-agent install recipes |
+| 645 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 646 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 647 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 648 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 649 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 650 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 651 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 652 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 653 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 654 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 655 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 656 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 657 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 658 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 659 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 660 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 661 | PAN-3034 | XS | low | stale |  |  | Command Deck session tree missed strike-only issues; the fix has already landed on main |
+| 662 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 663 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 664 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 665 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 666 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 667 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 668 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 669 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 670 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 671 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 672 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 673 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 674 | PAN-3504 | XS | medium | stale |  | PAN-3499 | Duplicate report of the parked.ts ProjectConfig.projectPath typecheck break on main |
+| 675 | PAN-3456 | XS | low | stale |  |  | pan swarm treated per-item sequential diagnostics as refusals; already fixed on main |
+| 676 | PAN-3443 | XL | low | ok |  |  | God View Spectrum Deck: Winamp-grade WebGL activity visualizer with mockup and reproduction-grade PRD |
+| 677 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 678 | PAN-2941 | M | low | ok |  |  | OKF v3 |
+| 679 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 680 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
+| 681 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 682 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 683 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 684 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 685 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 686 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 687 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 688 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 689 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 690 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 691 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 692 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 693 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 694 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 695 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
+| 696 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 697 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 698 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 699 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
+| 700 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
+| 701 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 702 | PAN-3011 | M | low | ok |  |  | Support poolside Laguna S 2.1 locally via Ollama or vLLM and hosted via OpenRouter |
+| 703 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 704 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 705 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 706 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 707 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 708 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 709 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 710 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 711 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
 | 712 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
 | 713 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
 | 714 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
@@ -1068,123 +1068,123 @@ The inspect verdict is never delivered to the work agent, so an agent that waits
 
 pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-2995 (rank 51)
-
-pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.
-
 ### PAN-3580 (rank 51)
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
+
+### PAN-2995 (rank 52)
+
+pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3047.
 
 ### PAN-3677 (rank 52)
 
 Planning agents wedge after a background Explore task finishes; parent never consumes the result. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3498 (rank 53)
+### PAN-3498 (rank 54)
 
 write-sequence pins in-pipeline ranks without renumbering: 11 duplicate ranks and 11 gaps persisted. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3560 (rank 54)
+### PAN-3560 (rank 55)
 
 PTY supervisor overloads under concurrent convoys; fleet-wide 502s kill resumes and feedback delivery. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3571 (rank 55)
+### PAN-3571 (rank 56)
 
 Stop-hook completion check exits silently on timeout: 334 stranded turn-ends, agents idle until a patrol notices. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3496 (rank 56)
+### PAN-3496 (rank 57)
 
 Review and inspect agents must decide review depth themselves instead of parking the convoy on an operator AUQ. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3329 (rank 57)
+### PAN-3329 (rank 58)
 
 Deployment generation node_modules and tracked packages files are deleted while a dev-checkout build runs. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3274 (rank 58)
+### PAN-3274 (rank 59)
 
 A test-role agent spawned, never ran a turn, and strands its issue behind a verdict never produced. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3566.
 
-### PAN-3236 (rank 59)
+### PAN-3236 (rank 60)
 
 ECONNREFUSED on a dead supervisor socket is misclassified as ambiguous, so review feedback never lands. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3234 (rank 60)
+### PAN-3234 (rank 61)
 
 Agents freeze on blocking choice menus and no health surface notices; the detector exists but is unwired. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3168 (rank 61)
+### PAN-3168 (rank 62)
 
 DoD row 5 counts an agent paused for close-out as running, deadlocking the issue in verifying_on_main forever. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3103 (rank 62)
+### PAN-3103 (rank 63)
 
 A transient merge_status failed permanently skips close-out, so merged work stays open and pickup-eligible. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3100 (rank 63)
+### PAN-3100 (rank 64)
 
 The test role evaluates the dirty working tree, so a live work agent uncommitted edits produce false failures. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3043 (rank 64)
+### PAN-3043 (rank 65)
 
 Mid-run provider quota exhaustion is undetected: an agent stayed running for days holding an advancing slot. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-2695 (rank 65)
+### PAN-2695 (rank 66)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 66)
+### PAN-2742 (rank 67)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-3640 (rank 67)
+### PAN-3640 (rank 68)
 
 Agent GC keeps terminal rows because a lost state push race aborts before drift reconciliation. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3651.
 
-### PAN-3565 (rank 68)
+### PAN-3565 (rank 69)
 
 Review lifecycle: failed spawn wedges starting, infra failure synthesized as a real CHANGES REQUESTED verdict. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3564.
 
-### PAN-3557 (rank 69)
+### PAN-3557 (rank 70)
 
 Post-merge label writes have no retry; a rate-limited 403 hides a merged issue from the verify-on-main sweep. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3464 (rank 70)
+### PAN-3464 (rank 71)
 
 pan swarm reset never clears slotCompletions, so the coordinator re-arms the exact wedge reset was run to escape. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3257 (rank 71)
+### PAN-3257 (rank 72)
 
 Crash-resume does not re-wire the PTY supervisor; a stale socket refuses every delivery and state loses the flag. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3188 (rank 72)
+### PAN-3188 (rank 73)
 
 DoD row 5 accepts only the transient verifying_on_main waypoint, so an already-done issue can never close out. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3118 (rank 73)
+### PAN-3118 (rank 74)
 
 Model quota exhaustion halts agents invisibly: four planning agents read running at zero cost with no fallback. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3043.
 
-### PAN-3104 (rank 74)
+### PAN-3104 (rank 75)
 
 A stale test result artifact is re-applied with no freshness check and keeps re-failing an issue after the fix landed. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream. Sequenced after PAN-3100.
 
-### PAN-3044 (rank 75)
+### PAN-3044 (rank 76)
 
 Review feedback delivery runs against closed issues, resurrecting agents and raising needs-you 12 days after close-out. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3023 (rank 76)
+### PAN-3023 (rank 77)
 
 Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 1/3 never retries. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-2700 (rank 77)
+### PAN-2700 (rank 78)
 
 Stale .pan/test/result.json is consumed by the next cycle, insta-failing with the previous run verdict.
 
-### PAN-2733 (rank 78)
+### PAN-2733 (rank 79)
 
 substrate-bug-poller has never run — BOT_LOGIN is a git author string not a GitHub login; the auto-triage loop is inert.
 
-### PAN-1560 (rank 79)
+### PAN-1560 (rank 80)
 
 Re-review after a PR head moves never re-posts status, stranding otherwise-green PRs at BLOCKED.
 
@@ -1195,7 +1195,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-14T16:31:38Z",
+  "generatedAt": "2026-08-14T16:33:00Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 860,
@@ -1878,8 +1878,21 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "auto"
     },
     {
-      "issue": "PAN-2995",
+      "issue": "PAN-3580",
       "rank": 51,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
+      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2995",
+      "rank": 52,
       "size": "S",
       "importance": "high",
       "score": 87,
@@ -1907,7 +1920,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3498",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -1920,7 +1933,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3560",
-      "rank": 54,
+      "rank": 55,
       "size": "M",
       "importance": "high",
       "score": 86,
@@ -1933,7 +1946,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3571",
-      "rank": 55,
+      "rank": 56,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -1946,7 +1959,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3496",
-      "rank": 56,
+      "rank": 57,
       "size": "XS",
       "importance": "high",
       "score": 86,
@@ -1959,7 +1972,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3329",
-      "rank": 57,
+      "rank": 58,
       "size": "M",
       "importance": "high",
       "score": 86,
@@ -1972,7 +1985,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3274",
-      "rank": 58,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -1987,7 +2000,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3236",
-      "rank": 59,
+      "rank": 60,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -2000,7 +2013,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3234",
-      "rank": 60,
+      "rank": 61,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -2013,7 +2026,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3168",
-      "rank": 61,
+      "rank": 62,
       "size": "XS",
       "importance": "high",
       "score": 86,
@@ -2026,7 +2039,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3103",
-      "rank": 62,
+      "rank": 63,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -2039,7 +2052,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3100",
-      "rank": 63,
+      "rank": 64,
       "size": "S",
       "importance": "high",
       "score": 86,
@@ -2052,7 +2065,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3043",
-      "rank": 64,
+      "rank": 65,
       "size": "M",
       "importance": "high",
       "score": 86,
@@ -2065,7 +2078,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2695",
-      "rank": 65,
+      "rank": 66,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2078,7 +2091,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2742",
-      "rank": 66,
+      "rank": 67,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2091,7 +2104,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3640",
-      "rank": 67,
+      "rank": 68,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2106,7 +2119,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3565",
-      "rank": 68,
+      "rank": 69,
       "size": "M",
       "importance": "high",
       "score": 85,
@@ -2121,7 +2134,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3557",
-      "rank": 69,
+      "rank": 70,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2134,7 +2147,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3464",
-      "rank": 70,
+      "rank": 71,
       "size": "XS",
       "importance": "high",
       "score": 85,
@@ -2147,7 +2160,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3257",
-      "rank": 71,
+      "rank": 72,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2160,7 +2173,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3188",
-      "rank": 72,
+      "rank": 73,
       "size": "XS",
       "importance": "high",
       "score": 85,
@@ -2173,7 +2186,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3118",
-      "rank": 73,
+      "rank": 74,
       "size": "M",
       "importance": "high",
       "score": 85,
@@ -2188,7 +2201,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3104",
-      "rank": 74,
+      "rank": 75,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2203,7 +2216,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3044",
-      "rank": 75,
+      "rank": 76,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2216,7 +2229,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3023",
-      "rank": 76,
+      "rank": 77,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2229,7 +2242,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2700",
-      "rank": 77,
+      "rank": 78,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2242,7 +2255,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2733",
-      "rank": 78,
+      "rank": 79,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2255,7 +2268,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1560",
-      "rank": 79,
+      "rank": 80,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2268,7 +2281,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2769",
-      "rank": 80,
+      "rank": 81,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2281,7 +2294,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2828",
-      "rank": 81,
+      "rank": 82,
       "size": "S",
       "importance": "critical",
       "score": 93,
@@ -2294,7 +2307,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2883",
-      "rank": 82,
+      "rank": 83,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -2309,7 +2322,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2806",
-      "rank": 83,
+      "rank": 84,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2322,7 +2335,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2796",
-      "rank": 84,
+      "rank": 85,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2335,7 +2348,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2940",
-      "rank": 85,
+      "rank": 86,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -2348,7 +2361,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3697",
-      "rank": 86,
+      "rank": 87,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2360,7 +2373,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3621",
-      "rank": 87,
+      "rank": 88,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2372,26 +2385,13 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3605",
-      "rank": 88,
+      "rank": 89,
       "size": "XS",
       "importance": "high",
       "score": 84,
       "condition": "ok",
       "dependsOn": [],
       "why": "lint-effect-diagnostics executed a squatted npm package via npx registry fallback — supply-chain exposure",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3580",
-      "rank": 51,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
-      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3502,8 +3502,20 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "auto"
     },
     {
-      "issue": "PAN-3048",
+      "issue": "PAN-3668",
       "rank": 176,
+      "size": "L",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3048",
+      "rank": 177,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -3515,7 +3527,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2627",
-      "rank": 177,
+      "rank": 178,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3528,7 +3540,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2324",
-      "rank": 178,
+      "rank": 179,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3541,7 +3553,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2165",
-      "rank": 179,
+      "rank": 180,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3554,7 +3566,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2905",
-      "rank": 180,
+      "rank": 181,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3567,7 +3579,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2259",
-      "rank": 181,
+      "rank": 182,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3580,7 +3592,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2379",
-      "rank": 182,
+      "rank": 183,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3593,7 +3605,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2430",
-      "rank": 183,
+      "rank": 184,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3606,7 +3618,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2593",
-      "rank": 184,
+      "rank": 185,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3619,7 +3631,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2656",
-      "rank": 185,
+      "rank": 186,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3632,7 +3644,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3553",
-      "rank": 186,
+      "rank": 187,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3644,7 +3656,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2075",
-      "rank": 187,
+      "rank": 188,
       "size": "XL",
       "importance": "high",
       "score": 78,
@@ -3658,7 +3670,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2077",
-      "rank": 188,
+      "rank": 189,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3673,7 +3685,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2078",
-      "rank": 189,
+      "rank": 190,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3688,7 +3700,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2079",
-      "rank": 190,
+      "rank": 191,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3703,7 +3715,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2080",
-      "rank": 191,
+      "rank": 192,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3718,7 +3730,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1775",
-      "rank": 192,
+      "rank": 193,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3731,7 +3743,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-454",
-      "rank": 193,
+      "rank": 194,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3746,7 +3758,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1436",
-      "rank": 194,
+      "rank": 195,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3759,7 +3771,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3617",
-      "rank": 195,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3771,7 +3783,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3596",
-      "rank": 196,
+      "rank": 197,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3783,7 +3795,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3570",
-      "rank": 197,
+      "rank": 198,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3795,7 +3807,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3517",
-      "rank": 198,
+      "rank": 199,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3807,7 +3819,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3508",
-      "rank": 199,
+      "rank": 200,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3819,7 +3831,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1711",
-      "rank": 200,
+      "rank": 201,
       "size": "L",
       "importance": "high",
       "score": 78,
@@ -3832,7 +3844,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3355",
-      "rank": 201,
+      "rank": 202,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3844,7 +3856,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3306",
-      "rank": 202,
+      "rank": 203,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3858,7 +3870,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3289",
-      "rank": 203,
+      "rank": 204,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3872,7 +3884,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3267",
-      "rank": 204,
+      "rank": 205,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3884,7 +3896,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3210",
-      "rank": 205,
+      "rank": 206,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3896,7 +3908,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3186",
-      "rank": 206,
+      "rank": 207,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3908,7 +3920,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3185",
-      "rank": 207,
+      "rank": 208,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3920,7 +3932,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3179",
-      "rank": 208,
+      "rank": 209,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3932,7 +3944,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3176",
-      "rank": 209,
+      "rank": 210,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3944,7 +3956,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3096",
-      "rank": 210,
+      "rank": 211,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3956,7 +3968,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3077",
-      "rank": 211,
+      "rank": 212,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3968,7 +3980,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2980",
-      "rank": 212,
+      "rank": 213,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3980,7 +3992,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2971",
-      "rank": 213,
+      "rank": 214,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3992,7 +4004,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2642",
-      "rank": 214,
+      "rank": 215,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4006,7 +4018,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1868",
-      "rank": 215,
+      "rank": 216,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -4021,7 +4033,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2466",
-      "rank": 216,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4034,7 +4046,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1042",
-      "rank": 217,
+      "rank": 218,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4047,7 +4059,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-570",
-      "rank": 218,
+      "rank": 219,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -4062,7 +4074,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-106",
-      "rank": 219,
+      "rank": 220,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -4075,7 +4087,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2059",
-      "rank": 220,
+      "rank": 221,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4089,7 +4101,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2376",
-      "rank": 221,
+      "rank": 222,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -4103,7 +4115,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3579",
-      "rank": 222,
+      "rank": 223,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -4115,7 +4127,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3510",
-      "rank": 223,
+      "rank": 224,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -4127,7 +4139,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3245",
-      "rank": 224,
+      "rank": 225,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4139,7 +4151,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3243",
-      "rank": 225,
+      "rank": 226,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4153,7 +4165,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3171",
-      "rank": 226,
+      "rank": 227,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -4165,7 +4177,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3167",
-      "rank": 227,
+      "rank": 228,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -4177,7 +4189,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3050",
-      "rank": 228,
+      "rank": 229,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4189,7 +4201,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3032",
-      "rank": 229,
+      "rank": 230,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4201,7 +4213,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3652",
-      "rank": 230,
+      "rank": 231,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4213,7 +4225,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3536",
-      "rank": 231,
+      "rank": 232,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4225,7 +4237,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3518",
-      "rank": 232,
+      "rank": 233,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4239,7 +4251,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3303",
-      "rank": 233,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4251,7 +4263,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3280",
-      "rank": 234,
+      "rank": 235,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4263,7 +4275,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3218",
-      "rank": 235,
+      "rank": 236,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4275,7 +4287,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3130",
-      "rank": 236,
+      "rank": 237,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4287,7 +4299,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3094",
-      "rank": 237,
+      "rank": 238,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4299,7 +4311,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3015",
-      "rank": 238,
+      "rank": 239,
       "size": "L",
       "importance": "high",
       "score": 74,
@@ -4311,7 +4323,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3014",
-      "rank": 239,
+      "rank": 240,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4323,7 +4335,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3627",
-      "rank": 240,
+      "rank": 241,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4335,7 +4347,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3533",
-      "rank": 241,
+      "rank": 242,
       "size": "L",
       "importance": "high",
       "score": 72,
@@ -4346,18 +4358,6 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "why": "Resource segregation: per-project isolation classes so one project cannot starve another project pipeline",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3420",
-      "rank": 270,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3332",
@@ -4697,8 +4697,20 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "auto"
     },
     {
-      "issue": "PAN-2188",
+      "issue": "PAN-3420",
       "rank": 270,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2188",
+      "rank": 271,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4711,7 +4723,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2189",
-      "rank": 271,
+      "rank": 272,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4724,7 +4736,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2190",
-      "rank": 272,
+      "rank": 273,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4737,7 +4749,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2233",
-      "rank": 273,
+      "rank": 274,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4750,7 +4762,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2526",
-      "rank": 274,
+      "rank": 275,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4763,7 +4775,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2008",
-      "rank": 275,
+      "rank": 276,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4778,7 +4790,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1936",
-      "rank": 276,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4791,7 +4803,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1988",
-      "rank": 277,
+      "rank": 278,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4806,7 +4818,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1910",
-      "rank": 278,
+      "rank": 279,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4821,7 +4833,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1325",
-      "rank": 279,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4833,7 +4845,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1728",
-      "rank": 280,
+      "rank": 281,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4845,7 +4857,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2651",
-      "rank": 281,
+      "rank": 282,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4857,7 +4869,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2678",
-      "rank": 282,
+      "rank": 283,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4869,7 +4881,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2241",
-      "rank": 283,
+      "rank": 284,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4881,7 +4893,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2242",
-      "rank": 284,
+      "rank": 285,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4893,7 +4905,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2240",
-      "rank": 285,
+      "rank": 286,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4905,7 +4917,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2243",
-      "rank": 286,
+      "rank": 287,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4917,7 +4929,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2244",
-      "rank": 287,
+      "rank": 288,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4929,7 +4941,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2202",
-      "rank": 288,
+      "rank": 289,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4941,7 +4953,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2195",
-      "rank": 289,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4953,7 +4965,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2237",
-      "rank": 290,
+      "rank": 291,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4965,7 +4977,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2487",
-      "rank": 291,
+      "rank": 292,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4977,7 +4989,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2469",
-      "rank": 292,
+      "rank": 293,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4989,7 +5001,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2212",
-      "rank": 293,
+      "rank": 294,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5001,7 +5013,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2213",
-      "rank": 294,
+      "rank": 295,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5013,7 +5025,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2211",
-      "rank": 295,
+      "rank": 296,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5025,7 +5037,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2210",
-      "rank": 296,
+      "rank": 297,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -5037,7 +5049,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2201",
-      "rank": 297,
+      "rank": 298,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -5049,7 +5061,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2718",
-      "rank": 298,
+      "rank": 299,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5061,7 +5073,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2646",
-      "rank": 299,
+      "rank": 300,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -5073,7 +5085,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2652",
-      "rank": 300,
+      "rank": 301,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5085,7 +5097,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2667",
-      "rank": 301,
+      "rank": 302,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5097,7 +5109,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2755",
-      "rank": 302,
+      "rank": 303,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -5109,7 +5121,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2754",
-      "rank": 303,
+      "rank": 304,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -5121,7 +5133,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2809",
-      "rank": 304,
+      "rank": 305,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5133,7 +5145,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2810",
-      "rank": 305,
+      "rank": 306,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -5145,7 +5157,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2495",
-      "rank": 306,
+      "rank": 307,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5157,7 +5169,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2478",
-      "rank": 307,
+      "rank": 308,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5169,7 +5181,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1710",
-      "rank": 308,
+      "rank": 309,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5181,7 +5193,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1720",
-      "rank": 309,
+      "rank": 310,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5193,7 +5205,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1558",
-      "rank": 310,
+      "rank": 311,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -5205,7 +5217,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1650",
-      "rank": 311,
+      "rank": 312,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -5217,7 +5229,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1766",
-      "rank": 312,
+      "rank": 313,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5229,7 +5241,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1770",
-      "rank": 313,
+      "rank": 314,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -5241,7 +5253,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2027",
-      "rank": 314,
+      "rank": 315,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5253,7 +5265,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2266",
-      "rank": 315,
+      "rank": 316,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5265,7 +5277,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1578",
-      "rank": 316,
+      "rank": 317,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5277,7 +5289,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1538",
-      "rank": 317,
+      "rank": 318,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5289,7 +5301,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-687",
-      "rank": 318,
+      "rank": 319,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5301,7 +5313,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-466",
-      "rank": 319,
+      "rank": 320,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5313,7 +5325,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-465",
-      "rank": 320,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5325,7 +5337,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-463",
-      "rank": 321,
+      "rank": 322,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5337,7 +5349,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1142",
-      "rank": 322,
+      "rank": 323,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5349,7 +5361,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1424",
-      "rank": 323,
+      "rank": 324,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5361,7 +5373,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1196",
-      "rank": 324,
+      "rank": 325,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5373,7 +5385,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1311",
-      "rank": 325,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5385,7 +5397,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1313",
-      "rank": 326,
+      "rank": 327,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5397,7 +5409,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1246",
-      "rank": 327,
+      "rank": 328,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5409,7 +5421,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1253",
-      "rank": 328,
+      "rank": 329,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5421,7 +5433,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1254",
-      "rank": 329,
+      "rank": 330,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5433,7 +5445,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1357",
-      "rank": 330,
+      "rank": 331,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5445,7 +5457,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1915",
-      "rank": 331,
+      "rank": 332,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5457,7 +5469,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1435",
-      "rank": 332,
+      "rank": 333,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5469,7 +5481,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1672",
-      "rank": 333,
+      "rank": 334,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5481,7 +5493,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1640",
-      "rank": 334,
+      "rank": 335,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5493,7 +5505,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1217",
-      "rank": 335,
+      "rank": 336,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5505,7 +5517,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1218",
-      "rank": 336,
+      "rank": 337,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5517,7 +5529,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1219",
-      "rank": 337,
+      "rank": 338,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5529,7 +5541,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1209",
-      "rank": 338,
+      "rank": 339,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -5541,7 +5553,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1451",
-      "rank": 339,
+      "rank": 340,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5553,7 +5565,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1452",
-      "rank": 340,
+      "rank": 341,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5565,7 +5577,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1454",
-      "rank": 341,
+      "rank": 342,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5577,7 +5589,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1553",
-      "rank": 342,
+      "rank": 343,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5589,7 +5601,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1504",
-      "rank": 343,
+      "rank": 344,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5601,7 +5613,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1480",
-      "rank": 344,
+      "rank": 345,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5613,7 +5625,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1479",
-      "rank": 345,
+      "rank": 346,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5625,7 +5637,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2950",
-      "rank": 346,
+      "rank": 347,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5637,7 +5649,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2837",
-      "rank": 347,
+      "rank": 348,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5649,7 +5661,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2836",
-      "rank": 348,
+      "rank": 349,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5661,7 +5673,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2830",
-      "rank": 349,
+      "rank": 350,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5673,7 +5685,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2720",
-      "rank": 350,
+      "rank": 351,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5685,7 +5697,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2650",
-      "rank": 351,
+      "rank": 352,
       "size": "L",
       "importance": "high",
       "score": 67,
@@ -5697,7 +5709,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2549",
-      "rank": 352,
+      "rank": 353,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5709,7 +5721,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2358",
-      "rank": 353,
+      "rank": 354,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5721,7 +5733,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2334",
-      "rank": 354,
+      "rank": 355,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5733,7 +5745,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2308",
-      "rank": 355,
+      "rank": 356,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5745,7 +5757,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2193",
-      "rank": 356,
+      "rank": 357,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5757,7 +5769,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1984",
-      "rank": 357,
+      "rank": 358,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5769,7 +5781,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1913",
-      "rank": 358,
+      "rank": 359,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5781,7 +5793,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1906",
-      "rank": 359,
+      "rank": 360,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5793,7 +5805,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1544",
-      "rank": 360,
+      "rank": 361,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5805,7 +5817,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-955",
-      "rank": 361,
+      "rank": 362,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5817,7 +5829,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-813",
-      "rank": 362,
+      "rank": 363,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5829,7 +5841,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-807",
-      "rank": 363,
+      "rank": 364,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5841,7 +5853,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-630",
-      "rank": 364,
+      "rank": 365,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5853,7 +5865,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-471",
-      "rank": 365,
+      "rank": 366,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5865,7 +5877,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-438",
-      "rank": 366,
+      "rank": 367,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5877,7 +5889,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-262",
-      "rank": 367,
+      "rank": 368,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5889,7 +5901,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-176",
-      "rank": 368,
+      "rank": 369,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5901,7 +5913,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-578",
-      "rank": 369,
+      "rank": 370,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5913,7 +5925,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2921",
-      "rank": 370,
+      "rank": 371,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5925,7 +5937,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2839",
-      "rank": 371,
+      "rank": 372,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5937,7 +5949,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2824",
-      "rank": 372,
+      "rank": 373,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5949,7 +5961,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2805",
-      "rank": 373,
+      "rank": 374,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5961,7 +5973,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2792",
-      "rank": 374,
+      "rank": 375,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5973,7 +5985,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2761",
-      "rank": 375,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5985,7 +5997,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2739",
-      "rank": 376,
+      "rank": 377,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5997,7 +6009,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2738",
-      "rank": 377,
+      "rank": 378,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6009,7 +6021,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2717",
-      "rank": 378,
+      "rank": 379,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6021,7 +6033,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2697",
-      "rank": 379,
+      "rank": 380,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6033,7 +6045,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2696",
-      "rank": 380,
+      "rank": 381,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6045,7 +6057,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2691",
-      "rank": 381,
+      "rank": 382,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6057,7 +6069,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2686",
-      "rank": 382,
+      "rank": 383,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6069,7 +6081,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3661",
-      "rank": 383,
+      "rank": 384,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6081,7 +6093,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2350",
-      "rank": 384,
+      "rank": 385,
       "size": "XL",
       "importance": "medium",
       "score": 62,
@@ -6095,7 +6107,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3455",
-      "rank": 385,
+      "rank": 386,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6107,7 +6119,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3235",
-      "rank": 386,
+      "rank": 387,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6119,7 +6131,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3181",
-      "rank": 387,
+      "rank": 388,
       "size": "L",
       "importance": "medium",
       "score": 62,
@@ -6131,7 +6143,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3137",
-      "rank": 388,
+      "rank": 389,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -6143,7 +6155,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3117",
-      "rank": 389,
+      "rank": 390,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -6155,7 +6167,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2672",
-      "rank": 390,
+      "rank": 391,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6167,7 +6179,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2670",
-      "rank": 391,
+      "rank": 392,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6179,7 +6191,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2664",
-      "rank": 392,
+      "rank": 393,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6191,7 +6203,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2663",
-      "rank": 393,
+      "rank": 394,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6203,7 +6215,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2659",
-      "rank": 394,
+      "rank": 395,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6215,7 +6227,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2649",
-      "rank": 395,
+      "rank": 396,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6227,7 +6239,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2580",
-      "rank": 396,
+      "rank": 397,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -6239,7 +6251,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2572",
-      "rank": 397,
+      "rank": 398,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -6251,7 +6263,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2563",
-      "rank": 398,
+      "rank": 399,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6263,7 +6275,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2560",
-      "rank": 399,
+      "rank": 400,
       "size": "M",
       "importance": "medium",
       "score": 60,
@@ -6275,7 +6287,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2554",
-      "rank": 400,
+      "rank": 401,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6287,7 +6299,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2550",
-      "rank": 401,
+      "rank": 402,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -6299,7 +6311,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2547",
-      "rank": 402,
+      "rank": 403,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6311,7 +6323,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2546",
-      "rank": 403,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -6323,7 +6335,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2506",
-      "rank": 404,
+      "rank": 405,
       "size": "M",
       "importance": "medium",
       "score": 60,
@@ -6332,18 +6344,6 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "why": "flywheel-primary-root.test.ts fails on macOS: /var vs /private/var symlink not canonicalized",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3668",
-      "rank": 176,
-      "size": "L",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3540",
@@ -7790,20 +7790,8 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "planning": "auto"
     },
     {
-      "issue": "PAN-1641",
-      "rank": 711,
-      "size": "M",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Run agents on local GPU models via a managed Ollama sidecar",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2355",
-      "rank": 526,
+      "rank": 525,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7818,7 +7806,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3061",
-      "rank": 527,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7832,7 +7820,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-863",
-      "rank": 528,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7844,7 +7832,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-817",
-      "rank": 529,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7856,7 +7844,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-802",
-      "rank": 530,
+      "rank": 529,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7868,7 +7856,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-713",
-      "rank": 531,
+      "rank": 530,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7880,7 +7868,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-700",
-      "rank": 532,
+      "rank": 531,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7892,7 +7880,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-646",
-      "rank": 533,
+      "rank": 532,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7904,7 +7892,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-532",
-      "rank": 534,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7916,7 +7904,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2896",
-      "rank": 535,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7928,7 +7916,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2685",
-      "rank": 536,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7940,7 +7928,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2626",
-      "rank": 537,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7952,7 +7940,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2625",
-      "rank": 538,
+      "rank": 537,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7964,7 +7952,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2609",
-      "rank": 539,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7976,7 +7964,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2608",
-      "rank": 540,
+      "rank": 539,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7988,7 +7976,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2582",
-      "rank": 541,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -8000,7 +7988,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3335",
-      "rank": 542,
+      "rank": 541,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -8012,7 +8000,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2977",
-      "rank": 543,
+      "rank": 542,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -8026,7 +8014,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2558",
-      "rank": 544,
+      "rank": 543,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -8038,7 +8026,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2557",
-      "rank": 545,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -8050,7 +8038,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2553",
-      "rank": 546,
+      "rank": 545,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -8062,7 +8050,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2548",
-      "rank": 547,
+      "rank": 546,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -8074,7 +8062,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2521",
-      "rank": 548,
+      "rank": 547,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -8086,7 +8074,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2493",
-      "rank": 549,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -8098,7 +8086,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3499",
-      "rank": 550,
+      "rank": 549,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -8110,7 +8098,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2444",
-      "rank": 551,
+      "rank": 550,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8122,7 +8110,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2443",
-      "rank": 552,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8134,7 +8122,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2442",
-      "rank": 553,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8146,7 +8134,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2409",
-      "rank": 554,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8158,7 +8146,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2399",
-      "rank": 555,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8170,7 +8158,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2392",
-      "rank": 556,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8182,7 +8170,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2335",
-      "rank": 557,
+      "rank": 556,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8194,7 +8182,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2295",
-      "rank": 558,
+      "rank": 557,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8206,7 +8194,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3558",
-      "rank": 559,
+      "rank": 558,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8218,7 +8206,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3469",
-      "rank": 560,
+      "rank": 559,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8230,7 +8218,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3131",
-      "rank": 561,
+      "rank": 560,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8244,7 +8232,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3058",
-      "rank": 562,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8256,7 +8244,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2288",
-      "rank": 563,
+      "rank": 562,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8268,7 +8256,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2065",
-      "rank": 564,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8280,7 +8268,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2035",
-      "rank": 565,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8292,7 +8280,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2034",
-      "rank": 566,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8304,7 +8292,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2033",
-      "rank": 567,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8316,7 +8304,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2032",
-      "rank": 568,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8328,7 +8316,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2031",
-      "rank": 569,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8340,7 +8328,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2030",
-      "rank": 570,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8352,7 +8340,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2029",
-      "rank": 571,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8364,7 +8352,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2028",
-      "rank": 572,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8376,7 +8364,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2026",
-      "rank": 573,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8388,7 +8376,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2025",
-      "rank": 574,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8400,7 +8388,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2024",
-      "rank": 575,
+      "rank": 574,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8412,7 +8400,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2004",
-      "rank": 576,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8424,7 +8412,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1995",
-      "rank": 577,
+      "rank": 576,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8436,7 +8424,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3333",
-      "rank": 578,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8448,7 +8436,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3054",
-      "rank": 579,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8460,7 +8448,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1985",
-      "rank": 580,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8472,7 +8460,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1968",
-      "rank": 581,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8484,7 +8472,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1967",
-      "rank": 582,
+      "rank": 581,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8496,7 +8484,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1965",
-      "rank": 583,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8508,7 +8496,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1937",
-      "rank": 584,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8520,7 +8508,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1926",
-      "rank": 585,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8532,7 +8520,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1916",
-      "rank": 586,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8544,7 +8532,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1854",
-      "rank": 587,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8556,7 +8544,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1853",
-      "rank": 588,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8568,7 +8556,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1852",
-      "rank": 589,
+      "rank": 588,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8580,7 +8568,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1844",
-      "rank": 590,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8592,7 +8580,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1840",
-      "rank": 591,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8604,7 +8592,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1839",
-      "rank": 592,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8616,7 +8604,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1776",
-      "rank": 593,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8640,7 +8628,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3322",
-      "rank": 595,
+      "rank": 594,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8654,7 +8642,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2356",
-      "rank": 596,
+      "rank": 595,
       "size": "XL",
       "importance": "medium",
       "score": 40,
@@ -8669,7 +8657,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1754",
-      "rank": 597,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8681,7 +8669,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1751",
-      "rank": 598,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8693,7 +8681,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1750",
-      "rank": 599,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8705,7 +8693,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1748",
-      "rank": 600,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8717,7 +8705,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1735",
-      "rank": 601,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8729,7 +8717,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1691",
-      "rank": 602,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8741,7 +8729,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1685",
-      "rank": 603,
+      "rank": 602,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8753,7 +8741,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1676",
-      "rank": 604,
+      "rank": 603,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8765,7 +8753,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1667",
-      "rank": 605,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8777,7 +8765,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1657",
-      "rank": 606,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8789,7 +8777,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1656",
-      "rank": 607,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8801,7 +8789,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1655",
-      "rank": 608,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8813,7 +8801,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1654",
-      "rank": 609,
+      "rank": 608,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8825,7 +8813,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1653",
-      "rank": 610,
+      "rank": 609,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8837,7 +8825,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1623",
-      "rank": 611,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8849,7 +8837,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3502",
-      "rank": 612,
+      "rank": 611,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8861,7 +8849,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1561",
-      "rank": 613,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8873,7 +8861,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1550",
-      "rank": 614,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8885,7 +8873,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1545",
-      "rank": 615,
+      "rank": 614,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8897,7 +8885,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1542",
-      "rank": 616,
+      "rank": 615,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8909,7 +8897,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1524",
-      "rank": 617,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8921,7 +8909,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1497",
-      "rank": 618,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8933,7 +8921,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1490",
-      "rank": 619,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8945,7 +8933,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1489",
-      "rank": 620,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8957,7 +8945,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1485",
-      "rank": 621,
+      "rank": 620,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8969,7 +8957,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1473",
-      "rank": 622,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8981,7 +8969,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1443",
-      "rank": 623,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8993,7 +8981,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1442",
-      "rank": 624,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9005,7 +8993,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1437",
-      "rank": 625,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9017,7 +9005,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1432",
-      "rank": 626,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9029,7 +9017,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1223",
-      "rank": 627,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9041,7 +9029,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1165",
-      "rank": 628,
+      "rank": 627,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9053,7 +9041,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1151",
-      "rank": 629,
+      "rank": 628,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -9065,7 +9053,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1060",
-      "rank": 630,
+      "rank": 629,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9077,7 +9065,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1051",
-      "rank": 631,
+      "rank": 630,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9089,7 +9077,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1040",
-      "rank": 632,
+      "rank": 631,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -9101,7 +9089,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1037",
-      "rank": 633,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9113,7 +9101,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-958",
-      "rank": 634,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9125,7 +9113,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-949",
-      "rank": 635,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9137,7 +9125,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-947",
-      "rank": 636,
+      "rank": 635,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9149,7 +9137,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-938",
-      "rank": 637,
+      "rank": 636,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9161,7 +9149,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-903",
-      "rank": 638,
+      "rank": 637,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9173,7 +9161,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-902",
-      "rank": 639,
+      "rank": 638,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9185,7 +9173,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-901",
-      "rank": 640,
+      "rank": 639,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9197,7 +9185,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-818",
-      "rank": 641,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9209,7 +9197,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-736",
-      "rank": 642,
+      "rank": 641,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9221,7 +9209,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-709",
-      "rank": 643,
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9233,7 +9221,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3441",
-      "rank": 644,
+      "rank": 643,
       "size": "XL",
       "importance": "low",
       "score": 34,
@@ -9245,7 +9233,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2978",
-      "rank": 645,
+      "rank": 644,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -9260,7 +9248,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-678",
-      "rank": 646,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9272,7 +9260,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-675",
-      "rank": 647,
+      "rank": 646,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9284,7 +9272,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-654",
-      "rank": 648,
+      "rank": 647,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -9296,7 +9284,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-649",
-      "rank": 649,
+      "rank": 648,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9308,7 +9296,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-637",
-      "rank": 650,
+      "rank": 649,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -9320,7 +9308,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-629",
-      "rank": 651,
+      "rank": 650,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9332,7 +9320,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-613",
-      "rank": 652,
+      "rank": 651,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9344,7 +9332,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-607",
-      "rank": 653,
+      "rank": 652,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9356,7 +9344,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-606",
-      "rank": 654,
+      "rank": 653,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9368,7 +9356,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-548",
-      "rank": 655,
+      "rank": 654,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9380,7 +9368,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-546",
-      "rank": 656,
+      "rank": 655,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9392,7 +9380,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-537",
-      "rank": 657,
+      "rank": 656,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9404,7 +9392,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-531",
-      "rank": 658,
+      "rank": 657,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9416,7 +9404,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-452",
-      "rank": 659,
+      "rank": 658,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9428,7 +9416,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-450",
-      "rank": 660,
+      "rank": 659,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9440,7 +9428,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-294",
-      "rank": 661,
+      "rank": 660,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9452,7 +9440,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3034",
-      "rank": 662,
+      "rank": 661,
       "size": "XS",
       "importance": "low",
       "score": 32,
@@ -9464,7 +9452,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-293",
-      "rank": 663,
+      "rank": 662,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9476,7 +9464,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-277",
-      "rank": 664,
+      "rank": 663,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9488,7 +9476,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-258",
-      "rank": 665,
+      "rank": 664,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9500,7 +9488,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-255",
-      "rank": 666,
+      "rank": 665,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9512,7 +9500,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-252",
-      "rank": 667,
+      "rank": 666,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9524,7 +9512,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-243",
-      "rank": 668,
+      "rank": 667,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9536,7 +9524,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-77",
-      "rank": 669,
+      "rank": 668,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9548,7 +9536,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-54",
-      "rank": 670,
+      "rank": 669,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -9560,7 +9548,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-38",
-      "rank": 671,
+      "rank": 670,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9572,7 +9560,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-37",
-      "rank": 672,
+      "rank": 671,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9584,7 +9572,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1126",
-      "rank": 673,
+      "rank": 672,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9596,7 +9584,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-1066",
-      "rank": 674,
+      "rank": 673,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9608,7 +9596,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3504",
-      "rank": 675,
+      "rank": 674,
       "size": "XS",
       "importance": "medium",
       "score": 30,
@@ -9622,7 +9610,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3456",
-      "rank": 676,
+      "rank": 675,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -9634,7 +9622,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3443",
-      "rank": 677,
+      "rank": 676,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9646,7 +9634,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2968",
-      "rank": 678,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9658,7 +9646,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2941",
-      "rank": 679,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9670,7 +9658,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2936",
-      "rank": 680,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9682,7 +9670,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2922",
-      "rank": 681,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9694,7 +9682,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2868",
-      "rank": 682,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9706,7 +9694,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2767",
-      "rank": 683,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9718,7 +9706,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2679",
-      "rank": 684,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9730,7 +9718,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2662",
-      "rank": 685,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9742,7 +9730,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2645",
-      "rank": 686,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9754,7 +9742,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2635",
-      "rank": 687,
+      "rank": 686,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9766,7 +9754,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2630",
-      "rank": 688,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9778,7 +9766,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2629",
-      "rank": 689,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9790,7 +9778,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2628",
-      "rank": 690,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9802,7 +9790,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2622",
-      "rank": 691,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9814,7 +9802,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2600",
-      "rank": 692,
+      "rank": 691,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9826,7 +9814,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2533",
-      "rank": 693,
+      "rank": 692,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9838,7 +9826,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2527",
-      "rank": 694,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9850,7 +9838,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2514",
-      "rank": 695,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9862,7 +9850,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2507",
-      "rank": 696,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9874,7 +9862,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2505",
-      "rank": 697,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9886,7 +9874,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2504",
-      "rank": 698,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9898,7 +9886,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2449",
-      "rank": 699,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9910,7 +9898,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2424",
-      "rank": 700,
+      "rank": 699,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9922,7 +9910,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2406",
-      "rank": 701,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9934,7 +9922,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2394",
-      "rank": 702,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9946,7 +9934,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-3011",
-      "rank": 703,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9958,7 +9946,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2282",
-      "rank": 704,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9970,7 +9958,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2091",
-      "rank": 705,
+      "rank": 704,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9982,7 +9970,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2085",
-      "rank": 706,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9994,7 +9982,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2084",
-      "rank": 707,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10006,7 +9994,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2083",
-      "rank": 708,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10018,7 +10006,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2082",
-      "rank": 709,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10030,7 +10018,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2074",
-      "rank": 710,
+      "rank": 709,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -10042,7 +10030,7 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
     },
     {
       "issue": "PAN-2046",
-      "rank": 711,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10051,6 +10039,18 @@ Re-review after a PR head moves never re-posts status, stranding otherwise-green
       "why": "Conversation view does not surface terminal command responses",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-1641",
+      "rank": 711,
+      "size": "M",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Run agents on local GPU models via a managed Ollama sidecar",
+      "gate": "auto",
+      "planning": "skip"
     },
     {
       "issue": "PAN-2006",
