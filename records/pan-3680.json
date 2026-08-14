@@ -299,24 +299,23 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T12:12:59.142Z",
+  "updated": "2026-08-14T12:13:01.262Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z",
-    "updatedAt": "2026-08-14T11:55:56.207Z",
+    "updatedAt": "2026-08-14T12:12:57.776Z",
     "reviewNotes": "Verification failed at test",
     "testNotes": "typecheck passed; lint passed; npm test FAILED — tests/integration/swarm-foreman-polyrepo.test.ts fails deterministically (AssertionError at line 82, expected [] to include merge message; reproduced in isolation, not in flaky-quarantine.txt). Configured gate's && chain means the frontend test step never ran under the gate (standalone: 4 files/64 tests passed). UAT not required — pure CLI/backend swarm orchestration, no dashboard/UI acceptance criteria.",
-    "verificationNotes": "Verification FAILED at test (784457ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "9e08f98c567dd80f4e3c495a1971d500852c7672",
-    "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
+    "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
     "reviewRequestedAt": "2026-08-14T11:38:28.307Z",
     "reviewSpawnedAt": "2026-08-14T10:54:45.160Z",
     "scopeDrift": {
@@ -463,15 +462,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 23600942,
-            "output": 11484,
-            "cacheRead": 18938624,
+            "input": 25073956,
+            "output": 11907,
+            "cacheRead": 19995648,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 207468112,
-            "output": 281883,
-            "cacheRead": 203251200,
+            "input": 216180715,
+            "output": 286737,
+            "cacheRead": 211904000,
             "cacheWrite": 0
           }
         },
@@ -494,15 +493,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 23600942,
-          "output": 11484,
-          "cacheRead": 18938624,
+          "input": 25073956,
+          "output": 11907,
+          "cacheRead": 19995648,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 207468112,
-          "output": 281883,
-          "cacheRead": 203251200,
+          "input": 216180715,
+          "output": 286737,
+          "cacheRead": 211904000,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -519,8 +518,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 136.829193,
-        "pricingAsOf": "2026-08-14T11:56:19.562Z"
+        "usd": 141.60022800000002,
+        "pricingAsOf": "2026-08-14T12:13:01.242Z"
       }
     },
     "merges": [
@@ -528,8 +527,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3680",
