@@ -52,6 +52,7 @@
 | Agent state planes (permanent/runtime/liveness) | [docs/AGENT-STATE-PLANES.md](docs/AGENT-STATE-PLANES.md) |
 | Workspaces & projects domain, quick actions, memory homes | [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) |
 | Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md), [docs/DEFINITION-OF-DONE.md](docs/DEFINITION-OF-DONE.md) |
+| Restart gate (operator approval for voluntary dashboard restarts, exempt paths) | [docs/RESTART-GATE.md](docs/RESTART-GATE.md) |
 | xBRIEF plans, four artifacts, status lifecycle | [docs/XBRIEF.md](docs/XBRIEF.md) |
 | Flywheel + order books | [docs/FLYWHEEL.md](docs/FLYWHEEL.md), [docs/ORDER-BOOKS.md](docs/ORDER-BOOKS.md) |
 | Effect bridging + diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |

@@ -15,6 +15,7 @@ import { extractPrefixSync } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
+import { getRestartGate } from '../../services/restart-gate.js';
 import { jsonResponse } from '../../http-helpers.js';
 import {
   getOverdeckVersion,
@@ -520,12 +521,29 @@ const postDevRebuildRoute = HttpRouter.add(
 // server. Spawns a detached `pan restart --dashboard` so the new process
 // outlives the SIGTERM that kills this server. Used by the browser fallback
 // path in App.tsx when window.overdeckBridge is not available.
+//
+// PAN-3729: pressing the dashboard's own restart button IS operator approval.
+// Two things follow from that:
+//   1. Every request waiting in the restart gate is folded into an epoch this
+//      restart claims, so the next boot marks them satisfied and the blocked
+//      requesters exit instead of waiting for an approval that already happened.
+//   2. The spawned CLI runs with `--now`, the explicit bypass. Without it the
+//      spawned `pan restart` would register its own request, find a claimed
+//      epoch it is not a member of, and block forever — the restart the
+//      operator just asked for would never happen.
 const postRestartDashboardRoute = HttpRouter.add(
   'POST',
   '/api/system/restart-dashboard',
-  Effect.sync(() => {
+  Effect.promise(async () => {
     try {
-      const invocation = panCliInvocation(['restart', '--dashboard']);
+      await getRestartGate().satisfyForDirectRestart(`dashboard-ui:${process.pid}`);
+    } catch (error: unknown) {
+      // The gate is runtime-plane convenience state — never let it block the
+      // restart the operator explicitly asked for.
+      console.error('[restart-dashboard] restart-gate implicit approval failed:', error);
+    }
+    try {
+      const invocation = panCliInvocation(['restart', '--dashboard', '--now']);
       const child = spawn(invocation.command, invocation.args, {
         detached: true,
         stdio: 'ignore',
