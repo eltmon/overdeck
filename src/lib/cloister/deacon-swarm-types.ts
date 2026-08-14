@@ -9,6 +9,7 @@ import type { resolveAutomaticSwarmPolicy } from '../swarm-policy.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import type { FeatureWorkspace } from './deacon-workspaces.js';
+import type { RequestIssueReviewResult } from './deacon-swarm-finalization.js';
 import type {
   clearSwarmCompletionObservationRecord,
   readSwarmCompletionObservation,
@@ -18,6 +19,13 @@ import type {
 } from './deacon-swarm-record.js';
 import type { ensureSwarmForeman } from './swarm-foreman.js';
 import type { SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
+
+export interface ArchivedBlockedSlot {
+  archivedBranch: string;
+  archivedWorktree: string;
+  replacementBranch: string;
+  releasedAt: string;
+}
 
 /** Dependencies used by one swarm coordinator patrol. */
 export interface CoordinateSwarmSlotsDeps {
@@ -47,9 +55,11 @@ export interface CoordinateSwarmSlotsDeps {
   readCompletionObservation?: typeof readSwarmCompletionObservation;
   writeCompletionObservation?: typeof writeSwarmCompletionObservation;
   clearCompletionObservation?: typeof clearSwarmCompletionObservationRecord;
+  archiveBlockedSlot?: (issueId: string, workspacePath: string, slotIndex: number, branch: string) => Promise<ArchivedBlockedSlot>;
+  prepareReleasedSlot?: (issueId: string, workspacePath: string, slotIndex: number, itemId: string, branch: string) => Promise<void>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
-    issue: { issueId: string; featureWorkspace: string },
+    issue: { issueId: string; featureWorkspace: string; slotBranch?: string; slotWorkspace?: string },
     slotIndex: number,
     item: XBriefItem,
   ) => Promise<SlotMergeResult>;
@@ -91,6 +101,10 @@ export interface CoordinateSwarmSlotsDeps {
   emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
   sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
   resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
+  getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
+  clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
+  /** Request issue-level review after the feature branch contains every item. */
+  requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }
 
 export interface SlotAssignment {
