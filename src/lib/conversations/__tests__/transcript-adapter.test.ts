@@ -90,6 +90,10 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
         type: 'response_item',
         payload: { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}' },
       }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'custom_tool_call', name: 'apply_patch', input: '*** Begin Patch' },
+      }),
       JSON.stringify({ type: 'response_item', payload: { type: 'function_call_output', output: 'file.txt' } }),
       JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'done' } }),
       JSON.stringify({
@@ -103,6 +107,8 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
 
     expect(serialized).toContain('[user]\nhello codex');
     expect(serialized).toContain('[tool_use: exec_command]');
+    const customToolCall = serialized.split('\n\n').find((part) => part.startsWith('[tool_use: apply_patch]'));
+    expect(customToolCall).toContain(JSON.stringify('*** Begin Patch'));
     expect(serialized).toContain('[assistant]\ndone');
     expect(serialized).not.toContain('file.txt');
     expect(serialized).not.toContain('reasoning');

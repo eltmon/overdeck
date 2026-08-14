@@ -446,7 +446,7 @@ export async function runForkPipeline(
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
       } catch (error) {
         console.warn(
           `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -471,7 +471,7 @@ export async function runForkPipeline(
         `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
       );
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
       } catch (heuristicError) {
         console.warn(
           `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
