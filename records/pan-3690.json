@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-14T02:29:00.532Z",
+  "updated": "2026-08-14T02:42:07.422Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
@@ -13,7 +13,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T02:29:00.484Z",
+    "updatedAt": "2026-08-14T02:42:07.355Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs panopticon-cli:origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "mergeNotes": "Post-rebase verification failed at empty-changeset",
     "strikeReadyHead": "eeb8f3f1b4999f9a84e3b7bb806d90c9e73cbb6a",
@@ -50,9 +50,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 41779259,
-            "output": 22853,
-            "cacheRead": 41011968,
+            "input": 41862468,
+            "output": 22907,
+            "cacheRead": 41022976,
             "cacheWrite": 0
           }
         },
@@ -73,9 +73,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 41779259,
-          "output": 22853,
-          "cacheRead": 41011968,
+          "input": 41862468,
+          "output": 22907,
+          "cacheRead": 41022976,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -86,8 +86,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 25.029266,
-        "pricingAsOf": "2026-08-14T02:29:00.490Z"
+        "usd": 25.397395,
+        "pricingAsOf": "2026-08-14T02:42:07.372Z"
       }
     },
     "merges": [],
