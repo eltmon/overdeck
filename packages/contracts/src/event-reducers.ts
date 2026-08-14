@@ -743,7 +743,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        restartGate: { status: event.payload.status, pending: event.payload.pending },
+        restartGate: {
+          status: event.payload.status,
+          pending: event.payload.pending,
+          // PAN-3731: carries the "requesters went away without restarting"
+          // notice. Dropping it here would silently starve the banner.
+          ...(event.payload.lastOutcome === undefined ? {} : { lastOutcome: event.payload.lastOutcome }),
+        },
       }
 
     case 'resources.updated':

@@ -29,14 +29,21 @@
  * - An unclaimed epoch whose members have ALL expired is dropped, so the gate
  *   cannot wedge in `approved` forever with nobody left to claim it. This is
  *   the post-approval twin of "approve when every request has already expired
- *   → clear the gate, restart nothing".
+ *   → clear the gate, restart nothing". That drop records `lastOutcome` on the
+ *   projection for 15s so the banner can say the approval restarted nothing
+ *   instead of silently vanishing (PAN-3731).
  * - Satisfied ids are served to polls for 10 minutes after boot, then pruned.
  */
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import type { RestartGateKind, RestartGateRequest, RestartGateSnapshot } from '@overdeck/contracts';
+import type {
+  RestartGateKind,
+  RestartGateOutcome,
+  RestartGateRequest,
+  RestartGateSnapshot,
+} from '@overdeck/contracts';
 
 import { OVERDECK_HOME } from '../../../lib/paths.js';
 
@@ -50,6 +57,13 @@ export const CLAIM_LAPSE_MS = 5 * 60_000;
 export const SATISFIED_TTL_MS = 10 * 60_000;
 /** How often the server prunes expired requests so the banner self-clears. */
 export const SWEEP_INTERVAL_MS = 5_000;
+/**
+ * How long the projection carries `lastOutcome` (PAN-3731 — not part of the
+ * pinned PAN-3729 wire contract). Long enough for a browser to receive the
+ * event and show its short notice, short enough that a late connect does not
+ * see a stale one.
+ */
+export const OUTCOME_TTL_MS = 15_000;
 
 export const RESTART_GATE_FILE = join(OVERDECK_HOME, 'restart-gate.json');
 
@@ -76,6 +90,8 @@ export interface RestartGateState {
   pending: StoredRestartRequest[];
   epoch: RestartGateEpoch | null;
   satisfied: Array<{ requesterId: string; satisfiedAt: string }>;
+  /** Set when an epoch ended without restarting anything (PAN-3731). */
+  lastOutcome?: RestartGateOutcome;
 }
 
 export type RestartGateStatus = RestartGateSnapshot['status'];
@@ -124,15 +140,30 @@ export function pruneRestartGateState(state: RestartGateState, nowMs: number): R
   const pending = state.pending.filter((request) => nowMs - millis(request.lastSeenAt) < REQUEST_TTL_MS);
   const satisfied = state.satisfied.filter((entry) => nowMs - millis(entry.satisfiedAt) < SATISFIED_TTL_MS);
 
+  let lastOutcome = state.lastOutcome;
+  if (lastOutcome && nowMs - millis(lastOutcome.at) >= OUTCOME_TTL_MS) lastOutcome = undefined;
+
   let epoch = state.epoch;
   if (epoch && !hasLiveClaim(epoch, nowMs)) {
     // Every member of an unclaimed (or lapsed) epoch is gone — nobody is left
     // to claim it, so the epoch must not outlive them and block later requests.
     const livePending = new Set(pending.map((request) => request.requesterId));
-    if (!epoch.requesterIds.some((id) => livePending.has(id))) epoch = null;
+    if (!epoch.requesterIds.some((id) => livePending.has(id))) {
+      epoch = null;
+      // An approval opened this epoch and it died with nobody to perform the
+      // restart, so the operator's click restarted nothing. Record that, or
+      // the banner would just vanish and read as a broken button (PAN-3731).
+      lastOutcome = { type: 'pruned-unclaimed', at: new Date(nowMs).toISOString() };
+    }
   }
 
-  return { ...state, pending, satisfied, epoch };
+  return {
+    version: state.version,
+    pending,
+    satisfied,
+    epoch,
+    ...(lastOutcome === undefined ? {} : { lastOutcome }),
+  };
 }
 
 /** The single place gate status is derived — used by every read and mutation. */
@@ -152,6 +183,7 @@ export function toRestartGateSnapshot(state: RestartGateState, nowMs: number): R
       ...(request.builtSha === undefined ? {} : { builtSha: request.builtSha }),
       requestedAt: request.requestedAt,
     })),
+    ...(state.lastOutcome === undefined ? {} : { lastOutcome: state.lastOutcome }),
   };
 }
 
@@ -386,6 +418,7 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
         pending: Array.isArray(candidate.pending) ? candidate.pending : [],
         epoch: candidate.epoch ?? null,
         satisfied: Array.isArray(candidate.satisfied) ? candidate.satisfied : [],
+        ...(candidate.lastOutcome === undefined ? {} : { lastOutcome: candidate.lastOutcome }),
       };
     } catch {
       // Missing or unreadable file — a fresh gate is the correct fallback,

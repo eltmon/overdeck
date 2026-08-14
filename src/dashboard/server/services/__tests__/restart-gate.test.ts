@@ -16,6 +16,7 @@ import {
 
 import {
   CLAIM_LAPSE_MS,
+  OUTCOME_TTL_MS,
   REQUEST_TTL_MS,
   SATISFIED_TTL_MS,
   SWEEP_INTERVAL_MS,
@@ -167,6 +168,47 @@ describe('restart gate state machine', () => {
     expect(deriveRestartGateStatus(next.state, T0 + REQUEST_TTL_MS)).toBe('pending');
   });
 
+  it('records the dead-requester outcome on that drop and forgets it after the window (PAN-3731)', () => {
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
+    state = approveRestartGate(state, T0).state;
+
+    // The operator approved and nobody claimed. Without this the banner would
+    // just vanish, so the approval would read as a broken button.
+    const droppedAt = T0 + REQUEST_TTL_MS;
+    const dropped = pruneRestartGateState(state, droppedAt);
+    const outcome = { type: 'pruned-unclaimed', at: new Date(droppedAt).toISOString() };
+    expect(dropped.lastOutcome).toEqual(outcome);
+    expect(toRestartGateSnapshot(dropped, droppedAt)).toEqual({
+      status: 'idle',
+      pending: [],
+      lastOutcome: outcome,
+    });
+
+    // The notice is a short window, not a permanent flag on the projection.
+    const stillShown = pruneRestartGateState(dropped, droppedAt + OUTCOME_TTL_MS - 1);
+    expect(stillShown.lastOutcome).toEqual(outcome);
+    const forgotten = pruneRestartGateState(dropped, droppedAt + OUTCOME_TTL_MS);
+    expect(forgotten.lastOutcome).toBeUndefined();
+    expect(toRestartGateSnapshot(forgotten, droppedAt + OUTCOME_TTL_MS)).not.toHaveProperty('lastOutcome');
+  });
+
+  it('records no outcome when nothing was approved or when the restart actually happened', () => {
+    // A request that expires before any approval is an ordinary timeout — the
+    // operator never clicked anything, so there is nothing to explain.
+    const neverApproved = pruneRestartGateState(
+      upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state,
+      T0 + REQUEST_TTL_MS,
+    );
+    expect(neverApproved.lastOutcome).toBeUndefined();
+
+    // A claimed epoch is cleared by the boot that completes it, so the prune
+    // never sees it die and the notice must not fire.
+    let claimed = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
+    claimed = approveRestartGate(claimed, T0).state;
+    claimed = claimRestartGate(claimed, 'a', T0).state;
+    expect(resolveRestartGateBoot(claimed, T0 + 3_000).state.lastOutcome).toBeUndefined();
+  });
+
   it('keeps a live claim alive even when the claimant stops polling', () => {
     let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
     state = approveRestartGate(state, T0).state;
@@ -308,6 +350,29 @@ describe('restart gate service', () => {
     expect(emitted.at(-1)).toEqual({ status: 'idle', pending: [] });
   });
 
+  it('publishes the dead-requester outcome when a sweep drops an approved epoch (PAN-3731)', async () => {
+    const gate = makeGate();
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    await gate.approve();
+
+    // The requester died between the approval and its next poll.
+    clock = T0 + REQUEST_TTL_MS;
+    const swept = await gate.sweep();
+    expect(swept).toEqual({
+      status: 'idle',
+      pending: [],
+      lastOutcome: { type: 'pruned-unclaimed', at: new Date(clock).toISOString() },
+    });
+    expect(emitted.at(-1)).toEqual(swept);
+
+    // Past its window the projection carries the notice no more, and the
+    // cleared projection is published so a stale banner cannot linger.
+    clock = T0 + REQUEST_TTL_MS + OUTCOME_TTL_MS;
+    const cleared = await gate.sweep();
+    expect(cleared.lastOutcome).toBeUndefined();
+    expect(emitted.at(-1)).toEqual({ status: 'idle', pending: [] });
+  });
+
   it('sweeps on the 5s interval so a dead requester leaves the banner', async () => {
     // Fake timers only — the stub gate does no I/O, so nothing real is gated
     // behind the fake clock.
@@ -331,6 +396,14 @@ describe('restart gate service', () => {
 describe('restart gate read-model exposure', () => {
   const isDomainEvent = Schema.is(DomainEvent);
 
+  /** An approved epoch whose only requester died — the PAN-3731 projection. */
+  function prunedUnclaimedProjection() {
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('reload:22', 'pan reload'), T0).state;
+    state = approveRestartGate(state, T0).state;
+    const droppedAt = T0 + REQUEST_TTL_MS;
+    return toRestartGateSnapshot(pruneRestartGateState(state, droppedAt), droppedAt);
+  }
+
   it('emits a restart_gate.changed event the ws-rpc schema filter accepts', () => {
     // emitOnly stamps sequence -1 (in-memory only). ws-rpc drops any event that
     // fails DomainEvent validation, which would silently starve the banner.
@@ -341,6 +414,30 @@ describe('restart gate read-model exposure', () => {
       timestamp: new Date(T0).toISOString(),
       payload: toRestartGateSnapshot(state, T0),
     })).toBe(true);
+  });
+
+  it('accepts a payload carrying the PAN-3731 outcome field', () => {
+    const projection = prunedUnclaimedProjection();
+    expect(projection.lastOutcome?.type).toBe('pruned-unclaimed');
+    expect(isDomainEvent({
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0).toISOString(),
+      payload: projection,
+    })).toBe(true);
+  });
+
+  it('carries the outcome through the reducer to read-model state', () => {
+    const projection = prunedUnclaimedProjection();
+    const applied = applyEvent(INITIAL_READ_MODEL_STATE, {
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0).toISOString(),
+      payload: projection,
+    });
+    // The reducer rebuilds the projection field by field, so an unlisted field
+    // is dropped silently and the banner never learns the requester died.
+    expect(applied.restartGate).toEqual(projection);
   });
 
   it('lands the gate in read-model state from an event and from a snapshot', () => {
