@@ -18,19 +18,18 @@
     }
   ],
   "created": "2026-08-13T22:26:54.990Z",
-  "updated": "2026-08-14T02:05:55.858Z",
+  "updated": "2026-08-14T02:06:00.243Z",
   "pipeline": {
     "issueId": "PAN-3691",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
-    "mergeStatus": "merging",
-    "mergeStep": "stripping-planning",
+    "mergeStatus": "verifying",
+    "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T02:05:44.090Z",
+    "updatedAt": "2026-08-14T02:05:44.158Z",
     "verificationNotes": "Verification FAILED at test (727851ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3691-strike/.overdeck/verification-latest.json",
-    "mergeNotes": "Post-rebase verification failed at test",
     "strikeReadyHead": "7351d6477a68d5742fdfcc96217d0691a85c62c1",
     "strikeReadyAt": "2026-08-14T01:41:58.318Z",
     "strikeLandingState": "landing",
@@ -95,7 +94,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.5904380000000002,
-        "pricingAsOf": "2026-08-14T02:05:55.772Z"
+        "pricingAsOf": "2026-08-14T02:06:00.233Z"
       }
     },
     "merges": [],
