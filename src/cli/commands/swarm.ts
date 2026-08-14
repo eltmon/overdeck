@@ -24,7 +24,7 @@ import {
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
-import { writeSwarmPolicyMode } from '../../lib/cloister/deacon-swarm-record.js';
+import { writeSwarmPolicyMode, clearSupersededSwarmAttempts } from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
@@ -346,6 +346,20 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Exact slot workspace names only: `<workspaceBaseName>-slot-<integer>`
+ * (PAN-3694). Reset enumerates the workspaces directory to find stale slot
+ * directories, and preserved archives such as
+ * `feature-min-888-slot-1-reset-backup-20260814` or
+ * `feature-min-888-slot-2-failed-20260814` share the `-slot-` prefix — a
+ * startsWith match swept them in and `slotBranchFromPath` then crashed on the
+ * trailing suffix. Backup, quarantine, failed, and reset-archive suffixes are
+ * operator-preserved state, never live slots.
+ */
+export function isSlotWorkspaceDirectoryName(workspaceBaseName: string, entryName: string): boolean {
+  return new RegExp(`^${escapeRegExp(workspaceBaseName)}-slot-\\d+$`).test(entryName);
+}
+
 export interface SwarmResetOptions {
   force?: boolean;
   reason?: string;
@@ -355,6 +369,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
+  clearSupersededSwarmAttempts: typeof clearSupersededSwarmAttempts;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
   removeAgent: (agentId: string) => Promise<unknown>;
@@ -368,14 +383,15 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   resolveProjectFromIssueSync,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   clearAllSlotAssignments,
+  clearSupersededSwarmAttempts,
   clearFailedMergeBlock,
   getFailedMergeBlocks,
   removeAgent,
   listSlotWorkspaceDirectories: workspacePath => {
     const parent = join(workspacePath, '..');
-    const prefix = `${workspacePath.slice(parent.length + 1)}-slot-`;
+    const baseName = workspacePath.slice(parent.length + 1);
     return readdirSync(parent, { withFileTypes: true })
-      .filter(entry => entry.isDirectory() && entry.name.startsWith(prefix))
+      .filter(entry => entry.isDirectory() && isSlotWorkspaceDirectoryName(baseName, entry.name))
       .map(entry => join(parent, entry.name));
   },
   resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktreesSync,
@@ -495,6 +511,10 @@ export async function swarmResetCommand(
   }
 
   await deps.clearAllSlotAssignments(workspacePath, issue);
+  // PAN-3694: the superseded-attempt high-water must not survive the reset —
+  // it would reserve indexes 1..high-water and leave a fresh swarm able to
+  // dispatch only high-water+1 even though every slot below is free.
+  await deps.clearSupersededSwarmAttempts(workspacePath, issue);
   for (const block of deps.getFailedMergeBlocks(issue, workspacePath)) {
     await deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
   }
@@ -532,7 +552,7 @@ export async function swarmResetCommand(
   deps.console.log(
     `Pushed to origin: ${pushed.length > 0 ? pushed.join(', ') : 'nothing (no unmerged slot branches needed a backup)'}. `
     + `Removed ${worktrees.length + staleSlotDirectories.length} slot workspace(s) and ${branches.length} local slot branch(es). `
-    + `Cleared the recorded slot assignments and any failed-merge block`
+    + `Cleared the recorded slot assignments, the superseded-attempt high-water, and any failed-merge block`
     + `${stoppedRows > 0 ? `, marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}`
     + `${retiredAgents.length > 0 ? `, and retired ${retiredAgents.length} dead slot agent record(s): ${retiredAgents.join(', ')}` : ', and retired no dead slot agent records'}`
     + `${skippedLiveAgents.length > 0 ? `. Skipped live slot agent session(s): ${skippedLiveAgents.join(', ')}` : ''}.`,
