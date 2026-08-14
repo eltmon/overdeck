@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:26:09.597Z",
+  "updated": "2026-08-14T06:27:41.236Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "newest-first-comparator": {
-        "writerId": "agent-pan-3704",
-        "agentId": "agent-pan-3704",
-        "pid": 1316211,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T06:26:09.597Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3704",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Added persisted newest-first preference state, conversation sort timestamps, and the required PAN-3704 file-size audit entry; typecheck passed.",
         "releasedAt": "2026-08-14T06:25:53.192Z"
+      },
+      {
+        "writerId": "agent-pan-3704",
+        "agentId": "agent-pan-3704",
+        "pid": 1316211,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T06:26:09.597Z",
+        "itemId": "newest-first-comparator",
+        "outcome": "completed",
+        "reason": "Added exported newest-first comparator with valid/missing timestamp handling and rank fallback; typecheck passed.",
+        "releasedAt": "2026-08-14T06:27:41.236Z"
       }
     ],
     "statusReasons": {
       "pref-state-and-sortts": {
         "reason": "Added persisted newest-first preference state, conversation sort timestamps, and the required PAN-3704 file-size audit entry; typecheck passed.",
         "updatedAt": "2026-08-14T06:25:53.192Z"
+      },
+      "newest-first-comparator": {
+        "reason": "Added exported newest-first comparator with valid/missing timestamp handling and rank fallback; typecheck passed.",
+        "updatedAt": "2026-08-14T06:27:41.236Z"
       }
     }
   },
@@ -104,6 +111,9 @@
     "pref-state-and-sortts.ac1": "completed",
     "pref-state-and-sortts.ac2": "completed",
     "pref-state-and-sortts.ac3": "completed",
-    "newest-first-comparator": "running"
+    "newest-first-comparator": "completed",
+    "newest-first-comparator.ac1": "completed",
+    "newest-first-comparator.ac2": "completed",
+    "newest-first-comparator.ac3": "completed"
   }
 }
