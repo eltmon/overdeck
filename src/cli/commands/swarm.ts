@@ -310,7 +310,7 @@ export async function swarmFreezeCommand(
   const hold = deps.readSwarmHold(workspacePath, issue);
   if (hold) {
     deps.console.log(chalk.yellow(
-      `${issue} is already frozen — the Deacon is already skipping all swarm coordination for it. `
+      `${issue} is already frozen — its foreman cannot run gated dispatch, merge, or recovery actions. `
       + `Run \`pan swarm resume ${issue}\` to lift the hold.`,
     ));
     return { ok: true };
@@ -324,10 +324,9 @@ export async function swarmFreezeCommand(
   await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm freeze' });
   deps.console.log(chalk.green(`Froze swarm coordination for ${issue}.`));
   deps.console.log(
-    `The Deacon will now skip all swarm coordination for ${issue} on every patrol — no slot reconciliation, `
-    + `no slot merging, no slot garbage collection, and no new slot dispatch will run for this issue until you run `
-    + `\`pan swarm resume ${issue}\`. Slot agents that are already running keep running; freeze only stops the `
-    + 'Deacon from acting on the issue.',
+    `The hold prevents the ${issue} foreman from running gated dispatch, merge, or recovery actions until you run `
+    + `\`pan swarm resume ${issue}\`. Slot agents that are already running keep running. Deacon patrols preserve `
+    + 'the hold while continuing janitor, liveness, and event-delivery backstops.',
   );
   return { ok: true };
 }
@@ -342,7 +341,7 @@ export async function swarmResumeCommand(
   const hold = deps.readSwarmHold(workspacePath, issue);
   if (!hold) {
     deps.console.log(chalk.yellow(
-      `${issue} is already resumed — no swarm freeze is set, so the Deacon is coordinating it normally.`,
+      `${issue} is already resumed — no swarm freeze is set, so its foreman may run gated swarm actions.`,
     ));
     return { ok: true };
   }
@@ -351,8 +350,8 @@ export async function swarmResumeCommand(
   await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'unpause', source: 'pan swarm resume' });
   deps.console.log(chalk.green(`Resumed swarm coordination for ${issue}.`));
   deps.console.log(
-    `The freeze on ${issue} is lifted — the Deacon will pick this issue back up on its next patrol cycle and `
-    + 'resume slot reconciliation, merging, garbage collection, and dispatch.',
+    `The freeze on ${issue} is lifted. Its foreman may resume gated dispatch, merge, and recovery actions. `
+    + 'Deacon patrols continue to provide janitor, liveness, and event-delivery backstops.',
   );
   return { ok: true };
 }

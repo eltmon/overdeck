@@ -71,6 +71,22 @@ describe('pan swarm wait', () => {
     });
   });
 
+  it('returns a delta when an observed slot disappears', async () => {
+    let current = snapshot();
+    const deps = waitDeps(vi.fn(async () => current));
+    const resultPromise = swarmWaitCommand('PAN-3680', { timeout: 30 }, deps);
+
+    await Promise.resolve();
+    current = { ...snapshot(), slots: [] };
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await expect(resultPromise).resolves.toMatchObject({
+      ok: true,
+      timedOut: false,
+      delta: { slots: [{ slotIndex: 1, before: 'running', sessionExited: true }] },
+    });
+  });
+
   it('returns an empty delta with exit success at timeout', async () => {
     const deps = waitDeps(vi.fn(async () => snapshot()));
     const resultPromise = swarmWaitCommand('PAN-3680', { timeout: 2 }, deps);
@@ -98,6 +114,7 @@ describe('pan swarm wait', () => {
       getReviewStatusSync: vi.fn(() => null),
       readSwarmHold: vi.fn(() => ({ reason: 'inspect drift', setBy: 'foreman', at: '2026-08-13T00:00:00Z' })),
       readSwarmInterventions: vi.fn(() => ({ '1': { stalled: 2 } })),
+      readStatusOverrides: vi.fn(() => undefined),
       listSessionNamesSync: vi.fn(() => ['agent-pan-3680']),
       getConcurrencyLimits: vi.fn(() => ({ reservedSwarmSlots: 3 })),
       countRunningSwarmSlotsForIssue: vi.fn(() => 0),

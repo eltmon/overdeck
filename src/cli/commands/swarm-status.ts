@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
+import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
+import { applyStatusOverrides } from '../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
   classifyInFlightSlots,
@@ -34,6 +36,7 @@ export interface SwarmStatusCommandDeps {
   getReviewStatusSync: typeof getReviewStatusSync;
   readSwarmHold: typeof readSwarmHold;
   readSwarmInterventions: typeof readSwarmInterventions;
+  readStatusOverrides: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
   countRunningSwarmSlotsForIssue: (issueId: string) => number;
@@ -82,6 +85,8 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   getReviewStatusSync,
   readSwarmHold,
   readSwarmInterventions,
+  readStatusOverrides: (workspacePath, issueId) =>
+    readIssueRecordForWorkspaceSync(workspacePath, issueId)?.statusOverrides,
   listSessionNamesSync,
   getConcurrencyLimits,
   countRunningSwarmSlotsForIssue,
@@ -104,7 +109,11 @@ export async function deriveSwarmStatus(
   const loaded = await loadSwarmPlan(issue, deps);
   if (!loaded) return null;
   const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, loaded.doc);
+  const overrides = deps.readStatusOverrides(workspacePath, issue);
+  const effectiveDoc = overrides && Object.keys(overrides).length > 0
+    ? applyStatusOverrides(loaded.doc, overrides)
+    : loaded.doc;
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, effectiveDoc);
   const classified = await deps.classifyInFlightSlots(reconciled.inFlight, workspacePath);
   const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
   const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
@@ -209,14 +218,17 @@ interface SwarmStatusDelta {
 
 function diffSnapshots(before: SwarmStatusSnapshot, after: SwarmStatusSnapshot): SwarmStatusDelta {
   const oldSlots = new Map(before.slots.map(slot => [slot.slotIndex, slot]));
-  const slots = after.slots.flatMap(slot => {
-    const old = oldSlots.get(slot.slotIndex);
-    if (old?.lifecycle === slot.lifecycle && old.sessionAlive === slot.sessionAlive) return [];
+  const newSlots = new Map(after.slots.map(slot => [slot.slotIndex, slot]));
+  const slotIndexes = [...new Set([...oldSlots.keys(), ...newSlots.keys()])].sort((a, b) => a - b);
+  const slots = slotIndexes.flatMap(slotIndex => {
+    const old = oldSlots.get(slotIndex);
+    const next = newSlots.get(slotIndex);
+    if (old?.lifecycle === next?.lifecycle && old?.sessionAlive === next?.sessionAlive) return [];
     return [{
-      slotIndex: slot.slotIndex,
+      slotIndex,
       before: old?.lifecycle,
-      after: slot.lifecycle,
-      sessionExited: old?.sessionAlive === true && !slot.sessionAlive || undefined,
+      after: next?.lifecycle,
+      sessionExited: old?.sessionAlive === true && next?.sessionAlive !== true || undefined,
     }];
   });
   return {
@@ -241,7 +253,10 @@ function printHumanStatus(
     output.log(`Hold: deacon-ignored — run \`pan swarm resume ${snapshot.issueId}\` to lift it.${reason}`);
   }
   else if (reviewHold?.stuck) output.log(`Hold: stuck — ${reviewHold.stuckReason ?? 'no reason recorded'}`);
-  else output.log('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+  else output.log(
+    'Hold: none — the foreman may run gated dispatch, merge, and recovery actions. '
+    + 'Deacon patrols provide janitor, liveness, and event-delivery backstops.',
+  );
   output.log(`Capacity: ${snapshot.capacity.used} of ${snapshot.capacity.limit} swarm slots in use.`);
   if (Object.keys(snapshot.interventions).length > 0) {
     output.log(`Interventions: ${JSON.stringify(snapshot.interventions)}`);

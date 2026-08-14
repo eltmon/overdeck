@@ -409,7 +409,7 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
     };
   }
 
-  it('freeze persists deaconIgnored with the default reason and explains the hold', async () => {
+  it('freeze persists the hold and explains foreman and Deacon responsibilities', async () => {
     const deps = makeHoldDeps(undefined);
 
     const result = await swarmFreezeCommand('pan-2203', {}, deps);
@@ -423,8 +423,11 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
       kind: 'pause',
       source: 'pan swarm freeze',
     });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('skip all swarm coordination for PAN-2203'));
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('prevents the PAN-2203 foreman from running gated dispatch, merge, or recovery actions');
+    expect(output).toContain('Deacon patrols preserve the hold while continuing janitor, liveness, and event-delivery backstops');
+    expect(output).toContain('pan swarm resume PAN-2203');
+    expect(output).not.toContain('Deacon will now skip all swarm coordination');
   });
 
   it('freeze records a custom --reason', async () => {
@@ -448,7 +451,7 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already frozen'));
   });
 
-  it('resume clears deaconIgnored and points at the next patrol cycle', async () => {
+  it('resume clears the hold and explains foreman and Deacon responsibilities', async () => {
     const deps = makeHoldDeps({ reason: 'existing', setBy: 'test', at: 'now' });
 
     const result = await swarmResumeCommand('pan-2203', deps);
@@ -460,7 +463,10 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
       kind: 'unpause',
       source: 'pan swarm resume',
     });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('next patrol'));
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('Its foreman may resume gated dispatch, merge, and recovery actions');
+    expect(output).toContain('Deacon patrols continue to provide janitor, liveness, and event-delivery backstops');
+    expect(output).not.toContain('Deacon will pick this issue back up');
   });
 
   it('resuming an unfrozen issue is an idempotent no-op with an already-resumed notice', async () => {
@@ -583,6 +589,7 @@ describe('pan swarm status (PAN-2214)', () => {
     getFailedMergeBlocks?: () => Array<Record<string, unknown>>;
     sessionNames?: string[];
     liveSlotCount?: number;
+    statusOverrides?: Record<string, string>;
   } = {}): SwarmStatusCommandDeps {
     const doc = options.doc ?? makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
@@ -611,6 +618,7 @@ describe('pan swarm status (PAN-2214)', () => {
       getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
       readSwarmHold: vi.fn(() => undefined),
       readSwarmInterventions: vi.fn(() => ({})),
+      readStatusOverrides: vi.fn(() => options.statusOverrides),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
         maxWorkAgents: 4,
@@ -665,12 +673,24 @@ describe('pan swarm status (PAN-2214)', () => {
     expect(output).toContain('Reason: operator freeze');
   });
 
-  it('prints that coordination is active when no hold is set', async () => {
+  it('prints foreman ownership and Deacon backstop duties when no hold is set', async () => {
     const deps = makeStatusDeps({ hold: null });
 
     await swarmStatusCommand('PAN-2203', deps);
 
-    expect(loggedText(deps)).toContain('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+    const output = loggedText(deps);
+    expect(output).toContain('the foreman may run gated dispatch, merge, and recovery actions');
+    expect(output).toContain('Deacon patrols provide janitor, liveness, and event-delivery backstops');
+    expect(output).not.toContain('Deacon is actively coordinating');
+  });
+
+  it('applies durable status overrides before reconciling slots', async () => {
+    const deps = makeStatusDeps({ statusOverrides: { 'wi-1': 'completed' } });
+
+    await swarmStatusCommand('PAN-2203', deps);
+
+    const effectiveDoc = vi.mocked(deps.reconcileSlotState).mock.calls[0]?.[2];
+    expect(effectiveDoc?.plan.items.find(item => item.id === 'wi-1')?.status).toBe('completed');
   });
 
   it('PAN-2364: lists blocked slots separately and overrides ready-to-merge mislabel', async () => {
@@ -731,6 +751,7 @@ describe('pan swarm status (PAN-2214)', () => {
       'getFailedMergeBlocks',
       'getReviewStatusSync',
       'listSessionNamesSync',
+      'readStatusOverrides',
       'readSwarmHold',
       'readSwarmInterventions',
       'reconcileSlotState',
