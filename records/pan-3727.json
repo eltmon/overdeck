@@ -130,21 +130,19 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T15:11:27.609Z",
+  "updated": "2026-08-14T15:17:54.507Z",
   "pipeline": {
     "issueId": "PAN-3727",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-14T15:11:27.594Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-08-14T15:17:53.999Z",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
-    "reviewedAtCommit": "27e4850568a6866025851cc3249e5624ef1ee84d",
     "reviewSpawnedAt": "2026-08-14T15:05:56.921Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -220,6 +218,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 88,
+            "output": 14681,
+            "cacheRead": 6292895,
+            "cacheWrite": 165728
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-5": {
             "input": 964,
@@ -243,15 +249,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 964,
-          "output": 193797,
-          "cacheRead": 188803178,
-          "cacheWrite": 2597780
+          "input": 1052,
+          "output": 208478,
+          "cacheRead": 195096073,
+          "cacheWrite": 2763508
         }
       },
       "costAtCloseOut": {
-        "usd": 52.27385,
-        "pricingAsOf": "2026-08-14T15:11:27.598Z"
+        "usd": 54.093738,
+        "pricingAsOf": "2026-08-14T15:17:54.055Z"
       }
     },
     "merges": [
