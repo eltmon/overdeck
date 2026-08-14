@@ -215,6 +215,7 @@ export interface EnsureSwarmForemanDeps {
   messageAgent: typeof messageAgent;
   buildWorkAgentPrompt: typeof buildWorkAgentPrompt;
   spawnRun: typeof spawnRun;
+  resolveProjectFromIssueSync: typeof resolveProjectFromIssueSync;
 }
 
 const defaultForemanDeps: EnsureSwarmForemanDeps = {
@@ -222,6 +223,7 @@ const defaultForemanDeps: EnsureSwarmForemanDeps = {
   messageAgent,
   buildWorkAgentPrompt,
   spawnRun,
+  resolveProjectFromIssueSync,
 };
 
 export async function ensureSwarmForeman(
@@ -240,7 +242,7 @@ export async function ensureSwarmForeman(
     issueId: issue,
     env: 'LOCAL',
     workspacePath,
-    projectRoot: join(workspacePath, '..', '..'),
+    projectRoot: deps.resolveProjectFromIssueSync(issue)?.projectPath,
   });
   const state = await deps.spawnRun(issue, 'work', {
     workspace: workspacePath,

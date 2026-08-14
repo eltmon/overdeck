@@ -19,6 +19,7 @@ function deps(sessions: string[] = []): EnsureSwarmForemanDeps {
       status: 'running',
       startedAt: '2026-08-13T00:00:00Z',
     })),
+    resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
   } as unknown as EnsureSwarmForemanDeps;
 }
 
