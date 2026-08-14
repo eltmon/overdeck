@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:27:30.451Z",
+  "updated": "2026-08-14T13:34:35.320Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "resolver-record-terminal": {
-        "writerId": "agent-pan-3727",
-        "agentId": "agent-pan-3727",
-        "pid": 1123740,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T13:27:30.451Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "clearRecordPipelineClosedOutSync/clearRecordPipelineClosedOut now delete record.pipeline.mergeStatus when it is 'merged', alongside clearing closedOut/closedOutAt and stamping reopenedAt. Added tests to record-update.test.ts (sync + async doors) and reopen.test.ts (end-to-end via reopenWorkspaceState). Typecheck and tests green.",
         "releasedAt": "2026-08-14T13:27:04.708Z"
+      },
+      {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 1123740,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:27:30.451Z",
+        "itemId": "resolver-record-terminal",
+        "outcome": "completed",
+        "reason": "Added readRecordTerminal option + defaultReadRecordTerminal to resolver.ts: checks record.pipeline.closedOut/mergeStatus before any tracker isClosed() call, so a tracker blip can't resurrect a record-terminal issue. classifyOne short-circuits issueClosed=true and skips trips read when terminal. Added 8 tests to resolver.test.ts: 3 dispatch-level (record-terminal suppresses rows/skips isClosed, survives tracker blip, non-terminal falls back) + 5 predicate-level (closedOut, merged+no-reopen, merged+reopened NOT terminal, no-evidence NOT terminal, unresolvable issue). Typecheck and tests green.",
+        "releasedAt": "2026-08-14T13:34:35.319Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "reopen-clears-record-merge": {
         "reason": "clearRecordPipelineClosedOutSync/clearRecordPipelineClosedOut now delete record.pipeline.mergeStatus when it is 'merged', alongside clearing closedOut/closedOutAt and stamping reopenedAt. Added tests to record-update.test.ts (sync + async doors) and reopen.test.ts (end-to-end via reopenWorkspaceState). Typecheck and tests green.",
         "updatedAt": "2026-08-14T13:27:04.708Z"
+      },
+      "resolver-record-terminal": {
+        "reason": "Added readRecordTerminal option + defaultReadRecordTerminal to resolver.ts: checks record.pipeline.closedOut/mergeStatus before any tracker isClosed() call, so a tracker blip can't resurrect a record-terminal issue. classifyOne short-circuits issueClosed=true and skips trips read when terminal. Added 8 tests to resolver.test.ts: 3 dispatch-level (record-terminal suppresses rows/skips isClosed, survives tracker blip, non-terminal falls back) + 5 predicate-level (closedOut, merged+no-reopen, merged+reopened NOT terminal, no-evidence NOT terminal, unresolvable issue). Typecheck and tests green.",
+        "updatedAt": "2026-08-14T13:34:35.319Z"
       }
     }
   },
@@ -160,6 +167,10 @@
     "reopen-clears-record-merge": "completed",
     "reopen-clears-record-merge.ac1": "completed",
     "reopen-clears-record-merge.ac2": "completed",
-    "resolver-record-terminal": "running"
+    "resolver-record-terminal": "completed",
+    "resolver-record-terminal.ac1": "completed",
+    "resolver-record-terminal.ac2": "completed",
+    "resolver-record-terminal.ac3": "completed",
+    "resolver-record-terminal.ac4": "completed"
   }
 }
