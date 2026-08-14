@@ -85,6 +85,47 @@ export function readSwarmInterventions(
   return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.interventions ?? {};
 }
 
+export function readSwarmCompletionObservation(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+): NonNullable<PanIssueSwarmRecord['completionObservations']>[string] | undefined {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
+    ?.swarm?.completionObservations?.[progressKey];
+}
+
+export async function writeSwarmCompletionObservation(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+  observation: NonNullable<PanIssueSwarmRecord['completionObservations']>[string],
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      completionObservations: {
+        ...(record.swarm?.completionObservations ?? {}),
+        [progressKey]: observation,
+      },
+    },
+  }));
+}
+
+export async function clearSwarmCompletionObservationRecord(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
+    const existing = record.swarm?.completionObservations;
+    if (!existing?.[progressKey]) return record;
+    const completionObservations = { ...existing };
+    delete completionObservations[progressKey];
+    return { ...record, swarm: { ...(record.swarm ?? {}), completionObservations } };
+  });
+}
+
 export async function writeSwarmIntervention(
   workspacePath: string,
   issueId: string,

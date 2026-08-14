@@ -63,7 +63,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
-import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { clearSwarmCompletionObservationRecord, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmCompletionObservation, readSwarmHold, writeSwarmCompletionObservation, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
@@ -112,6 +112,7 @@ export interface CoordinateSwarmSlotsDeps {
   getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
   isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
   sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
+  readCompletionObservation?: typeof readSwarmCompletionObservation; writeCompletionObservation?: typeof writeSwarmCompletionObservation; clearCompletionObservation?: typeof clearSwarmCompletionObservationRecord;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
     issue: { issueId: string; featureWorkspace: string },
@@ -414,6 +415,7 @@ export async function classifyInFlightSlots(
       | 'getSlotBranchAheadCount'
       | 'isSlotWorktreeClean'
       | 'sendCompletionNudge'
+      | 'readCompletionObservation' | 'writeCompletionObservation' | 'clearCompletionObservation'
       | 'readSlotCompletion'
       | 'clearSlotCompletion'
     >> = defaultDeps,
@@ -482,7 +484,9 @@ export async function classifyInFlightSlots(
         || previous.outputDigest !== outputDigest
       ) {
         slotProgressObservations.set(progressKey, { commitTime, outputDigest, lastProgressAt: now });
-        clearSwarmCompletionObservation(progressKey);
+        if (options.workspacePath && options.issueId) {
+          await clearSwarmCompletionObservation(options.workspacePath, options.issueId, progressKey, deps);
+        }
         classified.push({ ...slot, lifecycle: 'running' });
         continue;
       }

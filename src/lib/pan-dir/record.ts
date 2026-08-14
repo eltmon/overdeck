@@ -121,6 +121,8 @@ export interface PanIssueSwarmRecord {
   hold?: { reason: string; setBy: string; at: string };
   /** Recovery attempts keyed by slot index, then stable failure class. */
   interventions?: Record<string, Record<string, number>>;
+  /** Completion-inference samples keyed by the slot progress identity. */
+  completionObservations?: Record<string, { signature: string; nudged: boolean; consecutiveDoneCount: number }>;
   /**
    * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
    * keyed by `String(slotIndex)`. `writeSwarmFailedMergeBlock` folds this into
