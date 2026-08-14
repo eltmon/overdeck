@@ -58,8 +58,6 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/command-palette-sorting.ts",
-      "src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts",
-      "src/dashboard/frontend/src/lib/wsTransport.ts",
       "src/dashboard/server/routes/__tests__/palette.test.ts",
       "src/dashboard/server/routes/palette.ts"
     ],
@@ -72,15 +70,13 @@
       "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
       "src/dashboard/frontend/src/components/CommandPalette.tsx",
       "src/dashboard/frontend/src/components/command-palette-sorting.ts",
-      "src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts",
-      "src/dashboard/frontend/src/lib/wsTransport.ts",
       "src/dashboard/server/routes/__tests__/palette.test.ts",
       "src/dashboard/server/routes/palette.ts"
     ],
-    "recordedAt": "2026-08-14T07:31:20.960Z"
+    "recordedAt": "2026-08-14T09:01:11.684Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T08:56:54.898Z",
+  "updated": "2026-08-14T09:01:11.685Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
