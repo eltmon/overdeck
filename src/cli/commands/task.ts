@@ -101,5 +101,8 @@ export function registerTaskCommands(program: Command): void {
   mutation(task.command('done <issue> <item>'), 'done');
   mutation(task.command('block <issue> <item>'), 'block', true);
   mutation(task.command('unblock <issue> <item>'), 'unblock');
+  // PAN-3691: canonical recovery for a task falsely marked completed (e.g. a
+  // swarm slot that merged with no current-item changes). Resets to pending.
+  mutation(task.command('reopen <issue> <item>'), 'reopen', true);
   mutation(task.command('cancel <issue> <item>'), 'cancel', true);
 }

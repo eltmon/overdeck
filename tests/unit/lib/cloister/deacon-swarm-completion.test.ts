@@ -264,7 +264,7 @@ describe('deacon-swarm completion classification', () => {
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 
-  it('infers ready-to-merge on the second unchanged idle observation in auto mode', async () => {
+  it('keeps a live slot waiting for its durable completion signal in auto mode', async () => {
     const agentId = 'agent-pan-2203-slot-2';
     const fakeDeps = deps({
       sessions: [agentId],
@@ -300,8 +300,8 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'ready-to-merge',
-        signal: 'inferred',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: [],
       }),
     ]);

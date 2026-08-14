@@ -164,13 +164,17 @@ The coordinator clears the marker through the record door when the slot leaves f
 
 ### Inferred completion — `swarm.infer_completion`
 
-For a slot that has committed clean, branch-ahead work but written no marker — the agent exited without signaling, or the marker write raced — `classifyDoneWithoutSignal()` infers completion from git state: a branch-ahead count of at least 1 and a state-plane-clean worktree (see below). The default mode is `auto`:
+For a slot that has committed clean, branch-ahead work but written no marker — the agent exited without signaling, or the marker write raced — `classifyDoneWithoutSignal()` observes git state: a branch-ahead count of at least 1 and a state-plane-clean worktree (see below). For **live** agents, inference never completes the slot (PAN-3691: a clean/ahead branch alone proved too weak — a fresh polyrepo slot whose outer wrapper branch was ahead from setup commits was falsely classified ready-to-merge). The modes:
 
-- **`auto`** (default) — nudge the slot's agent once (`run pan done <issue>`), then after two consecutive stable observations (unchanged commit time, output digest, and ahead count) classify the slot `ready-to-merge` with signal `inferred`.
-- **`nudge`** — nudge once and never converge; the slot stays `awaiting-completion-signal` until an explicit `pan done` lands. Use this when an operator-visible signal is required.
+- **`auto`** (default) — nudge the slot's agent once (`run pan done <issue>`) per stable observation; the slot stays `awaiting-completion-signal` until its durable completion marker lands. Identical to `nudge` for live agents since PAN-3691.
+- **`nudge`** — same as `auto`.
 - **`off`** — no nudge and no inference; `classifyDoneWithoutSignal()` returns `null` and the slot is left to normal stall/failed classification.
 
-Set the mode in `~/.overdeck/cloister.toml` under `[swarm] infer_completion`, or override it per process with the `PAN_SWARM_INFER_COMPLETION=auto|nudge|off` environment variable. The previous default was `nudge`; it is now `auto`, so a slot that genuinely finished is not stuck awaiting a signal that never arrives.
+Durable slots (no live agent: missing agent row or vanished tmux session) may still be classified `ready-to-merge` from git state via `classifyDurableReadySlot()`, but the ahead count is polyrepo-aware: `defaultGetSlotBranchAheadCount()` sums `base..slot` commits across the item's real repo roots and never consults the polyrepo wrapper, so outer bookkeeping commits cannot satisfy a fresh item. `verifyAndMergeSlot()` applies the same gate at merge time — a slot branch with zero unmerged current-item commits in every repo (including a sequentially reused slot branch whose earlier item already merged) is refused and surfaced, never reported `merged`. For polyrepo slots the merge integrates each nested slot branch with unmerged work into its base feature checkout; the wrapper is never merged.
+
+Recovery: if a task was falsely marked completed, `pan task reopen <issue> <item> --reason <text>` resets it to `pending` with an audited reason (PAN-3691).
+
+Set the mode in `~/.overdeck/cloister.toml` under `[swarm] infer_completion`, or override it per process with the `PAN_SWARM_INFER_COMPLETION=auto|nudge|off` environment variable.
 
 ### State-plane-clean worktree
 

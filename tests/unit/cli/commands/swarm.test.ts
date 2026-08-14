@@ -737,6 +737,9 @@ describe('pan swarm reset (PAN-2214)', () => {
       listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
       removeAgent: vi.fn(async () => {}),
+      listSlotWorkspaceDirectories: vi.fn(() => []),
+      resolveSlotWorkspaceWorktrees: vi.fn(() => ({ isPolyrepo: false, nested: [] })),
+      removeDirectory: vi.fn(async () => undefined),
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
@@ -750,6 +753,9 @@ describe('pan swarm reset (PAN-2214)', () => {
           for (const [branch, count] of Object.entries(branches)) {
             if (command === `git rev-list --count HEAD..${JSON.stringify(branch)}`) return { stdout: `${count}\n` };
           }
+          return { stdout: '0\n' };
+        }
+        if (command.startsWith('git rev-list --count ')) {
           return { stdout: '0\n' };
         }
         if (command === 'git worktree list --porcelain') {
@@ -792,6 +798,30 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(pushIndex).toBeGreaterThanOrEqual(0);
     expect(removeIndex).toBeGreaterThan(pushIndex);
     expect(deleteIndex).toBeGreaterThan(pushIndex);
+  });
+
+  it('removes stale polyrepo slot directories and nested worktrees left by reset', async () => {
+    const deps = makeResetDeps();
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-4';
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [{
+        repoKey: 'api',
+        dir: `${slotWorkspace}/api`,
+        parentRepo: '/repo/api',
+        featureBranch: 'feature/pan-2203',
+      }],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-4/api"',
+      '/repo/api',
+    );
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
   });
 
   it('a push failure without --force aborts with the branch named and deletes nothing', async () => {
