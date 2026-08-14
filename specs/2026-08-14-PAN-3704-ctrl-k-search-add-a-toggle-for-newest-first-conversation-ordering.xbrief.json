@@ -1,0 +1,412 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T06:15:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3704: Ctrl-K search: add a toggle for newest-first conversation ordering",
+    "updated": "2026-08-14T06:20:43.916Z"
+  },
+  "plan": {
+    "id": "pan-3704",
+    "title": "Ctrl-K search: add a toggle for newest-first conversation ordering",
+    "status": "proposed",
+    "uid": "9edb5b4a-dc77-4110-a747-4c151eb35676",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-14T06:15:06Z",
+    "updated": "2026-08-14T06:20:43.916Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3704",
+        "label": "PAN-3704",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3703",
+        "label": "PAN-3703",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-palette",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "PAN-3703 makes Ctrl-K conversation results appear newest first. Once that lands the ordering is unconditional; operators who preferred relevance-ranked order have no way back. The newest-first ordering must become optional through a visible, persistent, accessible toggle inside the palette.",
+      "Proposal": "Implement the toggle entirely client-side in src/dashboard/frontend/src/components/CommandPalette.tsx. The server response already carries ts and rank per conversation hit, so no API change is needed. Add an overdeck.ui.* localStorage preference (default ON), carry ts onto PaletteAction as sortTs, add an exported newest-first comparator (ts desc, missing-ts last, rank-asc tiebreak), gate the Conversations group's within-group sort on the preference, and render a native <button aria-pressed> labeled 'Newest first' in the palette footer with scope-chip styling. If PAN-3703 lands first, gate its ordering behind this preference instead of adding a duplicate comparator; if it ordered server-side, still add the client comparator so OFF restores rank order without a refetch.",
+      "NonGoals": "- No server-side ordering change, new query parameter, or API-contract change.\n- No reordering of non-conversation groups, and no per-group toggles.\n- No cross-device or account sync of the preference (localStorage only).\n- No change to which conversations are searched or matched — display order only.\n- No grouping/dedup of multiple hits from one conversation.\n- Not a fix for PAN-3703 itself; this issue owns the toggle and shares the comparator contract."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Toggle defaults ON (newest-first, opt-out)",
+        "rationale": "PAN-3703 establishes newest-first as the requested behavior; the issue asks to make it optional, not to revert the default."
+      },
+      {
+        "summary": "Client-side comparator; server response untouched",
+        "rationale": "The client already receives ts and rank per hit; only a client-side design can restore rank order without a refetch or new query parameter."
+      },
+      {
+        "summary": "localStorage persistence under 'overdeck.ui.paletteConversationsNewestFirst'",
+        "rationale": "The established Command-Palette-adjacent settings pattern (Sidebar.tsx overdeck.ui.* keys, lazy useState + try/catch write-through); the issue explicitly asks for the established pattern."
+      },
+      {
+        "summary": "Footer <button aria-pressed> with scope-chip styling",
+        "rationale": "aria-pressed on a native button is the existing dashboard toggle idiom (PipelineView.tsx) and satisfies keyboard + screen-reader accessibility with no new component or color tokens."
+      },
+      {
+        "summary": "Plan is executable regardless of PAN-3703 landing order",
+        "rationale": "PAN-3703 is still in planning with no merged code; the PRD fully specifies the comparator and defines both coordination paths so the work agent never has to wait or guess."
+      }
+    ],
+    "items": [
+      {
+        "id": "pref-state-and-sortts",
+        "title": "Add newest-first preference state and carry ts onto PaletteAction",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T06:15:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only CommandPalette.tsx; later items build on it sequentially.",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx: (1) export the constant PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY = 'overdeck.ui.paletteConversationsNewestFirst' near EMPTY_SEARCH (line ~153); (2) inside CommandPalette add conversationsNewestFirst state with a lazy initializer reading localStorage (default ON: `!== 'false'`) and a toggleConversationsNewestFirst useCallback that flips it and persists with try/catch, following the Sidebar.tsx:292-307 pattern; (3) add `sortTs?: string | null` to the PaletteAction interface after `rank` (line ~65) and set `sortTs: hit.ts` in the conversation action built at lines ~779-806. Do not change any rendering yet — that is the wiring item. The PRD at .pan/drafts/PAN-3704.md (WI-1) has the exact code."
+        },
+        "items": [
+          {
+            "id": "pref-state-and-sortts.ac1",
+            "title": "CommandPalette.tsx contains an exported PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY constant with value 'overdeck.ui.paletteConversationsNewestFirst'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pref-state-and-sortts.ac2",
+            "title": "The preference state defaults to true when the localStorage key is absent, and persists 'false'/'true' through a try/catch write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pref-state-and-sortts.ac3",
+            "title": "PaletteAction contains an optional sortTs field and every conversation action stores its hit's ts in it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "newest-first-comparator",
+        "title": "Add exported compareConversationActionsNewestFirst comparator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T06:15:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Same file as pref-state-and-sortts but disjoint region; sequenced by the blocks edge.",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx add and export compareConversationActionsNewestFirst(a, b) next to the display helpers (after formatHitDate, ~line 203): valid timestamps sort newest first (bTs - aTs); a valid timestamp always sorts before a missing/invalid one; remaining ties (equal ts, or both missing) fall back to rank ascending. Export the PaletteAction interface if the comparator's exported signature needs it. Use the exact implementation in the PRD (.pan/drafts/PAN-3704.md, WI-2), including the doc comment referencing PAN-3704. Do not call the comparator from the render path yet."
+        },
+        "items": [
+          {
+            "id": "newest-first-comparator.ac1",
+            "title": "compareConversationActionsNewestFirst returns a negative number when a's ts is newer than b's ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "newest-first-comparator.ac2",
+            "title": "The comparator falls back to rank ascending when timestamps are equal or both missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "newest-first-comparator.ac3",
+            "title": "The comparator returns a positive number when a has a missing or unparseable sortTs and b has a valid sortTs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-toggle-and-sort",
+        "title": "Gate the Conversations sort on the preference and add the footer toggle button",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T06:15:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing CommandPalette tests pass unchanged"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Final wiring in the same file; sequenced after the two building-block items.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx: (1) change the within-group sort at lines ~970-972 so that when group === 'Conversations' and conversationsNewestFirst is true it uses compareConversationActionsNewestFirst, otherwise rank ascending — every other group keeps the rank sort in both modes; (2) add a native <button type=\"button\"> to the footer (lines ~1035-1048) after the key-hint spans: className ml-auto plus the scope-chip active/inactive class formula (lines ~937-941), label 'Newest first', aria-pressed={conversationsNewestFirst}, onClick={toggleConversationsNewestFirst}. Exact before/after snippets are in the PRD (.pan/drafts/PAN-3704.md, WI-3). The button must not close the palette and must not trigger a new search request; the already-loaded results re-sort immediately. If PAN-3703 has landed and changed this sort site, rebase and wrap its ordering behind the same preference instead of duplicating it."
+        },
+        "items": [
+          {
+            "id": "wire-toggle-and-sort.ac1",
+            "title": "The palette footer renders a keyboard-focusable button with accessible name 'Newest first' and aria-pressed reflecting the current preference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-toggle-and-sort.ac2",
+            "title": "When the preference is ON, the Conversations group renders hits newest-first; when OFF, it renders them in rank ascending order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-toggle-and-sort.ac3",
+            "title": "Clicking the button re-sorts the visible conversation results immediately, sends no new /api/palette/search request, and the palette still displays the current query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-toggle-and-sort.ac4",
+            "title": "Each non-conversation group (issues, actions, workspaces, memory) preserves its rank order in both toggle states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "toggle-tests",
+        "title": "Cover the toggle and both orderings in CommandPalette.test.tsx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T06:15:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "expected_outputs": [
+            "all tests in CommandPalette.test.tsx pass, including the six new PAN-3704 cases"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Test-only file, disjoint from implementation; sequenced after wiring so the behavior exists.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a describe('CommandPalette newest-first conversation toggle (PAN-3704)') block to src/dashboard/frontend/src/components/CommandPalette.test.tsx with the six tests enumerated in the PRD (.pan/drafts/PAN-3704.md, WI-4): default-ON newest-first rendering, toggle-off restoring rank order plus localStorage write, remount honoring a stored 'false', deterministic fallback (equal ts by rank, missing ts last), aria-pressed accessibility state, and non-conversation groups unaffected. Reuse the existing strictFetchMock setup and data-value row-selection helpers from the 'CommandPalette conversation results' describe (line ~141). Follow the repo fake-timers rule: the suite already uses vi.advanceTimersByTime; never add real setTimeout waits. Clear the PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY localStorage key in beforeEach so test order cannot leak state."
+        },
+        "items": [
+          {
+            "id": "toggle-tests.ac1",
+            "title": "A test with three conversation hits whose rank order differs from recency order renders them newest-first by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toggle-tests.ac2",
+            "title": "A test clicking the toggle shows rank order and records 'false' under the localStorage key; a remounted palette with that stored value renders rank order without any click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toggle-tests.ac3",
+            "title": "A test with equal timestamps shows rank-ascending fallback and a missing-timestamp hit rendered last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toggle-tests.ac4",
+            "title": "A test asserts the control exposes aria-pressed true by default and false after activation, and that issue/action row order survives both states unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-toggle-docs",
+        "title": "Document the Newest-first toggle in the palette docs and module header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T06:15:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DESKTOP-APP.md",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Newest first' docs/DESKTOP-APP.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new paragraph in the Cmd+K Command Palette section"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Docs-only; content fully specified in the PRD so it can run in parallel with implementation.",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Two small doc edits, exact content in the PRD (.pan/drafts/PAN-3704.md, WI-5): (1) in docs/DESKTOP-APP.md's 'Cmd+K Command Palette' section (line ~103) add a short paragraph stating that conversation results can be shown newest-first or in relevance rank order via the 'Newest first' toggle in the palette footer, that the default is on, and that the choice persists per browser; (2) in the module header comment of src/dashboard/frontend/src/components/CommandPalette.tsx (lines ~7-13) extend the 'Conversations' line to mention the newest-first toggle and the overdeck.ui.paletteConversationsNewestFirst localStorage key."
+        },
+        "items": [
+          {
+            "id": "palette-toggle-docs.ac1",
+            "title": "docs/DESKTOP-APP.md's Cmd+K Command Palette section contains the string 'Newest first' and records the default (on) and per-browser persistence scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-toggle-docs.ac2",
+            "title": "The CommandPalette.tsx module header shows the toggle on the Conversations line and names the overdeck.ui.paletteConversationsNewestFirst key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pref-state-and-sortts",
+        "to": "newest-first-comparator",
+        "type": "blocks"
+      },
+      {
+        "from": "newest-first-comparator",
+        "to": "wire-toggle-and-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "pref-state-and-sortts",
+        "to": "wire-toggle-and-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-toggle-and-sort",
+        "to": "toggle-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-toggle-and-sort",
+        "to": "palette-toggle-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-14-PAN-3704-ctrl-k-search-add-a-toggle-for-newest-first-conversation-ordering.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
