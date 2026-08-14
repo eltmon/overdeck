@@ -117,6 +117,10 @@ export interface PanIssueSwarmRecord {
     autoAdvance?: boolean;
   };
   finalizedAt?: string;
+  /** Dedicated swarm mutation hold. Generic Deacon holds remain in review status. */
+  hold?: { reason: string; setBy: string; at: string };
+  /** Recovery attempts keyed by slot index, then stable failure class. */
+  interventions?: Record<string, Record<string, number>>;
   /**
    * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
    * keyed by `String(slotIndex)`. `writeSwarmFailedMergeBlock` folds this into

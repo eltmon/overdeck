@@ -83,6 +83,9 @@ function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
       source: { mode: 'global', maxSlots: 'default', autoAdvance: 'default' },
     })),
     writeSwarmPolicyMode: vi.fn(async () => undefined),
+    readSwarmHold: vi.fn(() => undefined),
+    readSwarmInterventionCount: vi.fn(() => 0),
+    writeSwarmIntervention: vi.fn(async () => 1),
     console: {
       log: vi.fn(),
       error: vi.fn(),
@@ -392,22 +395,27 @@ describe('pan swarm command', () => {
 });
 
 describe('pan swarm freeze / resume (PAN-2214)', () => {
-  function makeHoldDeps(status: { deaconIgnored?: boolean } | null): SwarmHoldCommandDeps {
+  function makeHoldDeps(hold: { reason: string; setBy: string; at: string } | undefined): SwarmHoldCommandDeps {
     return {
-      getReviewStatusSync: vi.fn(() => status as ReturnType<SwarmHoldCommandDeps['getReviewStatusSync']>),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       console: { log: vi.fn(), error: vi.fn() },
     };
   }
 
   it('freeze persists deaconIgnored with the default reason and explains the hold', async () => {
-    const deps = makeHoldDeps(null);
+    const deps = makeHoldDeps(undefined);
 
     const result = await swarmFreezeCommand('pan-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm freeze via pan swarm freeze');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'swarm freeze via pan swarm freeze', setBy: 'pan swarm freeze', at: '2026-08-13T12:00:00.000Z',
+    });
     expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2203',
       kind: 'pause',
@@ -418,31 +426,33 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
   });
 
   it('freeze records a custom --reason', async () => {
-    const deps = makeHoldDeps(null);
+    const deps = makeHoldDeps(undefined);
 
     await swarmFreezeCommand('PAN-2203', { reason: 'investigating slot churn' }, deps);
 
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'investigating slot churn');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'investigating slot churn', setBy: 'pan swarm freeze', at: '2026-08-13T12:00:00.000Z',
+    });
   });
 
   it('freezing an already-frozen issue is an idempotent no-op with an already notice', async () => {
-    const deps = makeHoldDeps({ deaconIgnored: true });
+    const deps = makeHoldDeps({ reason: 'existing', setBy: 'test', at: 'now' });
 
     const result = await swarmFreezeCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.writeSwarmHold).not.toHaveBeenCalled();
     expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already frozen'));
   });
 
   it('resume clears deaconIgnored and points at the next patrol cycle', async () => {
-    const deps = makeHoldDeps({ deaconIgnored: true });
+    const deps = makeHoldDeps({ reason: 'existing', setBy: 'test', at: 'now' });
 
     const result = await swarmResumeCommand('pan-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', false);
+    expect(deps.clearSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
     expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2203',
       kind: 'unpause',
@@ -452,12 +462,12 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
   });
 
   it('resuming an unfrozen issue is an idempotent no-op with an already-resumed notice', async () => {
-    const deps = makeHoldDeps(null);
+    const deps = makeHoldDeps(undefined);
 
     const result = await swarmResumeCommand('PAN-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.clearSwarmHold).not.toHaveBeenCalled();
     expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already resumed'));
   });
@@ -465,14 +475,17 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
 
 describe('pan swarm stop (PAN-2214)', () => {
   function makeStopDeps(options: {
-    status?: { deaconIgnored?: boolean } | null;
+    hold?: { reason: string; setBy: string; at: string };
     sessionNames?: string[];
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
   } = {}): SwarmStopCommandDeps & { runGitCommand: ReturnType<typeof vi.fn> } {
     return {
-      getReviewStatusSync: vi.fn(() => (options.status ?? null) as ReturnType<SwarmStopCommandDeps['getReviewStatusSync']>),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => options.hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as ReturnType<SwarmStopCommandDeps['listSlotAgents']>),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       stopAgentSync: vi.fn(),
@@ -490,14 +503,16 @@ describe('pan swarm stop (PAN-2214)', () => {
     const result = await swarmStopCommand('pan-2203', { reason: 'runaway dispatch' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'runaway dispatch');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'runaway dispatch', setBy: 'pan swarm stop', at: '2026-08-13T12:00:00.000Z',
+    });
     const stopTargets = vi.mocked(deps.stopAgentSync).mock.calls.map(([agentId]) => agentId);
     expect(stopTargets).toEqual([
       'agent-pan-2203-slot-1',
       'agent-pan-2203-slot-2',
       'agent-pan-2203-slot-3',
     ]);
-    const holdOrder = vi.mocked(deps.setDeaconIgnored).mock.invocationCallOrder[0];
+    const holdOrder = vi.mocked(deps.writeSwarmHold).mock.invocationCallOrder[0];
     for (const stopOrder of vi.mocked(deps.stopAgentSync).mock.invocationCallOrder) {
       expect(holdOrder).toBeLessThan(stopOrder);
     }
@@ -511,7 +526,7 @@ describe('pan swarm stop (PAN-2214)', () => {
     const result = await swarmStopCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm stop via pan swarm stop');
+    expect(deps.writeSwarmHold).toHaveBeenCalled();
     expect(deps.stopAgentSync).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('nothing to stop'));
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
@@ -519,14 +534,14 @@ describe('pan swarm stop (PAN-2214)', () => {
 
   it('keeps an existing freeze in place instead of re-setting it', async () => {
     const deps = makeStopDeps({
-      status: { deaconIgnored: true },
+      hold: { reason: 'existing', setBy: 'test', at: 'now' },
       sessionNames: ['agent-pan-2203-slot-1'],
     });
 
     const result = await swarmStopCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.writeSwarmHold).not.toHaveBeenCalled();
     expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
   });
 
@@ -725,14 +740,17 @@ describe('pan swarm reset (PAN-2214)', () => {
     pushFailsFor?: string[];
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
     liveSessions?: string[];
-    status?: { deaconIgnored?: boolean } | null;
+    hold?: { reason: string; setBy: string; at: string };
   } = {}): SwarmResetCommandDeps & { gitCalls: string[] } {
     const gitCalls: string[] = [];
     const branches = options.slotBranches ?? {};
     const deps = {
-      getReviewStatusSync: vi.fn(() => (options.status ?? null) as never),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => options.hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as never),
       listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
@@ -895,8 +913,8 @@ describe('pan swarm reset (PAN-2214)', () => {
     const result = await swarmResetCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, expect.any(String));
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalledWith('PAN-2203', false);
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', expect.any(Object));
+    expect(deps.clearSwarmHold).not.toHaveBeenCalled();
     expect(loggedText(deps)).toContain('hold REMAINS SET');
     expect(loggedText(deps)).toContain('pan swarm resume PAN-2203');
   });

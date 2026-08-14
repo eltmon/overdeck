@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { getIssueWorkspacePath } from '../../lib/pan-dir/record.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
@@ -23,10 +24,17 @@ import {
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
-import { writeSwarmPolicyMode } from '../../lib/cloister/deacon-swarm-record.js';
+import {
+  clearSwarmHold,
+  readSwarmHold,
+  readSwarmInterventionCount,
+  writeSwarmHold,
+  writeSwarmIntervention,
+  writeSwarmPolicyMode,
+} from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
-import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
+import { getReviewStatusSync } from '../../lib/review-status.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
@@ -54,6 +62,9 @@ export interface SwarmCommandDeps {
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
   resolveSwarmPolicy: typeof resolveSwarmPolicy;
   writeSwarmPolicyMode: typeof writeSwarmPolicyMode;
+  readSwarmHold: typeof readSwarmHold;
+  readSwarmInterventionCount: typeof readSwarmInterventionCount;
+  writeSwarmIntervention: typeof writeSwarmIntervention;
   console: ConsoleLike;
 }
 
@@ -65,6 +76,7 @@ export interface SwarmCommandResult {
 
 export interface SwarmRecoverOptions {
   action?: SwarmRecoveryAction;
+  operator?: boolean;
 }
 
 export interface SwarmFreezeOptions {
@@ -72,16 +84,22 @@ export interface SwarmFreezeOptions {
 }
 
 export interface SwarmHoldCommandDeps {
-  getReviewStatusSync: typeof getReviewStatusSync;
-  setDeaconIgnored: typeof setDeaconIgnored;
+  getIssueWorkspacePath: typeof getIssueWorkspacePath;
+  readSwarmHold: typeof readSwarmHold;
+  writeSwarmHold: typeof writeSwarmHold;
+  clearSwarmHold: typeof clearSwarmHold;
   appendOperatorInterventionEvent: typeof appendOperatorInterventionEvent;
+  now: () => string;
   console: ConsoleLike;
 }
 
 const defaultHoldDeps: SwarmHoldCommandDeps = {
-  getReviewStatusSync,
-  setDeaconIgnored,
+  getIssueWorkspacePath,
+  readSwarmHold,
+  writeSwarmHold,
+  clearSwarmHold,
   appendOperatorInterventionEvent,
+  now: () => new Date().toISOString(),
   console,
 };
 
@@ -109,6 +127,9 @@ const defaultDeps: SwarmCommandDeps = {
   recoverFailedMergeSlot,
   resolveSwarmPolicy,
   writeSwarmPolicyMode,
+  readSwarmHold,
+  readSwarmInterventionCount,
+  writeSwarmIntervention,
   console,
 };
 
@@ -132,6 +153,11 @@ export async function swarmCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
+  const hold = deps.readSwarmHold(workspacePath, issue);
+  if (hold) {
+    deps.console.error(chalk.red(swarmHoldMessage(issue, hold.reason)));
+    return { ok: false, actions: [], workspacePath };
+  }
   // PAN-3459: an explicit start is the issue-level opt-in. Deacon patrols
   // re-resolve the swarm policy with manual=false, so under the default
   // global `swarm.mode: off` they would skip this issue after wave 1 —
@@ -200,7 +226,35 @@ export async function swarmRecoverCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
+  const hold = deps.readSwarmHold(workspacePath, issue);
+  if (hold) {
+    deps.console.error(chalk.red(swarmHoldMessage(issue, hold.reason)));
+    return { ok: false, actions: [], workspacePath };
+  }
   const block = deps.getFailedMergeBlock(issue, slotIndex, workspacePath);
+  const failureClass = block ? 'failed-merge' : 'slot-failure';
+  const interventionCount = deps.readSwarmInterventionCount(workspacePath, issue, slotIndex, failureClass);
+  if (interventionCount >= 3 && !options.operator) {
+    deps.console.error(chalk.red(
+      `Refusing intervention ${interventionCount + 1} for ${issue} slot ${slotIndex} (${failureClass}). `
+      + 'The automatic limit is 3 per slot and failure class; pass --operator to override it.',
+    ));
+    return { ok: false, actions: [], workspacePath };
+  }
+  const recordedIntervention = await deps.writeSwarmIntervention(
+    workspacePath,
+    issue,
+    slotIndex,
+    failureClass,
+    { operator: options.operator },
+  );
+  if (recordedIntervention === null) {
+    deps.console.error(chalk.red(
+      `Refusing intervention 4 for ${issue} slot ${slotIndex} (${failureClass}). `
+      + 'The automatic limit is 3 per slot and failure class; pass --operator to override it.',
+    ));
+    return { ok: false, actions: [], workspacePath };
+  }
   if (!block) {
     if (action === 'retry') {
       const actions = await deps.coordinateSwarmSlots({ issueId: issue });
@@ -238,8 +292,10 @@ export async function swarmFreezeCommand(
   deps: SwarmHoldCommandDeps = defaultHoldDeps,
 ): Promise<{ ok: boolean }> {
   const issue = issueId.toUpperCase();
-  const status = safeGetReviewStatus(issue, deps);
-  if (status?.deaconIgnored) {
+  const workspacePath = requireSwarmWorkspace(issue, deps);
+  if (!workspacePath) return { ok: false };
+  const hold = deps.readSwarmHold(workspacePath, issue);
+  if (hold) {
     deps.console.log(chalk.yellow(
       `${issue} is already frozen — the Deacon is already skipping all swarm coordination for it. `
       + `Run \`pan swarm resume ${issue}\` to lift the hold.`,
@@ -247,7 +303,11 @@ export async function swarmFreezeCommand(
     return { ok: true };
   }
 
-  deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm freeze via pan swarm freeze');
+  await deps.writeSwarmHold(workspacePath, issue, {
+    reason: options.reason ?? 'swarm freeze via pan swarm freeze',
+    setBy: 'pan swarm freeze',
+    at: deps.now(),
+  });
   await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm freeze' });
   deps.console.log(chalk.green(`Froze swarm coordination for ${issue}.`));
   deps.console.log(
@@ -264,15 +324,17 @@ export async function swarmResumeCommand(
   deps: SwarmHoldCommandDeps = defaultHoldDeps,
 ): Promise<{ ok: boolean }> {
   const issue = issueId.toUpperCase();
-  const status = safeGetReviewStatus(issue, deps);
-  if (!status?.deaconIgnored) {
+  const workspacePath = requireSwarmWorkspace(issue, deps);
+  if (!workspacePath) return { ok: false };
+  const hold = deps.readSwarmHold(workspacePath, issue);
+  if (!hold) {
     deps.console.log(chalk.yellow(
       `${issue} is already resumed — no swarm freeze is set, so the Deacon is coordinating it normally.`,
     ));
     return { ok: true };
   }
 
-  deps.setDeaconIgnored(issue, false);
+  await deps.clearSwarmHold(workspacePath, issue);
   await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'unpause', source: 'pan swarm resume' });
   deps.console.log(chalk.green(`Resumed swarm coordination for ${issue}.`));
   deps.console.log(
@@ -292,11 +354,17 @@ export async function swarmStopCommand(
 
   // Hold FIRST so the Deacon cannot re-spawn slots while they are being stopped
   // (the PAN-1791 incident race: operator removes slots, Deacon re-dispatches them).
-  const status = safeGetReviewStatus(issue, deps);
-  if (status?.deaconIgnored) {
+  const workspacePath = requireSwarmWorkspace(issue, deps);
+  if (!workspacePath) return { ok: false };
+  const hold = deps.readSwarmHold(workspacePath, issue);
+  if (hold) {
     deps.console.log(chalk.yellow(`${issue} is already frozen — keeping the existing hold in place.`));
   } else {
-    deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm stop via pan swarm stop');
+    await deps.writeSwarmHold(workspacePath, issue, {
+      reason: options.reason ?? 'swarm stop via pan swarm stop',
+      setBy: 'pan swarm stop',
+      at: deps.now(),
+    });
   }
   await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm stop' });
 
@@ -342,6 +410,19 @@ export async function swarmStopCommand(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function requireSwarmWorkspace(
+  issueId: string,
+  deps: Pick<SwarmHoldCommandDeps, 'getIssueWorkspacePath' | 'console'>,
+): string | null {
+  const workspacePath = deps.getIssueWorkspacePath(issueId);
+  if (!workspacePath) deps.console.error(chalk.red(`Could not resolve workspace for ${issueId}.`));
+  return workspacePath;
+}
+
+export function swarmHoldMessage(issueId: string, reason: string): string {
+  return `${issueId} is under a swarm hold (${reason}); run \`pan swarm resume ${issueId}\` before mutating it.`;
 }
 
 export interface SwarmResetOptions {
@@ -542,17 +623,6 @@ async function listSlotWorktreePaths(
   }
 }
 
-function safeGetReviewStatus(
-  issueId: string,
-  deps: Pick<SwarmHoldCommandDeps, 'getReviewStatusSync'>,
-): ReturnType<typeof getReviewStatusSync> {
-  try {
-    return deps.getReviewStatusSync(issueId);
-  } catch {
-    return null;
-  }
-}
-
 export interface SwarmStatusCommandDeps {
   resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
   findSpecByIssue: typeof findSpecByIssue;
@@ -581,6 +651,17 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   countRunningSwarmSlotsForIssue,
   console,
 };
+
+function safeGetReviewStatus(
+  issueId: string,
+  deps: Pick<SwarmStatusCommandDeps, 'getReviewStatusSync'>,
+): ReturnType<typeof getReviewStatusSync> {
+  try {
+    return deps.getReviewStatusSync(issueId);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Read-only reconciled view of an issue's swarm: per-slot rows, the operator
@@ -714,6 +795,7 @@ export function registerSwarmCommands(program: Command): void {
     .command('recover <id> <slotIndex>')
     .description('Recover a failed swarm slot')
     .option('--action <action>', 'Recovery action: retry, drop, or handoff', 'retry')
+    .option('--operator', 'Override the three-intervention limit for this failure class')
     .action(async (id: string, slotIndex: string, options: SwarmRecoverOptions) => {
       const result = await swarmRecoverCommand(id, slotIndex, options);
       if (!result.ok) process.exitCode = 1;

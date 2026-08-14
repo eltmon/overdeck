@@ -1,6 +1,7 @@
 import {
   readIssueRecordForWorkspaceSync,
   type PanIssueRecord,
+  type PanIssueSwarmRecord,
   type PanIssueSwarmSlotCompletion,
 } from '../pan-dir/record.js';
 import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
@@ -41,6 +42,69 @@ export async function writeSwarmFinalizedAt(workspacePath: string, issueId: stri
       finalizedAt,
     },
   }));
+}
+
+export function readSwarmHold(workspacePath: string, issueId: string): PanIssueSwarmRecord['hold'] {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.hold;
+}
+
+export async function writeSwarmHold(
+  workspacePath: string,
+  issueId: string,
+  hold: NonNullable<PanIssueSwarmRecord['hold']>,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => ({
+    ...record,
+    swarm: { ...(record.swarm ?? {}), hold },
+  }));
+}
+
+export async function clearSwarmHold(workspacePath: string, issueId: string): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
+    if (!record.swarm?.hold) return record;
+    const swarm = { ...record.swarm };
+    delete swarm.hold;
+    return { ...record, swarm };
+  });
+}
+
+export function readSwarmInterventionCount(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  failureClass: string,
+): number {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
+    ?.swarm?.interventions?.[String(slotIndex)]?.[failureClass] ?? 0;
+}
+
+export async function writeSwarmIntervention(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  failureClass: string,
+  options: { operator?: boolean } = {},
+): Promise<number | null> {
+  let count: number | null = null;
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
+    const slotKey = String(slotIndex);
+    const interventions = record.swarm?.interventions ?? {};
+    const slotInterventions = interventions[slotKey] ?? {};
+    const current = slotInterventions[failureClass] ?? 0;
+    if (current >= 3 && !options.operator) return record;
+    count = current + 1;
+    return {
+      ...record,
+      swarm: {
+        ...(record.swarm ?? {}),
+        interventions: {
+          ...interventions,
+          [slotKey]: { ...slotInterventions, [failureClass]: count as number },
+        },
+      },
+    };
+  });
+  return count;
 }
 
 /**
