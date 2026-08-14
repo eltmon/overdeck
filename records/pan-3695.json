@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T05:37:46.852Z",
+  "updated": "2026-08-14T05:50:57.609Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -28,7 +28,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T05:37:46.833Z",
+    "updatedAt": "2026-08-14T05:50:57.587Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3695 after its harness exited before push.",
     "strikeReadyHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
     "strikeReadyAt": "2026-08-14T05:05:29.152Z",
@@ -92,7 +92,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.0659170000000002,
-        "pricingAsOf": "2026-08-14T05:37:46.836Z"
+        "pricingAsOf": "2026-08-14T05:50:57.592Z"
       }
     },
     "merges": [],
