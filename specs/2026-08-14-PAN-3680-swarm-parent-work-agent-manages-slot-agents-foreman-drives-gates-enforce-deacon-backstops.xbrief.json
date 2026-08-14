@@ -1,0 +1,1098 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T01:49:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3680: Swarm: parent Work agent manages slot agents (foreman drives, gates enforce, Deacon backstops)",
+    "updated": "2026-08-14T01:58:00.473Z"
+  },
+  "plan": {
+    "id": "pan-3680",
+    "title": "Swarm: parent Work agent manages slot agents (foreman drives, gates enforce, Deacon backstops)",
+    "status": "proposed",
+    "uid": "143209fd-cc12-416e-9ac5-3352913ec6e1",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-14T01:49:52Z",
+    "updated": "2026-08-14T01:58:00.473Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3680",
+        "label": "PAN-3680",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3680.md",
+        "label": "Canonical PRD drafts/pan-3680.md",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3679",
+        "label": "PAN-3679 polyrepo reconciliation companion fix",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "cloister",
+      "deacon",
+      "foreman",
+      "orchestration"
+    ],
+    "metadata": {
+      "sizeJustification": "This is a single coordinated ownership inversion (PRD section 10): gated commands and foreman spawn land while the patrol still runs, then the Deacon reduction removes the old loop, then docs catch up. The steps are only safe as one reviewed arc — splitting into sibling issues would leave two live coordinators racing mid-migration (exactly the MIN-888 failure mode). Most items serialize on src/cli/commands/swarm.ts and src/lib/cloister/deacon-swarm.ts; the docs sweep is one audit-gated item naming 14 exact files per the section 11 no-loss audit.",
+      "canonicalFilename": "2026-08-14-PAN-3680-swarm-parent-work-agent-manages-slot-agents-foreman-drives-gates-enforce-deacon-backstops.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Swarm coordination is owned entirely by the Deacon's deterministic coordinateSwarmSlots() loop with no agent-level cognition: the parent Work agent never exists once slots dispatch, so nothing with issue-level context catches semantic dependency drift, workspace escapes, plan omissions, or globally-wrong local choices (MIN-888/MIN-889 evidence, 2026-08-13: a dependent slot dispatched against a schema that did not exist, and a slot edited the shared primary checkout unnoticed).",
+      "Proposal": "Reinstate the parent Work agent (foreman, agent-<issue>) as the owner of swarm orchestration. The PAN-2203 deterministic machinery survives as the internals of hard-gated `pan swarm` commands the foreman drives (dispatch, merge, status, wait, recover); the Deacon is reduced to watchdog (foreman liveness respawn, stall events to the foreman) and janitor (merged/orphan slot GC). The foreman finalizes via `pan done` and continues through review/test/merge/close-out. Full design: canonical PRD drafts/pan-3680.md on overdeck-state (decisions D-1 through D-15, requirements FR-1..FR-19, NFR-1..NFR-8).",
+      "NonGoals": "- Remote Fly slots (PAN-1773)\n- Difficulty-tier/model routing changes (PAN-1791 axis untouched)\n- Cross-issue concurrency manager (PAN-1666)\n- Mechanical delivery-door topology enforcement (nuclear-family messaging is role-prompt-enforced in v1; PRD D-14)\n- PAN-3679's own reconciliation fix (lands independently; FR-6/FR-7 duplicate its invariants as permanent gate contracts with tests either way)\n- Renaming src/lib/cloister/deacon-swarm.ts to swarm-gates.ts (deferred to keep the inversion diff reviewable)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopt the canonical PRD drafts/pan-3680.md verbatim as the planning basis",
+        "rationale": "The issue body names it as the PRD; it was verified against main on 2026-08-13 and its anchors re-verified in this session (call sites, guards, deletion targets all match); no contradiction with any authoritative input."
+      },
+      {
+        "summary": "Land as one issue with plan.metadata.sizeJustification instead of splitting into sibling issues",
+        "rationale": "The projected surface exceeds the finalize lint limits, but the PRD's migration sequence is one coordinated ownership inversion; intermediate states with two live coordinators are exactly the race this issue exists to kill."
+      },
+      {
+        "summary": "Keep the module name deacon-swarm.ts during this change",
+        "rationale": "The PRD marks the rename to swarm-gates.ts optional; renaming mid-refactor would make the functional inversion diff unreviewable. Recorded as a NonGoal."
+      },
+      {
+        "summary": "requiresInspection on exactly two items: swarm-hold-counters (deep) and foreman-spawn (fast)",
+        "rationale": "The hold/intervention record fields are a cross-cutting durable schema every gate encodes assumptions about; the spawn/attach contract is the architectural decision the liveness and policy items build on. All other items are mechanical extractions with named tests where a wrong diff surfaces immediately."
+      }
+    ],
+    "items": [
+      {
+        "id": "swarm-hold-counters",
+        "title": "Add durable swarm.hold and swarm.interventions record fields; rewire freeze/resume/stop/reset off deaconIgnored",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "dispatch-gate",
+            "merge-gate",
+            "status-json-wait",
+            "recover-reclaim",
+            "completion-observations"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm-record.ts",
+            "src/cli/commands/swarm.ts",
+            "tests/unit/cli/commands/swarm-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/swarm-hold.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/commands/swarm-hold.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-14",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `swarm.hold` ({reason, setBy, at}) and `swarm.interventions` (per-slot per-failure-class counters) to the per-issue record through the record door: writeSwarmHold/clearSwarmHold/writeSwarmIntervention beside writeSwarmFinalizedAt in src/lib/cloister/deacon-swarm-record.ts (anchor :35). Rewire `pan swarm freeze` (src/cli/commands/swarm.ts:235), `resume` (:262), `stop` (:285), `reset` (:379) off setDeaconIgnored (src/lib/review-status.ts:1058) onto the new field; deaconIgnored reverts to meaning only the generic operator hold. Add a shared hold-check helper every mutating swarm gate will call, and wire the intervention counter into the existing `pan swarm recover` handler (swarm.ts:177): the 4th intervention in one failure class refuses without --operator. New test tests/unit/cli/commands/swarm-hold.test.ts. This is the durable schema every later gate encodes assumptions about — see NFR-1's allowlist."
+        },
+        "items": [
+          {
+            "id": "swarm-hold-counters.ac1",
+            "title": "Given a swarm-active issue, when `pan swarm freeze <id>` runs, then it persists `swarm.hold` with reason/setBy/at in the per-issue record and leaves `deaconIgnored` untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-hold-counters.ac2",
+            "title": "Given `swarm.hold` set, when `pan swarm resume <id>` runs, then it clears `swarm.hold` from the record; stop and reset also write the hold before their other effects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-hold-counters.ac3",
+            "title": "Given a slot with 3 recorded interventions in one failure class, when `pan swarm recover` is invoked a 4th time for that class without `--operator`, then it exits non-zero and records no 4th intervention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-hold-counters.ac4",
+            "title": "tests/unit/cli/commands/swarm-hold.test.ts passes and `npm run typecheck` completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-gate",
+        "title": "Add gated `pan swarm dispatch` command with the blocker-done invariant inside the gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-dispatch-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-dispatch-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/cloister/deacon-swarm-dispatch-gate.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "New `pan swarm dispatch <id> [--json]` subcommand in src/cli/commands/swarm.ts performing exactly one dispatch pass: reconcile (src/lib/agents/slot-reconcile.ts:67) → classify → dispatchNextWave (src/lib/cloister/deacon-swarm.ts:863) extracted to be callable as a one-pass gate, keeping every existing guard (occupancy :889-906, duplicate-spawn slotIndexConflictReason :1041, overlap :915-919, capacity :921-924 + tryReserveSwarmSlot, claim-before-spawn :955, rollback :990-1000). NEW HARD INVARIANT (FR-6): an item whose blocks parents are not all done/merged is never claimable — enforced inside dispatchNextWave before claim, not by the caller. Refuses under swarm.hold; takes a coarse per-issue advisory file lock so an operator-invoked gate and a foreman-invoked gate cannot interleave (NFR-2). Structured output: dispatched / deferred-with-reason / blocked. Keep the per-spawn freeze re-check idiom (:966-979) pointed at swarm.hold."
+        },
+        "items": [
+          {
+            "id": "dispatch-gate.ac1",
+            "title": "Given an item whose `blocks` parent is not done/merged, when `pan swarm dispatch <id> --json` runs — even with the item explicitly requested — then the item is never claimed and the JSON output lists it as blocked with the parent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-gate.ac2",
+            "title": "Given a spawn throw mid-dispatch, when the gate exits, then the item claim and the capacity reservation are released and a re-run dispatches cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-gate.ac3",
+            "title": "Given two pending items with overlapping files_scope, when dispatch runs, then it defers the later item and reports the overlap reason in the structured output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-gate.ac4",
+            "title": "Given `swarm.hold` set, when dispatch runs, then it exits non-zero, spawns nothing, and mutates no record state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-gate",
+        "title": "Add gated `pan swarm merge <id> <slot>` command with the live-slot refusal invariant",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/agents/slot-reconcile.ts",
+            "tests/unit/lib/cloister/deacon-swarm-merge-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-merge-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/cloister/deacon-swarm-merge-gate.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "New `pan swarm merge <id> <slot> [--json]` subcommand: single-slot verify+merge extracted from mergeReadySlots (src/lib/cloister/deacon-swarm.ts:538), with marker precedence from classifyInFlightSlots (:428-438). Order: refuse a live-session slot with no completion signal (FR-7) → verifyAndMergeSlot (src/lib/agents/slot-merge.ts:36) → item done via the task door (applyTaskStatusChange, src/lib/pan-dir/task-door.ts:105) → clearSwarmSlotCompletion → reap agent (deacon-swarm-gc.ts:10) → fireTieredCommitHooks (swarm-tiered-hooks.ts:97). Polyrepo-aware merged derivation: merged status derives from the slot's concrete repo branches through the merge door, never root-branch ancestry of a sparse workspace; the awaitingMerge guard at slot-reconcile.ts:114-115 is the anchor — coordinate with PAN-3679's fix, but the invariant and its test live here regardless of landing order. Conflict → durable failedMergeBlock (deacon-swarm.ts:698), exit 1 with a recovery hint. Refuses under swarm.hold."
+        },
+        "items": [
+          {
+            "id": "merge-gate.ac1",
+            "title": "Given a slot with a live session and no completion marker, when `pan swarm merge <id> <slot>` runs, then it refuses and records no merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate.ac2",
+            "title": "Given a sparse-polyrepo fixture whose wrapper root branch is unchanged while a member repo holds live slot work, when reconciliation runs, then root-branch ancestry never classifies the slot as merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate.ac3",
+            "title": "Given a completed slot, when merge succeeds, then the item becomes done via the task door, the completion marker is cleared, the agent is reaped, and tiered commit hooks fire — in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate.ac4",
+            "title": "Given a merge conflict, when the gate runs, then it writes a durable failedMergeBlock, exits 1 with a recovery hint, and leaves the item claimed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-json-wait",
+        "title": "Extend `pan swarm status` with --json/foreman/hold/interventions; add blocking `pan swarm wait`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "tests/unit/cli/commands/swarm-wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/swarm-wait.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/commands/swarm-wait.test.ts passes all cases under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend `pan swarm status <id>` (src/cli/commands/swarm.ts:590) with --json and three additions: foreman identity/liveness, `swarm.hold`, and intervention counters. Add new `pan swarm wait <id> [--timeout <sec>]`: blocks until a slot lifecycle transition (completion marker write, session exit, stall event, failed-merge block) or timeout, then prints the status delta (--json). Implementation polls the derive surface at a coarse interval in-process — no daemon dependency; this is the foreman's token-cheap quiescent loop. Tests MUST use vi.useFakeTimers() + advanceTimersByTimeAsync; never real timers."
+        },
+        "items": [
+          {
+            "id": "status-json-wait.ac1",
+            "title": "`pan swarm status <id> --json` emits foreman identity/liveness, the `swarm.hold` value, and per-slot intervention counters alongside today's reconcile/classify data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-json-wait.ac2",
+            "title": "Given fake timers, when a completion marker is written mid-wait, then `pan swarm wait` returns and its delta names the completed slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-json-wait.ac3",
+            "title": "Given fake timers, when a slot session exits mid-wait, then wait returns with the exit in the delta; when nothing happens, wait returns at timeout with an empty delta and exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-spawn",
+        "title": "Spawn/attach the foreman from `pan swarm <id>`; `pan start` attaches on swarm-active issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deacon-reduction",
+            "foreman-liveness",
+            "policy-rebasing"
+          ],
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/cli/commands/start.ts",
+            "tests/unit/cli/commands/swarm-foreman-spawn.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/swarm-foreman-spawn.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/commands/swarm-foreman-spawn.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-16",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace `coordinateSwarmSlots({ issueId, manual: true })` in swarmCommand (src/cli/commands/swarm.ts:156) with `ensureSwarmForeman(issueId, workspacePath, { startedBy: 'cli:swarm' })`: eligibility gate (analyzeSwarmReadiness) → ensureFeatureWorkspace (swarm.ts:767) → persist issue-level mode as today (writeSwarmPolicyMode) → spawnRun(issueId, 'work', { workspace, foreman: true, startedBy }) producing the bare `agent-<issue>` id (runAgentId, spawn-prep.ts:673) with a foreman marker persisted in agent state for dashboard/liveness. Live-foreman idempotency: message the existing foreman instead of spawning (duplicate-agent doctrine). `pan start` (src/cli/commands/start.ts:1193) on a swarm-active issue attaches/respawns the foreman instead of refusing. No hardcoded model id anywhere in the path — Cloister routes (NFR-8); dispatch is the foreman's first act, not the CLI's side effect."
+        },
+        "items": [
+          {
+            "id": "foreman-spawn.ac1",
+            "title": "Given a swarm-eligible issue, when `pan swarm <id>` runs, then it spawns `agent-<issue>` (bare id, no slot suffix) as a registered work agent with the foreman marker, and dispatches no slots itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-spawn.ac2",
+            "title": "Given a live foreman, when `pan swarm <id>` runs again, then it sends the foreman a message and spawns no second agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-spawn.ac3",
+            "title": "Given a swarm-active issue, when `pan start <id>` runs, then it attaches to or respawns the foreman instead of refusing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-spawn.ac4",
+            "title": "The foreman spawn path contains no hardcoded model id and no --model flag unless the operator passed one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recover-reclaim",
+        "title": "Add `pan swarm recover --action reclaim` with durable intervention accounting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/swarm-failed-slot.ts",
+            "src/cli/commands/swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-reclaim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-reclaim.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/cloister/deacon-swarm-reclaim.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend recoverFailedMergeSlot (src/lib/cloister/deacon-swarm.ts:714) and the recover handler (src/cli/commands/swarm.ts:177) with `--action reclaim`: archive the slot attempt (archiveFailedSwarmSlot, src/lib/cloister/swarm-failed-slot.ts:47), unblock the item, and record the foreman take-over so the foreman can then implement serially (PRD D-6: never implement while the slot is live — reclaim closes the slot through the gate first). retry/drop/handoff keep current semantics through the gate. Every action increments the per-slot per-failure-class intervention counter from swarm-hold-counters; the 4th in one class refuses without --operator."
+        },
+        "items": [
+          {
+            "id": "recover-reclaim.ac1",
+            "title": "Given a failed slot, when `pan swarm recover <id> <slot> --action reclaim` runs, then it archives the slot attempt, unblocks the item, and records the foreman take-over in the per-issue record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-reclaim.ac2",
+            "title": "Given a reclaimed item, when the foreman next dispatches or implements serially, then no live slot exists for that item and the item is claimable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-reclaim.ac3",
+            "title": "Each recover action (retry, drop, handoff, reclaim) records an increment to the durable per-slot per-failure-class intervention counter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "completion-observations",
+        "title": "Move completion-inference observation state to the per-issue record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm-completion.ts",
+            "src/lib/cloister/deacon-swarm-record.ts",
+            "tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/cloister/deacon-swarm-completion.test.ts passes all cases under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move slotCompletionObservations (src/lib/cloister/deacon-swarm-completion.ts:10) from the process-local module map to the per-issue record as `swarm.completionObservations`, read/written through the record door, so classifyDoneWithoutSignal (:25) works identically from short-lived gate processes and the resident janitor. The slot pan-done marker write (persistAndVerifySwarmSlotCompletion) is unchanged; inference remains the fallback for a dead/degraded foreman (PRD D-11). Extend the existing completion tests: observations survive a simulated process restart; two stable observations converge in auto mode. Fake timers for all observation-window waits."
+        },
+        "items": [
+          {
+            "id": "completion-observations.ac1",
+            "title": "Given recorded observations, when the process restarts (fresh module state), then classifyDoneWithoutSignal resumes from the record with no observation loss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completion-observations.ac2",
+            "title": "Given two stable observations under fake timers, when inference runs in auto mode, then it classifies the slot done-without-signal exactly as the process-local version did",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completion-observations.ac3",
+            "title": "The classifier persists observation state only through the record door — no module-global observation map remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-reduction",
+        "title": "Remove Deacon autonomous swarm coordination; patrol calls swarmJanitorPass; slot events message the foreman",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-swarm-finalization.ts",
+            "src/lib/cloister/deacon-swarm-completion.ts",
+            "tests/unit/lib/cloister/deacon-swarm-janitor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-janitor.test.ts tests/unit/lib/cloister/in-flight-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-janitor.test.ts and in-flight-guard.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Swap the patrol call (src/lib/cloister/deacon.ts:3006) from coordinateSwarmSlots() to swarmJanitorPass() (enumeration + GC only in this item; liveness and stall events land in their own items). Replace the reactive slot agent.stopped fast path (src/lib/cloister/service-reactive.ts:463-467) and the slot-done fast path (deacon.ts:2190) with a `[swarm-event]` message to the foreman via messageAgent (src/lib/agents/messaging.ts:182). Remove the CLI pass-through coordination calls (src/cli/commands/swarm.ts:156 was replaced by foreman-spawn; :206 goes away). Delete deacon-swarm-finalization.ts (finalizeSwarmIssueIfComplete, :36) and its requestIssueReview dependency (deacon-swarm.ts:163); delete recordStalledSlotRecovery (:815) and defaultSendCompletionNudge (deacon-swarm-completion.ts:139) — nudging becomes a foreman duty. Keep exports the CLI gates still need. Server-reachable code stays async-only (NFR-3). This is a boot-path change: build, boot-test on a throwaway instance, restart with `pan restart --health-timeout 120000` (NFR-7)."
+        },
+        "items": [
+          {
+            "id": "deacon-reduction.ac1",
+            "title": "A patrol tick produces no swarm dispatch, merge, or recovery actions — only janitor enumeration and GC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-reduction.ac2",
+            "title": "Given a slot agent.stopped event, when the reactive fast path fires, then exactly one `[swarm-event]` message is delivered to `agent-<issue>` and zero coordination calls run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-reduction.ac3",
+            "title": "The change deletes finalizeSwarmIssueIfComplete, recordStalledSlotRecovery, and defaultSendCompletionNudge, and grep returns no remaining callers or imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-reduction.ac4",
+            "title": "tests/unit/lib/cloister/in-flight-guard.test.ts passes (post-merge lifecycle still runs at most once per merge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-liveness",
+        "title": "Janitor respawns a dead foreman on swarm-active un-held issues, with a 3-failure freeze",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "tests/unit/lib/cloister/deacon-swarm-foreman-liveness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-foreman-liveness.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-foreman-liveness.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add foreman liveness to swarmJanitorPass (PRD section 3.4 step 2): swarm-active issue (live slot sessions, unmerged slot branches, or slot assignments present — reuse listFeatureWorkspaces + reconcileSlotState) + no live `agent-<issue>` session + no `swarm.hold` → respawn the foreman via the foreman-spawn path with a resume prompt ('read .pan/continue.json, run `pan swarm status <id> --json`, reconcile, continue the wave loop'). Respect the resource governor and verify no interference with the generic reconcileAgentLiveness net (src/lib/cloister/deacon-auto-resume.ts:955, patrol call deacon.ts:2711). >=3 consecutive respawn failures → freeze the issue and emit an operator halt report — never a silent thrash loop. Never respawn while a live foreman session exists (duplicate-agent doctrine). Fake timers throughout."
+        },
+        "items": [
+          {
+            "id": "foreman-liveness.ac1",
+            "title": "Given a dead foreman with live slots and no hold, when the janitor pass runs, then it respawns exactly one foreman with the resume prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-liveness.ac2",
+            "title": "Given `swarm.hold` set or a live foreman session, when the janitor pass runs, then it spawns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-liveness.ac3",
+            "title": "Given 3 consecutive respawn failures, when the janitor pass runs again, then it freezes the issue, emits an operator halt report, and makes no further respawn attempts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stall-events",
+        "title": "Stall detection emits [swarm-event] messages to the foreman instead of writing recovery blocks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall-events.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-stall-events.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-stall-events.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire classifyInFlightSlots' progress fingerprinting (src/lib/cloister/deacon-swarm.ts:465-508; threshold swarmStallThresholdMs :531, default 30 min, PAN_SWARM_STALL_THRESHOLD_MS) into the janitor pass: on stall, emit `[swarm-event] slot N stalled (no progress Xm)` to the foreman via the message door. Classification is the Deacon's; the recovery decision is the foreman's — the janitor writes no recovery blocks (recordStalledSlotRecovery was deleted in deacon-reduction). Stall observations stay in the resident Deacon process (PRD D-15). Fake timers for all threshold advancement."
+        },
+        "items": [
+          {
+            "id": "stall-events.ac1",
+            "title": "Given a slot with no progress past the stall threshold, when the janitor pass runs, then the foreman receives one `[swarm-event]` stall message and no recovery block is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stall-events.ac2",
+            "title": "Given a progressing slot, when the janitor pass runs, then it sends no message and records no state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-rebasing",
+        "title": "Re-base swarm policy semantics on the foreman: auto spawns a foreman, never slots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/swarm-policy.ts",
+            "tests/unit/lib/swarm-policy-foreman.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/swarm-policy-foreman.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "swarm-policy-foreman.test.ts passes all cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-point resolveAutomaticSwarmPolicy (src/lib/swarm-policy.ts:36) so it gates foreman auto-spawn from the janitor, not patrol coordination. New semantics (PRD D-9): `off` = no foreman wave loop (serial work only); `auto` = the janitor may auto-spawn a foreman for a swarm-eligible issue, never slots; `always` = require swarm readiness rather than silently falling back. `autoAdvance` is redefined as foreman pacing: true = advance waves without per-wave operator confirmation; false = pause for operator ack between waves. writeSwarmPolicyMode persistence and settings surfaces are untouched; manual `pan swarm <id>` works regardless of mode."
+        },
+        "items": [
+          {
+            "id": "policy-rebasing.ac1",
+            "title": "Given swarm.mode `auto` and an eligible issue, when the janitor pass runs, then it auto-spawns a foreman and never spawns slots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-rebasing.ac2",
+            "title": "Given swarm.mode `off`, when the janitor pass runs, then no foreman is spawned; a manual `pan swarm <id>` still spawns the foreman",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-rebasing.ac3",
+            "title": "resolveAutomaticSwarmPolicy returns foreman-spawn decisions and exposes the redefined autoAdvance pacing semantics; no caller routes it to slot dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-role-protocol",
+        "title": "Rewrite the roles/work.md foreman section onto the gated commands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "lint-skills passes",
+            "the foreman section names every gate verb"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the prose 'Foreman wave-driver protocol' in roles/work.md:85-136 with the gated-command protocol (PRD section 3.5): start/restart → `pan swarm status <id> --json`; dispatch → `pan swarm dispatch <id> --json` and judge deferrals (semantic readiness beyond the DAG); wait → loop `pan swarm wait <id> --timeout 540`, spot-read slot transcripts on wake; per completed slot → `pan swarm merge <id> <slot>` then integration check before advancing (autoAdvance false additionally requires operator ack); corrections via `pan tell` with polyrepo isolation checks; failures → retry-once-with-feedback then `recover --action reclaim` and implement serially — never implement while the slot lives (D-6); dual-stop envelope of 3 corrective interventions per slot per failure class (D-7); convergence digest composed in-context (D-10); endgame → `pan done <issue>` and continue through review/test/merge/close-out; context discipline (offload heavy subtasks, pan handoff when degraded). Nuclear-family messaging: foreman talks to slots, slots never coordinate peer-to-peer (D-14). Keep the in-context dispatch tier (chooseDispatchTier) for cheap slices."
+        },
+        "items": [
+          {
+            "id": "foreman-role-protocol.ac1",
+            "title": "The rewritten foreman section contains every gate verb — dispatch, merge, status, wait, recover, freeze, resume — as commands the foreman runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-role-protocol.ac2",
+            "title": "The section blocks implementing an item in foreman context while its slot is live and routes serial take-over through `recover --action reclaim`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-role-protocol.ac3",
+            "title": "bash scripts/lint-skills.sh passes with the rewritten section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-integration-test",
+        "title": "MIN-888-shaped integration test: scripted foreman over a sparse polyrepo fixture",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/swarm-foreman-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/integration/swarm-foreman-polyrepo.test.ts"
+          ],
+          "expected_outputs": [
+            "the integration test passes end-to-end with a scripted foreman driving the gates"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "AC-END"
+          ]
+        },
+        "narrative": {
+          "Action": "New tests/integration/swarm-foreman-polyrepo.test.ts with a sparse polyrepo workspace fixture (two repos, one absent from a slot workspace) and a 3-item plan with a blocks chain (schema → entities). A scripted foreman (test harness driving the gates, not an LLM) proves: the gate refuses to dispatch the dependent while its blocker is unmerged; a live slot is never classified merged; a slot diff touching the shared primary checkout is detectable from the slot's diff paths; a stall event reaches the foreman; the reclaim path works end-to-end. Fake timers for all waits; keep maxForks at 4."
+        },
+        "items": [
+          {
+            "id": "polyrepo-integration-test.ac1",
+            "title": "The fixture dispatches the schema item first and the dispatch gate refuses the entities item while schema is unmerged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-integration-test.ac2",
+            "title": "The scripted foreman check fails the slot when its diff touches the shared primary checkout, detected from the slot's diff paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-integration-test.ac3",
+            "title": "The scripted foreman drives dispatch → wait → merge → reclaim end-to-end and the test exits green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-audit-sweep",
+        "title": "Documentation no-loss audit sweep (PRD section 11 gate)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T01:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SWARM.md",
+            "docs/SWARM-POLICY.md",
+            "sync-sources/skills/pan-swarm/SKILL.md",
+            "sync-sources/rules/work-agents-via-pan.md",
+            "sync-sources/skills/pan-start/SKILL.md",
+            "docs/INDEX.md",
+            "docs/QUICK-REFERENCE.md",
+            "docs/RECOVERY-NET.md",
+            "docs/RESOURCE-GOVERNOR.md",
+            "docs/SPAWN-GATING.md",
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/TIERED-EXECUTION.md",
+            "docs/swarm-diagrams/*",
+            "docs/prds/planned/PAN-970-swarm.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh",
+            "grep -rn 'coordinated by Deacon' docs/ sync-sources/ || true"
+          ],
+          "expected_outputs": [
+            "lint-skills passes",
+            "no doc still claims swarms are Deacon-coordinated or that nothing stays resident after dispatch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute the 50-claim documentation no-loss audit (PRD section 11, groups A-H): rewrite docs/SWARM.md for the foreman-drives model (gated commands, Deacon's reduced role; remove 'coordinated by Deacon' and 'does not stay resident'); update docs/SWARM-POLICY.md for the re-based mode/autoAdvance semantics; update sync-sources/skills/pan-swarm/SKILL.md (source of truth — top-level skills/ is a build target) for the new command surface and recovery flow; sync-sources/rules/work-agents-via-pan.md gains the in-context-tier carve-out and drops 'swarm-runtime entry'; sync-sources/skills/pan-start/SKILL.md:33,65-67 for the attach-instead-of-refuse inversion; docs/INDEX.md:50,180 keywords; docs/QUICK-REFERENCE.md:43-45 flags re-validated; docs/RECOVERY-NET.md:16,43-46 redispatch door → foreman; docs/RESOURCE-GOVERNOR.md:326 foreman respawn accounting (the foreman consumes a concurrency seat); docs/SPAWN-GATING.md:22-42 adds the new gates as spawn surfaces; docs/AGENT-STATE-PLANES.md:21-28 lists the new durable fields (swarm.hold, swarm.interventions, swarm.completionObservations) per the NFR-1 allowlist; docs/TIERED-EXECUTION.md:164 names the foreman as reroute owner; regenerate or delete all three docs/swarm-diagrams (PNGs already stale vs JSON); mark docs/prds/planned/PAN-970-swarm.md superseded. Every audit item is resolved or explicitly waived in the PR description — the audit is the gate, not memory."
+        },
+        "items": [
+          {
+            "id": "docs-audit-sweep.ac1",
+            "title": "docs/SWARM.md describes the foreman-drives model and contains no remaining claim that swarms are 'coordinated by Deacon' or that nothing stays resident after dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-audit-sweep.ac2",
+            "title": "The durable record-field allowlist in docs/AGENT-STATE-PLANES.md contains swarm.hold, swarm.interventions, and swarm.completionObservations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-audit-sweep.ac3",
+            "title": "sync-sources/skills/pan-swarm/SKILL.md covers the dispatch/merge/status/wait/recover gate surface and the foreman recovery flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-audit-sweep.ac4",
+            "title": "The change regenerates or deletes the docs/swarm-diagrams and marks docs/prds/planned/PAN-970-swarm.md superseded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-audit-sweep.ac5",
+            "title": "The PR description records every PRD section 11 audit item (groups A-H) as resolved or explicitly waived",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "swarm-hold-counters",
+        "to": "dispatch-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-hold-counters",
+        "to": "completion-observations",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-gate",
+        "to": "merge-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-gate",
+        "to": "status-json-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "status-json-wait",
+        "to": "foreman-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-spawn",
+        "to": "recover-reclaim",
+        "type": "blocks"
+      },
+      {
+        "from": "recover-reclaim",
+        "to": "deacon-reduction",
+        "type": "blocks"
+      },
+      {
+        "from": "completion-observations",
+        "to": "deacon-reduction",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-reduction",
+        "to": "foreman-liveness",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-liveness",
+        "to": "stall-events",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-liveness",
+        "to": "policy-rebasing",
+        "type": "blocks"
+      },
+      {
+        "from": "recover-reclaim",
+        "to": "foreman-role-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "stall-events",
+        "to": "polyrepo-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-role-protocol",
+        "to": "docs-audit-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-rebasing",
+        "to": "docs-audit-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-integration-test",
+        "to": "docs-audit-sweep",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
