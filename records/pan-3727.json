@@ -69,19 +69,19 @@
     "recordedAt": "2026-08-14T14:02:32.470Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:08:18.763Z",
+  "updated": "2026-08-14T14:09:36.255Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:08:14.985Z",
-    "updatedAt": "2026-08-14T14:08:15.511Z",
+    "updatedAt": "2026-08-14T14:09:36.144Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
-    "verificationNotes": "Verification FAILED at lint (94597ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
+    "verificationNotes": "Verification FAILED at lint (97505ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "reviewRequestedAt": "2026-08-14T14:08:14.985Z",
     "scopeDrift": {
@@ -146,10 +146,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 630,
-            "output": 126267,
-            "cacheRead": 94400684,
-            "cacheWrite": 836042
+            "input": 642,
+            "output": 128341,
+            "cacheRead": 97226068,
+            "cacheWrite": 839249
           }
         }
       },
@@ -161,15 +161,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 630,
-          "output": 126267,
-          "cacheRead": 94400684,
-          "cacheWrite": 836042
+          "input": 642,
+          "output": 128341,
+          "cacheRead": 97226068,
+          "cacheWrite": 839249
         }
       },
       "costAtCloseOut": {
-        "usd": 22.243726,
-        "pricingAsOf": "2026-08-14T14:08:18.755Z"
+        "usd": 22.837585,
+        "pricingAsOf": "2026-08-14T14:09:36.178Z"
       }
     },
     "merges": [
