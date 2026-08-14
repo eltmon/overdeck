@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
+import { messageAgent } from '../agents/messaging.js';
 import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { spawnRun } from '../agents/spawn.js';
 import type { SpawnRunOptions } from '../agents/spawn-prep.js';
@@ -164,6 +165,7 @@ export interface CoordinateSwarmSlotsDeps {
   workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
   writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
   emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
+  sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -218,6 +220,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   setFinalizedAt: recordSwarmFinalizedAt,
   recordForemanTakeover: writeSwarmForemanTakeover,
   ensureSwarmForeman,
+  sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -287,7 +290,7 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
-  signal?: 'inferred' | 'completion-nudge' | 'durable-completion';
+  signal?: 'inferred' | 'completion-nudge' | 'durable-completion' | 'stall-event';
   actions?: string[];
 }
 
@@ -295,6 +298,7 @@ interface SlotProgressObservation {
   commitTime: number | null;
   outputDigest: string;
   lastProgressAt: number;
+  stallNotified?: boolean;
 }
 
 interface SlotAssignment {
@@ -413,14 +417,12 @@ export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultD
     actions.push(`[swarm-janitor] enumerated ${issueId}`);
     actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
     actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
-    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, {
-      ...(deps.listSlotAssignments ? { listSlotAssignments: deps.listSlotAssignments } : {}),
-      ...(deps.readSwarmHold ? { readSwarmHold: deps.readSwarmHold } : {}),
-      ...(deps.workResumeSlotsAvailable ? { workResumeSlotsAvailable: deps.workResumeSlotsAvailable } : {}),
-      ...(deps.ensureSwarmForeman ? { ensureSwarmForeman: deps.ensureSwarmForeman } : {}),
-      ...(deps.writeSwarmHold ? { writeSwarmHold: deps.writeSwarmHold } : {}),
-      ...(deps.emitActivityEntry ? { emitActivityEntry: deps.emitActivityEntry } : {}),
-    }));
+    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps));
+    const classified = await classifyInFlightSlots(reconciled.inFlight, { ...deps, listSessionNames: async () => sessions }, { issueId, workspacePath: workspace.workspacePath });
+    for (const slot of classified.filter(candidate => candidate.signal === 'stall-event')) {
+      await deps.sendStallEvent?.(`agent-${issueId.toLowerCase()}`, `[swarm-event] slot ${slot.slotIndex} stalled (no progress ${Math.floor((slot.stalledForMs ?? 0) / 60_000)}m)`);
+      actions.push(`[swarm-janitor] notified ${issueId} foreman that slot ${slot.slotIndex} stalled`);
+    }
   }
   return actions;
 }
@@ -449,12 +451,8 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
-    // PAN-2372 WI-4 / FR-6: a durable completion marker (written by slot
-    // `pan done`) is the STRONGEST completion signal — it is the durable record
-    // that the slot finished, so it beats a vanished session, a missing agent,
-    // and the rebuildable runtime plane. Check it before everything else. The
-    // itemId guard (AC2) ignores a stale marker left for a slot now bound to a
-    // different item (e.g. after a re-plan rotated slot→item).
+    // A durable completion marker beats the rebuildable runtime plane. Ignore
+    // stale markers left for a slot that is now bound to a different item.
     if (options.workspacePath && options.issueId) {
       const completion = await (deps.readSlotCompletion ?? defaultReadSlotCompletion)(
         options.workspacePath,
@@ -530,7 +528,9 @@ export async function classifyInFlightSlots(
           lifecycle: 'stalled',
           reason: 'no-progress-timeout',
           stalledForMs,
+          ...(!previous.stallNotified ? { signal: 'stall-event' as const } : {}),
         });
+        previous.stallNotified = true;
         continue;
       }
       classified.push({ ...slot, lifecycle: 'running' });

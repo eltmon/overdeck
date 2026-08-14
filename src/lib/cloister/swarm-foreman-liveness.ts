@@ -31,7 +31,8 @@ export async function maintainSwarmForeman(
   sessions: readonly string[],
   overrides: Partial<SwarmForemanLivenessDeps> = {},
 ): Promise<string[]> {
-  const deps = { ...defaultDeps, ...overrides };
+  const definedOverrides = Object.fromEntries(Object.entries(overrides).filter(([, value]) => value !== undefined));
+  const deps = { ...defaultDeps, ...definedOverrides } as SwarmForemanLivenessDeps;
   const issueLower = issueId.toLowerCase();
   const mergedSlotIndexes = new Set(reconciled.merged.map(slot => slot.slotIndex));
   const active = sessions.some(name => name.startsWith(`agent-${issueLower}-slot-`))
