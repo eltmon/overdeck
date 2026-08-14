@@ -125,6 +125,24 @@ describe('drainMailOnce', () => {
   it('returns 0 when the mail dir does not exist', async () => {
     expect(await drainMailOnce('agent-without-mail', () => {})).toBe(0);
   });
+
+  it('still drains `.delivered.md` backups and still skips keyed pending mail (PAN-3738)', async () => {
+    // The `.delivered.md` suffix marks a post-delivery backup for a human
+    // reading mail/; these files were plain `<ts>.md` before, and the monitor
+    // drained them, so the monitor keeps draining them — the naming change is
+    // deliberately behavior-preserving here. `dedup-<hash>.pending.md` stays
+    // codex notify-hook territory, exactly like a timestamped pending file.
+    writeMail('2026-01-04T00-00-00-000Z.delivered.md', '# Message\n\nalready landed\n');
+    writeMail('dedup-abc123.pending.md', '# Message\n\nkeyed busy mail\n');
+
+    const blocks: string[] = [];
+    expect(await drainMailOnce(AGENT_ID, (b) => blocks.push(b))).toBe(1);
+    expect(blocks[0]).toContain('already landed');
+
+    expect(readdirSync(agentMailDir(AGENT_ID)).filter((name) => name !== 'read'))
+      .toEqual(['dedup-abc123.pending.md']);
+    expect(readdirSync(agentMailReadDir(AGENT_ID))).toEqual(['2026-01-04T00-00-00-000Z.delivered.md']);
+  });
 });
 
 describe('listInboxMessagesSync', () => {
