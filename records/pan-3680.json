@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T02:15:45.748Z",
+  "updated": "2026-08-14T02:22:55.055Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "dispatch-gate": {
-        "writerId": "agent-pan-3680",
-        "agentId": "agent-pan-3680",
-        "pid": 880350,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T02:15:45.748Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Added durable swarm.hold and per-slot failure-class intervention counters, rewired freeze/resume/stop/reset, enforced recover cap, and updated tests and CLI guidance.",
         "releasedAt": "2026-08-14T02:15:28.983Z"
+      },
+      {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 880350,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T02:15:45.748Z",
+        "itemId": "dispatch-gate",
+        "outcome": "completed",
+        "reason": "Added pan swarm dispatch as a one-pass gated command with durable hold refusal, blocker-done enforcement, overlap serialization, duplicate/capacity guards, and rollback coverage.",
+        "releasedAt": "2026-08-14T02:22:55.055Z"
       }
     ],
     "statusReasons": {
       "swarm-hold-counters": {
         "reason": "Added durable swarm.hold and per-slot failure-class intervention counters, rewired freeze/resume/stop/reset, enforced recover cap, and updated tests and CLI guidance.",
         "updatedAt": "2026-08-14T02:15:28.983Z"
+      },
+      "dispatch-gate": {
+        "reason": "Added pan swarm dispatch as a one-pass gated command with durable hold refusal, blocker-done enforcement, overlap serialization, duplicate/capacity guards, and rollback coverage.",
+        "updatedAt": "2026-08-14T02:22:55.055Z"
       }
     }
   },
@@ -105,6 +112,10 @@
     "swarm-hold-counters.ac2": "completed",
     "swarm-hold-counters.ac3": "completed",
     "swarm-hold-counters.ac4": "completed",
-    "dispatch-gate": "running"
+    "dispatch-gate": "completed",
+    "dispatch-gate.ac1": "completed",
+    "dispatch-gate.ac2": "completed",
+    "dispatch-gate.ac3": "completed",
+    "dispatch-gate.ac4": "completed"
   }
 }
