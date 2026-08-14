@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:30:14.231Z",
+  "updated": "2026-08-14T06:31:35.999Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "toggle-tests": {
-        "writerId": "agent-pan-3704",
-        "agentId": "agent-pan-3704",
-        "pid": 1385919,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T06:30:14.230Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3704",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Wired conversation-only newest-first sorting behind the persisted preference and added an accessible aria-pressed footer button; typecheck and 19 CommandPalette tests passed via the frontend Vitest config.",
         "releasedAt": "2026-08-14T06:29:54.658Z"
+      },
+      {
+        "writerId": "agent-pan-3704",
+        "agentId": "agent-pan-3704",
+        "pid": 1385919,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T06:30:14.230Z",
+        "itemId": "toggle-tests",
+        "outcome": "completed",
+        "reason": "Added six PAN-3704 cases covering default recency order, toggle persistence, stored false, deterministic fallback, aria-pressed state, and unaffected action ordering; all 25 CommandPalette tests pass.",
+        "releasedAt": "2026-08-14T06:31:35.999Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "wire-toggle-and-sort": {
         "reason": "Wired conversation-only newest-first sorting behind the persisted preference and added an accessible aria-pressed footer button; typecheck and 19 CommandPalette tests passed via the frontend Vitest config.",
         "updatedAt": "2026-08-14T06:29:54.658Z"
+      },
+      "toggle-tests": {
+        "reason": "Added six PAN-3704 cases covering default recency order, toggle persistence, stored false, deterministic fallback, aria-pressed state, and unaffected action ordering; all 25 CommandPalette tests pass.",
+        "updatedAt": "2026-08-14T06:31:35.999Z"
       }
     }
   },
@@ -143,6 +150,10 @@
     "wire-toggle-and-sort.ac2": "completed",
     "wire-toggle-and-sort.ac3": "completed",
     "wire-toggle-and-sort.ac4": "completed",
-    "toggle-tests": "running"
+    "toggle-tests": "completed",
+    "toggle-tests.ac1": "completed",
+    "toggle-tests.ac2": "completed",
+    "toggle-tests.ac3": "completed",
+    "toggle-tests.ac4": "completed"
   }
 }
