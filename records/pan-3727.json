@@ -130,17 +130,18 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T15:17:56.746Z",
+  "updated": "2026-08-14T15:18:00.514Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-14T15:17:54.533Z",
+    "updatedAt": "2026-08-14T15:17:58.001Z",
+    "testNotes": "Reconciled from green GitHub Actions CI on 351e3e91: Non-blocking flake lane (https://github.com/eltmon/overdeck/actions/runs/31812166491/job/94805153301)",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "reviewSpawnedAt": "2026-08-14T15:05:56.921Z",
@@ -257,7 +258,7 @@
       },
       "costAtCloseOut": {
         "usd": 54.093738,
-        "pricingAsOf": "2026-08-14T15:17:56.728Z"
+        "pricingAsOf": "2026-08-14T15:18:00.493Z"
       }
     },
     "merges": [
