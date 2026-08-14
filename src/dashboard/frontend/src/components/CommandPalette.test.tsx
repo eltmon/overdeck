@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../lib/store';
 import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import type { Agent, Issue } from '../types';
-import { CommandPalette } from './CommandPalette';
+import { CommandPalette, PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY } from './CommandPalette';
 
 function issue(overrides: Partial<Issue>): Issue {
   return {
@@ -67,6 +67,7 @@ function getOptionByValue(value: string): HTMLElement {
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 beforeEach(() => {
+  localStorage.removeItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY);
   fetchControl = installStrictFetchMock(({ method, url }) => {
     if (method === 'GET' && url === '/api/palette/commands') {
       return Response.json({ commands: [] });
@@ -253,6 +254,113 @@ describe('CommandPalette conversation results', () => {
       label: 'semantic transcript hit',
       sourceLabel: 'Claude session session-',
     });
+  });
+});
+
+describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
+  const conversation = (id: string, rank: number, ts: string | null) => ({
+    sessionId: id,
+    conversationId: id,
+    projectId: 'overdeck',
+    projectKey: 'overdeck',
+    role: 'assistant',
+    ts,
+    byteOffset: rank,
+    displayContent: id,
+    excerpt: id,
+    excerptSegments: [{ text: id, match: true }],
+    rank,
+  });
+
+  const installConversationResults = (conversations: ReturnType<typeof conversation>[]) => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations, memory: [], summaries: [] });
+      }
+      return undefined;
+    });
+  };
+
+  const search = async () => {
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'conversation' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+  };
+
+  const optionLabels = () => Array.from(document.querySelectorAll('[role="option"][data-value^="conv-"]'))
+    .map((option) => option.getAttribute('data-value'));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders conversation hits newest-first by default', async () => {
+    installConversationResults([
+      conversation('oldest', 1, '2026-01-01T00:00:00Z'),
+      conversation('newest', 3, '2026-03-01T00:00:00Z'),
+      conversation('middle', 2, '2026-02-01T00:00:00Z'),
+    ]);
+    renderCommandPalette();
+    await search();
+    expect(optionLabels()).toEqual(['conv-newest-3', 'conv-middle-2', 'conv-oldest-1']);
+  });
+
+  it('restores rank order and persists false when toggled off', async () => {
+    installConversationResults([
+      conversation('older', 1, '2026-01-01T00:00:00Z'),
+      conversation('newer', 2, '2026-02-01T00:00:00Z'),
+    ]);
+    renderCommandPalette();
+    await search();
+    fireEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    expect(optionLabels()).toEqual(['conv-older-1', 'conv-newer-2']);
+    expect(localStorage.getItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY)).toBe('false');
+  });
+
+  it('honors a stored false preference on mount', async () => {
+    localStorage.setItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY, 'false');
+    installConversationResults([
+      conversation('older', 1, '2026-01-01T00:00:00Z'),
+      conversation('newer', 2, '2026-02-01T00:00:00Z'),
+    ]);
+    renderCommandPalette();
+    await search();
+    expect(optionLabels()).toEqual(['conv-older-1', 'conv-newer-2']);
+  });
+
+  it('uses rank for equal timestamps and places missing timestamps last', async () => {
+    installConversationResults([
+      conversation('equal-high-rank', 3, '2026-02-01T00:00:00Z'),
+      conversation('missing', 1, null),
+      conversation('equal-low-rank', 2, '2026-02-01T00:00:00Z'),
+    ]);
+    renderCommandPalette();
+    await search();
+    expect(optionLabels()).toEqual(['conv-equal-low-rank-2', 'conv-equal-high-rank-3', 'conv-missing-1']);
+  });
+
+  it('exposes and updates its pressed state accessibly', () => {
+    renderCommandPalette();
+    const toggle = screen.getByRole('button', { name: 'Newest first' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('preserves non-conversation action ordering in both states', () => {
+    renderCommandPalette();
+    const actionValues = () => Array.from(document.querySelectorAll('[role="option"]'))
+      .map((option) => option.getAttribute('data-value'))
+      .filter((value) => value === 'pan-flywheel' || value === 'start-cloister');
+    expect(actionValues()).toEqual(['pan-flywheel', 'start-cloister']);
+    fireEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    expect(actionValues()).toEqual(['pan-flywheel', 'start-cloister']);
   });
 });
 
