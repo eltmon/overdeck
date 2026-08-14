@@ -69,16 +69,17 @@
     "recordedAt": "2026-08-14T14:02:32.470Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:02:52.103Z",
+  "updated": "2026-08-14T14:06:05.549Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T14:02:48.150Z",
+    "updatedAt": "2026-08-14T14:06:05.451Z",
+    "verificationNotes": "Verification FAILED at lint (94597ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "reviewRequestedAt": "2026-08-14T14:02:36.372Z",
     "scopeDrift": {
@@ -166,7 +167,7 @@
       },
       "costAtCloseOut": {
         "usd": 20.653977,
-        "pricingAsOf": "2026-08-14T14:02:52.093Z"
+        "pricingAsOf": "2026-08-14T14:06:05.483Z"
       }
     },
     "merges": [
