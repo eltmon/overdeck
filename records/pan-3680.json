@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T03:35:52.166Z",
+  "updated": "2026-08-14T03:41:39.935Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "policy-rebasing": {
-        "writerId": "agent-pan-3680",
-        "agentId": "agent-pan-3680",
-        "pid": 2100202,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T03:35:52.166Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -225,6 +217,16 @@
         "itemId": "stall-events",
         "outcome": "completed",
         "releasedAt": "2026-08-14T03:35:44.504Z"
+      },
+      {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 2100202,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T03:35:52.166Z",
+        "itemId": "policy-rebasing",
+        "outcome": "completed",
+        "releasedAt": "2026-08-14T03:41:39.935Z"
       }
     ],
     "statusReasons": {
@@ -311,6 +313,9 @@
     "stall-events": "completed",
     "stall-events.ac1": "completed",
     "stall-events.ac2": "completed",
-    "policy-rebasing": "running"
+    "policy-rebasing": "completed",
+    "policy-rebasing.ac1": "completed",
+    "policy-rebasing.ac2": "completed",
+    "policy-rebasing.ac3": "completed"
   }
 }
