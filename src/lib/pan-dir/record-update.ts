@@ -135,6 +135,11 @@ export function clearRecordPipelineClosedOutSync(
   record.pipeline.closedOutAt = undefined;
   record.pipeline.reopenedAt = reopenedAt;
   record.pipeline.updatedAt = reopenedAt;
+  // PAN-3727: a stale mergeStatus='merged' left over from close-out makes the
+  // reopened issue read as record-terminal to resolveParkedPopulation's
+  // record-first terminality check, permanently hiding it from the parked
+  // population. Reopen is the one place that must drop it.
+  if (record.pipeline.mergeStatus === 'merged') record.pipeline.mergeStatus = undefined;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
@@ -152,6 +157,7 @@ export async function clearRecordPipelineClosedOut(
     record.pipeline.closedOutAt = undefined;
     record.pipeline.reopenedAt = reopenedAt;
     record.pipeline.updatedAt = reopenedAt;
+    if (record.pipeline.mergeStatus === 'merged') record.pipeline.mergeStatus = undefined;
     changed = true;
   }, { autoCommit: options.autoCommit });
   return changed;
