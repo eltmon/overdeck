@@ -395,6 +395,35 @@ export interface ResolveParkedOptions {
   readOpenTrips?: (issueId: string) => Promise<{ recoveryPath: string; needsYouEmittedAt?: string }[]>;
   /** Tracker-closed check (defaults to isIssueClosed). Only called for live-agent candidates. */
   isClosed?: (issueId: string) => Promise<boolean>;
+  /**
+   * Cheap local terminality evidence from the per-issue record (defaults to
+   * defaultReadRecordTerminal). Checked BEFORE any tracker call — a record
+   * this resolver already reads for trips, so a tracker blip can never
+   * resurrect a record-terminal issue into the parked population (PAN-3727).
+   */
+  readRecordTerminal?: (issueId: string) => Promise<boolean>;
+}
+
+/**
+ * Record-level terminality: closedOut is the durable close-out marker, and a
+ * mergeStatus of 'merged' with no reopenedAt means the issue merged and was
+ * never reopened afterward (reopenedAt is cleared of a stale mergeStatus by
+ * clearRecordPipelineClosedOut — see record-update.ts). Any throw or missing
+ * record is "not terminal" so this check can only suppress, never invent, a park.
+ */
+export async function defaultReadRecordTerminal(issueId: string): Promise<boolean> {
+  try {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return false;
+    const project = getProjectSync(resolved.projectKey);
+    if (!project) return false;
+    const record = await readIssueRecord(project, issueId);
+    if (!record?.pipeline) return false;
+    return record.pipeline.closedOut === true
+      || (record.pipeline.mergeStatus === 'merged' && !record.pipeline.reopenedAt);
+  } catch {
+    return false;
+  }
 }
 
 async function defaultReadOpenTrips(issueId: string): Promise<{ recoveryPath: string; needsYouEmittedAt?: string }[]> {
@@ -426,6 +455,7 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
   const now = options.now ?? Date.now();
   const readTrips = options.readOpenTrips ?? defaultReadOpenTrips;
   const isClosed = options.isClosed ?? isIssueClosed;
+  const readRecordTerminal = options.readRecordTerminal ?? defaultReadRecordTerminal;
 
   const statuses = loadReviewStatuses();
   const allAgents = listAgentStates();
@@ -461,7 +491,13 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
     const reviewStatus = statuses[statusKey] ?? null;
     const live = liveByIssue.get(issueId) ?? [];
     let issueClosed = closedByIssue.get(issueId) ?? null;
-    if (issueClosed === null && live.length > 0 && reviewStatus?.mergeStatus !== 'merged') {
+    if (issueClosed === null && await readRecordTerminal(issueId)) {
+      // Cheap local terminality evidence decides before any tracker call — a
+      // tracker blip (fail-open toward "open", negative-cached for minutes)
+      // must never resurrect a record-terminal issue into the population.
+      issueClosed = true;
+      closedByIssue.set(issueId, true);
+    } else if (issueClosed === null && live.length > 0 && reviewStatus?.mergeStatus !== 'merged') {
       // Zombie detection needs tracker-closed only when the cheap local signals
       // can't decide (strikes bypass the review pipeline, so mergeStatus never
       // records their merge). Bound the check to live-agent candidates.
