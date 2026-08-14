@@ -52,6 +52,8 @@ import {
   clearSwarmCompletionObservation,
   defaultGetSlotBranchAheadCount,
   defaultIsSlotWorktreeClean,
+  defaultIsSlotBranchPushed,
+  defaultSendCompletionNudge,
   resetSwarmCompletionInferenceForTests,
   swarmInferCompletionMode,
 } from './deacon-swarm-completion.js';
@@ -59,7 +61,7 @@ import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
-import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
+import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, releaseBlockedSwarmSlot, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 import { ensureSwarmForeman } from './swarm-foreman.js';
@@ -119,6 +121,8 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   },
   getSlotBranchAheadCount: defaultGetSlotBranchAheadCount,
   isSlotWorktreeClean: defaultIsSlotWorktreeClean,
+  isSlotBranchPushed: defaultIsSlotBranchPushed,
+  sendCompletionNudge: defaultSendCompletionNudge,
   slotWorktreeExists: existsSync,
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (issueId, operation, workspacePath = '') => {
@@ -138,6 +142,9 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   readSwarmHold,
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
+  listReleasedSlotIndexes: (issueId, workspacePath) => Object.keys(
+    readIssueRecordForWorkspaceSync(workspacePath, issueId)?.swarm?.releasedBlockedSlots ?? {},
+  ).map(Number),
   readStatusOverrides: defaultReadStatusOverrides,
   readSlotCompletion: defaultReadSlotCompletion,
   clearSlotCompletion: clearSwarmSlotCompletion,
@@ -297,6 +304,7 @@ export async function coordinateSwarmSlots(
         }
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
+      actions.push(...await releaseBlockedSlots(issueId, workspace.workspacePath, doc, reconciled, deps));
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, {
         workspacePath: workspace.workspacePath,
         issueId,
@@ -319,6 +327,44 @@ export async function coordinateSwarmSlots(
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+  return actions;
+}
+
+export async function releaseBlockedSlots(
+  issueId: string,
+  workspacePath: string,
+  doc: XBriefDocument,
+  reconciled: SlotReconcileResult,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'isSlotWorktreeClean'>
+    & Partial<Pick<CoordinateSwarmSlotsDeps, 'isSlotBranchPushed'>>,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const blockedItemIds = new Set(doc.plan.items.filter(item => item.status === 'blocked').map(item => item.id));
+  if (blockedItemIds.size === 0) return actions;
+
+  const sessionNames = new Set(await deps.listSessionNames());
+  for (const slot of reconciled.inFlight.filter(candidate => blockedItemIds.has(candidate.itemId))) {
+    const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+    if (sessionNames.has(agentId) && !(await deps.isPaneDead(agentId))) continue;
+    if (!slot.branch) {
+      actions.push(`[swarm] needs-you ${issueId}: blocked slot ${slot.slotIndex} has no branch; preserving assignment`);
+      continue;
+    }
+    const clean = await deps.isSlotWorktreeClean(`${workspacePath}-slot-${slot.slotIndex}`).catch(() => false);
+    const pushed = await (deps.isSlotBranchPushed ?? defaultIsSlotBranchPushed)(
+      workspacePath,
+      issueId,
+      slot.branch,
+    ).catch(() => false);
+    if (!clean || !pushed) {
+      const reason = !clean ? 'uncommitted work' : 'unpushed or unverifiable work';
+      actions.push(`[swarm] needs-you ${issueId}: blocked slot ${slot.slotIndex} has ${reason}; preserving assignment`);
+      continue;
+    }
+    await releaseBlockedSwarmSlot(workspacePath, issueId, slot.slotIndex, slot.itemId, slot.branch);
+    actions.push(`[swarm] released blocked slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch clean and pushed`);
+  }
+  reconciled.inFlight = reconciled.inFlight.filter(slot => !blockedItemIds.has(slot.itemId));
   return actions;
 }
 
@@ -814,6 +860,7 @@ export async function dispatchNextWave(
     | 'readSwarmHold'
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
+    | 'listReleasedSlotIndexes'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
   blockedSlotIndexes: Set<number> = new Set(),
   blockedItemIds: Set<string> = new Set(),
@@ -822,11 +869,12 @@ export async function dispatchNextWave(
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
   const configuredMaxSlotIndex = resolveSwarmMaxSlots(issueId, (deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)());
+  const releasedSlotIndexes = new Set((deps.listReleasedSlotIndexes ?? defaultDeps.listReleasedSlotIndexes)?.(issueId, workspacePath) ?? []);
   const occupiedSlotIndexes = new Set([
     ...blockedSlotIndexes, // PAN-2364: blocked slots count as occupied so other slots cannot collide with them
     ...reconciled.inFlight.map(slot => slot.slotIndex),
     // Active merged slots are covered by their assignment, agent, or worktree (PAN-3689).
-    ...reconciled.branches.filter(branch => !branch.merged).map(branch => branch.slotIndex),
+    ...reconciled.branches.filter(branch => !branch.merged && !releasedSlotIndexes.has(branch.slotIndex)).map(branch => branch.slotIndex),
     ...reconciled.agents.filter(agent => agent.status !== 'stopped').map(agent => agent.slotIndex),
     ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
     ...(reconciled.superseded ?? []).map(attempt => attempt.slotIndex),
@@ -835,7 +883,7 @@ export async function dispatchNextWave(
   // Orphaned on-disk worktrees still occupy their index (PAN-2213).
   if (deps.slotWorktreeExists) {
     for (let index = 1; index <= maxSlotIndex; index++) {
-      if (!occupiedSlotIndexes.has(index) && deps.slotWorktreeExists(`${workspacePath}-slot-${index}`)) {
+      if (!releasedSlotIndexes.has(index) && !occupiedSlotIndexes.has(index) && deps.slotWorktreeExists(`${workspacePath}-slot-${index}`)) {
         occupiedSlotIndexes.add(index);
       }
     }
@@ -863,7 +911,7 @@ export async function dispatchNextWave(
     for (;;) {
       const candidate = allocateSlotIndex(occupiedSlotIndexes, maxSlotIndex);
       if (candidate === null) break;
-      const conflict = slotIndexConflictReason(issueId, workspacePath, candidate, sessionNames, reconciled, deps);
+      const conflict = slotIndexConflictReason(issueId, workspacePath, candidate, sessionNames, reconciled, deps, releasedSlotIndexes);
       if (!conflict) {
         slotIndex = candidate;
         break;
@@ -951,7 +999,9 @@ export function recordSlotAssignment(workspacePath: string, issueId: string, ass
     ].sort((a, b) => a.slotIndex - b.slotIndex);
     const slotCompletions = { ...(record.swarm?.slotCompletions ?? {}) };
     delete slotCompletions[String(assignment.slotIndex)];
-    return { ...record, swarm: { ...(record.swarm ?? {}), slotAssignments, slotCompletions } };
+    const releasedBlockedSlots = { ...(record.swarm?.releasedBlockedSlots ?? {}) };
+    delete releasedBlockedSlots[String(assignment.slotIndex)];
+    return { ...record, swarm: { ...(record.swarm ?? {}), slotAssignments, slotCompletions, releasedBlockedSlots } };
   }).then(() => undefined);
 }
 
@@ -993,6 +1043,7 @@ function slotIndexConflictReason(
   sessionNames: readonly string[],
   reconciled: SlotReconcileResult,
   deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>>,
+  releasedSlotIndexes: ReadonlySet<number> = new Set(),
 ): string | undefined {
   const issueLower = issueId.toLowerCase();
   const agentId = `agent-${issueLower}-slot-${slotIndex}`;
@@ -1001,7 +1052,7 @@ function slotIndexConflictReason(
     return `live ${agentId} session already exists`;
   }
 
-  const unmergedBranch = reconciled.branches.find(slotBranch =>
+  const unmergedBranch = !releasedSlotIndexes.has(slotIndex) && reconciled.branches.find(slotBranch =>
     slotBranch.slotIndex === slotIndex && slotBranch.branch === branch && !slotBranch.merged
   );
   if (unmergedBranch) {
@@ -1009,7 +1060,7 @@ function slotIndexConflictReason(
   }
 
   const slotWorkspacePath = `${workspacePath}-slot-${slotIndex}`;
-  if (deps.slotWorktreeExists?.(slotWorkspacePath)) {
+  if (!releasedSlotIndexes.has(slotIndex) && deps.slotWorktreeExists?.(slotWorkspacePath)) {
     return `slot worktree already exists at ${slotWorkspacePath}`;
   }
 

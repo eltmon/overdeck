@@ -130,6 +130,7 @@ export interface PanIssueSwarmRecord {
    */
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
+  releasedBlockedSlots?: Record<string, { slotIndex: number; itemId: string; branch?: string; releasedAt: string }>;
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
   /**
    * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark

@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { messageAgent } from '../agents/messaging.js';
 import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
@@ -184,4 +185,35 @@ export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Pro
   // isStatePlaneOnlyStatus already returns true for empty porcelain (vacuous every()), so one
   // shared classifier covers both cases — no local path list here. See docs/STATE-PLANE-COMMIT-POLICY.md.
   return statuses.every(isStatePlaneOnlyStatus);
+}
+
+export async function defaultIsSlotBranchPushed(
+  workspacePath: string,
+  issueId: string,
+  branch: string,
+): Promise<boolean> {
+  const slotIndex = branch.match(/-slot-(\d+)$/)?.[1];
+  if (!slotIndex) return false;
+  const roots = resolveWorkspaceRepoRootsSync(issueId, `${workspacePath}-slot-${slotIndex}`);
+  if (roots.length === 0 || roots.some(root => root.degradedPolyrepo)) return false;
+  try {
+    const counts = await Promise.all(roots.map(async root => {
+      const { stdout } = await execAsync(
+        `git rev-list --count ${JSON.stringify(`origin/${branch}`)}..${JSON.stringify(branch)}`,
+        { cwd: root.dir },
+      );
+      return stdout.trim();
+    }));
+    return counts.every(count => count === '0');
+  } catch {
+    return false;
+  }
+}
+
+export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {
+  await messageAgent(
+    agentId,
+    `You appear to have committed clean slot work but have not signaled completion. If the slot is complete, run exactly:\n\npan done ${issueId}`,
+    'deacon:swarm-completion-inference',
+  );
 }

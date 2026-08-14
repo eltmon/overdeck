@@ -42,6 +42,7 @@ export interface CoordinateSwarmSlotsDeps {
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
   getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
   isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
+  isSlotBranchPushed?: (workspacePath: string, issueId: string, branch: string) => Promise<boolean>;
   sendCompletionNudge?: (agentId: string, issueId: string) => Promise<void>;
   readCompletionObservation?: typeof readSwarmCompletionObservation;
   writeCompletionObservation?: typeof writeSwarmCompletionObservation;
@@ -82,6 +83,7 @@ export interface CoordinateSwarmSlotsDeps {
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record. */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
+  listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
   recordForemanTakeover?: typeof writeSwarmForemanTakeover;
   ensureSwarmForeman?: typeof ensureSwarmForeman;
   workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
