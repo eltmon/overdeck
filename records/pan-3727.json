@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:34:57.128Z",
+  "updated": "2026-08-14T13:40:07.818Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "residue-sweep-patrol": {
-        "writerId": "agent-pan-3727",
-        "agentId": "agent-pan-3727",
-        "pid": 1343301,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T13:34:57.128Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -134,6 +126,17 @@
         "outcome": "completed",
         "reason": "Added readRecordTerminal option + defaultReadRecordTerminal to resolver.ts: checks record.pipeline.closedOut/mergeStatus before any tracker isClosed() call, so a tracker blip can't resurrect a record-terminal issue. classifyOne short-circuits issueClosed=true and skips trips read when terminal. Added 8 tests to resolver.test.ts: 3 dispatch-level (record-terminal suppresses rows/skips isClosed, survives tracker blip, non-terminal falls back) + 5 predicate-level (closedOut, merged+no-reopen, merged+reopened NOT terminal, no-evidence NOT terminal, unresolvable issue). Typecheck and tests green.",
         "releasedAt": "2026-08-14T13:34:35.319Z"
+      },
+      {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 1343301,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:34:57.128Z",
+        "itemId": "residue-sweep-patrol",
+        "outcome": "completed",
+        "reason": "New src/lib/cloister/parked-residue.ts: reconcileTerminalIssueResidue sweeps every project's terminal-issue records, acking open trips and clearing operator-gate flags via the existing doors; door failures warn per-issue and don't stop the sweep. Extracted shared isRecordPipelineTerminal predicate, reused by resolver.ts's defaultReadRecordTerminal. Wired into deacon.ts beside reconcileProjectStatePlanes on the same state-plane cadence. Added 9 tests (5 predicate, 4 patrol behavior). Bumped deacon.ts file-size allowlist (3571->3576). Typecheck and tests green.",
+        "releasedAt": "2026-08-14T13:40:07.817Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "resolver-record-terminal": {
         "reason": "Added readRecordTerminal option + defaultReadRecordTerminal to resolver.ts: checks record.pipeline.closedOut/mergeStatus before any tracker isClosed() call, so a tracker blip can't resurrect a record-terminal issue. classifyOne short-circuits issueClosed=true and skips trips read when terminal. Added 8 tests to resolver.test.ts: 3 dispatch-level (record-terminal suppresses rows/skips isClosed, survives tracker blip, non-terminal falls back) + 5 predicate-level (closedOut, merged+no-reopen, merged+reopened NOT terminal, no-evidence NOT terminal, unresolvable issue). Typecheck and tests green.",
         "updatedAt": "2026-08-14T13:34:35.319Z"
+      },
+      "residue-sweep-patrol": {
+        "reason": "New src/lib/cloister/parked-residue.ts: reconcileTerminalIssueResidue sweeps every project's terminal-issue records, acking open trips and clearing operator-gate flags via the existing doors; door failures warn per-issue and don't stop the sweep. Extracted shared isRecordPipelineTerminal predicate, reused by resolver.ts's defaultReadRecordTerminal. Wired into deacon.ts beside reconcileProjectStatePlanes on the same state-plane cadence. Added 9 tests (5 predicate, 4 patrol behavior). Bumped deacon.ts file-size allowlist (3571->3576). Typecheck and tests green.",
+        "updatedAt": "2026-08-14T13:40:07.817Z"
       }
     }
   },
@@ -180,6 +187,10 @@
     "resolver-record-terminal.ac2": "completed",
     "resolver-record-terminal.ac3": "completed",
     "resolver-record-terminal.ac4": "completed",
-    "residue-sweep-patrol": "running"
+    "residue-sweep-patrol": "completed",
+    "residue-sweep-patrol.ac1": "completed",
+    "residue-sweep-patrol.ac2": "completed",
+    "residue-sweep-patrol.ac3": "completed",
+    "residue-sweep-patrol.ac4": "completed"
   }
 }
