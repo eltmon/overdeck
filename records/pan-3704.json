@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:27:57.027Z",
+  "updated": "2026-08-14T06:29:54.658Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "wire-toggle-and-sort": {
-        "writerId": "agent-pan-3704",
-        "agentId": "agent-pan-3704",
-        "pid": 1351975,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T06:27:57.027Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3704",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Added exported newest-first comparator with valid/missing timestamp handling and rank fallback; typecheck passed.",
         "releasedAt": "2026-08-14T06:27:41.236Z"
+      },
+      {
+        "writerId": "agent-pan-3704",
+        "agentId": "agent-pan-3704",
+        "pid": 1351975,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T06:27:57.027Z",
+        "itemId": "wire-toggle-and-sort",
+        "outcome": "completed",
+        "reason": "Wired conversation-only newest-first sorting behind the persisted preference and added an accessible aria-pressed footer button; typecheck and 19 CommandPalette tests passed via the frontend Vitest config.",
+        "releasedAt": "2026-08-14T06:29:54.658Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "newest-first-comparator": {
         "reason": "Added exported newest-first comparator with valid/missing timestamp handling and rank fallback; typecheck passed.",
         "updatedAt": "2026-08-14T06:27:41.236Z"
+      },
+      "wire-toggle-and-sort": {
+        "reason": "Wired conversation-only newest-first sorting behind the persisted preference and added an accessible aria-pressed footer button; typecheck and 19 CommandPalette tests passed via the frontend Vitest config.",
+        "updatedAt": "2026-08-14T06:29:54.658Z"
       }
     }
   },
@@ -123,6 +130,10 @@
     "newest-first-comparator.ac1": "completed",
     "newest-first-comparator.ac2": "completed",
     "newest-first-comparator.ac3": "completed",
-    "wire-toggle-and-sort": "running"
+    "wire-toggle-and-sort": "completed",
+    "wire-toggle-and-sort.ac1": "completed",
+    "wire-toggle-and-sort.ac2": "completed",
+    "wire-toggle-and-sort.ac3": "completed",
+    "wire-toggle-and-sort.ac4": "completed"
   }
 }
