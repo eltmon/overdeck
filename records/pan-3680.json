@@ -157,7 +157,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:02:17.082Z",
+  "updated": "2026-08-14T05:02:19.484Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "blocked",
@@ -168,10 +168,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T05:01:56.525Z",
-    "reviewNotes": "Swarm status omits durable overrides, wait misses removed slots, and operator copy assigns coordination to Deacon.",
+    "updatedAt": "2026-08-14T05:01:57.735Z",
     "inspectNotes": "All four ACs met. AC1: ensureSwarmForeman spawns bare agent-<issue> (no slotIndex -> resolveRegisteredSlotSpawn returns null, spawn.ts:556 derives agent-<issue>) with foreman:true persisted to AgentState, and swarmCommand no longer calls coordinateSwarmSlots. AC2: live tmux session -> messageAgent, spawnRun not called. AC3/FR-16 now fixed: start.ts:822-824 computes swarmActive from the issue record swarm.policy.mode==='always' via getIssueWorkspacePath (record.ts:261, canonical/migration-aware read), start.ts:833 passes ignoreRegisteredSlots so work-agent-conflicts.ts:14 drops agents with slotIndex !== undefined (slotIndex is on AgentState and survives listRunningAgentsSync), and start.ts:961 skips assertCanStartFreshSync on the swarm path, so foreman-dead + slots-live now respawns instead of exiting 1. Covered by tests/cli/commands/start-conflicting-work.test.ts (slot ignored, non-slot helper still conflicts) and tests/unit/cli/commands/swarm-foreman-spawn.test.ts. AC4: no model argument anywhere in the path; projectRoot now from resolveProjectFromIssueSync instead of the join('..','..') layout guess. Two non-blocking follow-ups: (1) swarmActive reads ONLY the issue record layer, so an issue made swarm-active by a project- or global-level swarm.mode of auto/always (resolveSwarmPolicy layering, swarm-policy.ts:14-33; swarmCommand persists 'always' only when the resolved mode is off) would still hit the conflict refusal — resolveSwarmPolicy(id).mode !== 'off' would close it; current live config is global mode: off so every active swarm goes through pan swarm and is detected. (2) skipping assertCanStartFreshSync on the swarm path also drops the PAN-3555 warm-session/owes-rework protection, so a foreman with a resumable transcript is silently replaced rather than resumed — allowed by AC3 ('respawns'), but worth a deliberate resume-first branch later.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
+    "reviewedAtCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
+    "reviewRequestedAt": "2026-08-14T04:49:53.617Z",
     "reviewSpawnedAt": "2026-08-14T04:54:19.021Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -321,9 +322,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 146954580,
-            "output": 188397,
-            "cacheRead": 145132800,
+            "input": 147078209,
+            "output": 189583,
+            "cacheRead": 145243904,
             "cacheWrite": 0
           }
         },
@@ -344,9 +345,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 146954580,
-          "output": 188397,
-          "cacheRead": 145132800,
+          "input": 147078209,
+          "output": 189583,
+          "cacheRead": 145243904,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -357,8 +358,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 87.37805900000001,
-        "pricingAsOf": "2026-08-14T05:01:56.549Z"
+        "usd": 87.531816,
+        "pricingAsOf": "2026-08-14T05:02:19.473Z"
       }
     },
     "merges": [
