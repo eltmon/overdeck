@@ -32,6 +32,16 @@
       "timestamp": "2026-08-14T14:24:37.685Z",
       "reason": "end",
       "note": "Verification failed lint after pan done's rebase picked up a newer main tip; none of the 3 failures were PAN-3727 changes — all were pre-existing drift from concurrent merges landed on main while this branch was in flight: (1) sync-sources/skills/pan-restart/SKILL.md had 3 inline shell comments trailing a pan restart command on the same line, which lint-skills.sh's command extractor mis-parsed '#' as a bogus subcommand — moved comments to their own line; (2) packages/contracts/src/composer-commands.generated.ts was stale relative to main's newly-added 'pan restart --now' / 'pan restart approve' — regenerated via npm run generate:slash-commands; (3) PAN-3730's codex transcript adapter (landed on main concurrently) introduced a new import cycle (jsonl-resolver.ts -> agents.ts -> resume.ts -> conversation-compaction.ts -> summary-fork.ts -> transcript-adapter.ts) not present on this branch's pre-rebase tip — baselined it per the guard's own sanctioned resolution path (manually edit the baseline in an issue-referenced commit), verified via the canonicalizer diff that it's the only new cycle. Verified locally: full npm run lint exit 0, npm run typecheck exit 0, after each individual fix. No changes to PAN-3727's own 7 xBRIEF items — all still complete and correct."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-14T14:32Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-08-14T14:32:51.286Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-14T14:32:51.380Z"
     }
   ],
   "feedback": [
@@ -41,6 +51,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-14T14:15:55Z",
       "markdownBody": "VERIFICATION STUCK for PAN-3727 (attempt 2/3):\n\nFailed check: lint\n\nVerification FAILED at lint (183966ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3727 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    },
+    {
+      "seq": 4,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-08-14T14:32:51Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3727 (attempt 3/3):\n\nFailed check: test\n\nVerification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3727 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
     }
   ],
   "scopeDrift": {
@@ -98,7 +115,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:32:46.902Z",
+  "updated": "2026-08-14T14:32:51.380Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
