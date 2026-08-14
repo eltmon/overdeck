@@ -157,18 +157,18 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:18:47.347Z",
+  "updated": "2026-08-14T05:18:50.006Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T05:18:47.292Z",
+    "updatedAt": "2026-08-14T05:18:48.022Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All four ACs met. AC1: ensureSwarmForeman spawns bare agent-<issue> (no slotIndex -> resolveRegisteredSlotSpawn returns null, spawn.ts:556 derives agent-<issue>) with foreman:true persisted to AgentState, and swarmCommand no longer calls coordinateSwarmSlots. AC2: live tmux session -> messageAgent, spawnRun not called. AC3/FR-16 now fixed: start.ts:822-824 computes swarmActive from the issue record swarm.policy.mode==='always' via getIssueWorkspacePath (record.ts:261, canonical/migration-aware read), start.ts:833 passes ignoreRegisteredSlots so work-agent-conflicts.ts:14 drops agents with slotIndex !== undefined (slotIndex is on AgentState and survives listRunningAgentsSync), and start.ts:961 skips assertCanStartFreshSync on the swarm path, so foreman-dead + slots-live now respawns instead of exiting 1. Covered by tests/cli/commands/start-conflicting-work.test.ts (slot ignored, non-slot helper still conflicts) and tests/unit/cli/commands/swarm-foreman-spawn.test.ts. AC4: no model argument anywhere in the path; projectRoot now from resolveProjectFromIssueSync instead of the join('..','..') layout guess. Two non-blocking follow-ups: (1) swarmActive reads ONLY the issue record layer, so an issue made swarm-active by a project- or global-level swarm.mode of auto/always (resolveSwarmPolicy layering, swarm-policy.ts:14-33; swarmCommand persists 'always' only when the resolved mode is off) would still hit the conflict refusal — resolveSwarmPolicy(id).mode !== 'off' would close it; current live config is global mode: off so every active swarm goes through pan swarm and is detected. (2) skipping assertCanStartFreshSync on the swarm path also drops the PAN-3555 warm-session/owes-rework protection, so a foreman with a resumable transcript is silently replaced rather than resumed — allowed by AC3 ('respawns'), but worth a deliberate resume-first branch later.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 91.299342,
-        "pricingAsOf": "2026-08-14T05:18:47.335Z"
+        "pricingAsOf": "2026-08-14T05:18:49.998Z"
       }
     },
     "merges": [
