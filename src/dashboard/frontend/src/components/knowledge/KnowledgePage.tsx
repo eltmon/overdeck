@@ -142,7 +142,7 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
         <header>
           <div className="flex items-center gap-3">
             <BookOpen className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-            <h1 className="display-xl text-foreground">Knowledge</h1>
+            <h1 className="text-xl font-medium text-foreground">Knowledge</h1>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{knowledgeViewerPostureCopy()}</p>
         </header>

@@ -5,11 +5,17 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  // display-xl/display-lg/eyebrow are authored in src/index.css's
-  // `@layer components` but not yet consumed by any .tsx file (PAN-3410
-  // theme-token-scope lands the vocabulary; broadsheet-mechanical-migration
-  // adopts it). Without a safelist entry Tailwind's content-based purge drops
-  // them from the build since no scanned file contains the class name token.
+  // display-xl is authored in src/index.css's `@layer components` but has no
+  // call site yet: it is the HERO tier (clamp(3rem, 7vw, 4.5rem)), and its
+  // intended surface — the New Workspace page's chromeless title input — does
+  // not exist until PAN-3411. It was briefly adopted on KnowledgePage's h1 to
+  // satisfy a "must have one call site" criterion and reverted: a 68px title
+  // beside a 20px icon reads as a hero screen on a content page. Do not force
+  // an adoption; wait for the surface. Without a safelist entry Tailwind's
+  // content-based purge drops it since no scanned file contains the token.
+  // (display-lg and eyebrow are no longer listed — both now have real call
+  // sites, AppearanceSection.tsx and MetricTile.tsx respectively, so the
+  // content scan finds them.)
   // chip/chip-dashed/chip-selected/soft-card/soft-card-bordered/large-cta/
   // keycap/dot-metadata (PAN-3706 F-11) and shadow-floating/shadow-overlay
   // (PAN-3706 F-4) are the same situation: authored, not yet consumed.
@@ -18,8 +24,6 @@ export default {
   // its shadow-floating/shadow-overlay siblings.
   safelist: [
     'display-xl',
-    'display-lg',
-    'eyebrow',
     'chip',
     'chip-dashed',
     'chip-selected',
