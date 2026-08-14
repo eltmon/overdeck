@@ -217,23 +217,23 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:47:52.942Z",
+  "updated": "2026-08-14T05:52:45.773Z",
   "pipeline": {
     "issueId": "PAN-3680",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
-    "updatedAt": "2026-08-14T05:47:47.949Z",
-    "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "updatedAt": "2026-08-14T05:52:45.671Z",
+    "reviewNotes": "Cycle-3 ownership copy fixes pass; newly reported issues are unchanged since the prior synthesis and non-promotable.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All four ACs met. AC1: ensureSwarmForeman spawns bare agent-<issue> (no slotIndex -> resolveRegisteredSlotSpawn returns null, spawn.ts:556 derives agent-<issue>) with foreman:true persisted to AgentState, and swarmCommand no longer calls coordinateSwarmSlots. AC2: live tmux session -> messageAgent, spawnRun not called. AC3/FR-16 now fixed: start.ts:822-824 computes swarmActive from the issue record swarm.policy.mode==='always' via getIssueWorkspacePath (record.ts:261, canonical/migration-aware read), start.ts:833 passes ignoreRegisteredSlots so work-agent-conflicts.ts:14 drops agents with slotIndex !== undefined (slotIndex is on AgentState and survives listRunningAgentsSync), and start.ts:961 skips assertCanStartFreshSync on the swarm path, so foreman-dead + slots-live now respawns instead of exiting 1. Covered by tests/cli/commands/start-conflicting-work.test.ts (slot ignored, non-slot helper still conflicts) and tests/unit/cli/commands/swarm-foreman-spawn.test.ts. AC4: no model argument anywhere in the path; projectRoot now from resolveProjectFromIssueSync instead of the join('..','..') layout guess. Two non-blocking follow-ups: (1) swarmActive reads ONLY the issue record layer, so an issue made swarm-active by a project- or global-level swarm.mode of auto/always (resolveSwarmPolicy layering, swarm-policy.ts:14-33; swarmCommand persists 'always' only when the resolved mode is off) would still hit the conflict refusal — resolveSwarmPolicy(id).mode !== 'off' would close it; current live config is global mode: off so every active swarm goes through pan swarm and is detected. (2) skipping assertCanStartFreshSync on the swarm path also drops the PAN-3555 warm-session/owes-rework protection, so a foreman with a resumable transcript is silently replaced rather than resumed — allowed by AC3 ('respawns'), but worth a deliberate resume-first branch later.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
-    "reviewedAtCommit": "b18452d67ea00add8b575b07cdf659069146aa3d",
+    "reviewedAtCommit": "7098583cd857f7ded5cb52a3877331c60efd5460",
     "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
     "reviewSpawnedAt": "2026-08-14T05:47:47.948Z",
     "scopeDrift": {
@@ -378,15 +378,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 19365239,
-            "output": 9867,
-            "cacheRead": 15729664,
+            "input": 19639498,
+            "output": 10002,
+            "cacheRead": 15999488,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 169360611,
-            "output": 220303,
-            "cacheRead": 167112704,
+            "input": 177298715,
+            "output": 233944,
+            "cacheRead": 174882304,
             "cacheWrite": 0
           }
         },
@@ -401,15 +401,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 19365239,
-          "output": 9867,
-          "cacheRead": 15729664,
+          "input": 19639498,
+          "output": 10002,
+          "cacheRead": 15999488,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 169360611,
-          "output": 220303,
-          "cacheRead": 167112704,
+          "input": 177298715,
+          "output": 233944,
+          "cacheRead": 174882304,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -420,8 +420,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 101.455826,
-        "pricingAsOf": "2026-08-14T05:47:47.963Z"
+        "usd": 106.592376,
+        "pricingAsOf": "2026-08-14T05:52:45.746Z"
       }
     },
     "merges": [
