@@ -1,6 +1,6 @@
 ---
 name: pan-handoff
-description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. The focus text MUST be ≤500 characters or the fork is rejected."
+description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737)."
 triggers:
   - pan handoff
   - hand off conversation
@@ -24,7 +24,7 @@ pan handoff [conv] [focus text...]
 
 The trailing text after the conversation reference becomes the focus — no flag required.
 
-> ⚠️ **The focus MUST be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and **no conversation is created** — so count it and keep it under 500 on the first try. Keep the focus short and steering; do NOT pack backstory/context into it — the author reads the full source transcript for that. This is the single most common handoff mistake.
+> Keep the focus short and steering; do NOT pack backstory/context into it — the author reads the full source transcript for that, and long briefs belong in a file the focus points at. The hard cap is 10,000 characters (multi-line is fine; PAN-3737) — a longer focus is rejected with `Fork request rejected: focus must be 10000 characters or fewer` and no conversation is created.
 
 ## Where to run it, and where the successor lives
 
@@ -94,7 +94,7 @@ Use a normal summary fork when a quick passive summary is enough. Use a plain fo
 
 The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
 
-**Hard limit: the focus must be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and no conversation is created — so write it under 500 chars on the first try. Don't pack the backstory into the focus; the detail belongs in the transcript the author reads. The focus only steers what the author emphasizes.
+**Hard ceiling: 10,000 characters** (PAN-3737; multi-line focus is allowed). Don't pack the backstory into the focus even so; the detail belongs in the transcript the author reads or in a brief file in the successor cwd. The focus only steers what the author emphasizes, and its first ~70 characters become the new conversation's title.
 
 ## Authoring modes
 
