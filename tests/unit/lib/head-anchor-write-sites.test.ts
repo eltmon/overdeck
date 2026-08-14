@@ -54,6 +54,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/dashboard/server/routes/workspaces/merge-strike.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: verifiedAnchor', 'Producer-fed CI-green merge verification stamp (PAN-3067).'),
   allow('src/lib/cloister/uat-promote-verification.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: rehydrateHeadAnchor(member.headSha)', 'UAT member HEAD rehydrated at the generation-record boundary (PAN-3114).'),
   allow('src/lib/cloister/verification-runner.ts', 'lastVerifiedCommit', 'lastVerifiedCommit', 'Producer-fed verification stamp.'),
+  allow('src/lib/lifecycle/dod-gate.ts', 'lastVerifiedCommit', 'update.lastVerifiedCommit = rehydrateHeadAnchor(head)', 'Contained strike tip rehydrated after exact durable readiness match (PAN-3716).'),
   allow('src/lib/database/agent-backfill.ts', 'roleRunHead', "roleRunHead: 'role_run_head'", 'Database backfill column mapping.'),
   allow('src/lib/database/agent-mappers.ts', 'roleRunHead', 'roleRunHead: state.roleRunHead ?? null', 'Agent runtime serialization.'),
   allow('src/lib/database/agents-db.ts', 'roleRunHead', "roleRunHead: (row['role_run_head'] as string | null) ?? null", 'Agent runtime deserialization.'),

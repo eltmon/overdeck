@@ -30,6 +30,7 @@ describe('ensureRegisteredSlotWorktree', () => {
     await run('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
     await run('git', ['config', 'user.name', 'Test'], { cwd: repo });
     await run('git', ['commit', '--allow-empty', '-qm', 'base'], { cwd: repo });
+    await run('git', ['checkout', '-qb', 'feature/min-888'], { cwd: repo });
     roots.value = [{ repoKey: 'api', dir: repo, sourceBranch: 'feature/min-888', targetBranch: 'main', isPolyrepo: true }];
     const slot = {
       agentId: 'agent-min-888-slot-4', branch: 'feature/min-888-slot-4',

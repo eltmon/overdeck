@@ -80,6 +80,9 @@ type DispatchTestDeps = Pick<
   | 'shouldDispatch'
   | 'getMaxSlotIndex'
   | 'listSlotAssignments'
+  | 'listReleasedSlotIndexes'
+  | 'getReleasedSlotBranch'
+  | 'clearReleasedSlot'
   | 'listSessionNames'
   | 'slotWorktreeExists'
 >;
@@ -96,6 +99,9 @@ function deps(overrides: Partial<DispatchTestDeps> = {}): DispatchTestDeps {
     shouldDispatch: vi.fn(() => true),
     getMaxSlotIndex: vi.fn(() => 4),
     listSlotAssignments: vi.fn(() => []),
+    listReleasedSlotIndexes: vi.fn(() => []),
+    getReleasedSlotBranch: vi.fn(() => undefined),
+    clearReleasedSlot: vi.fn(async () => undefined),
     listSessionNames: vi.fn(async () => []),
     slotWorktreeExists: vi.fn(() => false),
     ...overrides,
@@ -342,6 +348,37 @@ describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regressi
 
     expect(actions).toEqual(['[swarm] dispatched implementation slot 2 (item wi-a) for PAN-2203']);
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 2 }));
+  });
+
+  it('PAN-3724: dispatches the next ready item into a released blocked slot index', async () => {
+    const plan = doc([item('wi-prerequisite', ['src/prerequisite.ts'])]);
+    const fakeDeps = deps({
+      getMaxSlotIndex: vi.fn(() => 1),
+      listReleasedSlotIndexes: vi.fn(() => [1]),
+      getReleasedSlotBranch: vi.fn(() => 'feature/pan-2203-slot-1-attempt-20260814'),
+      slotWorktreeExists: vi.fn(() => true),
+    });
+
+    const actions = await dispatchNextWave(
+      'PAN-2203',
+      '/repo/workspaces/feature-pan-2203',
+      plan,
+      reconciled({ branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }] }),
+      analyzeSwarmReadiness(plan),
+      fakeDeps,
+    );
+
+    expect(actions).toEqual(['[swarm] dispatched implementation slot 1 (item wi-prerequisite) for PAN-2203']);
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({
+      slotIndex: 1,
+      slotItemId: 'wi-prerequisite',
+      slotBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+    }));
+    expect(fakeDeps.clearReleasedSlot).toHaveBeenCalledWith(
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      1,
+    );
   });
 
   it('a stopped historical agent does not occupy its slot index (PAN-3689)', async () => {

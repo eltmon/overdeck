@@ -81,6 +81,9 @@ export async function reconcileSlotState(
   const agents = deps.listAgents(issueId);
   const assignments = deps.listSlotAssignments(issueId, workspace);
   const completions = deps.listSlotCompletions(issueId, workspace);
+  const releasedSlotIndexes = new Set(Object.keys(
+    readIssueRecordForWorkspaceSync(workspace, issueId.toUpperCase())?.swarm?.releasedBlockedSlots ?? {},
+  ).map(Number));
   const branchesBySlot = new Map(branches.map(branch => [branch.slotIndex, branch]));
   const agentsBySlot = new Map(agents.map(agent => [agent.slotIndex, agent]));
   const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspace));
@@ -88,7 +91,7 @@ export async function reconcileSlotState(
     .filter(item => item.slotEligible)
     .map(item => item.id));
   const itemStatuses = new Map(doc.plan.items.map(item => [item.id, item.status]));
-  const slotItems = resolveSlotItemOwnership(slotEligibleItemIds, assignments, agents);
+  const slotItems = resolveSlotItemOwnership(slotEligibleItemIds, assignments, agents, releasedSlotIndexes);
 
   const result: SlotReconcileResult = {
     issueId,
@@ -214,6 +217,7 @@ function resolveSlotItemOwnership(
   slotEligibleItemIds: Set<string>,
   assignments: ReconciledSlotAssignment[],
   agents: ReconciledSlotAgent[],
+  releasedSlotIndexes: Set<number>,
 ): Array<{ itemId: string; slotIndex: number }> {
   const ownership = new Map<string, number>();
 
@@ -223,6 +227,7 @@ function resolveSlotItemOwnership(
   }
 
   for (const agent of agents) {
+    if (agent.status === 'stopped' && releasedSlotIndexes.has(agent.slotIndex)) continue;
     if (!agent.slotItemId || !slotEligibleItemIds.has(agent.slotItemId) || ownership.has(agent.slotItemId)) continue;
     ownership.set(agent.slotItemId, agent.slotIndex);
   }
@@ -233,7 +238,7 @@ function resolveSlotItemOwnership(
 }
 
 function slotIndexFromBranch(issueLower: string, branch: string): number | null {
-  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}-slot-(\\d+)$`).exec(branch);
+  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}-slot-(\\d+)(?:-attempt-\\d+)?$`).exec(branch);
   if (!match) return null;
   return Number(match[1]);
 }

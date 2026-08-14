@@ -18,6 +18,7 @@ import type {
   ProjectCiSnapshot,
   ResetMarker,
   ResourceStats,
+  RestartGateSnapshot,
   ReviewStatusSnapshot,
 } from '@overdeck/contracts'
 import {
@@ -626,6 +627,13 @@ export const selectScanProgress = (s: DashboardState) => s.scanProgress
 
 export const selectProjectCi = (projectKey: string) =>
   (s: DashboardState): ProjectCiSnapshot | undefined => s.ciByProjectKey[projectKey]
+
+/**
+ * PAN-3729 — the voluntary-restart approval gate, delivered by the snapshot on
+ * connect and by `restart_gate.changed` events after that. Null until the
+ * server's gate first reports.
+ */
+export const selectRestartGate = (s: DashboardState): RestartGateSnapshot | null => s.restartGate
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 

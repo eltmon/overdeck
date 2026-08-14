@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName, listSlotWorkspaceDirectoriesSync } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -726,9 +726,17 @@ describe('pan swarm reset (PAN-2214)', () => {
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
     liveSessions?: string[];
     status?: { deaconIgnored?: boolean } | null;
+    // PAN-3713: nested worktree registration per parent repo cwd, and whether
+    // nested slot branches still exist locally / on origin.
+    registeredNestedWorktrees?: Record<string, string[]>;
+    nestedBranchesPresent?: boolean;
+    nestedBranchesOnOrigin?: boolean;
+    // Ahead count returned for nested `feature..slot` rev-list probes.
+    nestedAheadCount?: string;
   } = {}): SwarmResetCommandDeps & { gitCalls: string[] } {
     const gitCalls: string[] = [];
     const branches = options.slotBranches ?? {};
+    const outerWorkspace = '/repo/workspaces/feature-pan-2203';
     const deps = {
       getReviewStatusSync: vi.fn(() => (options.status ?? null) as never),
       setDeaconIgnored: vi.fn(),
@@ -745,10 +753,17 @@ describe('pan swarm reset (PAN-2214)', () => {
       clearSupersededSwarmAttempts: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
       getFailedMergeBlocks: vi.fn(() => [{ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' }]),
-      runGitCommand: vi.fn(async (command: string) => {
+      runGitCommand: vi.fn(async (command: string, cwd?: string) => {
         gitCalls.push(command);
         if (command.startsWith('git for-each-ref')) {
           return { stdout: `${Object.keys(branches).join('\n')}\n` };
+        }
+        if (command.startsWith('git branch --list ')) {
+          const branch = JSON.parse(command.slice('git branch --list '.length)) as string;
+          return { stdout: options.nestedBranchesPresent === false ? '' : `${branch}\n` };
+        }
+        if (command.startsWith('git ls-remote ')) {
+          return { stdout: options.nestedBranchesOnOrigin ? 'abc123\trefs/heads/x\n' : '' };
         }
         if (command.startsWith('git rev-list --count HEAD..')) {
           for (const [branch, count] of Object.entries(branches)) {
@@ -757,10 +772,17 @@ describe('pan swarm reset (PAN-2214)', () => {
           return { stdout: '0\n' };
         }
         if (command.startsWith('git rev-list --count ')) {
-          return { stdout: '0\n' };
+          return { stdout: `${options.nestedAheadCount ?? '0'}\n` };
         }
         if (command === 'git worktree list --porcelain') {
-          const lines = ['worktree /repo/workspaces/feature-pan-2203'];
+          if (cwd && cwd !== outerWorkspace) {
+            // A parent repo's porcelain list names its own main worktree plus
+            // whatever nested slot worktrees remain registered (PAN-3713).
+            const lines = [`worktree ${cwd}`];
+            for (const path of options.registeredNestedWorktrees?.[cwd] ?? []) lines.push(`worktree ${path}`);
+            return { stdout: `${lines.join('\n')}\n` };
+          }
+          const lines = [`worktree ${outerWorkspace}`];
           for (const path of options.worktreeSlotPaths ?? []) lines.push(`worktree ${path}`);
           return { stdout: `${lines.join('\n')}\n` };
         }
@@ -802,8 +824,10 @@ describe('pan swarm reset (PAN-2214)', () => {
   });
 
   it('removes stale polyrepo slot directories and nested worktrees left by reset', async () => {
-    const deps = makeResetDeps();
     const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-4';
+    const deps = makeResetDeps({
+      registeredNestedWorktrees: { '/repo/api': [`${slotWorkspace}/api`] },
+    });
     deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
     deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
       isPolyrepo: true,
@@ -823,6 +847,85 @@ describe('pan swarm reset (PAN-2214)', () => {
       '/repo/api',
     );
     expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+  });
+
+  it('treats an already-unregistered nested worktree as success and continues cleanup (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    // fe is still registered; api's worktree registration is already gone —
+    // the exact mix that crashed reset with "fatal: '<path>' is not a working tree".
+    const deps = makeResetDeps({
+      registeredNestedWorktrees: { '/repo/fe': [`${slotWorkspace}/fe`] },
+    });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'fe', dir: `${slotWorkspace}/fe`, parentRepo: '/repo/fe', featureBranch: 'feature/pan-2203' },
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    // The registered nested worktree is removed through git…
+    expect(deps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-2/fe"',
+      '/repo/fe',
+    );
+    // …the unregistered one is pruned, never force-removed (that call is the PAN-3713 crash)…
+    expect(deps.runGitCommand).not.toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-2/api"',
+      '/repo/api',
+    );
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git worktree prune', '/repo/api');
+    // …both merged slot branches are deleted without a push, the slot
+    // directory is removed, and slot state is cleared through the writer.
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git branch -D "feature/pan-2203-slot-2"', '/repo/fe');
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git branch -D "feature/pan-2203-slot-2"', '/repo/api');
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+  });
+
+  it('still pushes an unmerged nested branch before removing its unregistered worktree (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    // The nested slot branch exists locally with 2 commits the feature branch
+    // lacks; its worktree registration is already gone.
+    const deps = makeResetDeps({ nestedAheadCount: '2' });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/pan-2203-slot-2"', '/repo/api');
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+  });
+
+  it('re-running reset after partial cleanup succeeds when nested branches are already gone (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({ nestedBranchesPresent: false });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(loggedText(deps)).toContain('absent from /repo/api and origin');
   });
 
   it('a push failure without --force aborts with the branch named and deletes nothing', async () => {
@@ -950,6 +1053,83 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });
     expect(merged.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(merged.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
+  });
+
+  it('a stale slot directory removal failure is a controlled reset failure and clears no state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    // The PAN-3717 crash: root-owned container artifacts (fe/.pnpm-store)
+    // make the recursive host-side removal fail with EACCES.
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(
+        new Error(`EACCES: permission denied, rmdir '${slotWorkspace}/fe/.pnpm-store/v10'`),
+        { code: 'EACCES' },
+      );
+    });
+
+    // Must resolve with a controlled failure — never an uncaught exception.
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(false);
+    expect(loggedText(deps)).toContain(slotWorkspace);
+    expect(loggedText(deps)).toContain('EACCES');
+    expect(loggedText(deps)).toContain('NOT cleared');
+    expect(loggedText(deps)).toContain('pan swarm reset PAN-2203');
+    // Recorded slot state survives so a re-run picks up exactly here.
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+    expect(deps.clearSupersededSwarmAttempts).not.toHaveBeenCalled();
+    expect(deps.clearFailedMergeBlock).not.toHaveBeenCalled();
+    expect(deps.removeAgent).not.toHaveBeenCalled();
+  });
+
+  it('re-running reset after a failed directory removal succeeds and clears state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    });
+
+    await expect(swarmResetCommand('PAN-2203', {}, deps)).resolves.toEqual({ ok: false });
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+
+    // Removal now succeeds (e.g. the Docker fallback cleaned the root-owned
+    // artifacts): the same reset run reaches completion and clears state.
+    deps.removeDirectory = vi.fn(async () => undefined);
+    const rerun = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(rerun.ok).toBe(true);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(deps.clearSupersededSwarmAttempts).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+  });
+});
+
+describe('listSlotWorkspaceDirectoriesSync (PAN-3717 containment)', () => {
+  it('returns only real exact-name slot directories — never symlinks or preserved archives', () => {
+    const root = mkdtempSync(join(tmpdir(), 'swarm-slots-'));
+    try {
+      const workspaces = join(root, 'workspaces');
+      mkdirSync(workspaces);
+      const realSlot = join(workspaces, 'feature-min-888-slot-1');
+      mkdirSync(realSlot);
+      // A symlink planted at a slot-shaped name must never reach the
+      // privileged Docker bind mount in removeWorkspaceDirectory.
+      const elsewhere = join(root, 'elsewhere');
+      mkdirSync(elsewhere);
+      symlinkSync(elsewhere, join(workspaces, 'feature-min-888-slot-2'));
+      // Operator-preserved archives share the -slot- prefix but are not slots.
+      mkdirSync(join(workspaces, 'feature-min-888-slot-3-reset-backup-20260814'));
+
+      const found = listSlotWorkspaceDirectoriesSync(join(workspaces, 'feature-min-888'));
+
+      expect(found).toEqual([realSlot]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

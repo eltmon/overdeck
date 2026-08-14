@@ -182,8 +182,11 @@ export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string
   if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
   const focus = value.trim();
   if (!focus) return { ok: true, focus: undefined };
-  if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
-  if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
+  // PAN-3737: 10k is a sanity ceiling, not a steering-length guard — the old
+  // 500-char reject failed handoffs after the fact on essentially every long
+  // focus. Newlines/tabs are allowed; title derivation collapses whitespace.
+  if (focus.length > 10_000) return { ok: false, error: 'focus must be 10000 characters or fewer' };
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
   return { ok: true, focus };
 }
 
@@ -446,7 +449,7 @@ export async function runForkPipeline(
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
       } catch (error) {
         console.warn(
           `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -471,7 +474,7 @@ export async function runForkPipeline(
         `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
       );
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
       } catch (heuristicError) {
         console.warn(
           `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,

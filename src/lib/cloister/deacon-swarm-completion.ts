@@ -122,8 +122,8 @@ export async function defaultGetSlotBranchAheadCount(
   branch: string,
 ): Promise<number> {
   const baseBranch = `feature/${issueId.toLowerCase()}`;
-  const slotWorkspace = branch.match(/-slot-(\d+)$/)
-    ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)$/)![1]}`
+  const slotWorkspace = branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)
+    ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)![1]}`
     : workspacePath;
   const roots = resolveWorkspaceRepoRootsSync(issueId, slotWorkspace);
   let total = 0;

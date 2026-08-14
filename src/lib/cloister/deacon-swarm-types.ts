@@ -9,6 +9,13 @@ import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import type { FeatureWorkspace } from './deacon-workspaces.js';
 import type { RequestIssueReviewResult } from './deacon-swarm-finalization.js';
 
+export interface ArchivedBlockedSlot {
+  archivedBranch: string;
+  archivedWorktree: string;
+  replacementBranch: string;
+  releasedAt: string;
+}
+
 /** Dependencies used by one swarm coordinator patrol. */
 export interface CoordinateSwarmSlotsDeps {
   listFeatureWorkspaces: () => FeatureWorkspace[];
@@ -20,15 +27,24 @@ export interface CoordinateSwarmSlotsDeps {
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
   getPaneExitStatus: (sessionName: string) => Promise<number | null>;
+  /**
+   * PAN-3720: diagnostics only — NEVER merge authority. `classifyInFlightSlots`
+   * deliberately does not consult this: static slot ids cross assignment
+   * generations, so a terminal `done|completed` resolution may belong to a
+   * prior assignment and can never classify a slot ready-to-merge.
+   */
   getAgentRuntimeState: (agentId: string) => Promise<Pick<AgentRuntimeSnapshot, 'resolution'> | null>;
   getPaneOutputDigest: (sessionName: string) => Promise<string>;
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
   getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
   isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
+  isSlotBranchPushed?: (workspacePath: string, issueId: string, branch: string) => Promise<boolean>;
+  archiveBlockedSlot?: (issueId: string, workspacePath: string, slotIndex: number, branch: string) => Promise<ArchivedBlockedSlot>;
+  prepareReleasedSlot?: (issueId: string, workspacePath: string, slotIndex: number, itemId: string, branch: string) => Promise<void>;
   sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
-    issue: { issueId: string; featureWorkspace: string },
+    issue: { issueId: string; featureWorkspace: string; slotBranch?: string; slotWorkspace?: string },
     slotIndex: number,
     item: XBriefItem,
   ) => Promise<SlotMergeResult>;
@@ -61,6 +77,9 @@ export interface CoordinateSwarmSlotsDeps {
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record. */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
+  listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
+  getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
+  clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
   /** Request issue-level review after the feature branch contains every item. */
   requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }

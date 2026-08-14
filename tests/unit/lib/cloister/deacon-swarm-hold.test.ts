@@ -387,6 +387,14 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     recordFailedMergeBlock({ issueId: 'PAN-201', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
     mocks.getReviewStatusSync.mockReturnValue(null);
     const deps = makeCoordinateDeps('PAN-201', projectPath, workspacePath, {
+      // PAN-3720: runtime `done` is no longer merge authority — completion
+      // comes from the durable, item-bound slotCompletion marker.
+      readSlotCompletion: vi.fn((_ws: string, _issue: string, slotIndex: number) => ({
+        slotIndex,
+        itemId: `wi-${slotIndex}`,
+        agentId: `agent-pan-201-slot-${slotIndex}`,
+        completedAt: '2026-07-01T00:00:00.000Z',
+      })),
       reconcileSlotState: vi.fn(async () => ({
         issueId: 'PAN-201',
         merged: [],
@@ -406,7 +414,12 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     expect(actions).toContain('[swarm] merged slot 2 (item wi-2) for PAN-201');
     expect(deps.verifyAndMergeSlot).toHaveBeenCalledTimes(1);
     expect(deps.verifyAndMergeSlot).toHaveBeenCalledWith(
-      { issueId: 'PAN-201', featureWorkspace: workspacePath },
+      {
+        issueId: 'PAN-201',
+        featureWorkspace: workspacePath,
+        slotBranch: 'feature/pan-201-slot-2',
+        slotWorkspace: `${workspacePath}-slot-2`,
+      },
       2,
       expect.objectContaining({ id: 'wi-2' }),
     );

@@ -62,7 +62,11 @@ sender uses the keystroke cascade as before.
 3. `pan inbox` re-reads full bodies from `mail/` + `mail/read/`.
 
 `.pending.md` files remain codex notify-hook territory and `mail-*.json`
-remains the FPP mailbox; the monitor never touches either.
+remains the FPP mailbox; the monitor never touches either. `.delivered.md`
+files are post-delivery backups of messages another transport already landed
+(PAN-3738); the suffix only tells a human reading `mail/` that the file is a
+receipt rather than a queue entry, and the monitor drains them like any other
+plain `.md`.
 
 ## Boundaries
 

@@ -22,6 +22,8 @@ import {
   mergeReadySlots,
   recordFailedMergeBlock,
   recoverFailedMergeSlot,
+  releaseBlockedSlots,
+  recordSlotAssignment,
   resetSwarmLoopSafetyForTests,
   type ClassifiedSwarmSlot,
   type CoordinateSwarmSlotsDeps,
@@ -29,6 +31,7 @@ import {
 import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
+import { createMinimalIssueRecord } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 
 beforeEach(() => {
   mocks.listProjectsSync.mockReturnValue([]);
@@ -182,6 +185,98 @@ describe('deacon-swarm failed-merge recovery', () => {
       slotIndex: 1,
       branch: 'feature/pan-2203-slot-1',
     }));
+  });
+
+  it('PAN-3724: releases a dead blocked slot only after its work is clean and pushed', async () => {
+    writeIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203', {
+      ...createMinimalIssueRecord('PAN-2203'),
+      statusOverrides: { 'wi-a': 'blocked' },
+      swarm: {
+        slotAssignments: [{
+          slotIndex: 1,
+          itemId: 'wi-a',
+          agentId: 'agent-pan-2203-slot-1',
+          branch: 'feature/pan-2203-slot-1',
+        }],
+      },
+    });
+    const plan = doc(item('wi-a', 'blocked'));
+    const state = {
+      issueId: 'PAN-2203',
+      merged: [],
+      inFlight: [readySlot()],
+      pending: [],
+      branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }],
+      agents: [{ slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' as const, slotItemId: 'wi-a' }],
+    };
+    const safety = {
+      listSessionNames: vi.fn(async () => []),
+      isPaneDead: vi.fn(async () => true),
+      isSlotWorktreeClean: vi.fn(async () => true),
+      isSlotBranchPushed: vi.fn(async () => true),
+      archiveBlockedSlot: vi.fn(async () => ({
+        archivedBranch: 'feature/pan-2203-slot-1-blocked-20260814',
+        archivedWorktree: `${workspacePath}-slot-1-blocked-20260814`,
+        replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+        releasedAt: '2026-08-14T12:00:00.000Z',
+      })),
+      prepareReleasedSlot: vi.fn(async () => undefined),
+    };
+
+    await expect(releaseBlockedSlots('PAN-2203', workspacePath, plan, state, safety)).resolves.toEqual([
+      '[swarm] released blocked slot 1 (item wi-a) for PAN-2203: archived as feature/pan-2203-slot-1-blocked-20260814 and prepared feature/pan-2203-slot-1-attempt-20260814',
+    ]);
+
+    const record = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
+    expect(record?.swarm?.slotAssignments).toEqual([]);
+    expect(record?.swarm?.releasedBlockedSlots?.['1']).toEqual(expect.objectContaining({
+      slotIndex: 1,
+      itemId: 'wi-a',
+      branch: 'feature/pan-2203-slot-1',
+      archivedBranch: 'feature/pan-2203-slot-1-blocked-20260814',
+      replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+    }));
+    expect(state.inFlight).toEqual([]);
+
+    await recordSlotAssignment(workspacePath, 'PAN-2203', {
+      slotIndex: 1,
+      itemId: 'wi-a',
+      agentId: 'agent-pan-2203-slot-1',
+      branch: 'feature/pan-2203-slot-1',
+    });
+    const reopened = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
+    expect(reopened?.swarm?.releasedBlockedSlots?.['1']).toEqual(expect.objectContaining({
+      replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+    }));
+    expect(reopened?.swarm?.slotAssignments).toEqual([
+      expect.objectContaining({ slotIndex: 1, itemId: 'wi-a' }),
+    ]);
+  });
+
+  it.each([
+    ['uncommitted', false, true, 'uncommitted work'],
+    ['unpushed', true, false, 'unpushed or unverifiable work'],
+  ])('PAN-3724: preserves %s blocked work as needs-you', async (_label, clean, pushed, reason) => {
+    const plan = doc(item('wi-a', 'blocked'));
+    const state = {
+      issueId: 'PAN-2203',
+      merged: [],
+      inFlight: [readySlot()],
+      pending: [],
+      branches: [],
+      agents: [],
+    };
+
+    await expect(releaseBlockedSlots('PAN-2203', workspacePath, plan, state, {
+      listSessionNames: vi.fn(async () => []),
+      isPaneDead: vi.fn(async () => true),
+      isSlotWorktreeClean: vi.fn(async () => clean),
+      isSlotBranchPushed: vi.fn(async () => pushed),
+    })).resolves.toEqual([
+      `[swarm] needs-you PAN-2203: blocked slot 1 has ${reason}; preserving assignment`,
+    ]);
+
+    expect(readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203')?.swarm?.releasedBlockedSlots).toBeUndefined();
   });
 
   it('retries a failed-merge slot by unblocking and re-dispatching through dispatchNextWave', async () => {

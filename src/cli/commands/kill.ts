@@ -153,8 +153,25 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   // invocation: even when multiple agents share a workspace, one teardown
   // suffices.
   const issueForDocker = firstIssueIdForDocker ?? issueId;
+  const lower = issueForDocker.toLowerCase();
+
+  // PAN-3728: a precise single-agent kill (`pan kill agent-pan-3680-test`) must
+  // not tear down a compose stack that sibling agents of the same issue are
+  // still using — the teardown above was written for the issue-wide path, which
+  // kills every discovered agent and therefore has no live siblings left.
+  // Session existence is the operative liveness fact here; state.json status is
+  // known to drift.
+  const killedSet = new Set(agentIds);
+  const liveSiblings = findAgentIdsForIssue(lower)
+    .filter(siblingId => !killedSet.has(siblingId) && sessionExistsSync(siblingId));
+  if (liveSiblings.length > 0) {
+    console.log(chalk.gray(
+      `Skipping Docker teardown: ${liveSiblings.length} live sibling agent(s) (${liveSiblings.join(', ')}) still using this workspace`,
+    ));
+    return;
+  }
+
   try {
-    const lower = issueForDocker.toLowerCase();
     const project = resolveProjectFromIssueSync(issueForDocker);
     const projectPath = project?.projectPath ?? process.cwd();
     const workspacePath = findWorkspacePath(projectPath, lower);
