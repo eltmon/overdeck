@@ -34,9 +34,9 @@ describe('pan task CLI', () => {
     mocks.apply.mockImplementation(async (_project, issueId, operation) => ({ issueId, itemId: operation.itemId, status: 'running', sequence: 1 }));
   });
 
-  it('registers exactly the seven task verbs', () => {
+  it('registers exactly the eight task verbs', () => {
     expect(program().commands[0].commands.map((command) => command.name())).toEqual([
-      'next', 'show', 'claim', 'done', 'block', 'unblock', 'cancel',
+      'next', 'show', 'claim', 'done', 'block', 'unblock', 'reopen', 'cancel',
     ]);
   });
 
@@ -45,6 +45,7 @@ describe('pan task CLI', () => {
     ['done', []],
     ['block', ['--reason', 'waiting']],
     ['unblock', []],
+    ['reopen', ['--reason', 'falsely completed']],
     ['cancel', ['--reason', 'removed']],
   ])('routes %s through the task write door', async (verb, flags) => {
     await program().parseAsync(['node', 'pan', 'task', verb, 'PAN-1', 'PAN-1-a', ...flags]);

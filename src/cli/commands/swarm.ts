@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
@@ -23,7 +24,7 @@ import {
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
-import { writeSwarmPolicyMode } from '../../lib/cloister/deacon-swarm-record.js';
+import { writeSwarmPolicyMode, clearSupersededSwarmAttempts } from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
@@ -33,6 +34,7 @@ import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
+import { resolveSlotWorkspaceWorktreesSync, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
 
 const execAsync = promisify(exec);
 
@@ -344,6 +346,20 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Exact slot workspace names only: `<workspaceBaseName>-slot-<integer>`
+ * (PAN-3694). Reset enumerates the workspaces directory to find stale slot
+ * directories, and preserved archives such as
+ * `feature-min-888-slot-1-reset-backup-20260814` or
+ * `feature-min-888-slot-2-failed-20260814` share the `-slot-` prefix — a
+ * startsWith match swept them in and `slotBranchFromPath` then crashed on the
+ * trailing suffix. Backup, quarantine, failed, and reset-archive suffixes are
+ * operator-preserved state, never live slots.
+ */
+export function isSlotWorkspaceDirectoryName(workspaceBaseName: string, entryName: string): boolean {
+  return new RegExp(`^${escapeRegExp(workspaceBaseName)}-slot-\\d+$`).test(entryName);
+}
+
 export interface SwarmResetOptions {
   force?: boolean;
   reason?: string;
@@ -353,9 +369,13 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
+  clearSupersededSwarmAttempts: typeof clearSupersededSwarmAttempts;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
   removeAgent: (agentId: string) => Promise<unknown>;
+  listSlotWorkspaceDirectories: (workspacePath: string) => string[];
+  resolveSlotWorkspaceWorktrees: (issueId: string, slotWorkspace: string) => SlotWorkspaceWorktrees;
+  removeDirectory: (path: string) => Promise<void>;
 }
 
 const defaultResetDeps: SwarmResetCommandDeps = {
@@ -363,9 +383,19 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   resolveProjectFromIssueSync,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   clearAllSlotAssignments,
+  clearSupersededSwarmAttempts,
   clearFailedMergeBlock,
   getFailedMergeBlocks,
   removeAgent,
+  listSlotWorkspaceDirectories: workspacePath => {
+    const parent = join(workspacePath, '..');
+    const baseName = workspacePath.slice(parent.length + 1);
+    return readdirSync(parent, { withFileTypes: true })
+      .filter(entry => entry.isDirectory() && isSlotWorkspaceDirectoryName(baseName, entry.name))
+      .map(entry => join(parent, entry.name));
+  },
+  resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktreesSync,
+  removeDirectory: path => rm(path, { recursive: true, force: true }),
 };
 
 /**
@@ -430,17 +460,61 @@ export async function swarmResetCommand(
     }
   }
 
+  const worktrees = await listSlotWorktreePaths(workspacePath, deps.runGitCommand);
+  const registered = new Set(worktrees);
+  const staleSlotDirectories = deps.listSlotWorkspaceDirectories(workspacePath).filter(path => !registered.has(path));
+  const stalePolyrepoSlots = staleSlotDirectories.map(slotWorkspace => ({
+    slotWorkspace,
+    branch: slotBranchFromPath(issueLower, slotWorkspace),
+    nested: deps.resolveSlotWorkspaceWorktrees(issue, slotWorkspace).nested,
+  }));
+
+  // Nested polyrepo branches are owned by their parent repositories and do
+  // not appear in the aggregate workspace's branch list. Back them up before
+  // the first removal, under the same fail-closed rule as outer branches.
+  for (const slot of stalePolyrepoSlots) {
+    for (const worktree of slot.nested) {
+      try {
+        const result = await deps.runGitCommand(
+          `git rev-list --count ${JSON.stringify(worktree.featureBranch)}..${JSON.stringify(slot.branch)}`,
+          worktree.parentRepo,
+        ) as { stdout?: unknown };
+        const stdout = String(result?.stdout ?? '').trim();
+        if (!/^\d+$/.test(stdout)) throw new Error('unknown ahead count');
+        const ahead = Number(stdout);
+        if (ahead > 0) await deps.runGitCommand(`git push origin ${JSON.stringify(slot.branch)}`, worktree.parentRepo);
+      } catch (error) {
+        if (!options.force) {
+          deps.console.error(chalk.red(
+            `Aborting reset for ${issue}: preserving nested branch ${slot.branch} failed (${error instanceof Error ? error.message : String(error)}). Nothing was deleted.`,
+          ));
+          return { ok: false };
+        }
+      }
+    }
+  }
+
   // Worktrees first (a branch checked out in a worktree cannot be deleted),
   // then local slot branches.
-  const worktrees = await listSlotWorktreePaths(workspacePath, deps.runGitCommand);
   for (const worktreePath of worktrees) {
     await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktreePath)}`, workspacePath);
+  }
+  for (const { slotWorkspace, branch, nested } of stalePolyrepoSlots) {
+    for (const worktree of nested) {
+      await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktree.dir)}`, worktree.parentRepo);
+      await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, worktree.parentRepo).catch(() => undefined);
+    }
+    await deps.removeDirectory(slotWorkspace);
   }
   for (const { branch } of branches) {
     await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, workspacePath);
   }
 
   await deps.clearAllSlotAssignments(workspacePath, issue);
+  // PAN-3694: the superseded-attempt high-water must not survive the reset —
+  // it would reserve indexes 1..high-water and leave a fresh swarm able to
+  // dispatch only high-water+1 even though every slot below is free.
+  await deps.clearSupersededSwarmAttempts(workspacePath, issue);
   for (const block of deps.getFailedMergeBlocks(issue, workspacePath)) {
     await deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
   }
@@ -477,8 +551,8 @@ export async function swarmResetCommand(
   deps.console.log(chalk.green(`Swarm reset complete for ${issue}.`));
   deps.console.log(
     `Pushed to origin: ${pushed.length > 0 ? pushed.join(', ') : 'nothing (no unmerged slot branches needed a backup)'}. `
-    + `Removed ${worktrees.length} slot worktree(s) and ${branches.length} local slot branch(es). `
-    + `Cleared the recorded slot assignments and any failed-merge block`
+    + `Removed ${worktrees.length + staleSlotDirectories.length} slot workspace(s) and ${branches.length} local slot branch(es). `
+    + `Cleared the recorded slot assignments, the superseded-attempt high-water, and any failed-merge block`
     + `${stoppedRows > 0 ? `, marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}`
     + `${retiredAgents.length > 0 ? `, and retired ${retiredAgents.length} dead slot agent record(s): ${retiredAgents.join(', ')}` : ', and retired no dead slot agent records'}`
     + `${skippedLiveAgents.length > 0 ? `. Skipped live slot agent session(s): ${skippedLiveAgents.join(', ')}` : ''}.`,
@@ -489,6 +563,12 @@ export async function swarmResetCommand(
     + `(then \`pan swarm ${issue}\` to dispatch a fresh wave immediately).`,
   );
   return { ok: true };
+}
+
+function slotBranchFromPath(issueLower: string, slotWorkspace: string): string {
+  const match = /-slot-(\d+)$/.exec(slotWorkspace);
+  if (!match) throw new Error(`Invalid slot workspace path: ${slotWorkspace}`);
+  return `feature/${issueLower}-slot-${match[1]}`;
 }
 
 async function listLocalSlotBranches(
