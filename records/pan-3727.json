@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:20:34.331Z",
+  "updated": "2026-08-14T13:20:51.335Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "reopen-clears-record-merge": {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 933796,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:20:51.335Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -133,6 +141,7 @@
     "closeout-acks-residue": "completed",
     "closeout-acks-residue.ac1": "completed",
     "closeout-acks-residue.ac2": "completed",
-    "closeout-acks-residue.ac3": "completed"
+    "closeout-acks-residue.ac3": "completed",
+    "reopen-clears-record-merge": "running"
   }
 }
