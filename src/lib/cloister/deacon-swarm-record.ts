@@ -134,6 +134,36 @@ export async function clearSwarmSlotOwnership(
   });
 }
 
+export async function releaseBlockedSwarmSlot(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  itemId: string,
+  branch?: string,
+): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
+    const swarm = record.swarm ?? {};
+    const slotAssignments = (swarm.slotAssignments ?? []).filter(
+      assignment => assignment.slotIndex !== slotIndex,
+    );
+    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+    delete slotCompletions[String(slotIndex)];
+    return {
+      ...record,
+      swarm: {
+        ...swarm,
+        slotAssignments,
+        slotCompletions,
+        releasedBlockedSlots: {
+          ...(swarm.releasedBlockedSlots ?? {}),
+          [String(slotIndex)]: { slotIndex, itemId, branch, releasedAt: new Date().toISOString() },
+        },
+      },
+    };
+  });
+}
+
 /**
  * Drop every superseded-attempt record (PAN-3694). A work-preserving swarm
  * reset removes all slot worktrees and branches, so the slot indexes the
