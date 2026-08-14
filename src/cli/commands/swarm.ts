@@ -35,6 +35,7 @@ import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 import { resolveSlotWorkspaceWorktreesSync, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
+import { isRegisteredWorktree } from '../../lib/cloister/deacon-swarm-gc.js';
 
 const execAsync = promisify(exec);
 
@@ -475,6 +476,29 @@ export async function swarmResetCommand(
   for (const slot of stalePolyrepoSlots) {
     for (const worktree of slot.nested) {
       try {
+        // PAN-3713: a branch already deleted by an earlier (partial) cleanup
+        // pass has nothing left to preserve — `git rev-list` on a missing ref
+        // would throw and wedge every re-run. It is durable when origin still
+        // has it; when origin lacks it too, the only way it vanished is this
+        // same command, which deletes a branch only after proving it merged
+        // or pushed — warn and continue so re-runs stay idempotent.
+        const branchList = await deps.runGitCommand(
+          `git branch --list ${JSON.stringify(slot.branch)}`,
+          worktree.parentRepo,
+        ) as { stdout?: unknown };
+        if (String(branchList?.stdout ?? '').trim().length === 0) {
+          const remote = await deps.runGitCommand(
+            `git ls-remote --heads origin ${JSON.stringify(slot.branch)}`,
+            worktree.parentRepo,
+          ) as { stdout?: unknown };
+          if (String(remote?.stdout ?? '').trim().length === 0) {
+            deps.console.log(chalk.yellow(
+              `Nested branch ${slot.branch} is absent from ${worktree.parentRepo} and origin — `
+              + 'assuming an earlier cleanup pass removed it after proving durability.',
+            ));
+          }
+          continue;
+        }
         const result = await deps.runGitCommand(
           `git rev-list --count ${JSON.stringify(worktree.featureBranch)}..${JSON.stringify(slot.branch)}`,
           worktree.parentRepo,
@@ -501,7 +525,37 @@ export async function swarmResetCommand(
   }
   for (const { slotWorkspace, branch, nested } of stalePolyrepoSlots) {
     for (const worktree of nested) {
-      await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktree.dir)}`, worktree.parentRepo);
+      // PAN-3713: the nested list comes from project config, not from git, so
+      // it still names paths whose worktree registration an earlier merge/GC
+      // pass already removed. `git worktree remove` on such a path crashes
+      // with "fatal: '<path>' is not a working tree" — yet already-absent is
+      // exactly the desired postcondition. The preserve pass above proved the
+      // branch merged or pushed, so an unregistered path is a success: prune
+      // stale admin entries and continue with the remaining nested repos.
+      const registered = await isRegisteredWorktree(deps.runGitCommand, worktree.parentRepo, worktree.dir);
+      if (registered === null) {
+        deps.console.error(chalk.red(
+          `Aborting reset for ${issue}: worktree registration of ${worktree.dir} in ${worktree.parentRepo} `
+          + 'could not be determined. Nothing more was deleted; fix the repository state and re-run the reset.',
+        ));
+        return { ok: false };
+      }
+      if (registered) {
+        try {
+          await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktree.dir)}`, worktree.parentRepo);
+        } catch (error) {
+          deps.console.error(chalk.red(
+            `Aborting reset for ${issue}: removing nested worktree ${worktree.dir} failed `
+            + `(${error instanceof Error ? error.message : String(error)}). Fix the failure and re-run the reset.`,
+          ));
+          return { ok: false };
+        }
+      } else {
+        await deps.runGitCommand('git worktree prune', worktree.parentRepo).catch(() => undefined);
+        deps.console.log(chalk.dim(
+          `Nested worktree ${worktree.dir} is no longer registered in ${worktree.parentRepo} — already removed.`,
+        ));
+      }
       await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, worktree.parentRepo).catch(() => undefined);
     }
     await deps.removeDirectory(slotWorkspace);

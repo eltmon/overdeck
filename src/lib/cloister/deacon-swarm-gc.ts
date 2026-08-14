@@ -303,8 +303,11 @@ async function removeSlotWorkspace(
  * `repoDir`, or null when the registration state cannot be determined. The
  * porcelain list always names at least the repository's own main worktree, so
  * a response with no `worktree` lines is an anomaly, not proof of "absent".
+ * Shared with `pan swarm reset` (PAN-3713), which must distinguish an
+ * already-unregistered nested worktree (the desired postcondition) from a
+ * genuine removal failure.
  */
-async function isRegisteredWorktree(
+export async function isRegisteredWorktree(
   runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
   repoDir: string,
   worktreeDir: string,
