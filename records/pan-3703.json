@@ -37,18 +37,21 @@
     "recordedAt": "2026-08-14T06:49:34.446Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T06:57:18.554Z",
+  "updated": "2026-08-14T07:16:31.185Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T06:51:14.352Z",
-    "updatedAt": "2026-08-14T06:57:18.528Z",
+    "updatedAt": "2026-08-14T07:16:30.985Z",
     "reviewNotes": "All four reviewers approved with no blocking or advisory findings",
+    "testNotes": "typecheck/lint/tests all pass (1450 files, 13744 tests, exit 0; CommandPalette.test.tsx 23/23 incl. 4 new PAN-3703 ordering tests)",
+    "uatNotes": "Ctrl-K palette search endpoint (/api/palette/search) 401/403'd on all 7 attempts in the workspace peer dashboard — pre-existing session-auth issue unrelated to this frontend-only diff; newest-first ordering could not be observed end-to-end",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
     "reviewSpawnedAt": "2026-08-14T06:53:38.001Z",
@@ -80,9 +83,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 14473042,
-            "output": 19691,
-            "cacheRead": 14021888,
+            "input": 14626606,
+            "output": 20604,
+            "cacheRead": 14170624,
             "cacheWrite": 0
           }
         },
@@ -92,6 +95,14 @@
             "output": 76,
             "cacheRead": 0,
             "cacheWrite": 0
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 160,
+            "output": 29307,
+            "cacheRead": 15584619,
+            "cacheWrite": 253278
           }
         }
       },
@@ -103,9 +114,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 14473042,
-          "output": 19691,
-          "cacheRead": 14021888,
+          "input": 14626606,
+          "output": 20604,
+          "cacheRead": 14170624,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -113,11 +124,17 @@
           "output": 76,
           "cacheRead": 0,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 160,
+          "output": 29307,
+          "cacheRead": 15584619,
+          "cacheWrite": 253278
         }
       },
       "costAtCloseOut": {
-        "usd": 9.866029,
-        "pricingAsOf": "2026-08-14T06:57:18.534Z"
+        "usd": 14.035439,
+        "pricingAsOf": "2026-08-14T07:16:31.083Z"
       }
     },
     "merges": [
