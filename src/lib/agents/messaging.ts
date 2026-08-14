@@ -67,13 +67,24 @@ export interface MessageDeliveryOutcome {
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
 
+/** PAN-3736 — the one phrase for "the message went to the mail file because the
+ * agent was busy". It states that the agent is alive, and names the file, so a
+ * reader never mistakes a mid-turn agent for a dead one. It deliberately does
+ * not promise turn-end delivery: PAN-3738 tracks the queue that nothing drains
+ * for conversations. */
+function busyAgentQueuedReason(mailPath: string): string {
+  return `agent is alive and mid-turn; message queued to its mail file (${mailPath})`;
+}
+
+/** Writes the message to the agent's durable mail dir and returns the file path
+ * it wrote, so callers can name it in operator-facing output (PAN-3736). */
 function queueAgentMail(
   agentId: string,
   message: string,
   pendingTurnEndDelivery = false,
   dedupKey?: string,
   source?: string,
-): void {
+): string {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
   const now = new Date();
@@ -86,8 +97,10 @@ function queueAgentMail(
   // tier, PAN-3015). Callers that replay mail verbatim (codex notify hook
   // pastes `.pending.md` content) keep the legacy `# Message\n\n<body>` shape.
   const content = source ? formatMailFileContent(message, source, now) : `# Message\n\n${message}\n`;
-  writeFileSync(join(mailDir, filename), content
+  const mailPath = join(mailDir, filename);
+  writeFileSync(mailPath, content
   );
+  return mailPath;
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
@@ -511,11 +524,17 @@ export async function messageAgent(
   if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
     const promptReady = claimCodexIdleTurn(normalizedId);
     if (!promptReady) {
-      queueAgentMail(normalizedId, message, true, opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
-      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
+      // PAN-3736: a busy agent is a WORKING agent, not a dead one. Say that in
+      // one phrase everywhere this outcome surfaces, and name the mail file so
+      // a human or peer can read or hand-deliver it. The old wording promised
+      // turn-end delivery, which PAN-3738 shows is not currently true for
+      // conversations — so it no longer makes that promise.
+      const mailPath = queueAgentMail(normalizedId, message, true, opts.dedupKey);
+      const busyReason = busyAgentQueuedReason(mailPath);
+      logAgentLifecycleSync(normalizedId, `messageAgent: ${busyReason}`);
+      console.log(`[agents] ${normalizedId}: ${busyReason}`);
       await appendTellInterventionForUserSource(normalizedId, caller);
-      return { delivered: true, queuedToMail: true, reason: 'queued for turn-end delivery' };
+      return { delivered: true, queuedToMail: true, reason: busyReason };
     }
 
     const deliveryMethod = resolveAgentDeliveryMethod(agentState);

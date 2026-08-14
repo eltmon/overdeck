@@ -5234,6 +5234,23 @@
   cursor: help;
 }
 
+/* PAN-3736: the same handoff-fallback reason, once the conversation has proven
+   it is alive. Red is reserved for live failures, so a historical seed note is
+   muted — same chip geometry as .conversationBranchChip. */
+.conversationForkFallbackNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+  cursor: help;
+}
+
 /* ─── Branch / worktree chips (PAN-1523) ─────────────────────────────────── */
 
 .conversationBranchChip {
