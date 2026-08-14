@@ -1,6 +1,5 @@
 import { exec } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
@@ -40,6 +39,7 @@ import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 import { ensureSwarmForeman } from '../../lib/cloister/swarm-foreman.js';
 import { resolveSlotWorkspaceWorktreesSync, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
+import { removeWorkspaceDirectory } from '../../lib/workspace-manager/remove-directory.js';
 import { isRegisteredWorktree } from '../../lib/cloister/deacon-swarm-gc.js';
 import {
   swarmDispatchCommand,
@@ -451,6 +451,26 @@ export function isSlotWorkspaceDirectoryName(workspaceBaseName: string, entryNam
   return new RegExp(`^${escapeRegExp(workspaceBaseName)}-slot-\\d+$`).test(entryName);
 }
 
+/**
+ * Enumerates stale slot workspace directories next to `workspacePath`
+ * (PAN-3694). Two filters together scope downstream removal — including the
+ * privileged Docker fallback in removeWorkspaceDirectory (PAN-3717) — to real
+ * slot directories only:
+ *
+ * - `Dirent.isDirectory()` is false for symlinks (they surface via
+ *   `isSymbolicLink()`), so a symlink planted at a slot-shaped name can never
+ *   become the target of the Docker bind mount;
+ * - `isSlotWorkspaceDirectoryName` accepts only the exact
+ *   `<base>-slot-<integer>` shape, never operator-preserved archives.
+ */
+export function listSlotWorkspaceDirectoriesSync(workspacePath: string): string[] {
+  const parent = join(workspacePath, '..');
+  const baseName = workspacePath.slice(parent.length + 1);
+  return readdirSync(parent, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && isSlotWorkspaceDirectoryName(baseName, entry.name))
+    .map(entry => join(parent, entry.name));
+}
+
 export interface SwarmResetOptions {
   force?: boolean;
   reason?: string;
@@ -478,15 +498,9 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   clearFailedMergeBlock,
   getFailedMergeBlocks,
   removeAgent,
-  listSlotWorkspaceDirectories: workspacePath => {
-    const parent = join(workspacePath, '..');
-    const baseName = workspacePath.slice(parent.length + 1);
-    return readdirSync(parent, { withFileTypes: true })
-      .filter(entry => entry.isDirectory() && isSlotWorkspaceDirectoryName(baseName, entry.name))
-      .map(entry => join(parent, entry.name));
-  },
+  listSlotWorkspaceDirectories: listSlotWorkspaceDirectoriesSync,
   resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktreesSync,
-  removeDirectory: path => rm(path, { recursive: true, force: true }),
+  removeDirectory: path => removeWorkspaceDirectory(path),
 };
 
 /**
@@ -648,7 +662,22 @@ export async function swarmResetCommand(
       }
       await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, worktree.parentRepo).catch(() => undefined);
     }
-    await deps.removeDirectory(slotWorkspace);
+    // PAN-3717: slot directories can contain root-owned artifacts created by
+    // the workspace container (e.g. `.pnpm-store`), so removal goes through
+    // the resilient cleanup door (Docker fallback). A removal failure must be
+    // a controlled reset failure — recorded slot state stays uncleared so a
+    // re-run picks up exactly here; an uncaught EACCES would leave the swarm
+    // frozen with assignments intact and no actionable message.
+    try {
+      await deps.removeDirectory(slotWorkspace);
+    } catch (error) {
+      deps.console.error(chalk.red(
+        `Aborting reset for ${issue}: removing stale slot directory ${slotWorkspace} failed `
+        + `(${error instanceof Error ? error.message : String(error)}). Recorded slot state was NOT cleared; `
+        + `fix the removal failure and re-run \`pan swarm reset ${issue}\`.`,
+      ));
+      return { ok: false };
+    }
   }
   for (const { branch } of branches) {
     await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, workspacePath);

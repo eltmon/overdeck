@@ -233,6 +233,7 @@ describe('gatherIssueBranchContainment', () => {
 
     await expect(gatherIssueBranchContainment(project, 'PAN-3109', run)).resolves.toEqual({
       mergedWorkRefs: ['/project:feature/pan-3109'],
+      mergedWorkHeads: [{ ref: '/project:feature/pan-3109', head: 'bbb' }],
       pointerRefs: ['/project:origin/feature/pan-3109'],
       unmergedRefs: ['/project:strike/pan-3109', '/project:origin/strike/pan-3109'],
     });
@@ -271,6 +272,7 @@ describe('gatherIssueBranchContainment', () => {
 
     await expect(gatherIssueBranchContainment(polyrepoProject, 'MIN-873', run)).resolves.toEqual({
       mergedWorkRefs: ['/myn/frontend:feature/min-873'],
+      mergedWorkHeads: [{ ref: '/myn/frontend:feature/min-873', head: 'front-merge' }],
       pointerRefs: ['/myn/api:feature/min-873'],
       unmergedRefs: [],
     });

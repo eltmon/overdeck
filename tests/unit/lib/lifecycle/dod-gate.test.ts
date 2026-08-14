@@ -25,6 +25,7 @@ import {
   checkTestsRow,
   checkVerificationRow,
   evaluateDodGate,
+  reconcileContainedStrike,
   readContainingDefaultBranchCommits,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
@@ -267,6 +268,70 @@ describe('Definition-of-Done status rows', () => {
   });
 });
 
+describe('contained strike reconciliation', () => {
+  const head = 'b'.repeat(40);
+  const ctx = { issueId, projectPath: '/tmp/overdeck' };
+  const contained = {
+    id: 'merged' as const,
+    num: 4,
+    title: 'Merged to main',
+    expected: 'merged',
+    observed: 'contained strike',
+    status: 'pass' as const,
+    evidence: 'branch-containment' as const,
+    containedStrikeHead: head,
+  };
+
+  it('records terminal strike verdicts through the canonical writer', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({
+        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
+        strikeReadyHead: head, strikeReadyAt: '2026-08-13T00:00:00Z', strikeLandingState: 'needs_you',
+      }),
+      setStatus,
+    });
+
+    expect(setStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
+      reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
+      lastVerifiedCommit: head, mergeStatus: 'merged', strikeLandingState: 'landed',
+      strikeReadyHead: undefined, strikeReadyAt: undefined,
+    }));
+  });
+
+  it('requires readiness evidence tied to the contained head', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({ strikeReadyHead: 'c'.repeat(40) }),
+      setStatus,
+    });
+    expect(setStatus).not.toHaveBeenCalled();
+  });
+
+  it('preserves every existing negative verdict', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({
+        reviewStatus: 'blocked', testStatus: 'failed', verificationStatus: 'failed', strikeReadyHead: head,
+      }),
+      setStatus,
+    });
+    const update = setStatus.mock.calls[0]?.[1];
+    expect(update).not.toHaveProperty('reviewStatus');
+    expect(update).not.toHaveProperty('testStatus');
+    expect(update).not.toHaveProperty('verificationStatus');
+  });
+
+  it('does nothing for a normal PR-landed strike', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, { ...contained, evidence: undefined }, {
+      getStatus: () => live({ strikeReadyHead: head }),
+      setStatus,
+    });
+    expect(setStatus).not.toHaveBeenCalled();
+  });
+});
+
 describe('Definition-of-Done merged row', () => {
   const ctx = {
     issueId,
@@ -364,6 +429,23 @@ describe('Definition-of-Done merged row', () => {
 
     expect(row.evidence).toBe('branch-containment');
     expect(row.observed).toContain('non-PR landing (membership L2-work lens): fe:feature/min-908');
+  });
+
+  it('carries the contained strike head as reconciliation evidence', async () => {
+    const head = 'a'.repeat(40);
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: [`/tmp/overdeck:strike/${issueId.toLowerCase()}`],
+        mergedWorkHeads: [{ ref: `/tmp/overdeck:strike/${issueId.toLowerCase()}`, head }],
+        unmergedRefs: [],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row).toMatchObject({ evidence: 'branch-containment', containedStrikeHead: head });
   });
 
   it('reports unavailable merged-forge evidence without throwing', async () => {

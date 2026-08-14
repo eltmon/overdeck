@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName, listSlotWorkspaceDirectoriesSync } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -1104,6 +1104,83 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });
     expect(merged.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(merged.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
+  });
+
+  it('a stale slot directory removal failure is a controlled reset failure and clears no state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    // The PAN-3717 crash: root-owned container artifacts (fe/.pnpm-store)
+    // make the recursive host-side removal fail with EACCES.
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(
+        new Error(`EACCES: permission denied, rmdir '${slotWorkspace}/fe/.pnpm-store/v10'`),
+        { code: 'EACCES' },
+      );
+    });
+
+    // Must resolve with a controlled failure — never an uncaught exception.
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(false);
+    expect(loggedText(deps)).toContain(slotWorkspace);
+    expect(loggedText(deps)).toContain('EACCES');
+    expect(loggedText(deps)).toContain('NOT cleared');
+    expect(loggedText(deps)).toContain('pan swarm reset PAN-2203');
+    // Recorded slot state survives so a re-run picks up exactly here.
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+    expect(deps.clearSupersededSwarmAttempts).not.toHaveBeenCalled();
+    expect(deps.clearFailedMergeBlock).not.toHaveBeenCalled();
+    expect(deps.removeAgent).not.toHaveBeenCalled();
+  });
+
+  it('re-running reset after a failed directory removal succeeds and clears state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    });
+
+    await expect(swarmResetCommand('PAN-2203', {}, deps)).resolves.toEqual({ ok: false });
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+
+    // Removal now succeeds (e.g. the Docker fallback cleaned the root-owned
+    // artifacts): the same reset run reaches completion and clears state.
+    deps.removeDirectory = vi.fn(async () => undefined);
+    const rerun = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(rerun.ok).toBe(true);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(deps.clearSupersededSwarmAttempts).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+  });
+});
+
+describe('listSlotWorkspaceDirectoriesSync (PAN-3717 containment)', () => {
+  it('returns only real exact-name slot directories — never symlinks or preserved archives', () => {
+    const root = mkdtempSync(join(tmpdir(), 'swarm-slots-'));
+    try {
+      const workspaces = join(root, 'workspaces');
+      mkdirSync(workspaces);
+      const realSlot = join(workspaces, 'feature-min-888-slot-1');
+      mkdirSync(realSlot);
+      // A symlink planted at a slot-shaped name must never reach the
+      // privileged Docker bind mount in removeWorkspaceDirectory.
+      const elsewhere = join(root, 'elsewhere');
+      mkdirSync(elsewhere);
+      symlinkSync(elsewhere, join(workspaces, 'feature-min-888-slot-2'));
+      // Operator-preserved archives share the -slot- prefix but are not slots.
+      mkdirSync(join(workspaces, 'feature-min-888-slot-3-reset-backup-20260814'));
+
+      const found = listSlotWorkspaceDirectoriesSync(join(workspaces, 'feature-min-888'));
+
+      expect(found).toEqual([realSlot]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

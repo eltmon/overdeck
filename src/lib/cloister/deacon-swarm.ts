@@ -396,13 +396,21 @@ export async function classifyInFlightSlots(
       continue;
     }
 
-    const runtimeState = deps.getAgentRuntimeState ? await deps.getAgentRuntimeState(slot.agentId) : null;
-    if (runtimeState?.resolution === 'done' || runtimeState?.resolution === 'completed') {
-      classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0 });
-      continue;
-    }
-
+    // PAN-3720: a terminal runtime resolution is only trustworthy when the
+    // session is GONE. Static slot ids are reused across assignments (the
+    // Deacon reassigns e.g. agent-min-888-slot-1 to the next work item), and
+    // the fresh session inherits the previous assignment's terminal runtime
+    // snapshot — checking the runtime plane before liveness classified a live,
+    // freshly-spawned session as ready-to-merge before it did any work. While
+    // the session is alive, only a durable slotCompletion marker (checked
+    // above, itemId-guarded) may complete the slot; the runtime-resolution
+    // fallback below applies only to a vanished session.
     if (!sessionNames.has(slot.agentId)) {
+      const runtimeState = deps.getAgentRuntimeState ? await deps.getAgentRuntimeState(slot.agentId) : null;
+      if (runtimeState?.resolution === 'done' || runtimeState?.resolution === 'completed') {
+        classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0 });
+        continue;
+      }
       if (durableReady) {
         classified.push(durableReady);
         continue;
