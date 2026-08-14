@@ -39,7 +39,7 @@
     "recordedAt": "2026-08-14T06:50:56.362Z"
   },
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T07:32:57.534Z",
+  "updated": "2026-08-14T07:34:51.124Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "passed",
@@ -48,31 +48,17 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-14T07:32:55.103Z",
-    "reviewNotes": "All four reviewers are clean; all 11 in-scope requirements are covered.",
-    "testNotes": "typecheck clean (npm run typecheck). lint clean (npm run lint). npm test: clean rerun 1450 files/13744 tests passed, 4 frontend files/64 tests passed, 0 failures, 3 skipped (an earlier run showed 8 unrelated setupOverdeckTestDb() beforeEach hook timeouts under concurrent load; confirmed transient — a full clean rerun and a serial isolation rerun both passed 100%). Targeted CommandPalette.test.tsx: 25/25 passed via npm --prefix ./src/dashboard/frontend run test.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-14T07:34:50.853Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-14T07:34:50.851Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3710",
-    "reviewSpawnedAt": "2026-08-14T06:53:54.419Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-allowlist.txt"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/DESKTOP-APP.md",
-        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
-        "src/dashboard/frontend/src/components/CommandPalette.tsx"
-      ],
-      "actualChangedFiles": [
-        "docs/DESKTOP-APP.md",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
-        "src/dashboard/frontend/src/components/CommandPalette.tsx"
-      ],
-      "recordedAt": "2026-08-14T06:50:56.362Z"
-    }
+    "reviewSpawnedAt": "2026-08-14T06:53:54.419Z"
   },
   "closeOut": {
     "usage": {
@@ -101,10 +87,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 220,
-            "output": 37039,
-            "cacheRead": 21366819,
-            "cacheWrite": 250860
+            "input": 224,
+            "output": 37678,
+            "cacheRead": 21870221,
+            "cacheWrite": 251193
           }
         }
       },
@@ -128,15 +114,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 220,
-          "output": 37039,
-          "cacheRead": 21366819,
-          "cacheWrite": 250860
+          "input": 224,
+          "output": 37678,
+          "cacheRead": 21870221,
+          "cacheWrite": 251193
         }
       },
       "costAtCloseOut": {
-        "usd": 17.776696,
-        "pricingAsOf": "2026-08-14T07:32:57.524Z"
+        "usd": 17.884607,
+        "pricingAsOf": "2026-08-14T07:34:50.976Z"
       }
     },
     "merges": [
