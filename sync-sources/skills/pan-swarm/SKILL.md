@@ -31,6 +31,16 @@ pan swarm status PAN-2203
 
 `pan swarm status` is read-only — it performs no writes, no git mutation, and no dispatch. It prints one row per reconciled slot (index, item, lifecycle, branch merged/unmerged, agent session alive/dead), the hold state (whether the Deacon is skipping the issue and how to resume), and capacity (tmux-alive slot sessions against the reserved swarm slot limit).
 
+## Dispatch One Wave
+
+Run:
+
+```bash
+pan swarm dispatch PAN-2203
+```
+
+This command performs one gated dispatch pass. It refuses held issues and dependent items whose blockers are not complete. It serializes overlapping file scopes, enforces capacity and duplicate-slot checks, and releases claims if spawning fails. Use `--json` for structured output.
+
 ## Recover a Failed Slot
 
 Run:

@@ -63,7 +63,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
-import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
@@ -152,6 +152,8 @@ export interface CoordinateSwarmSlotsDeps {
    * activates mid-patrol (PAN-2214 slot-20 regression).
    */
   shouldDispatch?: (issueId: string) => boolean;
+  /** Dedicated swarm hold, checked again after claim and before every spawn. */
+  readSwarmHold?: typeof readSwarmHold;
   /**
    * Inclusive upper bound for slot index allocation — the swarm reserve.
    * Unbounded allocation climbed slot-5..slot-20 under an inconsistent
@@ -206,6 +208,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   spawnRun,
   getIssueHold: defaultGetIssueHold,
   shouldDispatch: defaultShouldDispatch,
+  readSwarmHold,
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
   readStatusOverrides: defaultReadStatusOverrides,
@@ -877,6 +880,7 @@ export async function dispatchNextWave(
     | 'clearSlotAssignment'
     | 'spawnRun'
     | 'shouldDispatch'
+    | 'readSwarmHold'
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
@@ -966,7 +970,8 @@ export async function dispatchNextWave(
       });
       // Freeze/hold can activate mid-wave; the cycle-start gate has already passed
       // by then, so re-check before every spawn (PAN-2214 slot-20 regression).
-      if (!(deps.shouldDispatch ?? defaultShouldDispatch)(issueId)) {
+      const swarmHold = deps.readSwarmHold?.(workspacePath, issueId);
+      if (swarmHold || !(deps.shouldDispatch ?? defaultShouldDispatch)(issueId)) {
         await deps.applyTaskOperationToPlanFile(issueId, {
           type: 'unblock',
           itemId: item.id,
