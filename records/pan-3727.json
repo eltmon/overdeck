@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:02:32.472Z",
+  "updated": "2026-08-14T14:02:36.378Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -25,7 +25,57 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T12:55:34.265Z"
+    "updatedAt": "2026-08-14T14:02:36.372Z",
+    "reviewRequestedAt": "2026-08-14T14:02:36.372Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/MERGE-WORKFLOW.md",
+        "docs/PARKED-POPULATION.md",
+        "src/cli/commands/parked.ts",
+        "src/lib/agents/agent-state.ts",
+        "src/lib/cloister/__tests__/parked-residue.test.ts",
+        "src/lib/cloister/__tests__/recovery-trip-all.test.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/parked-residue.ts",
+        "src/lib/cloister/recovery-trip.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/pan-dir/__tests__/record-update.test.ts",
+        "src/lib/pan-dir/record-update.ts",
+        "src/lib/parked/__tests__/resolver.test.ts",
+        "src/lib/parked/resolver.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/lib/agents/agent-state-gate.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/MERGE-WORKFLOW.md",
+        "docs/PARKED-POPULATION.md",
+        "scripts/file-size-allowlist.txt",
+        "src/cli/commands/parked.ts",
+        "src/lib/agents/agent-state.ts",
+        "src/lib/cloister/__tests__/parked-residue.test.ts",
+        "src/lib/cloister/__tests__/recovery-trip-all.test.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/parked-residue.ts",
+        "src/lib/cloister/recovery-trip.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/pan-dir/__tests__/record-update.test.ts",
+        "src/lib/pan-dir/record-update.ts",
+        "src/lib/parked/__tests__/resolver.test.ts",
+        "src/lib/parked/resolver.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/lib/agents/agent-state-gate.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "recordedAt": "2026-08-14T14:02:32.470Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3733"
   },
   "closeOut": {
     "usage": {
