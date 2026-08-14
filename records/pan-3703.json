@@ -22,7 +22,11 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts",
+      "src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts",
+      "src/dashboard/frontend/src/lib/wsTransport.ts",
+      "src/dashboard/server/routes/__tests__/palette.test.ts",
+      "src/dashboard/server/routes/palette.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -32,12 +36,16 @@
     "actualChangedFiles": [
       "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
       "src/dashboard/frontend/src/components/CommandPalette.tsx",
-      "src/dashboard/frontend/src/components/command-palette-sorting.ts"
+      "src/dashboard/frontend/src/components/command-palette-sorting.ts",
+      "src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts",
+      "src/dashboard/frontend/src/lib/wsTransport.ts",
+      "src/dashboard/server/routes/__tests__/palette.test.ts",
+      "src/dashboard/server/routes/palette.ts"
     ],
-    "recordedAt": "2026-08-14T06:49:34.446Z"
+    "recordedAt": "2026-08-14T07:31:20.960Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T07:31:17.074Z",
+  "updated": "2026-08-14T07:31:20.961Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
