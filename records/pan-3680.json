@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T02:00:26.356Z",
+  "updated": "2026-08-14T02:15:28.984Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -69,18 +69,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "swarm-hold-counters": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3680",
         "agentId": "agent-pan-3680",
         "pid": 662917,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T02:00:26.355Z"
+        "claimedAt": "2026-08-14T02:00:26.355Z",
+        "itemId": "swarm-hold-counters",
+        "outcome": "completed",
+        "reason": "Added durable swarm.hold and per-slot failure-class intervention counters, rewired freeze/resume/stop/reset, enforced recover cap, and updated tests and CLI guidance.",
+        "releasedAt": "2026-08-14T02:15:28.983Z"
+      }
+    ],
+    "statusReasons": {
+      "swarm-hold-counters": {
+        "reason": "Added durable swarm.hold and per-slot failure-class intervention counters, rewired freeze/resume/stop/reset, enforced recover cap, and updated tests and CLI guidance.",
+        "updatedAt": "2026-08-14T02:15:28.983Z"
       }
     }
   },
   "statusOverrides": {
-    "swarm-hold-counters": "running"
+    "swarm-hold-counters": "completed",
+    "swarm-hold-counters.ac1": "completed",
+    "swarm-hold-counters.ac2": "completed",
+    "swarm-hold-counters.ac3": "completed",
+    "swarm-hold-counters.ac4": "completed"
   }
 }
