@@ -98,7 +98,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:24:43.063Z",
+  "updated": "2026-08-14T14:26:44.458Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -111,7 +111,7 @@
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (183966ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
-    "reviewRequestedAt": "2026-08-14T14:24:32.867Z",
+    "reviewRequestedAt": "2026-08-14T14:26:44.094Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -165,7 +165,8 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-08-14T14:24:31.922Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z"
   },
   "closeOut": {
     "usage": {
