@@ -7,7 +7,7 @@ import { FsError } from '../errors.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveAutoResumeConfigForIssue } from '../cloister/auto-resume-config.js';
 import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from '../overdeck/agent-rollback-state.js';
-import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync } from '../overdeck/agent-state-sync.js';
+import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync, listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -665,6 +665,42 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
     yield* saveAgentState(state);
     return state;
   });
+
+/**
+ * Clear operator-gate residue (stoppedByUser, paused, troubled) on an issue's
+ * STOPPED agent rows — used by close-out and the terminal-issue residue
+ * patrol so a terminal issue's preserved agent rows stop reappearing in the
+ * operator-gate parked orbit (PAN-3727). Running/starting agents and
+ * scheduler yields are never touched: a yield is a live scheduling decision,
+ * not operator residue, and a live agent's gates are not this issue's to clear.
+ */
+export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
+  const normalized = issueId.toUpperCase();
+  const mutated: string[] = [];
+  for (const state of listOverdeckAgentStatesSync()) {
+    if (state.status !== 'stopped') continue;
+    if (state.issueId?.toUpperCase() !== normalized) continue;
+
+    let changed = false;
+    if (state.stoppedByUser) {
+      delete state.stoppedByUser;
+      changed = true;
+    }
+    if (state.paused === true && state.yieldedByScheduler !== true) {
+      applyAgentUnpaused(state);
+      changed = true;
+    }
+    if (state.troubled === true) {
+      applyAgentUntroubled(state);
+      changed = true;
+    }
+    if (changed) {
+      saveAgentStateSync(state);
+      mutated.push(state.id);
+    }
+  }
+  return mutated;
+}
 
 function applyAgentFailure(state: AgentState, reason: string): void {
   const config = resolveAutoResumeConfigForIssue(state.issueId);

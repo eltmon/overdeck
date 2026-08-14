@@ -1,11 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import {
   decideResumeGate,
   getAgentResumeGateBlockReason,
   markAgentRunning,
+  clearAgentOperatorGatesForIssueSync,
+  saveAgentStateSync,
+  getAgentStateSync,
   type AgentState,
   type ResumeGateBlock,
 } from '../../../../src/lib/agents/agent-state.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
 describe('getAgentResumeGateBlockReason', () => {
   it.each([
@@ -168,5 +172,59 @@ describe('decideResumeGate', () => {
         reason: block.reason,
       });
     }
+  });
+});
+
+describe('clearAgentOperatorGatesForIssueSync', () => {
+  let odb: OverdeckTestDb;
+  beforeEach(() => { odb = setupOverdeckTestDb(); });
+  afterEach(() => { teardownOverdeckTestDb(odb); });
+
+  function stoppedState(overrides: Partial<AgentState> = {}): AgentState {
+    return {
+      id: 'agent-pan-3727-work',
+      issueId: 'PAN-3727',
+      workspace: '/tmp/workspace',
+      role: 'work',
+      model: 'claude-opus-4-8',
+      status: 'stopped',
+      startedAt: '2026-08-01T00:00:00.000Z',
+      ...overrides,
+    } as AgentState;
+  }
+
+  it('clears stoppedByUser on a stopped row and returns its id', () => {
+    saveAgentStateSync(stoppedState({ stoppedByUser: true }));
+
+    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+
+    expect(mutated).toEqual(['agent-pan-3727-work']);
+    expect(getAgentStateSync('agent-pan-3727-work')?.stoppedByUser).toBeUndefined();
+  });
+
+  it('leaves a running agent row untouched and omits it from the returned ids', () => {
+    saveAgentStateSync(stoppedState({ id: 'agent-pan-3727-review', status: 'running', stoppedByUser: true }));
+
+    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+
+    expect(mutated).toEqual([]);
+    expect(getAgentStateSync('agent-pan-3727-review')?.stoppedByUser).toBe(true);
+  });
+
+  it('preserves a scheduler yield (paused + yieldedByScheduler) on a stopped row', () => {
+    saveAgentStateSync(stoppedState({
+      id: 'agent-pan-3727-yielded',
+      paused: true,
+      pausedReason: 'yield: making room for review of PAN-9999',
+      yieldedByScheduler: true,
+      yieldedAt: '2026-08-01T00:00:00.000Z',
+    }));
+
+    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+
+    expect(mutated).toEqual([]);
+    const loaded = getAgentStateSync('agent-pan-3727-yielded');
+    expect(loaded?.paused).toBe(true);
+    expect(loaded?.yieldedByScheduler).toBe(true);
   });
 });
