@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-13T21:55:53.887Z",
-  "updated": "2026-08-14T04:27:56.505Z",
+  "updated": "2026-08-14T04:40:16.845Z",
   "pipeline": {
     "issueId": "PAN-3690",
     "reviewStatus": "pending",
@@ -94,5 +94,15 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3690",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-08-14T04:27:56.474Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-14T04:40:16.841Z"
+    }
+  ]
 }
