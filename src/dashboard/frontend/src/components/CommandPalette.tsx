@@ -994,7 +994,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                 >
                   {filtered
                     .filter((a) => a.group === group && inScope(a))
-                    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+                    .sort(group === 'Conversations' && conversationsNewestFirst
+                      ? compareConversationActionsNewestFirst
+                      : (a, b) => (a.rank ?? 0) - (b.rank ?? 0))
                     .map((action) => {
                       const accent = accentForGroup(action.group);
                       return (
@@ -1070,6 +1072,18 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
               <kbd className="px-1.5 py-0.5 bg-card border border-border rounded text-[9px]">Esc</kbd>
               close
             </span>
+            <button
+              type="button"
+              aria-pressed={conversationsNewestFirst}
+              onClick={toggleConversationsNewestFirst}
+              className={`ml-auto text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${
+                conversationsNewestFirst
+                  ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                  : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+              }`}
+            >
+              Newest first
+            </button>
           </div>
         </Command>
       </div>
