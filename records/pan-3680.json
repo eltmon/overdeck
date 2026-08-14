@@ -292,7 +292,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T11:26:44.078Z",
+  "updated": "2026-08-14T11:35:07.231Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -302,7 +302,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-14T04:49:53.617Z",
     "updatedAt": "2026-08-14T11:26:43.888Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3680-review already running. Use 'pan tell' to message it.",
     "testNotes": "typecheck passed; lint passed; npm test FAILED — tests/integration/swarm-foreman-polyrepo.test.ts fails deterministically (AssertionError at line 82, expected [] to include merge message; reproduced in isolation, not in flaky-quarantine.txt). Configured gate's && chain means the frontend test step never ran under the gate (standalone: 4 files/64 tests passed). UAT not required — pure CLI/backend swarm orchestration, no dashboard/UI acceptance criteria.",
