@@ -130,7 +130,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T15:06:06.802Z",
+  "updated": "2026-08-14T15:06:15.089Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "reviewing",
@@ -222,10 +222,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 956,
-            "output": 192204,
-            "cacheRead": 186115762,
-            "cacheWrite": 2591312
+            "input": 960,
+            "output": 192481,
+            "cacheRead": 187457420,
+            "cacheWrite": 2593299
           }
         }
       },
@@ -243,15 +243,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 956,
-          "output": 192204,
-          "cacheRead": 186115762,
-          "cacheWrite": 2591312
+          "input": 960,
+          "output": 192481,
+          "cacheRead": 187457420,
+          "cacheWrite": 2593299
         }
       },
       "costAtCloseOut": {
-        "usd": 48.981718,
-        "pricingAsOf": "2026-08-14T15:06:05.177Z"
+        "usd": 49.257796,
+        "pricingAsOf": "2026-08-14T15:06:14.916Z"
       }
     },
     "merges": [
@@ -260,8 +260,8 @@
     "ranOn": "eltmon-z790"
   },
   "workModel": "claude-sonnet-5",
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3727",
