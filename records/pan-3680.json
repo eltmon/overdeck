@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T02:31:59.285Z",
+  "updated": "2026-08-14T02:39:25.070Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "status-json-wait": {
-        "writerId": "agent-pan-3680",
-        "agentId": "agent-pan-3680",
-        "pid": 1138902,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T02:31:59.285Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Implemented and verified in pushed commit b1a36abc2c",
         "releasedAt": "2026-08-14T02:31:22.711Z"
+      },
+      {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 1138902,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T02:31:59.285Z",
+        "itemId": "status-json-wait",
+        "outcome": "completed",
+        "reason": "Implemented and verified in pushed commit f77a711883",
+        "releasedAt": "2026-08-14T02:39:25.070Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "merge-gate": {
         "reason": "Implemented and verified in pushed commit b1a36abc2c",
         "updatedAt": "2026-08-14T02:31:22.711Z"
+      },
+      "status-json-wait": {
+        "reason": "Implemented and verified in pushed commit f77a711883",
+        "updatedAt": "2026-08-14T02:39:25.070Z"
       }
     }
   },
@@ -145,6 +152,9 @@
     "merge-gate.ac2": "completed",
     "merge-gate.ac3": "completed",
     "merge-gate.ac4": "completed",
-    "status-json-wait": "running"
+    "status-json-wait": "completed",
+    "status-json-wait.ac1": "completed",
+    "status-json-wait.ac2": "completed",
+    "status-json-wait.ac3": "completed"
   }
 }
