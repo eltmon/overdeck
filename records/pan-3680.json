@@ -354,7 +354,7 @@
     "recordedAt": "2026-08-14T13:10:06.393Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T13:11:31.476Z",
+  "updated": "2026-08-14T13:11:34.608Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -364,7 +364,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T13:10:15.416Z",
+    "panDoneRecoveredAt": "2026-08-14T13:11:30.954Z",
+    "updatedAt": "2026-08-14T13:11:31.453Z",
     "testNotes": "Verification of reviewed commit 054f0f9c could not complete: workspace entered an in-progress merge of origin/main mid-run (MERGE_HEAD present, UU conflicts in spawn-prep.ts, deacon-swarm-types.ts, deacon-swarm.ts with literal <<<<<<< HEAD markers). Still-live work agent agent-pan-3680 is actively resolving this conflict in the same worktree right now -- a concurrency race, not a defect at the reviewed commit. npm run typecheck passed before the merge began. npm run lint failed reproducibly (2 runs) on the conflict markers. npm test not run against the unstable tree. Prior recorded npm test run in pipeline.testNotes also failed deterministically (tests/integration/swarm-foreman-polyrepo.test.ts), no verified fix landed since. Branch needs conflict resolution + fresh review before re-test. Full evidence in .pan/test/result.json.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "054f0f9ce288b8c2fba53b6c2fb7ef4aa278171f",
@@ -508,23 +509,22 @@
         "tests/unit/lib/swarm-policy-foreman.test.ts"
       ],
       "recordedAt": "2026-08-14T13:10:06.393Z"
-    },
-    "panDoneRecoveredAt": "2026-08-14T13:11:30.954Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 28293612,
-            "output": 13500,
-            "cacheRead": 22272512,
+            "input": 28400402,
+            "output": 13553,
+            "cacheRead": 22377728,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 245013495,
-            "output": 322673,
-            "cacheRead": 238920704,
+            "input": 246068017,
+            "output": 323903,
+            "cacheRead": 239965696,
             "cacheWrite": 0
           }
         },
@@ -547,15 +547,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 28293612,
-          "output": 13500,
-          "cacheRead": 22272512,
+          "input": 28400402,
+          "output": 13553,
+          "cacheRead": 22377728,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 245013495,
-          "output": 322673,
-          "cacheRead": 238920704,
+          "input": 246068017,
+          "output": 323903,
+          "cacheRead": 239965696,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -572,8 +572,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 167.09428400000002,
-        "pricingAsOf": "2026-08-14T13:10:24.758Z"
+        "usd": 167.70133,
+        "pricingAsOf": "2026-08-14T13:11:34.589Z"
       }
     },
     "merges": [
