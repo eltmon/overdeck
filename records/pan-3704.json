@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-14T06:50:56.363Z",
+  "updated": "2026-08-14T06:50:59.182Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "pending",
@@ -25,7 +25,27 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T06:21:32.026Z"
+    "updatedAt": "2026-08-14T06:50:59.180Z",
+    "reviewRequestedAt": "2026-08-14T06:50:59.180Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DESKTOP-APP.md",
+        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+        "src/dashboard/frontend/src/components/CommandPalette.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/DESKTOP-APP.md",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+        "src/dashboard/frontend/src/components/CommandPalette.tsx"
+      ],
+      "recordedAt": "2026-08-14T06:50:56.362Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3710"
   },
   "closeOut": {
     "usage": {
