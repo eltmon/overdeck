@@ -448,6 +448,10 @@ export async function classifyInFlightSlots(
       }
     }
 
+    // PAN-3691: only a DEAD slot (no agent row, or a vanished tmux session)
+    // may be salvaged from durable git state, and only through the
+    // polyrepo-aware ahead count — outer wrapper bookkeeping commits never
+    // count. A LIVE agent never infers completion from branch state.
     const durableReady = await classifyDurableReadySlot(slot, deps, options);
     if (!slot.agentId) {
       if (durableReady) {
@@ -496,14 +500,14 @@ export async function classifyInFlightSlots(
 
       const stalledForMs = now - previous.lastProgressAt;
       if (stalledForMs > stallThresholdMs) {
-        const inferred = await classifyDoneWithoutSignal(slot, deps, options, {
+        const awaitingSignal = await classifyDoneWithoutSignal(slot, deps, options, {
           commitTime,
           outputDigest,
           progressKey,
           stalledForMs,
         });
-        if (inferred) {
-          classified.push(inferred);
+        if (awaitingSignal) {
+          classified.push(awaitingSignal);
           continue;
         }
         classified.push({
