@@ -130,22 +130,22 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T15:06:03.094Z",
+  "updated": "2026-08-14T15:06:06.802Z",
   "pipeline": {
     "issueId": "PAN-3727",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-14T15:05:56.108Z",
+    "updatedAt": "2026-08-14T15:05:56.922Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "reviewedAtCommit": "27e4850568a6866025851cc3249e5624ef1ee84d",
-    "reviewSpawnedAt": "2026-08-14T14:33:33.311Z",
+    "reviewSpawnedAt": "2026-08-14T15:05:56.921Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -251,7 +251,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.981718,
-        "pricingAsOf": "2026-08-14T15:05:57.740Z"
+        "pricingAsOf": "2026-08-14T15:06:05.177Z"
       }
     },
     "merges": [
