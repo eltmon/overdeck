@@ -195,7 +195,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:29:09.974Z",
+  "updated": "2026-08-14T05:30:03.281Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "blocked",
@@ -407,8 +407,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3680",
