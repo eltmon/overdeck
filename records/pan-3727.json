@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T13:14:07.148Z",
+  "updated": "2026-08-14T13:14:24.303Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "closeout-acks-residue": {
+        "writerId": "agent-pan-3727",
+        "agentId": "agent-pan-3727",
+        "pid": 798095,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T13:14:24.303Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3727",
@@ -114,6 +122,7 @@
     "clear-operator-gates-door": "completed",
     "clear-operator-gates-door.ac1": "completed",
     "clear-operator-gates-door.ac2": "completed",
-    "clear-operator-gates-door.ac3": "completed"
+    "clear-operator-gates-door.ac3": "completed",
+    "closeout-acks-residue": "running"
   }
 }
