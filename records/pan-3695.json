@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T04:27:00.353Z",
+  "updated": "2026-08-14T04:27:52.384Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -28,7 +28,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T04:19:17.092Z",
+    "updatedAt": "2026-08-14T04:27:52.359Z",
     "mergeNotes": "Post-rebase verification failed at lint",
     "strikeReadyHead": "974200adf8bc698b4f2d138c8417bf73a67c6abb",
     "strikeReadyAt": "2026-08-14T04:13:29.298Z",
@@ -49,26 +49,40 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/gpt-5.6-sol": {
+            "input": 212435,
+            "output": 889,
+            "cacheRead": 182784,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 1574,
-            "output": 216,
+            "input": 2361,
+            "output": 320,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 212435,
+          "output": 889,
+          "cacheRead": 182784,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5": {
-          "input": 1574,
-          "output": 216,
+          "input": 2361,
+          "output": 320,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0.002654,
-        "pricingAsOf": "2026-08-14T04:19:26.253Z"
+        "usd": 0.270278,
+        "pricingAsOf": "2026-08-14T04:27:52.372Z"
       }
     },
     "merges": [],
