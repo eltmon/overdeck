@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyInFlightSlots,
   getFailedMergeBlock,
-  recordStalledSlotRecovery,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -269,7 +268,6 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     });
 
-    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 

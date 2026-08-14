@@ -1,6 +1,5 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { messageAgent } from '../agents/messaging.js';
 import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
@@ -81,7 +80,7 @@ export async function classifyDoneWithoutSignal(
   const normalizedIssueId = options.issueId.toUpperCase();
 
   if (!current.nudged) {
-    await (deps.sendCompletionNudge ?? defaultSendCompletionNudge)(slot.agentId, normalizedIssueId);
+    if (deps.sendCompletionNudge) await deps.sendCompletionNudge(slot.agentId, normalizedIssueId);
     current.nudged = true;
     actions.push(`[swarm] nudged slot ${slot.slotIndex} (item ${slot.itemId}) for ${normalizedIssueId}: run pan done ${normalizedIssueId}`);
   }
@@ -170,12 +169,4 @@ export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Pro
   // isStatePlaneOnlyStatus already returns true for empty porcelain (vacuous every()), so one
   // shared classifier covers both cases — no local path list here. See docs/STATE-PLANE-COMMIT-POLICY.md.
   return isStatePlaneOnlyStatus(stdout);
-}
-
-export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {
-  await messageAgent(
-    agentId,
-    `You appear to have committed clean slot work but have not signaled completion. If the slot is complete, run exactly:\n\npan done ${issueId}`,
-    'deacon:swarm-completion-inference',
-  );
 }
