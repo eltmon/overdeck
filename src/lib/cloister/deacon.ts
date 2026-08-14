@@ -160,6 +160,7 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { recreatedStateWarnings, reconcileProjectStatePlanes, statePlaneReconcileEveryCycles } from './state-recreation-patrol.js';
+import { reconcileTerminalIssueResidue } from './parked-residue.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -3111,6 +3112,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
   const projectConfigs = listProjectsSync();
   if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileProjectStatePlanes(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
+  // PAN-3727: sweep terminal-issue records for parked-population residue (open
+  // recovery trips, operator-gate flags) left over from before close-out
+  // started acknowledging it. Same cadence as the state-plane patrol above.
+  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileTerminalIssueResidue(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog(warning.level, warning.message, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);

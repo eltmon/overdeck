@@ -39,6 +39,7 @@ import { shouldSkipReviewStatus } from '../cloister/stuck-remediation.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
 import { readIssueRecord } from '../pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { isRecordPipelineTerminal } from '../cloister/parked-residue.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
@@ -405,11 +406,10 @@ export interface ResolveParkedOptions {
 }
 
 /**
- * Record-level terminality: closedOut is the durable close-out marker, and a
- * mergeStatus of 'merged' with no reopenedAt means the issue merged and was
- * never reopened afterward (reopenedAt is cleared of a stale mergeStatus by
- * clearRecordPipelineClosedOut — see record-update.ts). Any throw or missing
- * record is "not terminal" so this check can only suppress, never invent, a park.
+ * Record-level terminality via the shared isRecordPipelineTerminal predicate
+ * (also used by the terminal-issue residue patrol, PAN-3727) — closedOut, or
+ * mergeStatus='merged' with no reopenedAt. Any throw or missing record is
+ * "not terminal" so this check can only suppress, never invent, a park.
  */
 export async function defaultReadRecordTerminal(issueId: string): Promise<boolean> {
   try {
@@ -418,9 +418,8 @@ export async function defaultReadRecordTerminal(issueId: string): Promise<boolea
     const project = getProjectSync(resolved.projectKey);
     if (!project) return false;
     const record = await readIssueRecord(project, issueId);
-    if (!record?.pipeline) return false;
-    return record.pipeline.closedOut === true
-      || (record.pipeline.mergeStatus === 'merged' && !record.pipeline.reopenedAt);
+    if (!record) return false;
+    return isRecordPipelineTerminal(record);
   } catch {
     return false;
   }
