@@ -317,7 +317,7 @@ describe('pan swarm command', () => {
     const result = await swarmRecoverCommand('PAN-2203', '3', { action: 'retry' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
     expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
   });
 
