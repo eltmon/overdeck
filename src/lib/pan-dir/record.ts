@@ -117,8 +117,7 @@ export interface PanIssueSwarmRecord {
     autoAdvance?: boolean;
   };
   finalizedAt?: string;
-  /** Dedicated swarm mutation hold. Generic Deacon holds remain in review status. */
-  hold?: { reason: string; setBy: string; at: string };
+  /** Dedicated swarm mutation hold; generic Deacon holds remain in review status. */ hold?: { reason: string; setBy: string; at: string };
   /** Recovery attempts keyed by slot index, then stable failure class. */
   interventions?: Record<string, Record<string, number>>;
   /** Completion-inference samples keyed by the slot progress identity. */
