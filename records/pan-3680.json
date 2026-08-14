@@ -17,9 +17,22 @@
       "timestamp": "2026-08-14T04:46:47.381Z",
       "reason": "end",
       "note": "Implemented persistent swarm foreman ownership, manual-only coordinator dispatch, Deacon GC/liveness/stall observation, policy rebasing, recovery, integration coverage, and documentation. Documentation audit: A ownership and residency resolved; B eight-step loop and gates resolved; C mode, autoAdvance, and holds resolved; D completion signals and observations resolved; E synthesis removed and obsolete diagrams deleted; F recovery and governor foreman ownership resolved; G stale runtime flags, diagrams, and PAN-970 references resolved; H CLI role, record fields, foreman restart, and tier reroute resolved. Verification after reconciling latest main: npm test (13,747 root and 64 frontend tests), npm run typecheck, npm run lint, isolated Node 22 dashboard boot, and live dashboard restart all passed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-14T05:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-14T05:01:57.135Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-14T05:01:57Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3680\n\n# Review Synthesis — PAN-3680 — 2026-08-14T05:15:00Z\n\n## Verdict: CHANGES REQUESTED — swarm status omits durable overrides, wait misses removed slots, and operator copy assigns coordination to Deacon\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.pan/review/agent-pan-3680-review-ce7c63b9/context.json`\n- Branch: `feature/pan-3680`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3680`\n- HEAD reviewed: `ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 2 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Status ignores canonical item status overrides — `src/cli/commands/swarm-status.ts:107`\n`deriveSwarmStatus` reconciles the raw spec without reading or supplying the issue record's `statusOverrides`. A durably completed item can remain reported as in flight, running, or ready to merge, and `pan swarm wait` inherits the stale snapshot. Read and apply the canonical overrides before reconciliation, then cover a pending spec item with a completed durable override.\n\n### [correctness] Wait does not detect a slot disappearing during cleanup — `src/cli/commands/swarm-status.ts:210`\n`diffSnapshots` iterates only over the after-snapshot slots. If cleanup removes a slot, the command reports no transition and can wait until timeout. Diff the union of before and after slot indexes, represent removal with an absent `after` value, and add a fake-timer test for a removed observed slot.\n\n### [requirements] Operator copy assigns coordination to Deacon after ownership moved to the foreman — `src/cli/commands/swarm-status.ts:244`\nThis in-PR-scope gap violates FR-8, FR-9, NFR-3, and NFR-7. Runtime patrols now retain janitor, liveness, classification, and event-delivery duties, but changed status, freeze, and resume text says Deacon coordinates, reconciles, merges, or dispatches the swarm (`src/cli/commands/swarm-status.ts:244`, `src/cli/commands/swarm.ts:327-330`, `src/cli/commands/swarm.ts:354-355`). Rewrite the operator-facing contract around foreman-owned gated actions and add focused output assertions.\n\n## Non-blocking Findings\n\n### [performance] Full Git-backed slot classification runs on every wait poll — `src/cli/commands/swarm-status.ts:91`\nThe one-second loop rebuilds a full snapshot and performs serial Git probes for each in-flight slot. Larger swarms can generate sustained subprocess load, while snapshot work extends the effective timeout. Consider a lightweight wait snapshot or cached, rate-limited classification, and measure timeout from a monotonic deadline.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.pan/review/agent-pan-3680-review-ce7c63b9/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3680 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -157,7 +170,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T04:54:19.378Z",
+  "updated": "2026-08-14T05:01:57.135Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "reviewing",
