@@ -166,6 +166,7 @@ export interface CoordinateSwarmSlotsDeps {
   writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
   emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
   sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
+  resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -221,6 +222,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   recordForemanTakeover: writeSwarmForemanTakeover,
   ensureSwarmForeman,
   sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
+  resolveAutomaticSwarmPolicy,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -358,14 +360,7 @@ export async function coordinateSwarmSlots(
         : spec.document;
       const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      const swarmInProgress = Object.entries(overrides ?? {})
-        .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const { policy, enabled } = resolveAutomaticSwarmPolicy(issueId, opts.manual, swarmInProgress);
-      if (!enabled) {
-        actions.push(`[swarm] ${issueId}: swarming off (${policy.source.mode}) — no automatic dispatch, recovery, merge, or cleanup; use an explicit swarm command or stop the legacy sessions`);
-        continue;
-      }
-      const dispatchEligible = enabled && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
+      const dispatchEligible = opts.manual === true && readiness.swarmEligible && slotEligibleCount >= 2;
       if (dispatchEligible) {
         actions.push(`[swarm] considered ${issueId}: swarm eligible`);
       }
@@ -417,7 +412,8 @@ export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultD
     actions.push(`[swarm-janitor] enumerated ${issueId}`);
     actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
     actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
-    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps));
+    const automatic = (deps.resolveAutomaticSwarmPolicy ?? resolveAutomaticSwarmPolicy)(issueId, analyzeSwarmReadiness(spec.document).swarmEligible);
+    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps, automatic.policy.mode !== 'off', automatic.spawnForeman));
     const classified = await classifyInFlightSlots(reconciled.inFlight, { ...deps, listSessionNames: async () => sessions }, { issueId, workspacePath: workspace.workspacePath });
     for (const slot of classified.filter(candidate => candidate.signal === 'stall-event')) {
       await deps.sendStallEvent?.(`agent-${issueId.toLowerCase()}`, `[swarm-event] slot ${slot.slotIndex} stalled (no progress ${Math.floor((slot.stalledForMs ?? 0) / 60_000)}m)`);

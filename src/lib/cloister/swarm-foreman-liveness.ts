@@ -30,12 +30,15 @@ export async function maintainSwarmForeman(
   reconciled: SlotReconcileResult,
   sessions: readonly string[],
   overrides: Partial<SwarmForemanLivenessDeps> = {},
+  allowSpawn = true,
+  bootstrap = false,
 ): Promise<string[]> {
   const definedOverrides = Object.fromEntries(Object.entries(overrides).filter(([, value]) => value !== undefined));
   const deps = { ...defaultDeps, ...definedOverrides } as SwarmForemanLivenessDeps;
   const issueLower = issueId.toLowerCase();
+  if (!allowSpawn) return [];
   const mergedSlotIndexes = new Set(reconciled.merged.map(slot => slot.slotIndex));
-  const active = sessions.some(name => name.startsWith(`agent-${issueLower}-slot-`))
+  const active = bootstrap || sessions.some(name => name.startsWith(`agent-${issueLower}-slot-`))
     || reconciled.branches.some(branch => !mergedSlotIndexes.has(branch.slotIndex))
     || deps.listSlotAssignments(issueId, workspacePath).length > 0;
   if (!active) {

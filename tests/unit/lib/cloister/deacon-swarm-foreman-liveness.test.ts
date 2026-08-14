@@ -24,6 +24,13 @@ function deps(overrides: Partial<CoordinateSwarmSlotsDeps> = {}): CoordinateSwar
     ensureSwarmForeman: vi.fn(async () => ['[swarm] spawned foreman agent-pan-3680 for PAN-3680']),
     writeSwarmHold: vi.fn(async () => undefined),
     emitActivityEntry: vi.fn(),
+    resolveAutomaticSwarmPolicy: vi.fn(() => ({
+      policy: { mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'test', maxSlots: 'test', autoAdvance: 'test' } },
+      spawnForeman: false,
+      requireSwarmReadiness: false,
+      advanceWavesWithoutConfirmation: true,
+      reason: 'not-ready',
+    })),
     ...overrides,
   } as unknown as CoordinateSwarmSlotsDeps;
 }
