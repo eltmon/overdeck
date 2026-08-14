@@ -41,6 +41,16 @@ pan swarm dispatch PAN-2203
 
 This command performs one gated dispatch pass. It refuses held issues and dependent items whose blockers are not complete. It serializes overlapping file scopes, enforces capacity and duplicate-slot checks, and releases claims if spawning fails. Use `--json` for structured output.
 
+## Merge One Slot
+
+Run:
+
+```bash
+pan swarm merge PAN-2203 1
+```
+
+The merge gate accepts only a completion-ready slot. It refuses live slots without a durable completion signal, verifies the slot, merges it, records the item done through the task door, and clears the completion marker. A conflict writes a durable failed-merge block for `pan swarm recover`. Use `--json` for structured output.
+
 ## Recover a Failed Slot
 
 Run:

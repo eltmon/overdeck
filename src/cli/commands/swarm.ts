@@ -7,7 +7,6 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getIssueWorkspacePath } from '../../lib/pan-dir/record.js';
-import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
@@ -17,7 +16,6 @@ import {
   clearAllSlotAssignments,
   clearFailedMergeBlock,
   coordinateSwarmSlots,
-  dispatchNextWave,
   getFailedMergeBlock,
   getFailedMergeBlocks,
   recoverFailedMergeSlot,
@@ -25,7 +23,6 @@ import {
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
-import { applyStatusOverrides } from '../../lib/xbrief/io.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import {
   clearSwarmHold,
@@ -44,6 +41,21 @@ import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
+import {
+  swarmDispatchCommand,
+  swarmMergeCommand,
+  type SwarmDispatchOptions,
+  type SwarmMergeOptions,
+} from './swarm-gates.js';
+
+export {
+  swarmDispatchCommand,
+  swarmMergeCommand,
+  type SwarmDispatchCommandDeps,
+  type SwarmDispatchOptions,
+  type SwarmMergeCommandDeps,
+  type SwarmMergeOptions,
+} from './swarm-gates.js';
 
 const execAsync = promisify(exec);
 
@@ -75,15 +87,6 @@ export interface SwarmCommandResult {
   ok: boolean;
   actions: string[];
   workspacePath?: string;
-}
-
-export interface SwarmDispatchOptions {
-  json?: boolean;
-}
-
-export interface SwarmDispatchCommandDeps extends SwarmCommandDeps {
-  reconcileSlotState: typeof reconcileSlotState;
-  dispatchNextWave: typeof dispatchNextWave;
 }
 
 export interface SwarmRecoverOptions {
@@ -143,12 +146,6 @@ const defaultDeps: SwarmCommandDeps = {
   readSwarmInterventionCount,
   writeSwarmIntervention,
   console,
-};
-
-const defaultDispatchDeps: SwarmDispatchCommandDeps = {
-  ...defaultDeps,
-  reconcileSlotState,
-  dispatchNextWave,
 };
 
 export async function swarmCommand(
@@ -301,49 +298,6 @@ export async function swarmRecoverCommand(
   const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, slotIndex, loaded.doc, action);
   for (const line of actions) deps.console.log(line);
 
-  return { ok: true, actions, workspacePath };
-}
-
-export async function swarmDispatchCommand(
-  issueId: string,
-  options: SwarmDispatchOptions = {},
-  deps: SwarmDispatchCommandDeps = defaultDispatchDeps,
-): Promise<SwarmCommandResult> {
-  const issue = issueId.toUpperCase();
-  const loaded = await loadSwarmPlan(issue, deps);
-  if (!loaded.ok) {
-    deps.console.error(chalk.red(loaded.error));
-    return { ok: false, actions: [] };
-  }
-
-  const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  const hold = deps.readSwarmHold(workspacePath, issue);
-  if (hold) {
-    deps.console.error(chalk.red(swarmHoldMessage(issue, hold.reason)));
-    return { ok: false, actions: [], workspacePath };
-  }
-
-  const overrides = readIssueRecordForWorkspaceSync(workspacePath, issue)?.statusOverrides;
-  const doc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
-    : loaded.doc;
-  const readiness = deps.analyzeSwarmReadiness(doc);
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc);
-  const failedMergeBlocks = deps.getFailedMergeBlocks(issue, workspacePath);
-  const actions = await deps.dispatchNextWave(
-    issue,
-    workspacePath,
-    doc,
-    reconciled,
-    readiness,
-    undefined,
-    new Set(failedMergeBlocks.map(block => block.slotIndex)),
-    new Set(failedMergeBlocks.map(block => block.itemId)),
-  );
-
-  if (options.json) deps.console.log(JSON.stringify({ issueId: issue, actions }));
-  else if (actions.length === 0) deps.console.log(chalk.yellow(`No swarm slots dispatched for ${issue}.`));
-  else for (const action of actions) deps.console.log(action);
   return { ok: true, actions, workspacePath };
 }
 
@@ -858,6 +812,15 @@ export function registerSwarmCommands(program: Command): void {
     .option('--json', 'Print structured dispatch results')
     .action(async (id: string, options: SwarmDispatchOptions) => {
       const result = await swarmDispatchCommand(id, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('merge <id> <slotIndex>')
+    .description('Verify and merge one completed swarm slot')
+    .option('--json', 'Print structured merge results')
+    .action(async (id: string, slotIndex: string, options: SwarmMergeOptions) => {
+      const result = await swarmMergeCommand(id, slotIndex, options);
       if (!result.ok) process.exitCode = 1;
     });
 
