@@ -349,20 +349,19 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T12:53:37.823Z",
+  "updated": "2026-08-14T12:53:39.822Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z",
-    "updatedAt": "2026-08-14T12:53:36.756Z",
-    "reviewNotes": "Approved at cycle 8; completion delivery and blocked-slot release changes are clean, with remaining findings unchanged under convergence.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-14T12:53:36.790Z",
+    "testNotes": "npm run typecheck: passed (tsc --noEmit, hooks, evals, dashboard, frontend, acp all clean). npm run lint: passed (eslint + all 18 project guard scripts, exit 0). npm test: FAILED. Configured gate is `vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- issueActions.test.ts issueActions.no-actions-lost.test.ts issueActions.parity.test.tsx fr7-conversation-pending-input.test.tsx`. Root vitest run: 1 failed | 1459 passed | 3 skipped (1463 files), 1 failed | 13777 passed | 50 skipped (13835 tests). Failing test: tests/integration/swarm-foreman-polyrepo.test.ts > 'drives dispatch, wait, merge, stall notification, isolation failure, and reclaim' - AssertionError: expected [] to include '[swarm] merged slot 1 (item schema) for ...' at tests/integration/swarm-foreman-polyrepo.test.ts:82. Reproduced deterministically in isolation (npx vitest run tests/integration/swarm-foreman-polyrepo.test.ts, same failure). Not present in scripts/flaky-quarantine.txt. Because the configured gate uses `&&`, the root failure short-circuits the frontend test step, which never executes under the configured command; run standalone for evidence it is otherwise healthy: 4 files passed, 64/64 tests passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "054f0f9ce288b8c2fba53b6c2fb7ef4aa278171f",
     "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
@@ -430,7 +429,7 @@
       },
       "costAtCloseOut": {
         "usd": 159.68591,
-        "pricingAsOf": "2026-08-14T12:53:36.847Z"
+        "pricingAsOf": "2026-08-14T12:53:39.815Z"
       }
     },
     "merges": [
@@ -438,8 +437,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3680",
