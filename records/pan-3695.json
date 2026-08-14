@@ -6,11 +6,6 @@
       "reason": "feedback",
       "note": "[2026-08-14T04:19Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-08-14T04:19:16.664Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-14T06:17Z] merge-agent → NEEDS-YOU — seq 2",
-      "timestamp": "2026-08-14T06:17:23.429Z"
     }
   ],
   "feedback": [
@@ -20,17 +15,10 @@
       "outcome": "failed",
       "timestamp": "2026-08-14T04:19:16Z",
       "markdownBody": "VERIFICATION FAILED for PAN-3695 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (216699ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3695-strike/.overdeck/verification-latest.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3695-strike/.overdeck/verification-latest.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-3695 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-3695 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm `pan show PAN-3695` or `pan review pending` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change."
-    },
-    {
-      "seq": 2,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-14T06:17:23Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3695 needs operator attention after 1 cycle(s).\n1. strike 974200adf8bc698b4f2d138c8417bf73a67c6abb; main 16b8b19f89adfc52bc03e694208369f914dc9f75; transport-failed: Strike merge request failed: fetch failed\n2. strike 593d24afdd24847f17bf1bb48b381b6fd0135135; main 24936d87502955f0f7efeb2a426f7958e19ecc2d; failed: Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent was stopped by the operator"
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-14T06:17:23.429Z",
+  "updated": "2026-08-14T06:17:43.178Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -40,11 +28,11 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T05:50:57.587Z",
+    "updatedAt": "2026-08-14T06:17:23.334Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3695 after its harness exited before push.",
     "strikeReadyHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
     "strikeReadyAt": "2026-08-14T05:05:29.152Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -104,7 +92,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.0659170000000002,
-        "pricingAsOf": "2026-08-14T05:50:57.592Z"
+        "pricingAsOf": "2026-08-14T06:17:23.350Z"
       }
     },
     "merges": [],
