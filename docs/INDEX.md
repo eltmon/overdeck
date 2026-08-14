@@ -47,7 +47,7 @@
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
 | [XBRIEF.md](./XBRIEF.md) | xBRIEF plan format, field-based lifecycle, continue state, compatibility, and migration |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | xBRIEF planning, DAG scheduling, acceptance criteria pipeline |
-| [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
+| [SWARM.md](./SWARM.md) | Resident foreman protocol, gated per-item dispatch and merge, status/wait observation, recovery actions, Deacon janitor duties, and durable record fields |
 | [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, status vs state, and skill → CLI → API → UI mapping |
 | [flywheel-brief.md](./flywheel-brief.md) | Default operating contract the Flywheel orchestrator reads at the start of every run |
 | [UAT-BATCH-TRAINS.md](./UAT-BATCH-TRAINS.md) | UAT batch trains (PAN-1737): auto-assembled rolling `uat/*` generations with in-batch conflict resolution, promote-the-batch merge, on-demand live UAT stacks, the reconciler, API, and the "UAT batches" card |
@@ -177,7 +177,7 @@
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
 - **"xBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → XBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
-- **"swarm"** / **"pan swarm"** / **"per-item dispatch"** / **"synthesis agent"** / **"files_scope"** / **"slot-merged"** / **"SwarmRuntime"** → SWARM.md
+- **"swarm"** / **"pan swarm"** / **"foreman"** / **"per-item dispatch"** / **"files_scope"** / **"slot merge"** / **"swarm-event"** → SWARM.md
 - **"beads conversion"** / **"createBeadsFromXBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md

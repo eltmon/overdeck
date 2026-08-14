@@ -1,5 +1,7 @@
 # PAN-970: Swarm — Multi-Agent Parallel Execution
 
+> **Superseded by PAN-3680.** This historical design assigns orchestration to Cloister and proposes a `SwarmRuntime` sidecar. The shipped model uses a resident foreman, deterministic CLI gates, and record-backed durable facts. See `docs/SWARM.md`.
+
 ## Vision
 
 Enable multiple work agents to execute vBRIEF items in parallel on the same issue, with Cloister as the orchestrating monitor. Each agent gets its own git worktree and beads claims. The DAG's dependency structure drives wave scheduling — independent items run simultaneously, blocking dependencies enforce ordering. When a wave completes, worktrees merge in dependency order and the next wave spawns.
