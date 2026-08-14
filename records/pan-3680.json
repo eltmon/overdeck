@@ -299,7 +299,7 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T11:37:02.820Z",
+  "updated": "2026-08-14T11:38:28.739Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -315,7 +315,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "9e08f98c567dd80f4e3c495a1971d500852c7672",
     "lastVerifiedCommit": "ce7c63b9024c45fd1e794686a3b67f1db8ccb2b0",
-    "reviewRequestedAt": "2026-08-14T11:35:25.312Z",
+    "reviewRequestedAt": "2026-08-14T11:38:28.307Z",
     "reviewSpawnedAt": "2026-08-14T10:54:45.160Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -454,7 +454,8 @@
         "tests/unit/lib/swarm-policy-foreman.test.ts"
       ],
       "recordedAt": "2026-08-14T11:35:24.352Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z"
   },
   "closeOut": {
     "usage": {
