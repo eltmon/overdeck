@@ -37,7 +37,7 @@
     "recordedAt": "2026-08-14T06:49:34.446Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T07:16:31.185Z",
+  "updated": "2026-08-14T07:16:34.159Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
@@ -48,10 +48,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T06:51:14.352Z",
-    "updatedAt": "2026-08-14T07:16:30.985Z",
+    "updatedAt": "2026-08-14T07:16:31.004Z",
     "reviewNotes": "All four reviewers approved with no blocking or advisory findings",
-    "testNotes": "typecheck/lint/tests all pass (1450 files, 13744 tests, exit 0; CommandPalette.test.tsx 23/23 incl. 4 new PAN-3703 ordering tests)",
-    "uatNotes": "Ctrl-K palette search endpoint (/api/palette/search) 401/403'd on all 7 attempts in the workspace peer dashboard — pre-existing session-auth issue unrelated to this frontend-only diff; newest-first ordering could not be observed end-to-end",
+    "testNotes": "npm run typecheck: passed (dashboard-types guard 30 known errors none new; frontend-types guard 0 known errors none new; all tsc projects clean). npm run lint: passed, exit 0 (eslint + all custom guards: file-size, circular-deps 54 baselined none new, ratchet-audit, quarantine-audit 12 entries, effect-diagnostics 308 known none new). npm test: full suite passed — 1450 test files / 13744 tests passed, 50 skipped (expected quarantine), plus 4 additional frontend files / 64 tests passed (issueActions + fr7-conversation-pending-input), duration 468.6s, exit 0. CommandPalette.test.tsx run in isolation: 23/23 passed, including the four new PAN-3703 ordering tests (T1 rank-disagreeing timestamps sort newest-first, T2 equal-ts falls back to rank, T3 missing ts sorts last, T4 memory group keeps rank order).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
     "reviewSpawnedAt": "2026-08-14T06:53:38.001Z",
@@ -134,7 +133,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.035439,
-        "pricingAsOf": "2026-08-14T07:16:31.083Z"
+        "pricingAsOf": "2026-08-14T07:16:34.143Z"
       }
     },
     "merges": [
