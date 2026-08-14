@@ -336,7 +336,6 @@ export async function classifyInFlightSlots(
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
     & Partial<Pick<
       CoordinateSwarmSlotsDeps,
-      'getAgentRuntimeState'
       | 'getPaneOutputDigest'
       | 'getBranchTipCommitTime'
       | 'getSlotBranchAheadCount'
@@ -388,21 +387,17 @@ export async function classifyInFlightSlots(
       continue;
     }
 
-    // PAN-3720: a terminal runtime resolution is only trustworthy when the
-    // session is GONE. Static slot ids are reused across assignments (the
-    // Deacon reassigns e.g. agent-min-888-slot-1 to the next work item), and
-    // the fresh session inherits the previous assignment's terminal runtime
-    // snapshot — checking the runtime plane before liveness classified a live,
-    // freshly-spawned session as ready-to-merge before it did any work. While
-    // the session is alive, only a durable slotCompletion marker (checked
-    // above, itemId-guarded) may complete the slot; the runtime-resolution
-    // fallback below applies only to a vanished session.
+    // PAN-3720: runtime resolution is NEVER merge authority — not for a live
+    // session, and not for a vanished one. Static slot ids cross assignment
+    // generations (the Deacon reassigns e.g. agent-min-888-slot-1 to the next
+    // work item), so a terminal done|completed snapshot may belong to the
+    // PREVIOUS assignment: unsafe while the fresh session is alive, and still
+    // unsafe after that session dies with partial commits. Normal completion
+    // requires the durable, itemId-guarded slotCompletion marker (checked
+    // above). A vanished session recovers only through clean committed branch
+    // state (classifyDurableReadySlot); a live session through a zero
+    // pane-exit below.
     if (!sessionNames.has(slot.agentId)) {
-      const runtimeState = deps.getAgentRuntimeState ? await deps.getAgentRuntimeState(slot.agentId) : null;
-      if (runtimeState?.resolution === 'done' || runtimeState?.resolution === 'completed') {
-        classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0 });
-        continue;
-      }
       if (durableReady) {
         classified.push(durableReady);
         continue;
