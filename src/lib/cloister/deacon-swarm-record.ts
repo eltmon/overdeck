@@ -135,6 +135,25 @@ export async function clearSwarmSlotOwnership(
 }
 
 /**
+ * Drop every superseded-attempt record (PAN-3694). A work-preserving swarm
+ * reset removes all slot worktrees and branches, so the slot indexes the
+ * superseded attempts occupied are genuinely free — but
+ * `applySupersededSlotHighWater` kept reserving indexes 1..high-water,
+ * leaving a fresh swarm able to dispatch only high-water+1. The archived
+ * branches remain on origin; only the index-blocking record is cleared.
+ */
+export async function clearSupersededSwarmAttempts(workspacePath: string, issueId: string): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      supersededAttempts: [],
+    },
+  }));
+}
+
+/**
  * PAN-2372 WI-3 / FR-4, FR-5: write the durable slot-completion marker and read
  * it straight back to confirm it persisted. Returns true only when the keyed
  * marker exists on disk with a matching agentId. The slot `pan done` caller MUST
