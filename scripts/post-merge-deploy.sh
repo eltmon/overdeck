@@ -251,20 +251,137 @@ if [[ "$REPO_ROOT" == *"/.overdeck/deployments/"* ]]; then
   rm -rf "$REPO_ROOT/scripts.old.$$" >> "$LOG_FILE" 2>&1 || true
 fi
 
+# --- Step 4b: Wait for the operator to approve the restart (PAN-3729) ---
+# A voluntary restart — a deploy, `pan reload`, or `pan restart` — must never
+# interrupt the operator mid-work, so it registers with the dashboard's restart
+# gate and blocks until the operator approves from the dashboard banner or with
+# `pan restart --now`. One approval satisfies every request waiting at that
+# moment: exactly one of them restarts and the rest skip their restart step.
+#
+# Blocking indefinitely is safe here. The unit this script re-execs into is
+# Type=simple with Restart=on-failure, which fires only on a nonzero exit and
+# never while the script is still running, and it sets no TimeoutStartSec or
+# WatchdogSec.
+#
+# Compat: a 404 (a dashboard build without the gate) or a health endpoint that
+# fails continuously for 60s proceeds ungated — that is what lets this change
+# deploy through today's server, and a dashboard that is not answering has no
+# live work to interrupt.
+GATE_URL="${OVERDECK_INTERNAL_DASHBOARD_URL:-http://127.0.0.1:${API_PORT:-${PORT:-3011}}}"
+GATE_REQUESTER_ID="deploy:${ISSUE_ID}:$$"
+GATE_POLL_SECONDS=5
+GATE_UNHEALTHY_LIMIT_SECONDS=60
+
+# Pull one scalar field out of a gate response — jq when it is installed, a
+# grep/sed fallback otherwise, the same way the escalation path degrades.
+gate_field() {
+  local body="$1" field="$2"
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$body" | jq -r --arg f "$field" '.[$f] // empty' 2>/dev/null || true
+  else
+    printf '%s' "$body" | grep -o "\"$field\"[[:space:]]*:[^,}]*" \
+      | sed -e 's/^[^:]*:[[:space:]]*//' -e 's/[" ]//g' | head -n1 || true
+  fi
+}
+
+gate_dashboard_healthy() {
+  local code
+  code="$(curl -sS -m 5 -o /dev/null -w '%{http_code}' "$GATE_URL/api/health" 2>/dev/null || true)"
+  [[ "$code" == "200" ]]
+}
+
+# Returns 0 when this deploy must perform the restart, 1 when an approved
+# restart by another requester already covered it.
+wait_for_restart_approval() {
+  local announced=0 unhealthy_since=0 raw code body status may_claim granted now
+  while true; do
+    raw="$(curl -sS -m 10 -w $'\n%{http_code}' -X POST "$GATE_URL/api/restart-gate/requests" \
+      -H 'content-type: application/json' \
+      --data "{\"requesterId\":\"$GATE_REQUESTER_ID\",\"kind\":\"deploy\",\"reason\":\"post-merge deploy for $ISSUE_ID\",\"builtSha\":\"$BUILT_SHA\"}" \
+      2>/dev/null || true)"
+    code="$(printf '%s' "$raw" | tail -n1)"
+    body="$(printf '%s' "$raw" | sed '$d')"
+
+    if [[ "$code" == "404" ]]; then
+      log "This dashboard build has no restart gate, so the deploy restarts without waiting for approval."
+      return 0
+    fi
+
+    if [[ "$code" != "200" ]]; then
+      if gate_dashboard_healthy; then
+        unhealthy_since=0
+      else
+        now="$(date +%s)"
+        if (( unhealthy_since == 0 )); then unhealthy_since="$now"; fi
+        if (( now - unhealthy_since >= GATE_UNHEALTHY_LIMIT_SECONDS )); then
+          log "The dashboard has not answered its health endpoint for $(( now - unhealthy_since ))s, so there is no live session to interrupt — restarting without waiting for approval."
+          return 0
+        fi
+      fi
+      sleep "$GATE_POLL_SECONDS"
+      continue
+    fi
+
+    status="$(gate_field "$body" status)"
+    if [[ "$status" == "satisfied" ]]; then
+      return 1
+    fi
+
+    if [[ "$status" == "approved" ]]; then
+      may_claim="$(gate_field "$body" mayClaim)"
+      if [[ "$may_claim" == "true" ]]; then
+        granted="$(gate_field "$(curl -sS -m 10 -X POST "$GATE_URL/api/restart-gate/claim" \
+          -H 'content-type: application/json' \
+          --data "{\"requesterId\":\"$GATE_REQUESTER_ID\"}" 2>/dev/null || true)" granted)"
+        if [[ "$granted" == "true" ]]; then
+          log "Operator approved the restart — proceeding."
+          return 0
+        fi
+      fi
+    fi
+
+    if (( announced == 0 )); then
+      announced=1
+      log "Waiting for operator approval before restarting the dashboard."
+      log "The deploy for $ISSUE_ID (sha $BUILT_SHA) is built and staged; the restart that puts it live now waits for you, so it cannot interrupt live work."
+      log "To let it run, either click \"Restart now\" in the banner at the top of any dashboard view, or run \`pan restart --now\` in a terminal. There is no timeout — this deploy waits until you do one of them."
+    fi
+    sleep "$GATE_POLL_SECONDS"
+  done
+}
+
+GATE_DECISION=restart
+if ! wait_for_restart_approval; then
+  GATE_DECISION=skip
+fi
+
 # --- Step 5: Restart through the shared lifecycle door ---
 # pan restart owns the restart lock, writes the initiator + stopping phase before
 # SIGTERM, starts the replacement in its own systemd unit, and verifies health.
 # The outer systemd unit retries this entire script on failure, so a post-kill
 # failure cannot abandon the machine with no successor.
-log "Restarting dashboard through pan restart..."
-GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
-PRIMARY_REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
-log "Restart command cwd: $PRIMARY_REPO_ROOT"
-if ! ( cd "$PRIMARY_REPO_ROOT" && OVERDECK_SKIP_SUPERVISOR_CYCLE=1 \
-  "$NODE" "$REPO_ROOT/dist/cli/index.js" restart --dashboard --resume \
-  --health-timeout 120000 ) >> "$LOG_FILE" 2>&1; then
-  log "ERROR: Shared dashboard restart failed; systemd will retry the deploy."
-  exit 1
+if [[ "$GATE_DECISION" == "skip" ]]; then
+  # Another approved requester restarted the dashboard while this deploy waited,
+  # and that one restart covers this one too. The freshly built dist is already
+  # swapped in, so the running server is on the new code; the restart marker
+  # stays for the new server to process, exactly as it would after our own
+  # restart.
+  log "Another approved restart already replaced the dashboard, so this deploy skipped its own restart (built sha=$BUILT_SHA is live in $REPO_ROOT/dist)."
+else
+  log "Restarting dashboard through pan restart..."
+  GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
+  PRIMARY_REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
+  log "Restart command cwd: $PRIMARY_REPO_ROOT"
+  # OVERDECK_RESTART_GATE_CLAIMED tells the child that this restart already
+  # cleared the gate. Without it the child registers a second request and waits
+  # for a second approval — one deploy, two operator clicks.
+  if ! ( cd "$PRIMARY_REPO_ROOT" && OVERDECK_SKIP_SUPERVISOR_CYCLE=1 \
+    OVERDECK_RESTART_GATE_CLAIMED=1 \
+    "$NODE" "$REPO_ROOT/dist/cli/index.js" restart --dashboard --resume \
+    --health-timeout 120000 ) >> "$LOG_FILE" 2>&1; then
+    log "ERROR: Shared dashboard restart failed; systemd will retry the deploy."
+    exit 1
+  fi
 fi
 
 # NOTE: The new server reads the restart marker and pending file on boot,
