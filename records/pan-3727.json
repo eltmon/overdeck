@@ -27,6 +27,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-14T14:15:56.108Z"
+    },
+    {
+      "timestamp": "2026-08-14T14:24:37.685Z",
+      "reason": "end",
+      "note": "Verification failed lint after pan done's rebase picked up a newer main tip; none of the 3 failures were PAN-3727 changes — all were pre-existing drift from concurrent merges landed on main while this branch was in flight: (1) sync-sources/skills/pan-restart/SKILL.md had 3 inline shell comments trailing a pan restart command on the same line, which lint-skills.sh's command extractor mis-parsed '#' as a bogus subcommand — moved comments to their own line; (2) packages/contracts/src/composer-commands.generated.ts was stale relative to main's newly-added 'pan restart --now' / 'pan restart approve' — regenerated via npm run generate:slash-commands; (3) PAN-3730's codex transcript adapter (landed on main concurrently) introduced a new import cycle (jsonl-resolver.ts -> agents.ts -> resume.ts -> conversation-compaction.ts -> summary-fork.ts -> transcript-adapter.ts) not present on this branch's pre-rebase tip — baselined it per the guard's own sanctioned resolution path (manually edit the baseline in an issue-referenced commit), verified via the canonicalizer diff that it's the only new cycle. Verified locally: full npm run lint exit 0, npm run typecheck exit 0, after each individual fix. No changes to PAN-3727's own 7 xBRIEF items — all still complete and correct."
     }
   ],
   "feedback": [
@@ -93,7 +98,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:24:32.869Z",
+  "updated": "2026-08-14T14:24:37.750Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
@@ -102,10 +107,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T14:24:32.867Z",
+    "updatedAt": "2026-08-14T14:24:37.682Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (183966ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
+    "reviewRequestedAt": "2026-08-14T14:24:32.867Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -159,8 +165,7 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-08-14T14:24:31.922Z"
-    },
-    "reviewRequestedAt": "2026-08-14T14:24:32.867Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -175,10 +180,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 662,
-            "output": 131160,
-            "cacheRead": 101580886,
-            "cacheWrite": 1331826
+            "input": 704,
+            "output": 140484,
+            "cacheRead": 112290328,
+            "cacheWrite": 1350249
           }
         }
       },
@@ -190,15 +195,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 662,
-          "output": 131160,
-          "cacheRead": 101580886,
-          "cacheWrite": 1331826
+          "input": 704,
+          "output": 140484,
+          "cacheRead": 112290328,
+          "cacheWrite": 1350249
         }
       },
       "costAtCloseOut": {
-        "usd": 24.968222,
-        "pricingAsOf": "2026-08-14T14:16:14.466Z"
+        "usd": 27.249491,
+        "pricingAsOf": "2026-08-14T14:24:37.717Z"
       }
     },
     "merges": [
