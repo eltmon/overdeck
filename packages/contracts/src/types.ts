@@ -562,6 +562,21 @@ export const RestartGateRequest = Schema.Struct({
 export type RestartGateRequest = typeof RestartGateRequest.Type
 
 /**
+ * How the last approval cycle ended, when the ending is worth telling the
+ * operator about (PAN-3731). Present only inside the brief window after it
+ * happened, so the banner can explain a click that restarted nothing.
+ *
+ * `pruned-unclaimed` — an approved epoch expired with nobody left to perform
+ * the restart: every requester died before claiming, or a claimant lapsed and
+ * the rest gave up. Either way nothing was restarted.
+ */
+export const RestartGateOutcome = Schema.Struct({
+  type: Schema.Literals(["pruned-unclaimed"]),
+  at: Schema.String,
+})
+export type RestartGateOutcome = typeof RestartGateOutcome.Type
+
+/**
  * The operator-facing view of the restart gate — identical to the body of
  * `GET /api/restart-gate`, so the banner and the CLI read the same shape.
  *
@@ -572,6 +587,7 @@ export type RestartGateRequest = typeof RestartGateRequest.Type
 export const RestartGateSnapshot = Schema.Struct({
   status: Schema.Literals(["idle", "pending", "approved", "claimed"]),
   pending: Schema.Array(RestartGateRequest),
+  lastOutcome: Schema.optional(RestartGateOutcome),
 })
 export type RestartGateSnapshot = typeof RestartGateSnapshot.Type
 

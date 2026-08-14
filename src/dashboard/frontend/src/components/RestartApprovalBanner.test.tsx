@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { RestartGateSnapshot } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../lib/store';
-import { RestartApprovalBanner } from './RestartApprovalBanner';
+import { OUTCOME_NOTICE_MS, RestartApprovalBanner } from './RestartApprovalBanner';
 
 vi.mock('../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'x-overdeck-csrf-token': 'test' })),
@@ -43,6 +43,16 @@ const TWO_PENDING: RestartGateSnapshot = {
   ],
 };
 
+/** The gate after an approved epoch died with nobody left to restart. */
+function prunedUnclaimed(at: string): RestartGateSnapshot {
+  return { status: 'idle', pending: [], lastOutcome: { type: 'pruned-unclaimed', at } };
+}
+
+/** The whole strip's text — the states split their message across elements. */
+function bannerText(): string {
+  return screen.getByTestId('restart-approval-banner').textContent ?? '';
+}
+
 describe('RestartApprovalBanner', () => {
   beforeEach(() => {
     seed(null);
@@ -78,12 +88,46 @@ describe('RestartApprovalBanner', () => {
     });
   });
 
-  it('stops asking once the restart is already approved or claimed', () => {
+  it('names who still has to restart once the approval lands (FR-1)', () => {
     seed({ ...TWO_PENDING, status: 'approved' });
     renderBanner();
-    expect(screen.queryByTestId('restart-approval-banner')).toBeNull();
 
+    // The click must visibly change something, or approving reads as a no-op.
+    expect(bannerText()).toContain('Approved — waiting for deploy:PAN-3724:11, reload:22 to restart…');
+    expect(screen.queryByRole('button', { name: 'Restart now' })).toBeNull();
+  });
+
+  it('says the restart is under way once a requester claims it (FR-3)', () => {
     seed({ ...TWO_PENDING, status: 'claimed' });
+    renderBanner();
+
+    // The WebSocket is about to drop; saying so makes the reconnect expected.
+    expect(bannerText()).toContain('Restarting…');
+    expect(screen.queryByRole('button', { name: 'Restart now' })).toBeNull();
+  });
+
+  it('explains a requester that died without restarting, then clears (FR-2)', () => {
+    vi.useFakeTimers();
+    try {
+      seed(prunedUnclaimed(new Date().toISOString()));
+      renderBanner();
+      expect(bannerText()).toContain(
+        'The requester(s) went away without restarting — nothing was restarted.',
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(OUTCOME_NOTICE_MS);
+      });
+      expect(screen.queryByTestId('restart-approval-banner')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never shows an outcome that is already older than its window', () => {
+    // A browser connecting minutes later gets the same projection from the
+    // snapshot; the notice is timed from the server's outcome, not the render.
+    seed(prunedUnclaimed(new Date(Date.now() - 60_000).toISOString()));
     renderBanner();
     expect(screen.queryByTestId('restart-approval-banner')).toBeNull();
   });
