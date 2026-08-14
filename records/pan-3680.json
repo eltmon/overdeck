@@ -349,7 +349,7 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T13:08:35.551Z",
+  "updated": "2026-08-14T13:08:39.593Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -359,8 +359,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T13:08:34.577Z",
-    "testNotes": "Verification of reviewed commit 054f0f9c (pipeline.reviewedAtCommit, reviewStatus=passed) could not complete because the workspace entered a live, in-progress merge of origin/main partway through this test run: MERGE_HEAD present, MERGE_MSG='Merge remote-tracking branch origin/main into feature/pan-3680', git status shows UU (both-modified/unresolved) in src/lib/agents/spawn-prep.ts, src/lib/cloister/deacon-swarm-types.ts, src/lib/cloister/deacon-swarm.ts, all containing literal <<<<<<< HEAD / ======= / >>>>>>> origin/main conflict markers. The still-live parent work agent (tmux session agent-pan-3680, running since 2026-08-13T21:59) is actively resolving this conflict in the same worktree right now (its pane shows repeated 'merge_conflict' blocker feedback and a fix-and-recommit loop in progress). This is a concurrency race, not a defect in the reviewed commit: npm run typecheck (tsc --noEmit + hooks/evals/dashboard/frontend/acp sub-checks) passed cleanly before the merge began. npm run lint then failed reproducibly (2 consecutive runs) with 'Parsing error: Merge conflict marker encountered' in the 3 files above, because the merge started mid-lint-run. npm test was not run against the unstable half-merged tree since any result would be meaningless. Separately, pipeline.testNotes already records a prior completed npm test run that failed deterministically at tests/integration/swarm-foreman-polyrepo.test.ts ('drives dispatch, wait, merge, stall notification, isolation failure, and reclaim' - AssertionError: expected [] to include a merge log line), reproduced in isolation, not in scripts/flaky-quarantine.txt. No verified fix for that failure has landed since. Net: no automated-gate result against this branch is currently valid. The branch needs the in-progress merge conflict resolved, the swarm-foreman-polyrepo test failure fixed, a commit+push, and a fresh review cycle before test verification can produce a meaningful passed/failed verdict. UAT: not required for this issue -- all 14 xBRIEF items and the PR's acceptance criteria are CLI/backend swarm-orchestration behavior (durable record fields, gated pan swarm commands, foreman/Deacon semantics, docs); no dashboard/browser-observable acceptance criterion exists (the PR's 'Isolated Node 22 dashboard boot and health check' line is the work agent's own dev-time smoke check, not a UI acceptance criterion).",
+    "updatedAt": "2026-08-14T13:08:35.079Z",
+    "testNotes": "Verification of reviewed commit 054f0f9c could not complete: workspace entered an in-progress merge of origin/main mid-run (MERGE_HEAD present, UU conflicts in spawn-prep.ts, deacon-swarm-types.ts, deacon-swarm.ts with literal <<<<<<< HEAD markers). Still-live work agent agent-pan-3680 is actively resolving this conflict in the same worktree right now -- a concurrency race, not a defect at the reviewed commit. npm run typecheck passed before the merge began. npm run lint failed reproducibly (2 runs) on the conflict markers. npm test not run against the unstable tree. Prior recorded npm test run in pipeline.testNotes also failed deterministically (tests/integration/swarm-foreman-polyrepo.test.ts), no verified fix landed since. Branch needs conflict resolution + fresh review before re-test. Full evidence in .pan/test/result.json.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "054f0f9ce288b8c2fba53b6c2fb7ef4aa278171f",
     "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
@@ -377,9 +377,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 243927195,
-            "output": 321439,
-            "cacheRead": 237857792,
+            "input": 244363714,
+            "output": 321687,
+            "cacheRead": 238291712,
             "cacheWrite": 0
           }
         },
@@ -408,9 +408,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 243927195,
-          "output": 321439,
-          "cacheRead": 237857792,
+          "input": 244363714,
+          "output": 321687,
+          "cacheRead": 238291712,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -427,8 +427,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 166.327883,
-        "pricingAsOf": "2026-08-14T13:08:34.990Z"
+        "usd": 166.565278,
+        "pricingAsOf": "2026-08-14T13:08:39.572Z"
       }
     },
     "merges": [
