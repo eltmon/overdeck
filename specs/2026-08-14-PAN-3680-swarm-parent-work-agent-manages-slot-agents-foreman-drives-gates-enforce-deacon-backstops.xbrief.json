@@ -4,17 +4,17 @@
     "created": "2026-08-14T01:49:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3680: Swarm: parent Work agent manages slot agents (foreman drives, gates enforce, Deacon backstops)",
-    "updated": "2026-08-14T01:58:00.473Z"
+    "updated": "2026-08-14T01:59:21.664Z"
   },
   "plan": {
     "id": "pan-3680",
     "title": "Swarm: parent Work agent manages slot agents (foreman drives, gates enforce, Deacon backstops)",
-    "status": "proposed",
+    "status": "running",
     "uid": "143209fd-cc12-416e-9ac5-3352913ec6e1",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-14T01:49:52Z",
-    "updated": "2026-08-14T01:58:00.473Z",
+    "updated": "2026-08-14T01:59:21.664Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3680",
@@ -1094,5 +1094,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
