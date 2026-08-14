@@ -6,10 +6,12 @@ import { getAgentStateSync } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
 import {
   resolveSlotWorkspaceWorktreesSync,
+  resolveWorkspaceRepoRootsSync,
   type NestedSlotWorktree,
   type SlotWorkspaceWorktrees,
+  type WorkspaceRepoRoot,
 } from '../project-repos.js';
-import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 
 const MERGED_LIVE_SLOT_IDLE_MS = 30 * 60 * 1000;
 
@@ -27,7 +29,27 @@ export async function reapMergedSlotAgent(
   }
 }
 
+export interface MergedSlotGcResult {
+  actions: string[];
+  /**
+   * Merged-status slots that were NOT fully cleaned up this pass (PAN-3695).
+   * Their items read as completed in the plan overlay, but the nested work is
+   * not yet integrated and pushed — downstream dispatch and finalization must
+   * be gated on this set.
+   */
+  uncleared: ReconciledSlotItem[];
+}
+
 export async function gcMergedSlots(
+  issueId: string,
+  workspacePath: string,
+  slots: ReconciledSlotItem[],
+  deps: Parameters<typeof gcMergedSlotsWithStatus>[3],
+): Promise<string[]> {
+  return (await gcMergedSlotsWithStatus(issueId, workspacePath, slots, deps)).actions;
+}
+
+export async function gcMergedSlotsWithStatus(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
@@ -36,10 +58,12 @@ export async function gcMergedSlots(
     getAgentLastActivity?: (agentId: string) => string | undefined;
     stopSlotAgent?: (agentId: string) => Promise<void>;
     listSlotWorkspaceWorktrees?: (issueId: string, slotWorkspace: string) => SlotWorkspaceWorktrees;
+    listFeatureWorkspaceRepoRoots?: (issueId: string, workspacePath: string) => WorkspaceRepoRoot[];
     removeDirectory?: (path: string) => Promise<void>;
   },
-): Promise<string[]> {
+): Promise<MergedSlotGcResult> {
   const actions: string[] = [];
+  const uncleared: ReconciledSlotItem[] = [];
   // A freshly dispatched slot branch points at the feature branch HEAD, so
   // `--merged HEAD` classifies it as merged before the agent's first commit.
   // Without a liveness guard, gc destroys the worktree/branch/assignment under
@@ -51,41 +75,88 @@ export async function gcMergedSlots(
     if (slot.status !== 'merged') continue;
 
     const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+    // PAN-3695: decide liveness up front, but reap the agent only AFTER every
+    // nested branch is merged, ancestry-verified, and the workspace removed.
+    // Reaping first stranded unmerged nested work with no agent left to answer
+    // for it (MIN-888 slot 4).
+    let reapAction: string | null = null;
     if (sessionNames.has(agentId)) {
       const completionProven = slot.mergedVia === 'completed-status';
       const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentStateSync(id)?.lastActivity))(agentId);
       const idleFor = lastActivity ? Date.now() - Date.parse(lastActivity) : 0;
       if (!completionProven && (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS)) {
         actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
+        uncleared.push(slot);
         continue;
       }
-      await (deps.stopSlotAgent ?? (id => Effect.runPromise(stopAgent(id))))(agentId);
-      actions.push(completionProven
+      reapAction = completionProven
         ? `[swarm] gc reaped merged agent ${agentId}`
-        : `[swarm] gc reaped idle merged agent ${agentId}`);
+        : `[swarm] gc reaped idle merged agent ${agentId}`;
     }
 
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
     const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
     if (worktreeExists(slotWorkspace)) {
       const removed = await removeSlotWorkspace(issueId, workspacePath, slotWorkspace, slotBranch, slot, deps, actions);
-      if (!removed) continue;
+      if (!removed) {
+        uncleared.push(slot);
+        continue;
+      }
     }
-    try {
-      await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
-    } catch (error) {
-      actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
+    // Polyrepo wrapper repos hold no local slot branch (PAN-3695): an absent
+    // outer branch is an idempotent success once every nested branch has
+    // verified ancestry, not a delete failure that wedges the slot forever.
+    const branchExists = await slotBranchExists(deps.runGitCommand, workspacePath, slotBranch);
+    if (branchExists === null) {
+      actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch state of ${slotBranch} could not be determined`);
+      uncleared.push(slot);
       continue;
     }
+    if (branchExists) {
+      try {
+        await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+      } catch (error) {
+        actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
+        uncleared.push(slot);
+        continue;
+      }
+    }
     await deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
+    if (reapAction) {
+      try {
+        await (deps.stopSlotAgent ?? (id => Effect.runPromise(stopAgent(id))))(agentId);
+        actions.push(reapAction);
+      } catch (error) {
+        actions.push(`[swarm] could not reap merged agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
 
-  return actions;
+  return { actions, uncleared };
+}
+
+/**
+ * Whether the outer workspace has a local `slotBranch`, or null when that
+ * cannot be determined. `git branch --list` exits 0 with empty output for an
+ * absent branch, so a throw is always an indeterminate state, never "absent".
+ */
+async function slotBranchExists(
+  runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
+  workspacePath: string,
+  slotBranch: string,
+): Promise<boolean | null> {
+  try {
+    const result = await runGitCommand(`git branch --list ${JSON.stringify(slotBranch)}`, workspacePath) as { stdout?: unknown };
+    return String(result?.stdout ?? '').trim().length > 0;
+  } catch {
+    return null;
+  }
 }
 
 type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
   listSlotWorkspaceWorktrees?: (issueId: string, slotWorkspace: string) => SlotWorkspaceWorktrees;
+  listFeatureWorkspaceRepoRoots?: (issueId: string, workspacePath: string) => WorkspaceRepoRoot[];
   removeDirectory?: (path: string) => Promise<void>;
 };
 
@@ -105,9 +176,15 @@ type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
  * defect the preflight exists to prevent (PAN-3686 post-deploy review). Any
  * preflight failure defers the whole slot with zero removals.
  *
- * Never discards unmerged or locally-modified nested work: an unsafe nested
- * worktree defers the whole slot with the reason recorded. Returns true when
- * the slot workspace is gone and GC may proceed to branch cleanup.
+ * Never discards unmerged or locally-modified nested work. PAN-3695: a slot
+ * that reached merged status with unmerged nested branches is INTEGRATED here,
+ * not just deferred — each unmerged nested slot branch is merged through the
+ * canonical nested merge path (`git merge --no-ff` into the per-repo base
+ * feature-workspace checkout, same as verifyAndMergeSlot) and ancestry is
+ * re-verified repo by repo before any removal. A repo whose merge is pending
+ * or failed defers the whole slot with an actionable repo-specific reason;
+ * successful per-repo merges are preserved and the next pass retries the rest.
+ * Uncommitted nested changes still defer the slot untouched.
  */
 async function removeSlotWorkspace(
   issueId: string,
@@ -125,11 +202,24 @@ async function removeSlotWorkspace(
 
   const { isPolyrepo, nested } = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktreesSync)(issueId, slotWorkspace);
 
+  // ── Integration (PAN-3695): merge unmerged nested slot branches through the
+  // canonical nested merge path before any removal. A merged-status slot whose
+  // nested work was never merged must be merged by the coordinator here —
+  // mergeReadySlots only consumes ready-to-merge slots, so a GC-only deferral
+  // is terminal and strands the work (MIN-888 slot 4). These merges mutate the
+  // per-repo BASE feature checkouts, never the slot workspace being removed.
+  if (nested.length > 0) {
+    const mergeFailures = await mergeNestedSlotBranches(issueId, workspacePath, slotBranch, nested, deps);
+    if (mergeFailures.length > 0) {
+      return defer(`nested merge incomplete: ${mergeFailures.join('; ')}`);
+    }
+  }
+
   // ── Preflight (read-only): no mutations below this line until every check
   // for every nested repo and the aggregate root has passed. ──
 
   for (const worktree of nested) {
-    const blocked = await nestedWorktreePreservationReason(deps.runGitCommand, worktree, slotBranch);
+    const blocked = await nestedWorktreeDirtyReason(deps.runGitCommand, worktree);
     if (blocked) return defer(`preserving nested work: ${blocked}`);
   }
 
@@ -233,24 +323,120 @@ async function isRegisteredWorktree(
 }
 
 /**
- * Why a nested slot worktree must be preserved, or null when it is safe to
- * remove. Safe means: the nested slot branch has zero commits the per-repo
- * feature branch lacks, and the checkout has no local modifications — any
- * tracked change or non-ignored untracked file blocks removal (ignored
- * build artifacts do not).
+ * Merge every nested slot branch that still has commits its per-repo feature
+ * branch lacks, through the canonical nested merge path (PAN-3695): the merge
+ * runs in the repo's base feature-workspace checkout, then ancestry is
+ * re-verified by re-counting `featureBranch..slotBranch` — a merge command
+ * exiting 0 is not proof the slot head landed — and the parent feature branch
+ * is pushed to origin so the work actually leaves the machine. A dirty base
+ * checkout refuses the merge, and a missing or degraded base checkout fails
+ * the repo outright — without it, remote durability cannot be verified, even
+ * when the local feature branch already contains the slot head. Every repo is
+ * attempted even after a sibling fails, so successful merges are preserved and
+ * only the failed repos are retried on the next pass. Returns the per-repo
+ * failure reasons; an empty list means every nested repo's slot branch is an
+ * ancestor of its pushed feature branch.
  */
-async function nestedWorktreePreservationReason(
+async function mergeNestedSlotBranches(
+  issueId: string,
+  workspacePath: string,
+  slotBranch: string,
+  nested: NestedSlotWorktree[],
+  deps: SlotRemovalDeps,
+): Promise<string[]> {
+  const failures: string[] = [];
+  const baseRoots = new Map(
+    (deps.listFeatureWorkspaceRepoRoots ?? resolveWorkspaceRepoRootsSync)(issueId, workspacePath)
+      .map(root => [root.repoKey, root]),
+  );
+  for (const worktree of nested) {
+    const ahead = await countCommitsAhead(deps.runGitCommand, worktree.parentRepo, worktree.featureBranch, slotBranch);
+    if (ahead === null) {
+      failures.push(`${worktree.repoKey}: merge state of ${slotBranch} against ${worktree.featureBranch} could not be determined`);
+      continue;
+    }
+    const baseRoot = baseRoots.get(worktree.repoKey);
+    // Remote durability must be verified for every nested repo before cleanup —
+    // a missing or degraded base checkout makes that impossible, even when the
+    // local feature branch already contains the slot head (PAN-3695 review).
+    if (!baseRoot || baseRoot.degradedPolyrepo) {
+      failures.push(ahead > 0
+        ? `${worktree.repoKey}: no base feature-workspace checkout for ${worktree.featureBranch} — cannot merge ${slotBranch} (${ahead} unmerged commit(s))`
+        : `${worktree.repoKey}: no base feature-workspace checkout for ${worktree.featureBranch} — cannot verify and push remote durability`);
+      continue;
+    }
+    if (ahead > 0) {
+      // Never merge into a dirty base checkout: tracked local changes there are
+      // someone's uncommitted work on the parent feature branch.
+      const baseDirty = await baseCheckoutDirtyReason(deps.runGitCommand, worktree, baseRoot, slotBranch);
+      if (baseDirty) {
+        failures.push(baseDirty);
+        continue;
+      }
+      try {
+        await deps.runGitCommand(`git merge --no-ff ${JSON.stringify(slotBranch)}`, baseRoot.dir);
+      } catch (error) {
+        await deps.runGitCommand('git merge --abort', baseRoot.dir).catch(() => {});
+        failures.push(`${worktree.repoKey}: ${slotBranch} did not merge cleanly into ${worktree.featureBranch}: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+      const remaining = await countCommitsAhead(deps.runGitCommand, worktree.parentRepo, worktree.featureBranch, slotBranch);
+      if (remaining !== 0) {
+        failures.push(`${worktree.repoKey}: ancestry verification failed — ${slotBranch} still has ${remaining ?? 'an unknown number of'} commit(s) not in ${worktree.featureBranch} after merge`);
+        continue;
+      }
+    }
+    // Push the parent feature branch so the merged nested work actually lands
+    // on the remote — a local-only merge is invisible to the outer pipeline
+    // (MIN-888 needed manual pushes). This also retries a push that failed on
+    // an earlier pass: the local merge is already an ancestor, but the
+    // origin..feature count still shows the unpushed commits.
+    const unpushed = await countCommitsAhead(deps.runGitCommand, baseRoot.dir, `origin/${worktree.featureBranch}`, worktree.featureBranch);
+    if (ahead > 0 || unpushed === null || unpushed > 0) {
+      try {
+        await deps.runGitCommand(`git push origin ${JSON.stringify(worktree.featureBranch)}`, baseRoot.dir);
+      } catch (error) {
+        failures.push(`${worktree.repoKey}: merged ${slotBranch} into ${worktree.featureBranch} but push to origin failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+    }
+  }
+  return failures;
+}
+
+/**
+ * Why a base feature-workspace checkout must not receive a merge right now, or
+ * null when it is clean. Tracked local modifications block the merge (git would
+ * refuse or, worse, entangle someone's uncommitted work); untracked files do
+ * not, so they are ignored here.
+ */
+async function baseCheckoutDirtyReason(
   runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
   worktree: NestedSlotWorktree,
+  baseRoot: WorkspaceRepoRoot,
   slotBranch: string,
 ): Promise<string | null> {
-  const ahead = await countCommitsAhead(runGitCommand, worktree.parentRepo, worktree.featureBranch, slotBranch);
-  if (ahead === null) {
-    return `${worktree.repoKey}: merge state of ${slotBranch} against ${worktree.featureBranch} could not be determined`;
+  try {
+    const status = await runGitCommand('git status --porcelain --untracked-files=no', baseRoot.dir) as { stdout?: unknown };
+    if (String(status?.stdout ?? '').trim().length > 0) {
+      return `${worktree.repoKey}: base feature checkout of ${worktree.featureBranch} has uncommitted changes — refusing to merge ${slotBranch}`;
+    }
+  } catch {
+    return `${worktree.repoKey}: base feature checkout state of ${worktree.featureBranch} could not be determined — refusing to merge ${slotBranch}`;
   }
-  if (ahead > 0) {
-    return `${worktree.repoKey}: ${slotBranch} has ${ahead} unmerged commit(s) not in ${worktree.featureBranch}`;
-  }
+  return null;
+}
+
+/**
+ * Why a nested slot worktree must be preserved, or null when it is safe to
+ * remove. Any tracked change or non-ignored untracked file blocks removal
+ * (ignored build artifacts do not). Merge state is handled separately by
+ * mergeNestedSlotBranches before this runs.
+ */
+async function nestedWorktreeDirtyReason(
+  runGitCommand: CoordinateSwarmSlotsDeps['runGitCommand'],
+  worktree: NestedSlotWorktree,
+): Promise<string | null> {
   try {
     const status = await runGitCommand('git status --porcelain --untracked-files=all', worktree.dir) as { stdout?: unknown };
     if (String(status?.stdout ?? '').trim().length > 0) {
