@@ -607,6 +607,8 @@ describe('pan swarm status (PAN-2214)', () => {
       classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
       getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
       getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
+      readSwarmHold: vi.fn(() => undefined),
+      readSwarmInterventions: vi.fn(() => ({})),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
         maxWorkAgents: 4,
@@ -727,6 +729,8 @@ describe('pan swarm status (PAN-2214)', () => {
       'getFailedMergeBlocks',
       'getReviewStatusSync',
       'listSessionNamesSync',
+      'readSwarmHold',
+      'readSwarmInterventions',
       'reconcileSlotState',
       'resolveProjectFromIssueSync',
     ]);

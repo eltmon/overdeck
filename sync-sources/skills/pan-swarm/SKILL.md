@@ -51,6 +51,15 @@ pan swarm merge PAN-2203 1
 
 The merge gate accepts only a completion-ready slot. It refuses live slots without a durable completion signal, verifies the slot, merges it, records the item done through the task door, and clears the completion marker. A conflict writes a durable failed-merge block for `pan swarm recover`. Use `--json` for structured output.
 
+## Observe Without Polling a Transcript
+
+```bash
+pan swarm status PAN-2203 --json
+pan swarm wait PAN-2203 --timeout 300 --json
+```
+
+`status --json` includes the foreman session, durable hold, intervention counters, capacity, and reconciled slot lifecycles. `wait` sleeps until a lifecycle signal changes or the timeout expires, then emits a structured delta.
+
 ## Recover a Failed Slot
 
 Run:

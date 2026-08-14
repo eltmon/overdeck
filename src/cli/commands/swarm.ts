@@ -12,17 +12,14 @@ import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
-  classifyInFlightSlots,
   clearAllSlotAssignments,
   clearFailedMergeBlock,
   coordinateSwarmSlots,
   getFailedMergeBlock,
   getFailedMergeBlocks,
   recoverFailedMergeSlot,
-  type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
-import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import {
   clearSwarmHold,
@@ -32,9 +29,7 @@ import {
   writeSwarmIntervention,
   writeSwarmPolicyMode,
 } from '../../lib/cloister/deacon-swarm-record.js';
-import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
-import { getReviewStatusSync } from '../../lib/review-status.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
@@ -47,6 +42,12 @@ import {
   type SwarmDispatchOptions,
   type SwarmMergeOptions,
 } from './swarm-gates.js';
+import {
+  swarmStatusCommand,
+  swarmWaitCommand,
+  type SwarmStatusOptions,
+  type SwarmWaitOptions,
+} from './swarm-status.js';
 
 export {
   swarmDispatchCommand,
@@ -56,6 +57,16 @@ export {
   type SwarmMergeCommandDeps,
   type SwarmMergeOptions,
 } from './swarm-gates.js';
+export {
+  deriveSwarmStatus,
+  swarmStatusCommand,
+  swarmWaitCommand,
+  type SwarmStatusCommandDeps,
+  type SwarmStatusOptions,
+  type SwarmStatusSnapshot,
+  type SwarmWaitCommandDeps,
+  type SwarmWaitOptions,
+} from './swarm-status.js';
 
 const execAsync = promisify(exec);
 
@@ -638,165 +649,6 @@ async function listSlotWorktreePaths(
   }
 }
 
-export interface SwarmStatusCommandDeps {
-  resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
-  findSpecByIssue: typeof findSpecByIssue;
-  reconcileSlotState: typeof reconcileSlotState;
-  classifyInFlightSlots: (
-    slots: Parameters<typeof classifyInFlightSlots>[0],
-    workspacePath: string,
-  ) => Promise<ClassifiedSwarmSlot[]>;
-  getFailedMergeBlocks: typeof getFailedMergeBlocks;
-  getReviewStatusSync: typeof getReviewStatusSync;
-  listSessionNamesSync: () => string[];
-  getConcurrencyLimits: typeof getConcurrencyLimits;
-  countRunningSwarmSlotsForIssue: (issueId: string) => number;
-  console: ConsoleLike;
-}
-
-const defaultStatusDeps: SwarmStatusCommandDeps = {
-  resolveProjectFromIssueSync,
-  findSpecByIssue,
-  reconcileSlotState,
-  classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
-  getFailedMergeBlocks,
-  getReviewStatusSync,
-  listSessionNamesSync,
-  getConcurrencyLimits,
-  countRunningSwarmSlotsForIssue,
-  console,
-};
-
-function safeGetReviewStatus(
-  issueId: string,
-  deps: Pick<SwarmStatusCommandDeps, 'getReviewStatusSync'>,
-): ReturnType<typeof getReviewStatusSync> {
-  try {
-    return deps.getReviewStatusSync(issueId);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read-only reconciled view of an issue's swarm: per-slot rows, the operator
- * hold state, and slot capacity. Performs no writes, no git mutation, and no
- * dispatch (PAN-2214).
- */
-export async function swarmStatusCommand(
-  issueId: string,
-  deps: SwarmStatusCommandDeps = defaultStatusDeps,
-): Promise<{ ok: boolean }> {
-  const issue = issueId.toUpperCase();
-  const issueLower = issue.toLowerCase();
-  const loaded = await loadSwarmPlan(issue, deps);
-  if (!loaded.ok) {
-    deps.console.error(chalk.red(loaded.error));
-    return { ok: false };
-  }
-
-  const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, loaded.doc);
-  const classified = await deps.classifyInFlightSlots(reconciled.inFlight, workspacePath);
-  const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
-  const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
-  const liveSessions = new Set(safeListSessionNames(deps));
-  const blockedSlots = deps.getFailedMergeBlocks(issue, workspacePath);
-  const blockedSlotIndexes = new Set(blockedSlots.map(block => block.slotIndex));
-
-  deps.console.log(chalk.bold(`Swarm status for ${issue}`));
-
-  const hold = safeGetReviewStatus(issue, deps);
-  if (hold?.deaconIgnored) {
-    const reason = hold.deaconIgnoredReason ? ` Reason: ${hold.deaconIgnoredReason}.` : '';
-    deps.console.log(
-      `Hold: deacon-ignored — the Deacon skips all swarm coordination (reconcile, merge, garbage collection, `
-      + `and dispatch) for this issue until you run \`pan swarm resume ${issue}\`.${reason}`,
-    );
-  } else if (hold?.stuck) {
-    const reason = hold.stuckReason ? ` Reason: ${hold.stuckReason}.` : '';
-    deps.console.log(
-      `Hold: stuck — the issue is flagged stuck, so the Deacon skips all swarm coordination for it until the `
-      + `flag is cleared.${reason}`,
-    );
-  } else {
-    deps.console.log('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
-  }
-
-  const limits = deps.getConcurrencyLimits();
-  const liveSlotCount = deps.countRunningSwarmSlotsForIssue(issue);
-  deps.console.log(
-    `Capacity: ${liveSlotCount} of ${limits.reservedSwarmSlots} swarm slots in use `
-    + '(tmux-alive slot sessions counted against the reserved swarm slot limit).',
-  );
-
-  const rows = [
-    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' as const })),
-    ...reconciled.inFlight.map(slot => ({
-      ...slot,
-      lifecycle: blockedSlotIndexes.has(slot.slotIndex)
-        ? 'failed-merge-blocked'
-        : (lifecycleBySlot.get(slot.slotIndex) ?? 'running'),
-    })),
-  ];
-
-  for (const block of blockedSlots) {
-    if (!rows.some(row => row.slotIndex === block.slotIndex)) {
-      rows.push({
-        itemId: block.itemId,
-        slotIndex: block.slotIndex,
-        status: 'in_flight',
-        branch: block.branch,
-        agentId: undefined,
-        lifecycle: 'failed-merge-blocked',
-      });
-    }
-  }
-
-  rows.sort((a, b) => a.slotIndex - b.slotIndex);
-
-  if (rows.length === 0) {
-    deps.console.log('Slots: none — nothing is dispatched right now, and no merged slot state remains.');
-    return { ok: true };
-  }
-
-  deps.console.log('Slots:');
-  for (const row of rows) {
-    const branch = row.branch ?? `feature/${issueLower}-slot-${row.slotIndex}`;
-    const branchState = branchMergedBySlot.get(row.slotIndex) === undefined
-      ? 'no local branch'
-      : branchMergedBySlot.get(row.slotIndex) ? 'merged' : 'unmerged';
-    const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;
-    const sessionState = liveSessions.has(sessionName) ? 'session alive' : 'session dead';
-    const lifecycle = row.lifecycle === 'failed-merge-blocked'
-      ? 'failed-merge (blocked)'
-      : row.lifecycle;
-    deps.console.log(
-      `  slot ${row.slotIndex} · item ${row.itemId} · ${lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
-    );
-  }
-
-  if (blockedSlots.length > 0) {
-    deps.console.log('Blocked slots:');
-    for (const block of blockedSlots) {
-      deps.console.log(
-        `  slot ${block.slotIndex} (item ${block.itemId}): ${block.note}. `
-        + `Recover with \`pan swarm recover ${issue} ${block.slotIndex} --action retry|drop|handoff\`.`,
-      );
-    }
-  }
-
-  return { ok: true };
-}
-
-function safeListSessionNames(deps: Pick<SwarmStatusCommandDeps, 'listSessionNamesSync'>): string[] {
-  try {
-    return deps.listSessionNamesSync();
-  } catch {
-    return [];
-  }
-}
-
 export function registerSwarmCommands(program: Command): void {
   const swarm = program
     .command('swarm <id>')
@@ -854,8 +706,19 @@ export function registerSwarmCommands(program: Command): void {
   swarm
     .command('status <id>')
     .description('Read-only reconciled swarm state: per-slot rows, hold state, and capacity')
-    .action(async (id: string) => {
-      const result = await swarmStatusCommand(id);
+    .option('--json', 'Print structured status including foreman, hold, and interventions')
+    .action(async (id: string, options: SwarmStatusOptions) => {
+      const result = await swarmStatusCommand(id, undefined, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('wait <id>')
+    .description('Wait for a swarm slot, foreman, or hold state transition')
+    .option('--timeout <seconds>', 'Maximum wait in seconds', '300')
+    .option('--json', 'Print the structured status delta')
+    .action(async (id: string, options: SwarmWaitOptions) => {
+      const result = await swarmWaitCommand(id, options);
       if (!result.ok) process.exitCode = 1;
     });
 

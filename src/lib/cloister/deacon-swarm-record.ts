@@ -78,6 +78,13 @@ export function readSwarmInterventionCount(
     ?.swarm?.interventions?.[String(slotIndex)]?.[failureClass] ?? 0;
 }
 
+export function readSwarmInterventions(
+  workspacePath: string,
+  issueId: string,
+): NonNullable<PanIssueSwarmRecord['interventions']> {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.interventions ?? {};
+}
+
 export async function writeSwarmIntervention(
   workspacePath: string,
   issueId: string,
