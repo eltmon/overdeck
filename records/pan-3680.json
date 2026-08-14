@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T03:35:44.504Z",
+  "updated": "2026-08-14T03:35:52.166Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 22,
-    "claims": {},
+    "sequence": 23,
+    "claims": {
+      "policy-rebasing": {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 2100202,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T03:35:52.166Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -302,6 +310,7 @@
     "foreman-liveness.ac3": "completed",
     "stall-events": "completed",
     "stall-events.ac1": "completed",
-    "stall-events.ac2": "completed"
+    "stall-events.ac2": "completed",
+    "policy-rebasing": "running"
   }
 }
