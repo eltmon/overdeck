@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T03:29:19.148Z",
+  "updated": "2026-08-14T03:35:44.504Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "stall-events": {
-        "writerId": "agent-pan-3680",
-        "agentId": "agent-pan-3680",
-        "pid": 2025042,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-14T03:29:19.148Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3680",
@@ -215,6 +207,16 @@
         "itemId": "foreman-liveness",
         "outcome": "completed",
         "releasedAt": "2026-08-14T03:29:02.264Z"
+      },
+      {
+        "writerId": "agent-pan-3680",
+        "agentId": "agent-pan-3680",
+        "pid": 2025042,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-14T03:29:19.148Z",
+        "itemId": "stall-events",
+        "outcome": "completed",
+        "releasedAt": "2026-08-14T03:35:44.504Z"
       }
     ],
     "statusReasons": {
@@ -298,6 +300,8 @@
     "foreman-liveness.ac1": "completed",
     "foreman-liveness.ac2": "completed",
     "foreman-liveness.ac3": "completed",
-    "stall-events": "running"
+    "stall-events": "completed",
+    "stall-events.ac1": "completed",
+    "stall-events.ac2": "completed"
   }
 }
