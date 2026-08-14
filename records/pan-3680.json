@@ -299,10 +299,10 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T11:55:27.733Z",
+  "updated": "2026-08-14T11:55:55.383Z",
   "pipeline": {
     "issueId": "PAN-3680",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -310,8 +310,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z",
-    "updatedAt": "2026-08-14T11:55:24.851Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3680-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-08-14T11:55:32.052Z",
+    "reviewNotes": "Verification failed at test",
     "testNotes": "typecheck passed; lint passed; npm test FAILED — tests/integration/swarm-foreman-polyrepo.test.ts fails deterministically (AssertionError at line 82, expected [] to include merge message; reproduced in isolation, not in flaky-quarantine.txt). Configured gate's && chain means the frontend test step never ran under the gate (standalone: 4 files/64 tests passed). UAT not required — pure CLI/backend swarm orchestration, no dashboard/UI acceptance criteria.",
     "verificationNotes": "Verification FAILED at test (784457ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3680/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
@@ -520,7 +520,7 @@
       },
       "costAtCloseOut": {
         "usd": 136.829193,
-        "pricingAsOf": "2026-08-14T11:55:27.651Z"
+        "pricingAsOf": "2026-08-14T11:55:54.339Z"
       }
     },
     "merges": [
