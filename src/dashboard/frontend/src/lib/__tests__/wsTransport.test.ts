@@ -1,5 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RECONNECT_MAX_DELAY_MS, reconnectBackoffDelayMs } from '../wsTransport'
+import { dashboardSessionUrls, RECONNECT_MAX_DELAY_MS, reconnectBackoffDelayMs } from '../wsTransport'
+
+describe('dashboard session bootstrap URLs', () => {
+  it('mints cookies on both API and frontend hosts in split-host workspaces', () => {
+    expect(dashboardSessionUrls(
+      'wss://api-feature-pan-3703.overdeck.localhost/ws/rpc',
+      'https://feature-pan-3703.overdeck.localhost',
+    )).toEqual([
+      'https://api-feature-pan-3703.overdeck.localhost/api/dashboard/session',
+      'https://feature-pan-3703.overdeck.localhost/api/dashboard/session',
+    ])
+  })
+
+  it('mints only once when the frontend and API share a host', () => {
+    expect(dashboardSessionUrls('wss://overdeck.localhost/ws/rpc', 'https://overdeck.localhost')).toEqual([
+      'https://overdeck.localhost/api/dashboard/session',
+    ])
+  })
+})
 
 describe('wsTransport reconnect backoff', () => {
   beforeEach(() => {

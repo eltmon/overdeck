@@ -39,6 +39,7 @@ import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { compareByRank, compareConversationHits } from './command-palette-sorting';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
+import { ensureDashboardSession } from '../lib/wsTransport';
 import {
   isUserFacingWorkspace,
   sortWorkspaces,
@@ -240,8 +241,6 @@ function accentForGroup(group: string): { box: string; icon: string } {
   }
 }
 
-// ─── Server API ───────────────────────────────────────────────────────────────
-
 async function callApi(path: string, method = 'POST'): Promise<void> {
   try {
     await fetch(path, { method });
@@ -275,6 +274,7 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
 
 async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
   try {
+    await ensureDashboardSession();
     const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal });
     if (!res.ok) return EMPTY_SEARCH;
     const data = await res.json() as PaletteSearchResponse;

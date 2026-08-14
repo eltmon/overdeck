@@ -44,6 +44,12 @@ function dashboardSessionUrl(url?: string): string {
   return rpcUrl.toString()
 }
 
+export function dashboardSessionUrls(url?: string, frontendOrigin = window.location.origin): string[] {
+  const apiSessionUrl = dashboardSessionUrl(url)
+  const frontendSessionUrl = new URL('/api/dashboard/session', frontendOrigin).toString()
+  return apiSessionUrl === frontendSessionUrl ? [apiSessionUrl] : [apiSessionUrl, frontendSessionUrl]
+}
+
 let dashboardSessionPromise: Promise<void> | null = null
 let dashboardCsrfToken: string | null = null
 
@@ -64,16 +70,17 @@ function consumeDashboardBootstrapToken(): string | null {
 export function ensureDashboardSession(url?: string): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
   const token = consumeDashboardBootstrapToken()
-  dashboardSessionPromise ??= fetch(dashboardSessionUrl(url), {
-    method: 'POST',
-    credentials: 'include',
-    headers: token ? { 'x-overdeck-internal-token': token } : undefined,
-  }).then(async (response) => {
+  dashboardSessionPromise ??= Promise.all(dashboardSessionUrls(url).map(async (sessionUrl, index) => {
+    const response = await fetch(sessionUrl, {
+      method: 'POST',
+      credentials: 'include',
+      headers: index === 0 && token ? { 'x-overdeck-internal-token': token } : undefined,
+    })
     if (response.status === 401) return
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
     const data = await response.json().catch(() => null) as { csrfToken?: unknown } | null
     if (typeof data?.csrfToken === 'string') dashboardCsrfToken = data.csrfToken
-  }).catch((err) => {
+  })).then(() => undefined).catch((err) => {
     dashboardSessionPromise = null
     throw err
   })

@@ -24,7 +24,6 @@ import { getConversationByClaudeSessionId } from '../../../lib/overdeck/conversa
 import { type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
 import { searchConversationChunks } from '../services/conversation-search-service.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
-import { validateOrigin } from './origin-validation.js';
 
 // ─── Pan command catalog ──────────────────────────────────────────────────────
 //
@@ -405,8 +404,8 @@ const getPaletteSearchRoute = HttpRouter.add(
   '/api/palette/search',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    // This authenticated GET is not a CSRF mutation. Origin validation rejected
+    // valid split-host workspace Referer headers even after session bootstrap.
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return authError;
 

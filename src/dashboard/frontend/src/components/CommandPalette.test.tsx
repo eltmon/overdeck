@@ -74,6 +74,9 @@ beforeEach(() => {
     if (method === 'GET' && url === '/api/workspace-registry') {
       return Response.json({ workspaces: [] });
     }
+    if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+      return Response.json({ csrfToken: 'test-csrf-token' });
+    }
     if (method === 'GET' && url.startsWith('/api/palette/search')) {
       return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
     }
@@ -148,6 +151,9 @@ describe('CommandPalette conversation results', () => {
       }
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({ workspaces: [] });
+      }
+      if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
       }
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
         return Response.json({
@@ -296,6 +302,9 @@ describe('CommandPalette conversation ordering (PAN-3703)', () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
+      }
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
         return Response.json({ observations: [], conversations, memory, summaries: [] });
       }
