@@ -3,21 +3,32 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-14T08:25:59.752Z",
-  "updated": "2026-08-14T09:04:03.447Z",
+  "updated": "2026-08-14T09:09:24.115Z",
   "pipeline": {
     "issueId": "PAN-3716",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T09:03:47.357Z",
+    "updatedAt": "2026-08-14T09:09:24.093Z",
     "strikeReadyHead": "73daff1522271bdc7da1db8966adf16c9b61b473",
     "strikeReadyAt": "2026-08-14T09:03:40.605Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-08-14T09:10:24.083Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-14T09:09:24.083Z",
+        "strikeHead": "73daff1522271bdc7da1db8966adf16c9b61b473",
+        "mainHead": "0619eb8411cdd599c3a44a9f4b7494723ec0e32b",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -30,9 +41,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 21325685,
-            "output": 16571,
-            "cacheRead": 20957696,
+            "input": 21482753,
+            "output": 16810,
+            "cacheRead": 21112576,
             "cacheWrite": 0
           }
         }
@@ -45,15 +56,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21325685,
-          "output": 16571,
-          "cacheRead": 20957696,
+          "input": 21482753,
+          "output": 16810,
+          "cacheRead": 21112576,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.815923,
-        "pricingAsOf": "2026-08-14T09:04:03.436Z"
+        "usd": 12.911473,
+        "pricingAsOf": "2026-08-14T09:09:24.105Z"
       }
     },
     "merges": [],
