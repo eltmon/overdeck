@@ -44,22 +44,7 @@
       "timestamp": "2026-08-14T14:32:51.380Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-14T14:15:55Z",
-      "markdownBody": "VERIFICATION STUCK for PAN-3727 (attempt 2/3):\n\nFailed check: lint\n\nVerification FAILED at lint (183966ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3727 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
-    },
-    {
-      "seq": 4,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-14T14:32:51Z",
-      "markdownBody": "VERIFICATION STUCK for PAN-3727 (attempt 3/3):\n\nFailed check: test\n\nVerification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3727 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -115,7 +100,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:33:31.879Z",
+  "updated": "2026-08-14T14:33:33.274Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "pending",
