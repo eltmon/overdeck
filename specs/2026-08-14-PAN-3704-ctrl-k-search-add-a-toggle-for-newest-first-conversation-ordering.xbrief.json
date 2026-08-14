@@ -4,17 +4,17 @@
     "created": "2026-08-14T06:15:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3704: Ctrl-K search: add a toggle for newest-first conversation ordering",
-    "updated": "2026-08-14T06:20:43.916Z"
+    "updated": "2026-08-14T06:21:37.808Z"
   },
   "plan": {
     "id": "pan-3704",
     "title": "Ctrl-K search: add a toggle for newest-first conversation ordering",
-    "status": "proposed",
+    "status": "running",
     "uid": "9edb5b4a-dc77-4110-a747-4c151eb35676",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-14T06:15:06Z",
-    "updated": "2026-08-14T06:20:43.916Z",
+    "updated": "2026-08-14T06:21:37.808Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3704",
@@ -408,5 +408,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
