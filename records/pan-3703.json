@@ -52,6 +52,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-14T08:43:14.344Z"
+    },
+    {
+      "timestamp": "2026-08-14T09:01:21.757Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -76,7 +81,7 @@
     "recordedAt": "2026-08-14T09:01:11.684Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T09:01:18.157Z",
+  "updated": "2026-08-14T09:01:21.839Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "pending",
@@ -86,7 +91,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T09:01:13.036Z",
+    "updatedAt": "2026-08-14T09:01:21.751Z",
     "reviewNotes": "All four reviewers approved with no blocking or advisory findings",
     "testNotes": "npm run typecheck: passed (dashboard-types guard 30 known errors none new; frontend-types guard 0 known errors none new; all tsc projects clean). npm run lint: passed, exit 0 (eslint + all custom guards: file-size, circular-deps 54 baselined none new, ratchet-audit, quarantine-audit 12 entries, effect-diagnostics 308 known none new). npm test: full suite passed — 1450 test files / 13744 tests passed, 50 skipped (expected quarantine), plus 4 additional frontend files / 64 tests passed (issueActions + fr7-conversation-pending-input), duration 468.6s, exit 0. CommandPalette.test.tsx run in isolation: 23/23 passed, including the four new PAN-3703 ordering tests (T1 rank-disagreeing timestamps sort newest-first, T2 equal-ts falls back to rank, T3 missing ts sorts last, T4 memory group keeps rank order).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
@@ -120,15 +125,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1533406,
-            "output": 2328,
-            "cacheRead": 1135872,
+            "input": 2233423,
+            "output": 4169,
+            "cacheRead": 1718528,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 27951529,
-            "output": 45633,
-            "cacheRead": 26975232,
+            "input": 39959975,
+            "output": 63529,
+            "cacheRead": 38775808,
             "cacheWrite": 0
           }
         },
@@ -151,15 +156,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1533406,
-          "output": 2328,
-          "cacheRead": 1135872,
+          "input": 2233423,
+          "output": 4169,
+          "cacheRead": 1718528,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 27951529,
-          "output": 45633,
-          "cacheRead": 26975232,
+          "input": 39959975,
+          "output": 63529,
+          "cacheRead": 38775808,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -176,8 +181,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.847365,
-        "pricingAsOf": "2026-08-14T07:45:38.264Z"
+        "usd": 31.323883000000002,
+        "pricingAsOf": "2026-08-14T09:01:21.791Z"
       }
     },
     "merges": [
