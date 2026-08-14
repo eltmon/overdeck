@@ -48,7 +48,7 @@ import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PaletteAction {
+export interface PaletteAction {
   id: string;
   label: string;
   description?: string;
@@ -202,6 +202,18 @@ function formatHitDate(ts: string | null): string {
       ? { month: 'short', day: 'numeric' }
       : { month: 'short', day: 'numeric', year: 'numeric' };
   return d.toLocaleDateString(undefined, opts);
+}
+
+/** Order conversation actions newest first while preserving search rank for timestamp ties (PAN-3704). */
+export function compareConversationActionsNewestFirst(a: PaletteAction, b: PaletteAction): number {
+  const aTs = a.sortTs ? Date.parse(a.sortTs) : Number.NaN;
+  const bTs = b.sortTs ? Date.parse(b.sortTs) : Number.NaN;
+  const aValid = !Number.isNaN(aTs);
+  const bValid = !Number.isNaN(bTs);
+
+  if (aValid && bValid && aTs !== bTs) return bTs - aTs;
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  return (a.rank ?? 0) - (b.rank ?? 0);
 }
 
 // ─── Result-type scoping (filter chips) ─────────────────────────────────────────
