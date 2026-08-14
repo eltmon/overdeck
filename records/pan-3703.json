@@ -50,21 +50,22 @@
     "recordedAt": "2026-08-14T07:31:20.960Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T07:38:06.651Z",
+  "updated": "2026-08-14T07:41:52.136Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T07:38:03.762Z",
-    "updatedAt": "2026-08-14T07:38:04.103Z",
+    "updatedAt": "2026-08-14T07:41:52.056Z",
     "reviewNotes": "All four reviewers approved with no blocking or advisory findings",
     "testNotes": "npm run typecheck: passed (dashboard-types guard 30 known errors none new; frontend-types guard 0 known errors none new; all tsc projects clean). npm run lint: passed, exit 0 (eslint + all custom guards: file-size, circular-deps 54 baselined none new, ratchet-audit, quarantine-audit 12 entries, effect-diagnostics 308 known none new). npm test: full suite passed — 1450 test files / 13744 tests passed, 50 skipped (expected quarantine), plus 4 additional frontend files / 64 tests passed (issueActions + fr7-conversation-pending-input), duration 468.6s, exit 0. CommandPalette.test.tsx run in isolation: 23/23 passed, including the four new PAN-3703 ordering tests (T1 rank-disagreeing timestamps sort newest-first, T2 equal-ts falls back to rank, T3 missing ts sorts last, T4 memory group keeps rank order).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
+    "lastVerifiedCommit": "094f24f48dcff9066360a8bc15df145e4f027c4a",
     "reviewRequestedAt": "2026-08-14T07:38:03.762Z",
     "reviewSpawnedAt": "2026-08-14T06:53:38.001Z",
     "scopeDrift": {
@@ -154,7 +155,7 @@
       },
       "costAtCloseOut": {
         "usd": 20.136136,
-        "pricingAsOf": "2026-08-14T07:38:06.642Z"
+        "pricingAsOf": "2026-08-14T07:41:52.105Z"
       }
     },
     "merges": [
