@@ -8,7 +8,7 @@
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
- *   - Conversations                         — semantic JSONL transcript search
+ *   - Conversations                         — semantic search with a newest-first toggle persisted at `overdeck.ui.paletteConversationsNewestFirst`
  *   - Memory / Observations                 — FTS over ~/.overdeck/memory
  */
 
