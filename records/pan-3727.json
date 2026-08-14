@@ -113,18 +113,18 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:44:17.942Z",
+  "updated": "2026-08-14T15:05:54.420Z",
   "pipeline": {
     "issueId": "PAN-3727",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-14T14:41:01.916Z",
-    "reviewNotes": "[correctness] Reopen skips merged-only records before clearing terminality — `src/lib/pan-dir/record-update.ts:133`",
+    "updatedAt": "2026-08-14T15:05:54.230Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "reviewedAtCommit": "27e4850568a6866025851cc3249e5624ef1ee84d",
@@ -205,10 +205,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 774,
-            "output": 149252,
-            "cacheRead": 130603485,
-            "cacheWrite": 1881341
+            "input": 954,
+            "output": 192105,
+            "cacheRead": 185448935,
+            "cacheWrite": 2587421
           }
         }
       },
@@ -226,15 +226,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 774,
-          "output": 149252,
-          "cacheRead": 130603485,
-          "cacheWrite": 1881341
+          "input": 954,
+          "output": 192105,
+          "cacheRead": 185448935,
+          "cacheWrite": 2587421
         }
       },
       "costAtCloseOut": {
-        "usd": 35.674451,
-        "pricingAsOf": "2026-08-14T14:41:01.926Z"
+        "usd": 48.837631,
+        "pricingAsOf": "2026-08-14T15:05:54.295Z"
       }
     },
     "merges": [
@@ -243,8 +243,8 @@
     "ranOn": "eltmon-z790"
   },
   "workModel": "claude-sonnet-5",
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3727",
