@@ -28,7 +28,13 @@ recommended release without acting on it.
   document the condition that releases it (and stuck flavors must carry
   operator copy — enforced in CI).
 - **Terminal residue** — a closed issue's leftover rows. Never parked; the
-  only row a closed issue can produce is `zombie-session`.
+  only row a closed issue can produce is `zombie-session`. Terminality
+  evidence is record-first (`pipeline.closedOut`, or `mergeStatus='merged'`
+  with no `reopenedAt`), checked BEFORE any tracker call — a tracker blip
+  cannot resurrect a record-terminal issue into the parked population
+  (PAN-3727). Close-out also acknowledges open recovery trips and clears
+  operator-gate flags on the issue's stopped agent rows, so a terminal
+  issue's rows stop escalating even before the tracker check would settle it.
 
 ## The nine orbits
 
@@ -69,12 +75,34 @@ park — review/test/merge owns the next move and the agent is supposed to wait.
 surface answers "what is parked." It gathers through existing doors
 (review-status door, agents table, tmux liveness, the record door for recovery
 trips, tracker-closed via `isIssueClosed`), never a store directly, and runs a
-two-pass closedness filter so terminal residue never renders as parked.
+two-pass closedness filter so terminal residue never renders as parked. Before
+any of that, it checks record-level terminality first (`isRecordPipelineTerminal`,
+shared with the residue patrol below): a live tracker call is fail-open toward
+"open" and negative-caches its result for minutes, so one Linear/GitHub blip
+must never resurrect an issue the record already knows is closed and merged
+(PAN-3727). The reaper's own fail-closed posture (`isLinearIssueClosed` /
+`isTrackerIssueClosed`) is deliberately unchanged — record-first terminality is
+additive evidence for the resolver, not a relaxation of the reaper's guard.
 Surfaces:
 
 - `pan parked [--json]` — CLI, oldest-first with why + release sentences.
 - `GET /api/parked` — `{rows, summary}` for the dashboard.
 - `GET /api/velocity` — transitions/hour plus the parked census.
+
+## The residue patrol (deacon patrol) — cleans up terminal-issue leftovers
+
+`reconcileTerminalIssueResidue()` in `src/lib/cloister/parked-residue.ts` runs
+on the deacon's state-plane cadence (~hourly), sweeping every project's
+record-terminal issues (via the shared `isRecordPipelineTerminal` predicate)
+for leftover open recovery trips and operator-gate flags (`stoppedByUser` /
+`paused` / `troubled`) on stopped agent rows. Unlike the sweeper below, this
+patrol DOES act: it acknowledges trips and clears gates through the existing
+doors (`acknowledgeAllOpenRecoveryTrips`, `clearAgentOperatorGatesForIssueSync`)
+so a terminal issue's residue stops re-surfacing as a ghost `needs-you` /
+`operator-gate` escalation. Close-out (`pan close`) runs the same ack step at
+merge time; this patrol is the backstop that catches residue predating that
+fix and any future leak path, one issue at a time — a door failure for one
+issue never blocks the rest (PAN-3727).
 
 ## The sweeper (deacon patrol) — OBSERVABILITY ONLY
 
