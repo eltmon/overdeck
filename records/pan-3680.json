@@ -324,7 +324,7 @@
     "recordedAt": "2026-08-14T11:35:24.352Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T12:18:19.676Z",
+  "updated": "2026-08-14T12:18:23.019Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -335,10 +335,9 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-14T11:38:28.307Z",
-    "updatedAt": "2026-08-14T12:18:16.959Z",
+    "updatedAt": "2026-08-14T12:18:17.013Z",
     "reviewNotes": "Verification failed at test",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "testNotes": "typecheck passed; lint passed; npm test FAILED — tests/integration/swarm-foreman-polyrepo.test.ts fails deterministically (AssertionError at line 82, expected [] to include merge message; reproduced in isolation, not in flaky-quarantine.txt). Configured gate's && chain means the frontend test step never ran under the gate (standalone: 4 files/64 tests passed). UAT not required — pure CLI/backend swarm orchestration, no dashboard/UI acceptance criteria.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
     "lastVerifiedCommit": "6867f5be9e5a5a74d6e704c5de985c6ea55eed1b",
@@ -494,9 +493,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 222040176,
-            "output": 293730,
-            "cacheRead": 217023232,
+            "input": 222693242,
+            "output": 297160,
+            "cacheRead": 217662976,
             "cacheWrite": 0
           }
         },
@@ -525,9 +524,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 222040176,
-          "output": 293730,
-          "cacheRead": 217023232,
+          "input": 222693242,
+          "output": 297160,
+          "cacheRead": 217662976,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -544,8 +543,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 148.07077900000002,
-        "pricingAsOf": "2026-08-14T12:18:19.660Z"
+        "usd": 148.560161,
+        "pricingAsOf": "2026-08-14T12:18:23.008Z"
       }
     },
     "merges": [
