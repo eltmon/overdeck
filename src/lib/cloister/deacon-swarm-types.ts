@@ -31,6 +31,7 @@ export interface CoordinateSwarmSlotsDeps {
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
   getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
   isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
+  isSlotBranchPushed?: (workspacePath: string, issueId: string, branch: string) => Promise<boolean>;
   sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
@@ -67,6 +68,7 @@ export interface CoordinateSwarmSlotsDeps {
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record. */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
+  listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
   /** Request issue-level review after the feature branch contains every item. */
   requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }

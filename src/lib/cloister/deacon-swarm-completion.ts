@@ -154,6 +154,29 @@ export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Pro
   return statuses.every(isStatePlaneOnlyStatus);
 }
 
+export async function defaultIsSlotBranchPushed(
+  workspacePath: string,
+  issueId: string,
+  branch: string,
+): Promise<boolean> {
+  const slotIndex = branch.match(/-slot-(\d+)$/)?.[1];
+  if (!slotIndex) return false;
+  const roots = resolveWorkspaceRepoRootsSync(issueId, `${workspacePath}-slot-${slotIndex}`);
+  if (roots.length === 0 || roots.some(root => root.degradedPolyrepo)) return false;
+  try {
+    const counts = await Promise.all(roots.map(async root => {
+      const { stdout } = await execAsync(
+        `git rev-list --count ${JSON.stringify(`origin/${branch}`)}..${JSON.stringify(branch)}`,
+        { cwd: root.dir },
+      );
+      return stdout.trim();
+    }));
+    return counts.every(count => count === '0');
+  } catch {
+    return false;
+  }
+}
+
 export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {
   await messageAgent(
     agentId,
