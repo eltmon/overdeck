@@ -31,6 +31,12 @@ export interface CoordinateSwarmSlotsDeps {
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
   getPaneExitStatus: (sessionName: string) => Promise<number | null>;
+  /**
+   * PAN-3720: diagnostics only — NEVER merge authority. `classifyInFlightSlots`
+   * deliberately does not consult this: static slot ids cross assignment
+   * generations, so a terminal `done|completed` resolution may belong to a
+   * prior assignment and can never classify a slot ready-to-merge.
+   */
   getAgentRuntimeState: (agentId: string) => Promise<Pick<AgentRuntimeSnapshot, 'resolution'> | null>;
   getPaneOutputDigest: (sessionName: string) => Promise<string>;
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;

@@ -87,7 +87,7 @@ function doc(): XBriefDocument {
       status: 'active',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',
-      items: [],
+      items: [{ id: 'wi-1', title: 'work item 1', status: 'running' }],
       edges: [],
     },
   };
@@ -163,6 +163,8 @@ describe('deacon-swarm completion classification', () => {
     expect(classified).toEqual([
       expect.objectContaining({ slotIndex: 1, lifecycle: 'running' }),
     ]);
+    // Runtime resolution is never merge authority — it must not even be read.
+    expect(fakeDeps.getAgentRuntimeState).not.toHaveBeenCalled();
 
     // A running slot must never reach the merge door.
     const verifyAndMergeSlot = vi.fn();
@@ -175,22 +177,44 @@ describe('deacon-swarm completion classification', () => {
     expect(mergeActions).toEqual([]);
   });
 
-  it('still honors a terminal runtime resolution when the session is gone', async () => {
+  it('PAN-3720: a vanished session reusing a slot id never merges on the prior assignment terminal runtime resolution, even with partial commits ahead', async () => {
+    // Static slot ids cross assignment generations: the stale 'completed'
+    // runtime snapshot belongs to the PREVIOUS work item. Without a current
+    // durable slotCompletion marker the vanished slot is failed — partial
+    // commits on the slot branch do not change that (the worktree is dirty,
+    // so the clean committed recovery path does not apply).
     const agentId = 'agent-pan-2203-slot-1';
-
-    await expect(classifyInFlightSlots([slot(1, agentId)], deps({
+    const fakeDeps = deps({
       sessions: [],
       runtime: {
         [agentId]: {
-          resolution: 'done',
+          resolution: 'completed',
         },
       },
-    }), {
+      aheadCount: 1,
+      clean: false,
+      // No durable slotCompletion marker for the current assignment.
+    });
+
+    const classified = await classifyInFlightSlots([slot(1, agentId)], fakeDeps, {
       workspacePath: '/workspace',
       issueId: 'PAN-2203',
-    })).resolves.toEqual([
-      expect.objectContaining({ slotIndex: 1, lifecycle: 'ready-to-merge', exitStatus: 0 }),
+    });
+
+    expect(classified).toEqual([
+      expect.objectContaining({ slotIndex: 1, lifecycle: 'failed', reason: 'vanished-session' }),
     ]);
+    expect(fakeDeps.getAgentRuntimeState).not.toHaveBeenCalled();
+
+    // A failed slot must never reach the merge door.
+    const verifyAndMergeSlot = vi.fn();
+    const mergeActions = await mergeReadySlots('PAN-2203', '/workspace', doc(), classified, {
+      verifyAndMergeSlot,
+      applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+      fireTieredCommitHooks: vi.fn(async () => []),
+    });
+    expect(verifyAndMergeSlot).not.toHaveBeenCalled();
+    expect(mergeActions).toEqual([]);
   });
 
   it('classifies a slot whose pane exited non-zero as failed', async () => {
