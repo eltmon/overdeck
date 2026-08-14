@@ -93,22 +93,25 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-14T14:24:31.923Z",
+  "updated": "2026-08-14T14:24:32.869Z",
   "pipeline": {
     "issueId": "PAN-3727",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-14T14:16:12.011Z",
+    "updatedAt": "2026-08-14T14:24:32.867Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (183966ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
     "scopeDrift": {
       "outsideDeclaredScope": [
-        "scripts/file-size-allowlist.txt"
+        "packages/contracts/src/composer-commands.generated.ts",
+        "scripts/circular-deps-baseline.txt",
+        "scripts/file-size-allowlist.txt",
+        "sync-sources/skills/pan-restart/SKILL.md"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -135,6 +138,8 @@
         "docs/DEFINITION-OF-DONE.md",
         "docs/MERGE-WORKFLOW.md",
         "docs/PARKED-POPULATION.md",
+        "packages/contracts/src/composer-commands.generated.ts",
+        "scripts/circular-deps-baseline.txt",
         "scripts/file-size-allowlist.txt",
         "src/cli/commands/parked.ts",
         "src/lib/agents/agent-state.ts",
@@ -148,12 +153,14 @@
         "src/lib/pan-dir/record-update.ts",
         "src/lib/parked/__tests__/resolver.test.ts",
         "src/lib/parked/resolver.ts",
+        "sync-sources/skills/pan-restart/SKILL.md",
         "tests/lib/reopen.test.ts",
         "tests/unit/lib/agents/agent-state-gate.test.ts",
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
-      "recordedAt": "2026-08-14T14:02:32.470Z"
-    }
+      "recordedAt": "2026-08-14T14:24:31.922Z"
+    },
+    "reviewRequestedAt": "2026-08-14T14:24:32.867Z"
   },
   "closeOut": {
     "usage": {
