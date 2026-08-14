@@ -37,7 +37,7 @@
     "recordedAt": "2026-08-14T06:49:34.446Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-14T06:49:46.345Z",
+  "updated": "2026-08-14T06:51:26.276Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "pending",
@@ -48,7 +48,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-08-14T06:49:44.861Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
-    "reviewRequestedAt": "2026-08-14T06:49:38.223Z",
+    "reviewRequestedAt": "2026-08-14T06:51:14.352Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/command-palette-sorting.ts"
@@ -64,7 +64,8 @@
         "src/dashboard/frontend/src/components/command-palette-sorting.ts"
       ],
       "recordedAt": "2026-08-14T06:49:34.446Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-14T06:51:14.352Z"
   },
   "closeOut": {
     "usage": {
