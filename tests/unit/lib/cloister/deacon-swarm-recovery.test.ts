@@ -214,10 +214,17 @@ describe('deacon-swarm failed-merge recovery', () => {
       isPaneDead: vi.fn(async () => true),
       isSlotWorktreeClean: vi.fn(async () => true),
       isSlotBranchPushed: vi.fn(async () => true),
+      archiveBlockedSlot: vi.fn(async () => ({
+        archivedBranch: 'feature/pan-2203-slot-1-blocked-20260814',
+        archivedWorktree: `${workspacePath}-slot-1-blocked-20260814`,
+        replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+        releasedAt: '2026-08-14T12:00:00.000Z',
+      })),
+      prepareReleasedSlot: vi.fn(async () => undefined),
     };
 
     await expect(releaseBlockedSlots('PAN-2203', workspacePath, plan, state, safety)).resolves.toEqual([
-      '[swarm] released blocked slot 1 (item wi-a) for PAN-2203: branch clean and pushed',
+      '[swarm] released blocked slot 1 (item wi-a) for PAN-2203: archived as feature/pan-2203-slot-1-blocked-20260814 and prepared feature/pan-2203-slot-1-attempt-20260814',
     ]);
 
     const record = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
@@ -226,6 +233,8 @@ describe('deacon-swarm failed-merge recovery', () => {
       slotIndex: 1,
       itemId: 'wi-a',
       branch: 'feature/pan-2203-slot-1',
+      archivedBranch: 'feature/pan-2203-slot-1-blocked-20260814',
+      replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
     }));
     expect(state.inFlight).toEqual([]);
 
@@ -236,7 +245,9 @@ describe('deacon-swarm failed-merge recovery', () => {
       branch: 'feature/pan-2203-slot-1',
     });
     const reopened = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
-    expect(reopened?.swarm?.releasedBlockedSlots).toEqual({});
+    expect(reopened?.swarm?.releasedBlockedSlots?.['1']).toEqual(expect.objectContaining({
+      replacementBranch: 'feature/pan-2203-slot-1-attempt-20260814',
+    }));
     expect(reopened?.swarm?.slotAssignments).toEqual([
       expect.objectContaining({ slotIndex: 1, itemId: 'wi-a' }),
     ]);

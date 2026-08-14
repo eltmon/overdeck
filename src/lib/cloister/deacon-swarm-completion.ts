@@ -122,8 +122,8 @@ export async function defaultGetSlotBranchAheadCount(
   branch: string,
 ): Promise<number> {
   const baseBranch = `feature/${issueId.toLowerCase()}`;
-  const slotWorkspace = branch.match(/-slot-(\d+)$/)
-    ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)$/)![1]}`
+  const slotWorkspace = branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)
+    ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)![1]}`
     : workspacePath;
   const roots = resolveWorkspaceRepoRootsSync(issueId, slotWorkspace);
   let total = 0;
@@ -152,29 +152,6 @@ export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Pro
   // isStatePlaneOnlyStatus already returns true for empty porcelain (vacuous every()), so one
   // shared classifier covers both cases — no local path list here. See docs/STATE-PLANE-COMMIT-POLICY.md.
   return statuses.every(isStatePlaneOnlyStatus);
-}
-
-export async function defaultIsSlotBranchPushed(
-  workspacePath: string,
-  issueId: string,
-  branch: string,
-): Promise<boolean> {
-  const slotIndex = branch.match(/-slot-(\d+)$/)?.[1];
-  if (!slotIndex) return false;
-  const roots = resolveWorkspaceRepoRootsSync(issueId, `${workspacePath}-slot-${slotIndex}`);
-  if (roots.length === 0 || roots.some(root => root.degradedPolyrepo)) return false;
-  try {
-    const counts = await Promise.all(roots.map(async root => {
-      const { stdout } = await execAsync(
-        `git rev-list --count ${JSON.stringify(`origin/${branch}`)}..${JSON.stringify(branch)}`,
-        { cwd: root.dir },
-      );
-      return stdout.trim();
-    }));
-    return counts.every(count => count === '0');
-  } catch {
-    return false;
-  }
 }
 
 export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {

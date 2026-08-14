@@ -96,7 +96,12 @@ describe('deacon-swarm ready-slot merge', () => {
       ]);
 
     expect(fakeDeps.verifyAndMergeSlot).toHaveBeenCalledWith(
-      { issueId: 'PAN-2203', featureWorkspace: workspacePath },
+      {
+        issueId: 'PAN-2203',
+        featureWorkspace: workspacePath,
+        slotBranch: 'feature/pan-2203-slot-1',
+        slotWorkspace: `${workspacePath}-slot-1`,
+      },
       1,
       expect.objectContaining({ id: 'wi-1' }),
     );

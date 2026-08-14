@@ -9,6 +9,8 @@ const execAsync = promisify(exec);
 export interface SlotMergeIssue {
   issueId: string;
   featureWorkspace?: string;
+  slotBranch?: string;
+  slotWorkspace?: string;
 }
 
 export interface SlotMergeEvidence {
@@ -48,8 +50,8 @@ export async function verifyAndMergeSlot(
   const featureWorkspace = typeof issue === 'string'
     ? defaultRunWorkspace(issue)
     : issue.featureWorkspace ?? defaultRunWorkspace(issue.issueId);
-  const slotWorkspace = `${featureWorkspace}-slot-${slotIndex}`;
-  const slotBranch = `feature/${issueId.toLowerCase()}-slot-${slotIndex}`;
+  const slotWorkspace = typeof issue === 'string' ? `${featureWorkspace}-slot-${slotIndex}` : issue.slotWorkspace ?? `${featureWorkspace}-slot-${slotIndex}`;
+  const slotBranch = typeof issue === 'string' ? `feature/${issueId.toLowerCase()}-slot-${slotIndex}` : issue.slotBranch ?? `feature/${issueId.toLowerCase()}-slot-${slotIndex}`;
   const deps: SlotMergeDeps = {
     run: async (command, cwd) => execAsync(command, { cwd }),
     resolveRepoRoots: resolveWorkspaceRepoRootsSync,
