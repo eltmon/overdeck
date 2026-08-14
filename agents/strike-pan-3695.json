@@ -9,8 +9,8 @@
     "overdeckHome": "/home/eltmon/.overdeck"
   },
   "launch": {
-    "harness": "claude-code",
-    "model": "k3[1m]",
+    "harness": "codex",
+    "model": "gpt-5.6-sol",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3695-strike",
     "branch": null
   },
@@ -42,6 +42,10 @@
     {
       "at": "2026-08-14T04:12:04.266Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-14T04:27:00.342Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
