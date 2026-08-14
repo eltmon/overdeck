@@ -68,7 +68,7 @@ Run:
 pan swarm recover PAN-2203 1 --action retry
 ```
 
-Use `--action retry` to unblock and redispatch the failed item, `--action drop` to mark the item done after operator review, or `--action handoff` to keep the failed slot blocked for manual resolution.
+Use `--action retry` to unblock and redispatch the failed item, `--action drop` to mark the item done after operator review, `--action handoff` to keep the failed slot blocked for manual resolution, or `--action reclaim` to close the slot and return the item to the foreman for serial implementation.
 
 Each recovery records a durable intervention by slot and failure class. The fourth intervention in the same class is refused. An operator can explicitly override this limit with `--operator`.
 

@@ -706,7 +706,7 @@ export function registerSwarmCommands(program: Command): void {
   swarm
     .command('recover <id> <slotIndex>')
     .description('Recover a failed swarm slot')
-    .option('--action <action>', 'Recovery action: retry, drop, or handoff', 'retry')
+    .option('--action <action>', 'Recovery action: retry, drop, handoff, or reclaim', 'retry')
     .option('--operator', 'Override the three-intervention limit for this failure class')
     .action(async (id: string, slotIndex: string, options: SwarmRecoverOptions) => {
       const result = await swarmRecoverCommand(id, slotIndex, options);
@@ -831,7 +831,7 @@ function swarmIneligibleReasons(readiness: SwarmReadinessVerdict): string[] {
 }
 
 function isSwarmRecoveryAction(action: unknown): action is SwarmRecoveryAction {
-  return action === 'retry' || action === 'drop' || action === 'handoff';
+  return action === 'retry' || action === 'drop' || action === 'handoff' || action === 'reclaim';
 }
 
 export const __testInternals = {

@@ -126,6 +126,24 @@ export async function clearSwarmCompletionObservationRecord(
   });
 }
 
+export async function writeSwarmForemanTakeover(
+  workspacePath: string,
+  issueId: string,
+  itemId: string,
+  slotIndex: number,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      reclaimedItems: {
+        ...(record.swarm?.reclaimedItems ?? {}),
+        [itemId]: { slotIndex, reclaimedAt: new Date().toISOString() },
+      },
+    },
+  }));
+}
+
 export async function writeSwarmIntervention(
   workspacePath: string,
   issueId: string,

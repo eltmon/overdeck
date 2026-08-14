@@ -63,7 +63,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
-import { clearSwarmCompletionObservationRecord, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmCompletionObservation, readSwarmHold, writeSwarmCompletionObservation, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { clearSwarmCompletionObservationRecord, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmCompletionObservation, readSwarmHold, writeSwarmCompletionObservation, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
@@ -80,7 +80,7 @@ const recentSlotMergeFires = new Map<string, number>();
 const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const failedMergeBlocks = new Map<string, FailedMergeBlock>();
 const slotProgressObservations = new Map<string, SlotProgressObservation>();
-export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
+export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff' | 'reclaim';
 
 export interface FailedMergeBlock {
   issueId: string;
@@ -165,6 +165,7 @@ export interface CoordinateSwarmSlotsDeps {
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   /** Request issue-level review once every swarm item has been assembled into the feature branch. */
   requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
+  recordForemanTakeover?: typeof writeSwarmForemanTakeover;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -218,6 +219,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
+  recordForemanTakeover: writeSwarmForemanTakeover,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -738,6 +740,7 @@ export async function recoverFailedMergeSlot(
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
     | 'runGitCommand'
+    | 'recordForemanTakeover'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
@@ -775,16 +778,10 @@ export async function recoverFailedMergeSlot(
 
   // retry: archive the conflicted attempt so it cannot re-assert, then unblock
   // and dispatch a fresh attempt.
-  await archiveFailedSwarmSlot(
-    normalizedIssueId,
-    workspacePath,
-    {
-      itemId: block.itemId,
-      slotIndex: block.slotIndex,
-      status: 'in_flight',
-      branch: block.branch,
-      agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
-    },
+  await archiveFailedSwarmSlot(normalizedIssueId, workspacePath, {
+    itemId: block.itemId, slotIndex: block.slotIndex, status: 'in_flight', branch: block.branch,
+    agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
+  },
     { runGitCommand: deps.runGitCommand, clearSlotAssignment: deps.clearSlotAssignment },
   );
   await deps.applyTaskOperationToPlanFile(normalizedIssueId, {
@@ -794,6 +791,10 @@ export async function recoverFailedMergeSlot(
     reason: 'Retrying failed swarm slot after merge conflict',
   }, workspacePath);
   await clearFailedMergeBlock(normalizedIssueId, block.slotIndex, workspacePath);
+  if (action === 'reclaim') {
+    await (deps.recordForemanTakeover ?? writeSwarmForemanTakeover)(workspacePath, normalizedIssueId, block.itemId, block.slotIndex);
+    return [`[swarm] reclaimed slot ${block.slotIndex} (item ${block.itemId}) for foreman implementation in ${normalizedIssueId}`];
+  }
   const remainingBlocks = getFailedMergeBlocks(normalizedIssueId, workspacePath);
   const blockedSlotIndexes = new Set(remainingBlocks.map(b => b.slotIndex));
   const blockedItemIds = new Set(remainingBlocks.map(b => b.itemId));
