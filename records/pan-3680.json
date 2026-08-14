@@ -17,6 +17,11 @@
       "timestamp": "2026-08-14T04:46:47.381Z",
       "reason": "end",
       "note": "Implemented persistent swarm foreman ownership, manual-only coordinator dispatch, Deacon GC/liveness/stall observation, policy rebasing, recovery, integration coverage, and documentation. Documentation audit: A ownership and residency resolved; B eight-step loop and gates resolved; C mode, autoAdvance, and holds resolved; D completion signals and observations resolved; E synthesis removed and obsolete diagrams deleted; F recovery and governor foreman ownership resolved; G stale runtime flags, diagrams, and PAN-970 references resolved; H CLI role, record fields, foreman restart, and tier reroute resolved. Verification after reconciling latest main: npm test (13,747 root and 64 frontend tests), npm run typecheck, npm run lint, isolated Node 22 dashboard boot, and live dashboard restart all passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-14T05:25:01.267Z"
     }
   ],
   "feedback": [],
@@ -157,7 +162,7 @@
     "recordedAt": "2026-08-14T04:46:40.117Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T05:24:59.785Z",
+  "updated": "2026-08-14T05:25:01.268Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "reviewing",
