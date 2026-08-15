@@ -384,18 +384,19 @@
     "recordedAt": "2026-08-14T13:16:21.774Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-14T13:33:08.725Z",
+  "updated": "2026-08-15T13:48:40.611Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T13:18:12.676Z",
-    "updatedAt": "2026-08-14T13:33:02.430Z",
+    "updatedAt": "2026-08-15T13:48:35.989Z",
     "testNotes": "Verification of reviewed commit 054f0f9c could not complete: workspace entered an in-progress merge of origin/main mid-run (MERGE_HEAD present, UU conflicts in spawn-prep.ts, deacon-swarm-types.ts, deacon-swarm.ts with literal <<<<<<< HEAD markers). Still-live work agent agent-pan-3680 is actively resolving this conflict in the same worktree right now -- a concurrency race, not a defect at the reviewed commit. npm run typecheck passed before the merge began. npm run lint failed reproducibly (2 runs) on the conflict markers. npm test not run against the unstable tree. Prior recorded npm test run in pipeline.testNotes also failed deterministically (tests/integration/swarm-foreman-polyrepo.test.ts), no verified fix landed since. Branch needs conflict resolution + fresh review before re-test. Full evidence in .pan/test/result.json.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3699",
     "reviewedAtCommit": "92226d7e49b1af6373c1ed3c9e496ebd8469584d",
@@ -552,9 +553,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 254118787,
-            "output": 335090,
-            "cacheRead": 247124480,
+            "input": 254654870,
+            "output": 336435,
+            "cacheRead": 247653888,
             "cacheWrite": 0
           }
         },
@@ -583,9 +584,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 254118787,
-          "output": 335090,
-          "cacheRead": 247124480,
+          "input": 254654870,
+          "output": 336435,
+          "cacheRead": 247653888,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -602,8 +603,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 176.076262,
-        "pricingAsOf": "2026-08-14T13:33:08.710Z"
+        "usd": 176.414691,
+        "pricingAsOf": "2026-08-15T13:48:36.006Z"
       }
     },
     "merges": [
