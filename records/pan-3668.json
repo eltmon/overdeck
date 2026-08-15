@@ -422,7 +422,7 @@
     "recordedAt": "2026-08-13T13:46:44.006Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-15T12:40:12.569Z",
+  "updated": "2026-08-15T12:59:22.379Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -433,7 +433,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-13T14:50:23.590Z",
-    "updatedAt": "2026-08-15T12:40:05.496Z",
+    "updatedAt": "2026-08-15T12:59:15.820Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "AC-1 pass: policy text carries provenance, workspace-boundary, pan-lifecycle, no-hidden-agents, and state-write-door rules; injection at spawn is work item 7 (constant currently unconsumed). AC-2 pass: deny-list verified against installed prime-agent 0.7.2 RPC dispatch - all 15 names are real and are exactly the daemon-coordination block (send_message, agent_messages_*, list/add/cancel_schedule, list/get/set/update/manage_heartbeat, observe/unobserve); no autonomous_* RPC command exists, heartbeats/schedules are the continuation surface and are covered; error message is standalone. AC-3 pass: checkpoint recorded with fallback, and enforcement independently re-verified against the pinned-range release during inspection. FLAG (non-blocking): policy.ts checkpoint comment overclaims doctor - doctor-prime-agent.ts pins semver >=0.1.0 <1.0.0 plus a --mode rpc help probe, not a protocol/command list, so 'protocol drift is rejected by doctor' is false; a future 0.x adding coordination commands would pass doctor and slip the deny-list. Fix the comment; consider an allow-list of root-session commands so the guard fails closed. Minor: assert applies to every Prime RPC session, not only managed ones - stricter than FR-17 requires and consistent with the PRD non-goal, but the 'Managed' name is then misleading.",
     "blockerReasons": [
@@ -748,7 +748,7 @@
       },
       "costAtCloseOut": {
         "usd": 101.4935093,
-        "pricingAsOf": "2026-08-15T12:40:12.404Z"
+        "pricingAsOf": "2026-08-15T12:59:22.229Z"
       }
     },
     "merges": [
