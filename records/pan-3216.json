@@ -64,7 +64,7 @@
     "recordedAt": "2026-07-28T06:40:20.292Z"
   },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T16:00:34.271Z",
+  "updated": "2026-08-15T16:52:49.750Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "passed",
@@ -218,16 +218,7 @@
   },
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3216",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-28T04:49:56.966Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 2,
     "claims": {},
