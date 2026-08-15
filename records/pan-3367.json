@@ -321,7 +321,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-15T16:51:33.874Z",
+  "updated": "2026-08-15T16:53:59.451Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "passed",
@@ -643,24 +643,7 @@
       "accepted": []
     }
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3367",
-      "recoveryPath": "autonomous-plan-dispatch",
-      "obligationGeneration": "in_planning",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T02:43:33.944Z"
-    },
-    {
-      "issue": "PAN-3367",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T03:13:07.572Z"
-    }
-  ],
+  "recoveryTrips": [],
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
