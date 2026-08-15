@@ -39,7 +39,7 @@
     "recordedAt": "2026-08-14T06:50:56.362Z"
   },
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-15T13:50:45.601Z",
+  "updated": "2026-08-15T13:50:53.189Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "passed",
@@ -50,7 +50,7 @@
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-15T13:48:35.818Z",
+    "updatedAt": "2026-08-15T13:50:28.030Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3710",
     "reviewSpawnedAt": "2026-08-14T06:53:54.419Z"
   },
@@ -116,7 +116,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.884607,
-        "pricingAsOf": "2026-08-15T13:48:35.862Z"
+        "pricingAsOf": "2026-08-15T13:50:28.041Z"
       }
     },
     "merges": [
@@ -124,8 +124,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "k3[1m]",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3704",
