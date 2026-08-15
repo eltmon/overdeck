@@ -130,7 +130,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-15T15:46:01.212Z",
+  "updated": "2026-08-15T15:46:16.488Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "passed",
@@ -261,94 +261,13 @@
       },
       "costAtCloseOut": {
         "usd": 55.241432,
-        "pricingAsOf": "2026-08-15T13:49:03.805Z"
+        "pricingAsOf": "2026-08-15T15:45:45.746Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3733"
     ],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-15T15:46:01.210Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed from pipeline journal",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed from pipeline journal",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed (from pipeline journal; no lastVerifiedCommit recorded)",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "All commits merged to main; Remote branch fully merged; PR #3733 MERGED at 2026-08-15T13:48:35Z",
-          "status": "pass",
-          "mergedAt": "2026-08-15T13:48:35Z",
-          "mergeCommit": "796ec3072650e8a0bab91864605a15d4ac3b328e"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "missing required checks on 796ec3072650e8a0bab91864605a15d4ac3b328e: test, lint, build (22), guard; verified on main by later green CI run f12a421585196a8909ce8b2c1ef060967ab18393 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
-          "status": "pass"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit 16edf260 contains merge 796ec307",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (13 transcript files preserved); No strike branch strike/pan-3727 found; Pruned 0 checkpoint ref(s) for agent-pan-3727, planning-pan-3727, strike-pan-3727; No specialist registry entries for PAN-3727"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "workModel": "claude-sonnet-5",
   "harness": "claude-code",
