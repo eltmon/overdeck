@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-29T00:22:24.082Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T04:44:30.391Z",
+  "updated": "2026-08-15T16:53:14.758Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -254,16 +254,7 @@
   "workModel": "kimi-code/k3",
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3252",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-28T21:54:57.485Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 14,
     "claims": {},
