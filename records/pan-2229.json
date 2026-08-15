@@ -165,7 +165,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T19:30:45.915Z",
+  "updated": "2026-08-15T16:51:51.318Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "passed",
@@ -369,32 +369,7 @@
   },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-10T21:32:52.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-10T23:22:27.105Z"
-    },
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-11T11:44:06.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-11T13:14:11.604Z"
-    },
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-13T03:19:59.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-13T04:50:14.582Z"
-    }
-  ],
+  "recoveryTrips": [],
   "statusOverrides": {
     "review-blocker-format-eval": "completed",
     "review-blocker-format-eval.ac1": "completed",
