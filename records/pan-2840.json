@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T13:17:40.687Z",
-  "updated": "2026-07-27T16:50:49.961Z",
+  "updated": "2026-08-15T16:52:03.425Z",
   "pipeline": {
     "issueId": "PAN-2840",
     "reviewStatus": "pending",
@@ -133,22 +133,5 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-2840",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-17T18:36:04.666Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-17T18:47:07.217Z"
-    },
-    {
-      "issue": "PAN-2840",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-18T14:17:50.807Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-18T14:23:18.444Z"
-    }
-  ]
+  "recoveryTrips": []
 }
