@@ -3,7 +3,6 @@ import {
   classifyInFlightSlots,
   getFailedMergeBlock,
   mergeReadySlots,
-  recordStalledSlotRecovery,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -44,9 +43,13 @@ function deps(options: {
   | 'getSlotBranchAheadCount'
   | 'isSlotWorktreeClean'
   | 'sendCompletionNudge'
+  | 'readCompletionObservation'
+  | 'writeCompletionObservation'
+  | 'clearCompletionObservation'
   | 'readSlotCompletion'
   | 'clearSlotCompletion'
 > {
+  const observations = new Map<string, { signature: string; nudged: boolean; consecutiveDoneCount: number }>();
   return {
     listSessionNames: vi.fn(async () => options.sessions ?? []),
     isPaneDead: vi.fn(async (sessionName: string) => options.dead?.[sessionName] ?? false),
@@ -57,6 +60,13 @@ function deps(options: {
     getSlotBranchAheadCount: vi.fn(async () => options.aheadCount ?? 0),
     isSlotWorktreeClean: vi.fn(async () => options.clean ?? false),
     sendCompletionNudge: options.sendCompletionNudge ?? vi.fn(async () => undefined),
+    readCompletionObservation: vi.fn((_workspace, _issue, key) => observations.get(key)),
+    writeCompletionObservation: vi.fn(async (_workspace, _issue, key, observation) => {
+      observations.set(key, observation);
+    }),
+    clearCompletionObservation: vi.fn(async (_workspace, _issue, key) => {
+      observations.delete(key);
+    }),
     readSlotCompletion: vi.fn((_workspacePath: string, _issueId: string, slotIndex: number) => options.slotCompletions?.[slotIndex]),
     clearSlotCompletion: vi.fn(async () => undefined),
   };
@@ -373,7 +383,6 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     });
 
-    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 
@@ -417,6 +426,28 @@ describe('deacon-swarm completion classification', () => {
         signal: 'completion-nudge',
         actions: [],
       }),
+    ]);
+  });
+
+  it('resumes the completion nudge observation after a simulated process restart without inferring live completion', async () => {
+    const agentId = 'agent-pan-2203-slot-8';
+    const observations = new Map<string, { signature: string; nudged: boolean; consecutiveDoneCount: number }>();
+    const firstDeps = deps({ sessions: [agentId], aheadCount: 1, clean: true });
+    firstDeps.readCompletionObservation = vi.fn((_workspace, _issue, key) => observations.get(key));
+    firstDeps.writeCompletionObservation = vi.fn(async (_workspace, _issue, key, value) => { observations.set(key, value); });
+    const options = {
+      workspacePath: '/workspace', issueId: 'PAN-2203', inferCompletion: 'auto' as const, stallThresholdMs: 10_000,
+    };
+
+    await classifyInFlightSlots([slot(8, agentId)], firstDeps, options);
+    await vi.advanceTimersByTimeAsync(10_001);
+    await classifyInFlightSlots([slot(8, agentId)], firstDeps, options);
+
+    const restartedDeps = deps({ sessions: [agentId], aheadCount: 1, clean: true });
+    restartedDeps.readCompletionObservation = vi.fn((_workspace, _issue, key) => observations.get(key));
+    restartedDeps.writeCompletionObservation = vi.fn(async (_workspace, _issue, key, value) => { observations.set(key, value); });
+    await expect(classifyInFlightSlots([slot(8, agentId)], restartedDeps, options)).resolves.toEqual([
+      expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }),
     ]);
   });
 

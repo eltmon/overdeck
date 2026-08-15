@@ -102,6 +102,8 @@ export interface SpawnOptions {
   slotIndex?: number;
   /** xBRIEF item id assigned to the registered swarm slot. */
   slotItemId?: string;
+  /** Marks the bare parent work agent as the swarm foreman. */
+  foreman?: boolean;
   allowHost?: boolean;
   flywheelRunId?: string;
   startedBy: string;
@@ -148,6 +150,8 @@ export interface SpawnRunOptions {
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */
   slotItemId?: string;
+  /** Marks the bare parent work agent as the swarm foreman. */
+  foreman?: boolean;
   /** Attempt-specific branch used when a static slot id is safely reused. */
   slotBranch?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */

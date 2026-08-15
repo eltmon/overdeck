@@ -8,7 +8,7 @@
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
- *   - Conversations                         — semantic JSONL transcript search
+ *   - Conversations                         — semantic search with a newest-first toggle persisted at `overdeck.ui.paletteConversationsNewestFirst`
  *   - Memory / Observations                 — FTS over ~/.overdeck/memory
  */
 
@@ -48,7 +48,7 @@ import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PaletteAction {
+export interface PaletteAction {
   id: string;
   label: string;
   description?: string;
@@ -63,6 +63,7 @@ interface PaletteAction {
   meta?: Array<{ icon?: React.ElementType; text: string; pill?: boolean }>;
   // Sort hint within group: lower = earlier.
   rank?: number;
+  sortTs?: string | null;
   /**
    * Run the action without closing the palette. For in-palette affordances that
    * change what is listed rather than navigating away — e.g. expanding the
@@ -151,6 +152,7 @@ interface PaletteSearchResponse {
 const EMPTY_AGENTS: Agent[] = [];
 const EMPTY_ISSUES: Issue[] = [];
 const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [], conversations: [] };
+export const PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY = 'overdeck.ui.paletteConversationsNewestFirst';
 
 // ─── Display helpers ────────────────────────────────────────────────────────────
 
@@ -200,6 +202,18 @@ function formatHitDate(ts: string | null): string {
       ? { month: 'short', day: 'numeric' }
       : { month: 'short', day: 'numeric', year: 'numeric' };
   return d.toLocaleDateString(undefined, opts);
+}
+
+/** Order conversation actions newest first while preserving search rank for timestamp ties (PAN-3704). */
+export function compareConversationActionsNewestFirst(a: PaletteAction, b: PaletteAction): number {
+  const aTs = a.sortTs ? Date.parse(a.sortTs) : Number.NaN;
+  const bTs = b.sortTs ? Date.parse(b.sortTs) : Number.NaN;
+  const aValid = !Number.isNaN(aTs);
+  const bValid = !Number.isNaN(bTs);
+
+  if (aValid && bValid && aTs !== bTs) return bTs - aTs;
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  return (a.rank ?? 0) - (b.rank ?? 0);
 }
 
 // ─── Result-type scoping (filter chips) ─────────────────────────────────────────
@@ -384,6 +398,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
+  const [conversationsNewestFirst, setConversationsNewestFirst] = useState(
+    () => localStorage.getItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY) !== 'false',
+  );
+  const toggleConversationsNewestFirst = useCallback(() => {
+    setConversationsNewestFirst((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   // Reset query when opened, and lazy-load the pan command catalog the first
   // time the palette is shown. Workspaces are re-fetched every open — most-
@@ -783,6 +807,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         icon: MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
+        sortTs: hit.ts,
         excerptSegments: hit.excerptSegments.map((seg) => ({
           kind: seg.match ? 'match' : 'text',
           value: seg.text,
@@ -969,7 +994,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                 >
                   {filtered
                     .filter((a) => a.group === group && inScope(a))
-                    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+                    .sort(group === 'Conversations' && conversationsNewestFirst
+                      ? compareConversationActionsNewestFirst
+                      : (a, b) => (a.rank ?? 0) - (b.rank ?? 0))
                     .map((action) => {
                       const accent = accentForGroup(action.group);
                       return (
@@ -1045,6 +1072,18 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
               <kbd className="px-1.5 py-0.5 bg-card border border-border rounded text-[9px]">Esc</kbd>
               close
             </span>
+            <button
+              type="button"
+              aria-pressed={conversationsNewestFirst}
+              onClick={toggleConversationsNewestFirst}
+              className={`ml-auto text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${
+                conversationsNewestFirst
+                  ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                  : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+              }`}
+            >
+              Newest first
+            </button>
           </div>
         </Command>
       </div>

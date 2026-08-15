@@ -33,9 +33,16 @@ export function resolveSwarmPolicy(issueId?: string, cli: SwarmPolicyLayer = {})
   return resolveSwarmPolicyLayers(global, project?.swarm, issue, cli);
 }
 
-export function resolveAutomaticSwarmPolicy(issueId: string, manual = false, inProgress = false) {
+export function resolveAutomaticSwarmPolicy(issueId: string, swarmEligible: boolean, manual = false) {
   const policy = resolveSwarmPolicy(issueId);
-  return { policy, enabled: manual || (policy.mode !== 'off' && (policy.autoAdvance || !inProgress)) };
+  const spawnForeman = manual || (policy.mode !== 'off' && swarmEligible);
+  return {
+    policy,
+    spawnForeman,
+    requireSwarmReadiness: policy.mode === 'always',
+    advanceWavesWithoutConfirmation: policy.autoAdvance,
+    reason: manual ? 'manual' : policy.mode === 'off' ? 'mode-off' : swarmEligible ? 'eligible' : 'not-ready',
+  } as const;
 }
 
 export function resolveSwarmMaxSlots(issueId: string, configured: number): number {

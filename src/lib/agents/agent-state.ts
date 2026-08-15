@@ -7,7 +7,7 @@ import { FsError } from '../errors.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveAutoResumeConfigForIssue } from '../cloister/auto-resume-config.js';
 import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from '../overdeck/agent-rollback-state.js';
-import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync } from '../overdeck/agent-state-sync.js';
+import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync, listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -54,6 +54,8 @@ export interface AgentState {
   harness?: RuntimeName;
   /** Unified role primitive (PAN-1048). */
   role: Role;
+  /** Parent work agent that owns a swarm's gated orchestration loop. */
+  foreman?: boolean;
   model: string;
   /**
    * The exact spawn key fed to the weighted-distribution model picker at spawn
@@ -665,6 +667,58 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
     yield* saveAgentState(state);
     return state;
   });
+
+/**
+ * Clear operator-gate residue (stoppedByUser, paused, troubled) on STOPPED
+ * agent rows whose issueId is in `issueIds` — used by close-out and the
+ * terminal-issue residue patrol so a terminal issue's preserved agent rows
+ * stop reappearing in the operator-gate parked orbit (PAN-3727). Running/
+ * starting agents and scheduler yields are never touched: a yield is a live
+ * scheduling decision, not operator residue, and a live agent's gates are not
+ * this issue's to clear.
+ *
+ * Batched (one `listOverdeckAgentStatesSync()` scan for every issueId in the
+ * set) so the recurring residue patrol does not perform one full agent-table
+ * scan per terminal issue (review finding, PAN-3727) — cost scales with the
+ * agent table once per patrol run, not with the number of terminal issues.
+ */
+export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<string>): Map<string, string[]> {
+  const mutated = new Map<string, string[]>();
+  if (issueIds.size === 0) return mutated;
+
+  for (const state of listOverdeckAgentStatesSync()) {
+    if (state.status !== 'stopped') continue;
+    const normalized = state.issueId?.toUpperCase();
+    if (!normalized || !issueIds.has(normalized)) continue;
+
+    let changed = false;
+    if (state.stoppedByUser) {
+      delete state.stoppedByUser;
+      changed = true;
+    }
+    if (state.paused === true && state.yieldedByScheduler !== true) {
+      applyAgentUnpaused(state);
+      changed = true;
+    }
+    if (state.troubled === true) {
+      applyAgentUntroubled(state);
+      changed = true;
+    }
+    if (changed) {
+      saveAgentStateSync(state);
+      const ids = mutated.get(normalized) ?? [];
+      ids.push(state.id);
+      mutated.set(normalized, ids);
+    }
+  }
+  return mutated;
+}
+
+/** Single-issue convenience wrapper over {@link clearAgentOperatorGatesForIssuesSync}. */
+export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
+  const normalized = issueId.toUpperCase();
+  return clearAgentOperatorGatesForIssuesSync(new Set([normalized])).get(normalized) ?? [];
+}
 
 function applyAgentFailure(state: AgentState, reason: string): void {
   const config = resolveAutoResumeConfigForIssue(state.issueId);

@@ -3,11 +3,22 @@ import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import type { SlotMergeResult } from '../agents/slot-merge.js';
 import type { SlotReconcileResult } from '../agents/slot-reconcile.js';
 import type { PanIssueSwarmSlotCompletion } from '../pan-dir/record.js';
+import type { findSpecByIssue } from '../pan-dir/specs.js';
 import type { ReviewStatus } from '../review-status.js';
+import type { resolveAutomaticSwarmPolicy } from '../swarm-policy.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import type { FeatureWorkspace } from './deacon-workspaces.js';
 import type { RequestIssueReviewResult } from './deacon-swarm-finalization.js';
+import type {
+  clearSwarmCompletionObservationRecord,
+  readSwarmCompletionObservation,
+  readSwarmHold,
+  writeSwarmCompletionObservation,
+  writeSwarmForemanTakeover,
+} from './deacon-swarm-record.js';
+import type { ensureSwarmForeman } from './swarm-foreman.js';
+import type { SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export interface ArchivedBlockedSlot {
   archivedBranch: string;
@@ -18,6 +29,7 @@ export interface ArchivedBlockedSlot {
 
 /** Dependencies used by one swarm coordinator patrol. */
 export interface CoordinateSwarmSlotsDeps {
+  findSpecByIssue?: typeof findSpecByIssue;
   listFeatureWorkspaces: () => FeatureWorkspace[];
   reconcileSlotState: (
     issueId: string,
@@ -39,9 +51,12 @@ export interface CoordinateSwarmSlotsDeps {
   getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
   isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
   isSlotBranchPushed?: (workspacePath: string, issueId: string, branch: string) => Promise<boolean>;
+  sendCompletionNudge?: (agentId: string, issueId: string) => Promise<void>;
+  readCompletionObservation?: typeof readSwarmCompletionObservation;
+  writeCompletionObservation?: typeof writeSwarmCompletionObservation;
+  clearCompletionObservation?: typeof clearSwarmCompletionObservationRecord;
   archiveBlockedSlot?: (issueId: string, workspacePath: string, slotIndex: number, branch: string) => Promise<ArchivedBlockedSlot>;
   prepareReleasedSlot?: (issueId: string, workspacePath: string, slotIndex: number, itemId: string, branch: string) => Promise<void>;
-  sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
     issue: { issueId: string; featureWorkspace: string; slotBranch?: string; slotWorkspace?: string },
@@ -73,11 +88,19 @@ export interface CoordinateSwarmSlotsDeps {
   setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /** Re-evaluated immediately before every slot spawn. */
   shouldDispatch?: (issueId: string) => boolean;
+  readSwarmHold?: typeof readSwarmHold;
   /** Inclusive upper bound for slot index allocation. */
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record. */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
+  recordForemanTakeover?: typeof writeSwarmForemanTakeover;
+  ensureSwarmForeman?: typeof ensureSwarmForeman;
+  workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
+  writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
+  emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
+  sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
+  resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
   getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
   clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
   /** Request issue-level review after the feature branch contains every item. */

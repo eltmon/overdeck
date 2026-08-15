@@ -6,10 +6,13 @@ import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
 import type { ClassifiedSwarmSlot, ClassifyInFlightSlotsOptions, CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+import {
+  clearSwarmCompletionObservationRecord,
+  readSwarmCompletionObservation,
+  writeSwarmCompletionObservation,
+} from './deacon-swarm-record.js';
 
 const execAsync = promisify(exec);
-const slotCompletionObservations = new Map<string, SlotCompletionObservation>();
-
 interface SlotCompletionObservation {
   signature: string;
   nudged: boolean;
@@ -25,13 +28,25 @@ export interface DoneWithoutSignalObservation {
 
 export async function classifyDoneWithoutSignal(
   slot: ReconciledSlotItem,
-  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'getSlotBranchAheadCount' | 'isSlotWorktreeClean' | 'sendCompletionNudge'>>,
+  deps: Partial<Pick<CoordinateSwarmSlotsDeps,
+    | 'getSlotBranchAheadCount'
+    | 'isSlotWorktreeClean'
+    | 'sendCompletionNudge'
+    | 'readCompletionObservation'
+    | 'writeCompletionObservation'
+    | 'clearCompletionObservation'>>,
   options: ClassifyInFlightSlotsOptions,
   observation: DoneWithoutSignalObservation,
 ): Promise<ClassifiedSwarmSlot | null> {
   const mode = options.inferCompletion ?? 'off';
   if (mode === 'off' || !slot.agentId || !slot.branch || !options.workspacePath || !options.issueId) {
-    slotCompletionObservations.delete(observation.progressKey);
+    if (options.workspacePath && options.issueId) {
+      await (deps.clearCompletionObservation ?? clearSwarmCompletionObservationRecord)(
+        options.workspacePath,
+        options.issueId,
+        observation.progressKey,
+      );
+    }
     return null;
   }
 
@@ -44,12 +59,20 @@ export async function classifyDoneWithoutSignal(
     `${options.workspacePath}-slot-${slot.slotIndex}`,
   ).catch(() => false);
   if (aheadCount < 1 || !clean) {
-    slotCompletionObservations.delete(observation.progressKey);
+    await (deps.clearCompletionObservation ?? clearSwarmCompletionObservationRecord)(
+      options.workspacePath,
+      options.issueId,
+      observation.progressKey,
+    );
     return null;
   }
 
   const signature = `${observation.commitTime ?? 'none'}:${observation.outputDigest}:${aheadCount}:clean`;
-  const previous = slotCompletionObservations.get(observation.progressKey);
+  const previous = (deps.readCompletionObservation ?? readSwarmCompletionObservation)(
+    options.workspacePath,
+    options.issueId,
+    observation.progressKey,
+  );
   const current: SlotCompletionObservation = {
     signature,
     nudged: previous?.signature === signature ? previous.nudged : false,
@@ -59,12 +82,17 @@ export async function classifyDoneWithoutSignal(
   const normalizedIssueId = options.issueId.toUpperCase();
 
   if (!current.nudged) {
-    await (deps.sendCompletionNudge ?? defaultSendCompletionNudge)(slot.agentId, normalizedIssueId);
+    if (deps.sendCompletionNudge) await deps.sendCompletionNudge(slot.agentId, normalizedIssueId);
     current.nudged = true;
     actions.push(`[swarm] nudged slot ${slot.slotIndex} (item ${slot.itemId}) for ${normalizedIssueId}: run pan done ${normalizedIssueId}`);
   }
 
-  slotCompletionObservations.set(observation.progressKey, current);
+  await (deps.writeCompletionObservation ?? writeSwarmCompletionObservation)(
+    options.workspacePath,
+    options.issueId,
+    observation.progressKey,
+    current,
+  );
   return {
     ...slot,
     lifecycle: 'awaiting-completion-signal',
@@ -98,11 +126,16 @@ export async function classifyDurableReadySlot(
 }
 
 export function resetSwarmCompletionInferenceForTests(): void {
-  slotCompletionObservations.clear();
+  // Completion inference is record-backed; there is no process-local state to reset.
 }
 
-export function clearSwarmCompletionObservation(progressKey: string): void {
-  slotCompletionObservations.delete(progressKey);
+export async function clearSwarmCompletionObservation(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'clearCompletionObservation'>>,
+): Promise<void> {
+  await (deps.clearCompletionObservation ?? clearSwarmCompletionObservationRecord)(workspacePath, issueId, progressKey);
 }
 
 export function swarmInferCompletionMode(): SwarmInferCompletionMode {

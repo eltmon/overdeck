@@ -22,28 +22,31 @@ const idleStackReaperMock = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/cloister/idle-stack-reaper.js', () => idleStackReaperMock);
 
-const swarmMock = vi.hoisted(() => ({
-  coordinateSwarmSlots: vi.fn(async () => []),
+const messagingMock = vi.hoisted(() => ({
+  messageAgent: vi.fn(async () => undefined),
 }));
 
-vi.mock('../../../../src/lib/cloister/deacon-swarm.js', () => swarmMock);
+vi.mock('../../../../src/lib/agents/messaging.js', () => messagingMock);
 
 import { handleCloisterDomainEvent } from '../../../../src/lib/cloister/service.js';
-import { coordinateSwarmSlots } from '../../../../src/lib/cloister/deacon-swarm.js';
 
 describe('service swarm fast-path', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('routes stopped slot agents to swarm coordination for the owning issue', async () => {
+  it('delivers one stopped-slot event to the owning foreman', async () => {
     await Effect.runPromise(handleCloisterDomainEvent({
       type: 'agent.stopped',
       payload: { agentId: 'agent-pan-2203-slot-2' },
     }));
 
-    expect(coordinateSwarmSlots).toHaveBeenCalledTimes(1);
-    expect(coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
+    expect(messagingMock.messageAgent).toHaveBeenCalledTimes(1);
+    expect(messagingMock.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-2203',
+      expect.stringContaining('[swarm-event] agent-pan-2203-slot-2 stopped'),
+      'reactive:swarm-event',
+    );
   });
 
   it('does not route non-slot stopped agents to swarm coordination', async () => {
@@ -52,6 +55,6 @@ describe('service swarm fast-path', () => {
       payload: { agentId: 'agent-pan-2203' },
     }));
 
-    expect(coordinateSwarmSlots).not.toHaveBeenCalled();
+    expect(messagingMock.messageAgent).not.toHaveBeenCalled();
   });
 });

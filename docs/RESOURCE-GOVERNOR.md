@@ -323,8 +323,11 @@ HARD pressure on its own.
 
 Recovery reconcilers do not bypass the governor. `decideAutonomousRedrive()`
 first applies the unified resume policy and then reads the cached memory verdict;
-under `holding`, stack rebuilds, dead-session respawns, and swarm redispatches
-remain deferred. Role-specific concurrency reservations are acquired only after
+under `holding`, stack rebuilds, dead-session respawns, and foreman revivals
+remain deferred. A foreman is a work agent and consumes one work-concurrency seat;
+the swarm janitor checks that capacity before it attempts a revival. Slot dispatch
+uses the separate reserved swarm-slot budget through the explicit dispatch gate.
+Role-specific concurrency reservations are acquired only after
 that admission decision. When memory returns to the recovery band, the same
 durable obligation is re-derived on the next deterministic patrol.
 

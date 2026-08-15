@@ -302,7 +302,12 @@ networks. NEVER remove this cleanup step.
 
 The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
 Close Out stops and removes the workspace Docker stack (including the
-`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
+`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. Close-out
+also runs a `close-out:ack-parked-residue` step that acknowledges the issue's open
+recovery trips and clears operator-gate flags on its stopped agent rows, non-blocking on
+failure; the deacon's `reconcileTerminalIssueResidue` patrol (state-plane cadence, ~hourly)
+is the recurring backstop that cleans residue predating this step or left by a failed run
+(PAN-3727). The deacon's
 reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
 and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
 worker with retry backoff. Tracker-backed devnet closure checks run in batches of four. The worker revalidates canonical merged status before each
