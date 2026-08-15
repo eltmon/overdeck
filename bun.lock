@@ -71,7 +71,7 @@
     },
     "apps/desktop": {
       "name": "@overdeck/desktop",
-      "version": "0.49.1",
+      "version": "0.49.2",
       "bin": {
         "overdeck-desktop": "./bin/overdeck.mjs",
       },
@@ -93,7 +93,7 @@
     },
     "packages/contracts": {
       "name": "@overdeck/contracts",
-      "version": "0.49.1",
+      "version": "0.49.2",
       "dependencies": {
         "effect": "4.0.0-beta.73",
       },
