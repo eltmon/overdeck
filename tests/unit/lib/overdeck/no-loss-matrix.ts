@@ -389,6 +389,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/dev/rebuild',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Dev-mode rebuild trigger; outside 8 remodel domains' },
   { surface: 'POST /api/system/restart-dashboard',        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Dashboard restart; outside 8 remodel domains' },
 
+  // ── restart-gate.ts (PAN-3729/PAN-3731) ───────────────────────────────────
+  { surface: 'GET /api/restart-gate',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Restart-gate read; operator approval for dashboard restarts; outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/requests',           kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Restart-gate request upsert/poll; outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/claim',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Restart-gate exclusive claim; outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/approve',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Restart-gate operator approval; outside 8 remodel domains' },
+
   // ── palette.ts ────────────────────────────────────────────────────────────
   { surface: 'GET /api/palette/commands',                 kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Command palette index; outside 8 remodel domains' },
   { surface: 'GET /api/palette/search',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Command palette search; outside 8 remodel domains' },
