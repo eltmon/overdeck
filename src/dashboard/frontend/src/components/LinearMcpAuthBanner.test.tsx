@@ -100,6 +100,28 @@ describe('LinearMcpAuthBanner', () => {
     expect(screen.queryByRole('link', { name: /Open Linear authorization/ })).not.toBeInTheDocument();
   });
 
+  it('links a blocked conversation agent to its /conv/<name> view', () => {
+    setIntervention(intervention({
+      blockedAgents: [{
+        agentId: 'conv-20260815-f8c3',
+        issueId: null,
+        declaredAt: '2026-08-15T12:19:35Z',
+        expiresAt: '2026-08-15T16:52:22Z',
+        notifiedAt: null,
+        issueUrl: null,
+      }],
+    }));
+    render(<LinearMcpAuthBanner />);
+
+    const convLink = screen.getByRole('link', { name: 'conv-20260815-f8c3' });
+    expect(convLink).toHaveAttribute('href', '/conv/conv-20260815-f8c3');
+    // Pipeline agents keep plain-text ids — they have no own page.
+    setIntervention(intervention());
+    render(<LinearMcpAuthBanner />);
+    expect(screen.queryByRole('link', { name: 'agent-min-852' })).not.toBeInTheDocument();
+    expect(screen.getByText('agent-min-852')).toBeInTheDocument();
+  });
+
   it('shows the waiting-for-URL state when no agent has produced an authorization URL', () => {
     setIntervention(intervention({ authUrl: null, authUrlAgentId: null }));
     render(<LinearMcpAuthBanner />);
