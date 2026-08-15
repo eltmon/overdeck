@@ -1301,7 +1301,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-05T16:07:50.098Z",
+  "updated": "2026-08-15T16:51:39.386Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1517,16 +1517,7 @@
       "accepted": []
     }
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1577",
-      "recoveryPath": "unsignaled-test-verdict",
-      "obligationGeneration": 1785721288780,
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-03T01:56:06.490Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 18,
     "claims": {},
