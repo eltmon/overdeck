@@ -39,7 +39,7 @@
     "recordedAt": "2026-08-14T06:50:56.362Z"
   },
   "created": "2026-08-14T06:01:28.823Z",
-  "updated": "2026-08-15T15:44:57.524Z",
+  "updated": "2026-08-15T15:44:58.271Z",
   "pipeline": {
     "issueId": "PAN-3704",
     "reviewStatus": "passed",
@@ -50,11 +50,11 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-15T15:44:57.500Z",
+    "updatedAt": "2026-08-15T15:44:58.254Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3710",
     "reviewSpawnedAt": "2026-08-14T06:53:54.419Z",
     "closedOut": true,
-    "closedOutAt": "2026-08-15T15:44:57.500Z"
+    "closedOutAt": "2026-08-15T15:44:58.254Z"
   },
   "closeOut": {
     "usage": {
@@ -126,7 +126,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-08-15T15:44:57.520Z",
+      "evaluatedAt": "2026-08-15T15:44:58.265Z",
       "rows": [
         {
           "id": "review",
@@ -201,7 +201,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (15 transcript files preserved); No strike branch strike/pan-3704 found; Pruned 25 checkpoint ref(s) for agent-pan-3704, planning-pan-3704, strike-pan-3704; No specialist registry entries for PAN-3704"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (15 transcript files preserved); No strike branch strike/pan-3704 found; Pruned 0 checkpoint ref(s) for agent-pan-3704, planning-pan-3704, strike-pan-3704; No specialist registry entries for PAN-3704"
         }
       ],
       "accepted": []
