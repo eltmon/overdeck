@@ -464,7 +464,13 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
       await Promise.all([
         handleAgentStoppedEvent(agentId),
         handleAgentStoppedForOrphanReviewerSessions(agentId),
-        slotMatch ? (await import('./deacon-swarm.js')).coordinateSwarmSlots({ issueId: slotMatch[1]!.toUpperCase() }) : Promise.resolve([]),
+        slotMatch
+          ? (await import('../agents/messaging.js')).messageAgent(
+              `agent-${slotMatch[1]!.toLowerCase()}`,
+              `[swarm-event] ${agentId} stopped; run pan swarm status ${slotMatch[1]!.toUpperCase()} --json`,
+              'reactive:swarm-event',
+            )
+          : Promise.resolve(),
       ]);
     }
     return;

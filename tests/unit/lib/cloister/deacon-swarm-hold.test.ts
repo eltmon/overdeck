@@ -130,7 +130,7 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
     setupWorkspace('pan-100', 'PAN-100');
     mocks.getReviewStatusSync.mockReturnValue({ deaconIgnored: true });
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] skipped PAN-100: deacon-ignored — operator hold');
     expect(actions).not.toContain('[swarm] considered PAN-100: swarm eligible');
@@ -144,7 +144,7 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
     setupWorkspace('pan-101', 'PAN-101');
     mocks.getReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'verification_stuck' });
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] PAN-101 is system-stuck (verification_stuck) — coordinating anyway (stuck no longer halts assembly, PAN-2469)');
     expect(actions).not.toContain('[swarm] skipped PAN-101: stuck — operator hold');
@@ -155,7 +155,7 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
     setupWorkspace('pan-102', 'PAN-102');
     mocks.getReviewStatusSync.mockReturnValue({ deaconIgnored: true });
 
-    const actions = await coordinateSwarmSlots({ issueId: 'PAN-102' });
+    const actions = await coordinateSwarmSlots({ issueId: 'PAN-102', manual: true });
 
     expect(actions).toContain('[swarm] skipped PAN-102: deacon-ignored — operator hold');
   });
@@ -165,7 +165,7 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
     setupWorkspace('pan-103', 'PAN-103');
     mocks.getReviewStatusSync.mockReturnValue(null);
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] considered PAN-103: swarm eligible');
   });
@@ -177,7 +177,7 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
       throw new Error('journal unreadable');
     });
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] considered PAN-104: swarm eligible');
   });
@@ -375,7 +375,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     mocks.getReviewStatusSync.mockReturnValue(null);
     const deps = makeCoordinateDeps('PAN-200', projectPath, workspacePath);
 
-    const actions = await coordinateSwarmSlots({}, deps);
+    const actions = await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(actions).toContain('[swarm] blocked slots for PAN-200: slot 1 (item wi-1), slot 3 (item wi-3) — other slots continue; run `pan swarm recover PAN-200 <slot>`');
   });
@@ -408,7 +408,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
       })),
     });
 
-    const actions = await coordinateSwarmSlots({}, deps);
+    const actions = await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(actions).toContain('[swarm] skipped merge slot 1 (item wi-1) for PAN-201: failed-merge block — awaiting `pan swarm recover`');
     expect(actions).toContain('[swarm] merged slot 2 (item wi-2) for PAN-201');
@@ -433,7 +433,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     mocks.getReviewStatusSync.mockReturnValue(null);
     const deps = makeCoordinateDeps('PAN-202', projectPath, workspacePath);
 
-    const actions = await coordinateSwarmSlots({}, deps);
+    const actions = await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(actions).toContain('[swarm] dispatched implementation slot 2 (item wi-2) for PAN-202');
     expect(deps.spawnRun).toHaveBeenCalledWith('PAN-202', 'work', expect.objectContaining({ slotIndex: 2, slotItemId: 'wi-2' }));

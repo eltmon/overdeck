@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
+import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
 import { verifyAndMergeSlot } from '../agents/slot-merge.js';
 import {
@@ -43,7 +44,7 @@ import {
   tryReserveSwarmSlot,
   type ConcurrencyLimits,
 } from './concurrency.js';
-import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
+import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 import {
   classifyDoneWithoutSignal,
@@ -55,23 +56,21 @@ import {
   resetSwarmCompletionInferenceForTests,
   swarmInferCompletionMode,
 } from './deacon-swarm-completion.js';
-import {
-  defaultRequestIssueReview,
-  finalizeSwarmIssueIfComplete,
-} from './deacon-swarm-finalization.js';
 import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
-import { clearReleasedBlockedSwarmSlot, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { defaultRequestIssueReview, finalizeSwarmIssueIfComplete } from './deacon-swarm-finalization.js';
+import { clearReleasedBlockedSwarmSlot, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 import { archiveBlockedSwarmSlot, defaultIsSlotBranchPushed, prepareReleasedSwarmSlot, releaseBlockedSlots } from './swarm-blocked-slot.js';
+import { ensureSwarmForeman } from './swarm-foreman.js';
+import { maintainSwarmForeman, resetForemanRespawnFailuresForTests, type SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
 export { releaseBlockedSlots } from './swarm-blocked-slot.js';
-
 const execAsync = promisify(exec);
 const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5_000;
 const SWARM_ADVANCE_FAILURE_THRESHOLD = 3;
@@ -82,7 +81,7 @@ const recentSlotMergeFires = new Map<string, number>();
 const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const failedMergeBlocks = new Map<string, FailedMergeBlock>();
 const slotProgressObservations = new Map<string, SlotProgressObservation>();
-export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
+export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff' | 'reclaim';
 
 export interface FailedMergeBlock {
   issueId: string;
@@ -99,6 +98,7 @@ export interface CoordinateSwarmSlotsOptions {
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
+  findSpecByIssue,
   listFeatureWorkspaces: () => listFeatureWorkspaces({ includeSlotWorkspaces: false }),
   reconcileSlotState,
   listSessionNames: () => Effect.runPromise(listTmuxSessionNames()),
@@ -143,6 +143,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   spawnRun,
   getIssueHold: defaultGetIssueHold,
   shouldDispatch: defaultShouldDispatch,
+  readSwarmHold,
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
   listReleasedSlotIndexes: (issueId, workspacePath) => Object.keys(
@@ -158,6 +159,10 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   clearSlotCompletion: clearSwarmSlotCompletion,
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
+  recordForemanTakeover: writeSwarmForemanTakeover,
+  ensureSwarmForeman,
+  sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
+  resolveAutomaticSwarmPolicy,
   requestIssueReview: defaultRequestIssueReview,
 };
 
@@ -228,7 +233,7 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
-  signal?: 'inferred' | 'completion-nudge' | 'durable-completion';
+  signal?: 'inferred' | 'completion-nudge' | 'durable-completion' | 'stall-event';
   actions?: string[];
 }
 
@@ -236,6 +241,7 @@ interface SlotProgressObservation {
   commitTime: number | null;
   outputDigest: string;
   lastProgressAt: number;
+  stallNotified?: boolean;
 }
 
 interface SlotAssignment {
@@ -295,14 +301,7 @@ export async function coordinateSwarmSlots(
         : spec.document;
       const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      const swarmInProgress = Object.entries(overrides ?? {})
-        .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const { policy, enabled } = resolveAutomaticSwarmPolicy(issueId, opts.manual, swarmInProgress);
-      if (!enabled) {
-        actions.push(`[swarm] ${issueId}: swarming off (${policy.source.mode}) — no automatic dispatch, recovery, merge, or cleanup; use an explicit swarm command or stop the legacy sessions`);
-        continue;
-      }
-      const dispatchEligible = enabled && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
+      const dispatchEligible = opts.manual === true && readiness.swarmEligible && slotEligibleCount >= 2;
       if (dispatchEligible) {
         actions.push(`[swarm] considered ${issueId}: swarm eligible`);
       }
@@ -328,12 +327,14 @@ export async function coordinateSwarmSlots(
       }
       const requeue = await requeueFailedSwarmSlots(issueId, workspace.workspacePath, classified, doc, reconciled, deps, blockedSlotIndexes);
       actions.push(...requeue.actions);
-      actions.push(...await recordStalledSlotRecovery(issueId, classified, workspace.workspacePath)); // stalled slots remain operator-recoverable
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps, blockedSlotIndexes));
       actions.push(...await gcMergedSlotsAndAdvance(issueId, workspace.workspacePath, reconciled, deps, async () => {
         const finalized = await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps);
         if (!dispatchEligible) return finalized;
-        return [...finalized, ...await dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps, blockedSlotIndexes, blockedItemIds)];
+        return [
+          ...finalized,
+          ...await dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps, blockedSlotIndexes, blockedItemIds),
+        ];
       }));
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
@@ -341,10 +342,31 @@ export async function coordinateSwarmSlots(
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-
   return actions;
 }
 
+export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultDeps): Promise<string[]> {
+  const actions: string[] = [];
+  const sessions = await deps.listSessionNames();
+  for (const workspace of deps.listFeatureWorkspaces()) {
+    const issueId = workspace.issueId.toUpperCase();
+    const spec = await Effect.runPromise((deps.findSpecByIssue ?? findSpecByIssue)(workspace.projectPath, issueId));
+    if (!spec) continue;
+    const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
+    actions.push(`[swarm-janitor] enumerated ${issueId}`);
+    actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
+    actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
+    const automatic = (deps.resolveAutomaticSwarmPolicy ?? resolveAutomaticSwarmPolicy)(issueId, analyzeSwarmReadiness(spec.document).swarmEligible);
+    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps, automatic.policy.mode !== 'off', automatic.spawnForeman));
+    const classified = await classifyInFlightSlots(reconciled.inFlight, { ...deps, listSessionNames: async () => sessions }, { issueId, workspacePath: workspace.workspacePath });
+    for (const slot of classified.filter(candidate => candidate.signal === 'stall-event')) {
+      await deps.sendStallEvent?.(`agent-${issueId.toLowerCase()}`, `[swarm-event] slot ${slot.slotIndex} stalled (no progress ${Math.floor((slot.stalledForMs ?? 0) / 60_000)}m)`);
+      actions.push(`[swarm-janitor] notified ${issueId} foreman that slot ${slot.slotIndex} stalled`);
+    }
+  }
+  return actions;
+}
+export { resetForemanRespawnFailuresForTests };
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
@@ -355,6 +377,7 @@ export async function classifyInFlightSlots(
       | 'getSlotBranchAheadCount'
       | 'isSlotWorktreeClean'
       | 'sendCompletionNudge'
+      | 'readCompletionObservation' | 'writeCompletionObservation' | 'clearCompletionObservation'
       | 'readSlotCompletion'
       | 'clearSlotCompletion'
     >> = defaultDeps,
@@ -366,12 +389,6 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
-    // PAN-2372 WI-4 / FR-6: a durable completion marker (written by slot
-    // `pan done`) is the STRONGEST completion signal — it is the durable record
-    // that the slot finished, so it beats a vanished session, a missing agent,
-    // and the rebuildable runtime plane. Check it before everything else. The
-    // itemId guard (AC2) ignores a stale marker left for a slot now bound to a
-    // different item (e.g. after a re-plan rotated slot→item).
     if (options.workspacePath && options.issueId) {
       const completion = await (deps.readSlotCompletion ?? defaultReadSlotCompletion)(
         options.workspacePath,
@@ -436,7 +453,9 @@ export async function classifyInFlightSlots(
         || previous.outputDigest !== outputDigest
       ) {
         slotProgressObservations.set(progressKey, { commitTime, outputDigest, lastProgressAt: now });
-        clearSwarmCompletionObservation(progressKey);
+        if (options.workspacePath && options.issueId) {
+          await clearSwarmCompletionObservation(options.workspacePath, options.issueId, progressKey, deps);
+        }
         classified.push({ ...slot, lifecycle: 'running' });
         continue;
       }
@@ -458,7 +477,9 @@ export async function classifyInFlightSlots(
           lifecycle: 'stalled',
           reason: 'no-progress-timeout',
           stalledForMs,
+          ...(!previous.stallNotified ? { signal: 'stall-event' as const } : {}),
         });
+        previous.stallNotified = true;
         continue;
       }
       classified.push({ ...slot, lifecycle: 'running' });
@@ -693,6 +714,7 @@ export async function recoverFailedMergeSlot(
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
     | 'runGitCommand'
+    | 'recordForemanTakeover'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
@@ -730,16 +752,10 @@ export async function recoverFailedMergeSlot(
 
   // retry: archive the conflicted attempt so it cannot re-assert, then unblock
   // and dispatch a fresh attempt.
-  await archiveFailedSwarmSlot(
-    normalizedIssueId,
-    workspacePath,
-    {
-      itemId: block.itemId,
-      slotIndex: block.slotIndex,
-      status: 'in_flight',
-      branch: block.branch,
-      agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
-    },
+  await archiveFailedSwarmSlot(normalizedIssueId, workspacePath, {
+    itemId: block.itemId, slotIndex: block.slotIndex, status: 'in_flight', branch: block.branch,
+    agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
+  },
     { runGitCommand: deps.runGitCommand, clearSlotAssignment: deps.clearSlotAssignment },
   );
   await deps.applyTaskOperationToPlanFile(normalizedIssueId, {
@@ -749,6 +765,10 @@ export async function recoverFailedMergeSlot(
     reason: 'Retrying failed swarm slot after merge conflict',
   }, workspacePath);
   await clearFailedMergeBlock(normalizedIssueId, block.slotIndex, workspacePath);
+  if (action === 'reclaim') {
+    await (deps.recordForemanTakeover ?? writeSwarmForemanTakeover)(workspacePath, normalizedIssueId, block.itemId, block.slotIndex);
+    return [`[swarm] reclaimed slot ${block.slotIndex} (item ${block.itemId}) for foreman implementation in ${normalizedIssueId}`];
+  }
   const remainingBlocks = getFailedMergeBlocks(normalizedIssueId, workspacePath);
   const blockedSlotIndexes = new Set(remainingBlocks.map(b => b.slotIndex));
   const blockedItemIds = new Set(remainingBlocks.map(b => b.itemId));
@@ -772,26 +792,6 @@ export async function recoverFailedMergeSlot(
       agents: [],
     }, analyzeSwarmReadiness(retryDoc), deps, blockedSlotIndexes, blockedItemIds),
   ];
-}
-
-export async function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwarmSlot[], workspacePath?: string): Promise<string[]> {
-  const actions: string[] = [];
-  const normalizedIssueId = issueId.toUpperCase();
-
-  for (const slot of slots.filter(s => s.lifecycle === 'stalled')) {
-    if (getFailedMergeBlock(normalizedIssueId, slot.slotIndex, workspacePath)) continue;
-
-    await recordFailedMergeBlock({
-      issueId: normalizedIssueId,
-      itemId: slot.itemId,
-      slotIndex: slot.slotIndex,
-      branch: slot.branch,
-      note: `Slot ${slot.slotIndex} stalled with no branch commit or pane output progress`,
-    }, workspacePath);
-    actions.push(`[swarm] stalled slot ${slot.slotIndex} (item ${slot.itemId}) for ${normalizedIssueId}: recovery required`);
-  }
-
-  return actions;
 }
 
 function writeSwarmFailedMergeBlock(
@@ -839,6 +839,7 @@ export async function dispatchNextWave(
     | 'clearSlotAssignment'
     | 'spawnRun'
     | 'shouldDispatch'
+    | 'readSwarmHold'
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
     | 'listReleasedSlotIndexes'
@@ -936,7 +937,8 @@ export async function dispatchNextWave(
       });
       // Freeze/hold can activate mid-wave; the cycle-start gate has already passed
       // by then, so re-check before every spawn (PAN-2214 slot-20 regression).
-      if (!(deps.shouldDispatch ?? defaultShouldDispatch)(issueId)) {
+      const swarmHold = deps.readSwarmHold?.(workspacePath, issueId);
+      if (swarmHold || !(deps.shouldDispatch ?? defaultShouldDispatch)(issueId)) {
         await deps.applyTaskOperationToPlanFile(issueId, {
           type: 'unblock',
           itemId: item.id,

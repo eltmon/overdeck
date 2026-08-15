@@ -37,7 +37,7 @@ import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingR
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
-import { coordinateSwarmSlots } from './deacon-swarm.js';
+import { swarmJanitorPass } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
@@ -2186,16 +2186,16 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       if (resolution === 'done' && count >= 1) {
         if (slotAgentMatch) {
-          console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);
-          const swarmActions = await coordinateSwarmSlots({ issueId });
+          console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: notifying its foreman`);
+          const { messageAgent } = await import('../agents/messaging.js');
+          await messageAgent(`agent-${issueId.toLowerCase()}`, `[swarm-event] ${agent.id} reported done; run pan swarm status ${issueId} --json`, 'deacon:swarm-event');
           saveAgentRuntimeState(agent.id, {
             resolution: 'completed',
             resolutionCount: count + 1,
             resolutionUpdatedAt: new Date().toISOString(),
           });
-          actions.push(`Deacon routed completed slot ${agent.id} (${issueId}) to swarm coordination`);
-          actions.push(...swarmActions);
-          addLog('action', `Routed completed slot ${agent.id} (${issueId}) to swarm coordination`, undefined);
+          actions.push(`Deacon notified foreman of completed slot ${agent.id} (${issueId})`);
+          addLog('action', `Notified foreman of completed slot ${agent.id} (${issueId})`, undefined);
           continue;
         }
 
@@ -3003,7 +3003,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-2203: deterministic swarm coordination. This pass derives active
   // swarms from workspaces + xBRIEF readiness; later beads fill in merge,
   // dispatch, recovery, and cooldown behavior.
-  const swarmActions = await coordinateSwarmSlots();
+  const swarmActions = await swarmJanitorPass();
   actions.push(...swarmActions);
   for (const a of swarmActions) addLog('action', a, state.patrolCycle);
 

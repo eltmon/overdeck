@@ -48,6 +48,7 @@ state it is in to running work.
   from the existing xBRIEF and xBRIEF tasks.
 - **Already running** — `pan start` exits 0 with a no-op message naming `pan tell <id>` for
   messaging and the tmux attach command.
+- **Swarm active** — the bare parent agent is the foreman. `pan start` attaches to or restores that foreman instead of refusing because slot agents exist; it never creates a competing serial parent.
 
 Planning depth is controlled by `--plan`:
 
@@ -65,6 +66,8 @@ Start-time policy flags are persisted on the issue before planning or work begin
 sets the durable work-model override used by later respawns, `--swarm` accepts `off`, `auto`,
 or `always`, `--review-mode` accepts `quick`, `full`, or `none`, and `--review-model` pins the
 model used by the review convoy. Omitted flags leave existing and inherited policy untouched.
+Swarm mode controls automatic foreman creation, not Deacon slot dispatch. `off` keeps serial work,
+while `auto` and `always` allow a readiness-eligible foreman loop.
 When this start also kicks off planning (no plan exists yet), `--plan-model <model>` overrides
 the planning agent's model for that session only — it is a one-shot override, not persisted
 policy, and it never changes the work agent's model (`--model`).
