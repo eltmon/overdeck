@@ -8,6 +8,7 @@ import {
   type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
+import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -74,12 +75,38 @@ function withIssueUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIn
   };
 }
 
+/**
+ * Attach each blocked conversation's canonical dashboard URL — /conv/<rowid>,
+ * the DB row id, which is how conversations are displayed everywhere else in
+ * the dashboard. Resolved through the conversations read door by name.
+ * Best-effort: an unresolvable conversation falls back to null and the banner
+ * renders the id as plain text.
+ */
+function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIntervention {
+  return {
+    ...intervention,
+    blockedAgents: intervention.blockedAgents.map(agent => {
+      if (!agent.agentId.startsWith('conv-')) {
+        return { ...agent, conversationUrl: null };
+      }
+      let conversationUrl: string | null = null;
+      try {
+        const conversation = getConversationByName(agent.agentId);
+        conversationUrl = conversation === null ? null : `/conv/${conversation.id}`;
+      } catch {
+        conversationUrl = null;
+      }
+      return { ...agent, conversationUrl };
+    }),
+  };
+}
+
 const getLinearMcpAuthRoute = HttpRouter.add(
   'GET',
   '/api/linear-mcp-auth',
   httpHandler(Effect.gen(function* () {
     const intervention = yield* Effect.promise(() => resolveLinearMcpAuthIntervention());
-    return jsonResponse(withIssueUrls(intervention));
+    return jsonResponse(withConversationUrls(withIssueUrls(intervention)));
   })),
 );
 

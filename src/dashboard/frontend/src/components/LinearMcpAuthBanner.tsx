@@ -99,14 +99,13 @@ export function LinearMcpAuthBanner() {
         <ul className="text-warning-foreground text-sm pl-8 flex flex-col gap-0.5">
           {blockedAgents.map((agent) => {
             const issueUrl = agent.issueUrl ?? (agent.issueId ? trackerIssueUrl(agent.issueId) : null);
-            // Conversations deep-link to /conv/<name> (the API resolves by
-            // name as well as rowid); pipeline agents have no own page, so
-            // they stay plain text next to their issue link.
-            const convUrl = agent.agentId.startsWith('conv-') ? `/conv/${encodeURIComponent(agent.agentId)}` : null;
+            // Conversations link to their canonical /conv/<rowid> view (the
+            // DB row id, projected by the server); agents without a
+            // conversation page stay plain text next to their issue link.
             return (
               <li key={agent.agentId}>
-                {convUrl ? (
-                  <a href={convUrl} className="font-semibold underline hover:opacity-80">
+                {agent.conversationUrl ? (
+                  <a href={agent.conversationUrl} className="font-semibold underline hover:opacity-80">
                     {agent.agentId}
                   </a>
                 ) : (

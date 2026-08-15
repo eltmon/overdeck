@@ -30,6 +30,10 @@ export interface LinearMcpAuthBlockedAgent {
   /** Projection-only enrichment attached by the GET route from the issues
    * resolver; never persisted in lifecycle events. */
   issueUrl?: string | null;
+  /** Projection-only enrichment attached by the GET route from the
+   * conversations read door: the canonical /conv/<rowid> dashboard URL for
+   * conv-* agents; never persisted in lifecycle events. */
+  conversationUrl?: string | null;
 }
 
 export interface LinearMcpAuthIntervention {
