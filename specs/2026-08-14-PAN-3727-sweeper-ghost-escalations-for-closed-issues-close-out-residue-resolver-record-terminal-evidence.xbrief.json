@@ -4,17 +4,17 @@
     "created": "2026-08-14T12:48:30.051Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3727: Sweeper ghost escalations for closed issues — close-out leaves open recovery trips + stop gates; parked resolver's closed-check fails open on tracker blips",
-    "updated": "2026-08-14T12:55:43.136Z"
+    "updated": "2026-08-15T15:45:20.490Z"
   },
   "plan": {
     "id": "pan-3727",
     "title": "Sweeper ghost escalations for closed issues — close-out residue + resolver record-terminal evidence",
-    "status": "running",
+    "status": "completed",
     "uid": "09d19a3e-8b77-4e58-938b-54e62231427d",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-14T12:48:30.051Z",
-    "updated": "2026-08-14T12:55:43.136Z",
+    "updated": "2026-08-15T15:45:20.490Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3727",
@@ -548,5 +548,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
