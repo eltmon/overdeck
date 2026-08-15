@@ -325,7 +325,7 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-30T05:07:39.968Z",
+  "updated": "2026-08-15T16:51:48.918Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "passed",
@@ -731,16 +731,7 @@
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1990",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-28T18:18:11.243Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 56,
     "claims": {},
