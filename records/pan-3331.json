@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-31T00:44:52.353Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-08-01T01:40:27.304Z",
+  "updated": "2026-08-15T16:53:42.893Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "passed",
@@ -557,16 +557,7 @@
   },
   "harness": "claude-code",
   "model": "claude-opus-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3331",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-30T19:54:38.863Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 14,
     "claims": {},
