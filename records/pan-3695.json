@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-15T13:36:41.389Z",
+  "updated": "2026-08-15T13:44:28.241Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -28,7 +28,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-15T13:36:41.381Z",
+    "updatedAt": "2026-08-15T13:44:28.229Z",
     "mergeNotes": "Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent was stopped by the operator",
     "strikeReadyHead": "593d24afdd24847f17bf1bb48b381b6fd0135135",
     "strikeReadyAt": "2026-08-14T05:05:29.152Z",
@@ -99,7 +99,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.0659170000000002,
-        "pricingAsOf": "2026-08-15T13:36:41.383Z"
+        "pricingAsOf": "2026-08-15T13:44:28.231Z"
       }
     },
     "merges": [],
