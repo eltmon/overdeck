@@ -48,7 +48,7 @@
   ],
   "feedback": [],
   "created": "2026-08-03T03:40:59.452Z",
-  "updated": "2026-08-06T22:20:25.801Z",
+  "updated": "2026-08-15T16:51:35.132Z",
   "pipeline": {
     "issueId": "PAN-1230",
     "reviewStatus": "passed",
@@ -155,14 +155,5 @@
       "accepted": []
     }
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1230",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-03T03:40:59.449Z"
-    }
-  ]
+  "recoveryTrips": []
 }
