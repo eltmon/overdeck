@@ -130,18 +130,18 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-15T13:48:57.899Z",
+  "updated": "2026-08-15T13:49:07.936Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-15T13:48:57.609Z",
+    "updatedAt": "2026-08-15T13:48:57.959Z",
     "testNotes": "All 7 configured gates green on HEAD 351e3e91: install, typecheck, frontend-typecheck, lint, build, server-bundle passed clean. test gate (vitest --changed origin/main, backend+frontend): frontend 168/168 files/1963/1963 tests passed; backend first attempt had 3 flaky failures in start-running-noop.test.ts (file untouched by this branch, passes 9/9 isolated, full retry per gate's retry:1 config passed clean: 806/808 files, 7719/7746 tests, exit 0). Review at HEAD APPROVED, 0 blocking findings. UAT not required: backend-only fix (doors, closeOut lifecycle, resolver, deacon patrol, docs), no UI-facing ACs.",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
@@ -259,7 +259,7 @@
       },
       "costAtCloseOut": {
         "usd": 55.241432,
-        "pricingAsOf": "2026-08-15T13:48:57.767Z"
+        "pricingAsOf": "2026-08-15T13:49:03.805Z"
       }
     },
     "merges": [
