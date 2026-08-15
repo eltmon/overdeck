@@ -130,7 +130,7 @@
     "recordedAt": "2026-08-14T14:24:31.922Z"
   },
   "created": "2026-08-14T12:26:18.315Z",
-  "updated": "2026-08-15T15:45:45.402Z",
+  "updated": "2026-08-15T15:46:01.212Z",
   "pipeline": {
     "issueId": "PAN-3727",
     "reviewStatus": "passed",
@@ -141,7 +141,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T14:26:44.094Z",
-    "updatedAt": "2026-08-15T15:45:45.383Z",
+    "updatedAt": "2026-08-15T15:46:01.199Z",
     "testNotes": "All 7 configured gates green on HEAD 351e3e91: install, typecheck, frontend-typecheck, lint, build, server-bundle passed clean. test gate (vitest --changed origin/main, backend+frontend): frontend 168/168 files/1963/1963 tests passed; backend first attempt had 3 flaky failures in start-running-noop.test.ts (file untouched by this branch, passes 9/9 isolated, full retry per gate's retry:1 config passed clean: 806/808 files, 7719/7746 tests, exit 0). Review at HEAD APPROVED, 0 blocking findings. UAT not required: backend-only fix (doors, closeOut lifecycle, resolver, deacon patrol, docs), no UI-facing ACs.",
     "verificationNotes": "Verification FAILED at test (608527ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3727/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3733",
@@ -201,7 +201,7 @@
       "recordedAt": "2026-08-14T14:24:31.922Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-08-15T15:45:45.383Z"
+    "closedOutAt": "2026-08-15T15:46:01.199Z"
   },
   "closeOut": {
     "usage": {
@@ -269,14 +269,14 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-08-15T15:45:45.402Z",
+      "evaluatedAt": "2026-08-15T15:46:01.210Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
           "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
+          "observed": "reviewStatus: passed from pipeline journal",
           "status": "pass"
         },
         {
@@ -284,7 +284,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
+          "observed": "testStatus: passed from pipeline journal",
           "status": "pass"
         },
         {
@@ -292,7 +292,7 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "observed": "verificationStatus: passed (from pipeline journal; no lastVerifiedCommit recorded)",
           "status": "pass"
         },
         {
@@ -300,7 +300,7 @@
           "num": 4,
           "title": "Merged to main",
           "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3733 MERGED at 2026-08-15T13:48:35Z",
+          "observed": "All commits merged to main; Remote branch fully merged; PR #3733 MERGED at 2026-08-15T13:48:35Z",
           "status": "pass",
           "mergedAt": "2026-08-15T13:48:35Z",
           "mergeCommit": "796ec3072650e8a0bab91864605a15d4ac3b328e"
@@ -310,7 +310,7 @@
           "num": 5,
           "title": "Post-merge lifecycle ran",
           "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
           "status": "pass"
         },
         {
@@ -344,7 +344,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (13 transcript files preserved); No strike branch strike/pan-3727 found; Pruned 283 checkpoint ref(s) for agent-pan-3727, planning-pan-3727, strike-pan-3727; No specialist registry entries for PAN-3727"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (13 transcript files preserved); No strike branch strike/pan-3727 found; Pruned 0 checkpoint ref(s) for agent-pan-3727, planning-pan-3727, strike-pan-3727; No specialist registry entries for PAN-3727"
         }
       ],
       "accepted": []
