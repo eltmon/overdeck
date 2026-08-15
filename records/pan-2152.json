@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-08-04T13:05:09.540Z",
+  "updated": "2026-08-15T16:51:35.106Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "passed",
@@ -85,8 +85,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "extract-beads": "completed",
     "extract-beads.extract-beads.ac1": "completed",

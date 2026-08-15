@@ -63,7 +63,7 @@
     }
   ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-08-04T13:05:07.722Z",
+  "updated": "2026-08-15T16:51:33.688Z",
   "pipeline": {
     "issueId": "PAN-2054",
     "reviewStatus": "passed",
@@ -169,7 +169,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "closedout-record-field": "completed",
