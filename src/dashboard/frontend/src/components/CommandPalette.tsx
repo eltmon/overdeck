@@ -36,8 +36,10 @@ import {
   Clock,
 } from 'lucide-react';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
+import { compareByRank, compareConversationHits } from './command-palette-sorting';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
+import { ensureDashboardSession } from '../lib/wsTransport';
 import {
   isUserFacingWorkspace,
   sortWorkspaces,
@@ -47,7 +49,6 @@ import {
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface PaletteAction {
   id: string;
   label: string;
@@ -61,8 +62,8 @@ interface PaletteAction {
   excerptSegments?: ExcerptSegment[];
   // Optional structured metadata chips (rendered instead of `description`).
   meta?: Array<{ icon?: React.ElementType; text: string; pill?: boolean }>;
-  // Sort hint within group: lower = earlier.
   rank?: number;
+  ts?: string | null;
   /**
    * Run the action without closing the palette. For in-palette affordances that
    * change what is listed rather than navigating away — e.g. expanding the
@@ -201,7 +202,6 @@ function formatHitDate(ts: string | null): string {
       : { month: 'short', day: 'numeric', year: 'numeric' };
   return d.toLocaleDateString(undefined, opts);
 }
-
 // ─── Result-type scoping (filter chips) ─────────────────────────────────────────
 
 type PaletteScope = 'all' | 'actions' | 'commands' | 'issues' | 'workspaces' | 'conversations' | 'memory';
@@ -241,8 +241,6 @@ function accentForGroup(group: string): { box: string; icon: string } {
   }
 }
 
-// ─── Server API ───────────────────────────────────────────────────────────────
-
 async function callApi(path: string, method = 'POST'): Promise<void> {
   try {
     await fetch(path, { method });
@@ -276,6 +274,7 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
 
 async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
   try {
+    await ensureDashboardSession();
     const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal });
     if (!res.ok) return EMPTY_SEARCH;
     const data = await res.json() as PaletteSearchResponse;
@@ -783,6 +782,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         icon: MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
+        ts: hit.ts,
         excerptSegments: hit.excerptSegments.map((seg) => ({
           kind: seg.match ? 'match' : 'text',
           value: seg.text,
@@ -969,7 +969,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                 >
                   {filtered
                     .filter((a) => a.group === group && inScope(a))
-                    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+                    .sort(group === 'Conversations' ? compareConversationHits : compareByRank)
                     .map((action) => {
                       const accent = accentForGroup(action.group);
                       return (

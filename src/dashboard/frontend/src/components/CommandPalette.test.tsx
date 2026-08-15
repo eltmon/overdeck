@@ -74,6 +74,9 @@ beforeEach(() => {
     if (method === 'GET' && url === '/api/workspace-registry') {
       return Response.json({ workspaces: [] });
     }
+    if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+      return Response.json({ csrfToken: 'test-csrf-token' });
+    }
     if (method === 'GET' && url.startsWith('/api/palette/search')) {
       return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
     }
@@ -148,6 +151,9 @@ describe('CommandPalette conversation results', () => {
       }
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({ workspaces: [] });
+      }
+      if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
       }
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
         return Response.json({
@@ -253,6 +259,135 @@ describe('CommandPalette conversation results', () => {
       label: 'semantic transcript hit',
       sourceLabel: 'Claude session session-',
     });
+  });
+});
+
+describe('CommandPalette conversation ordering (PAN-3703)', () => {
+  const conversationHit = (sessionId: string, ts: string | null, rank: number, byteOffset: number) => ({
+    sessionId,
+    conversationId: sessionId,
+    projectId: '-home-eltmon-Projects-overdeck',
+    projectKey: 'overdeck',
+    role: 'assistant',
+    ts,
+    byteOffset,
+    displayContent: sessionId,
+    excerpt: sessionId,
+    excerptSegments: [{ text: sessionId, match: false }],
+    rank,
+  });
+
+  const memoryHit = (id: string, rank: number) => ({
+    kind: 'memory' as const,
+    id,
+    projectId: 'overdeck',
+    workspaceId: '',
+    issueId: '',
+    timestamp: '2026-06-02T01:00:00.000Z',
+    displayContent: id,
+    excerpt: id,
+    excerptSegments: [{ kind: 'text' as const, value: id }],
+    tags: [],
+    docType: 'memory',
+    rank,
+  });
+
+  function installSearchResults({
+    conversations = [],
+    memory = [],
+  }: {
+    conversations?: ReturnType<typeof conversationHit>[];
+    memory?: ReturnType<typeof memoryHit>[];
+  }) {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
+      }
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations, memory, summaries: [] });
+      }
+      return undefined;
+    });
+  }
+
+  async function search() {
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), {
+      target: { value: 'needle' },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+  }
+
+  function expectBefore(first: string, second: string) {
+    expect(
+      getOptionByValue(first).compareDocumentPosition(getOptionByValue(second))
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders conversation hits newest-first when rank order disagrees', async () => {
+    installSearchResults({
+      conversations: [
+        conversationHit('oldest', '2026-06-01T01:00:00.000Z', 1, 10),
+        conversationHit('newest', '2026-06-03T01:00:00.000Z', 3, 30),
+        conversationHit('middle', '2026-06-02T01:00:00.000Z', 2, 20),
+      ],
+    });
+
+    await search();
+
+    expectBefore('conv-newest-30', 'conv-middle-20');
+    expectBefore('conv-middle-20', 'conv-oldest-10');
+  });
+
+  it('uses ascending rank when conversation timestamps are equal', async () => {
+    installSearchResults({
+      conversations: [
+        conversationHit('higher-rank', '2026-06-02T01:00:00.000Z', 4, 40),
+        conversationHit('lower-rank', '2026-06-02T01:00:00.000Z', 1, 10),
+      ],
+    });
+
+    await search();
+
+    expectBefore('conv-lower-rank-10', 'conv-higher-rank-40');
+  });
+
+  it('places a missing conversation timestamp after timestamped hits', async () => {
+    installSearchResults({
+      conversations: [
+        conversationHit('missing', null, 1, 10),
+        conversationHit('timestamped', '2026-06-02T01:00:00.000Z', 2, 20),
+      ],
+    });
+
+    await search();
+
+    expectBefore('conv-timestamped-20', 'conv-missing-10');
+  });
+
+  it('keeps memory hits in ascending rank order', async () => {
+    installSearchResults({
+      conversations: [conversationHit('conversation', '2026-06-02T01:00:00.000Z', 1, 10)],
+      memory: [memoryHit('higher-rank', 4), memoryHit('lower-rank', 1)],
+    });
+
+    await search();
+
+    expectBefore('mem-memory-lower-rank', 'mem-memory-higher-rank');
   });
 });
 

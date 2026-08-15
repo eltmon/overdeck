@@ -1,6 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NormalizedConversationSearchConfig } from '../../../../lib/config-yaml.js';
@@ -42,7 +44,9 @@ import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../../lib/database/conversation-embeddings-db.js';
 import { closeConversationSearchService } from '../../services/conversation-search-service.js';
-import { PAN_COMMANDS, runPaletteSearch } from '../palette.js';
+import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { dashboardSessionCookieHeader, _resetDashboardSessionTokenForTests } from '../dashboard-auth.js';
+import { PAN_COMMANDS, paletteRouteLayer, runPaletteSearch } from '../palette.js';
 
 let tmpDir: string | undefined;
 
@@ -73,6 +77,14 @@ function jsonlMessage(role: string, text: string): string {
   })}\n`;
 }
 
+async function requestPaletteSearch(headers: Record<string, string> = {}) {
+  const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/palette/search?q=needle', { headers }));
+  return Effect.runPromise(Effect.scoped(
+    Effect.flatMap(HttpRouter.toHttpEffect(paletteRouteLayer), (app) =>
+      Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)),
+  ));
+}
+
 describe('palette conversation search', () => {
   it('offers reset-to-planned in the command palette', () => {
     expect(PAN_COMMANDS).toContainEqual(expect.objectContaining({
@@ -81,6 +93,9 @@ describe('palette conversation search', () => {
   });
 
   beforeEach(() => {
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-palette-search-'));
     vi.mocked(listProjectsSync).mockReturnValue([]);
     vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
@@ -92,6 +107,26 @@ describe('palette conversation search', () => {
     vi.restoreAllMocks();
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = undefined;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  it('requires auth but accepts cookie-authenticated GETs from split-host frontends', async () => {
+    vi.mocked(getConversationSearchConfigSync).mockReturnValue({
+      enabled: false,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(tmpDir!, 'disabled-embeddings.db'),
+    });
+    await expect(requestPaletteSearch()).resolves.toMatchObject({ status: 401 });
+
+    const cookie = dashboardSessionCookieHeader().split(';')[0]!;
+    await expect(requestPaletteSearch({
+      cookie,
+      referer: 'https://feature-pan-3703.overdeck.localhost/',
+    })).resolves.toMatchObject({ status: 200 });
   });
 
   it('routes conversation hits by explicit project with cwd fallback', async () => {
