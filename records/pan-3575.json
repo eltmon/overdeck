@@ -139,7 +139,7 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-15T16:51:34.574Z",
+  "updated": "2026-08-15T16:54:30.766Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "passed",
@@ -382,16 +382,7 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3575",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-06T07:21:06.382Z"
-    }
-  ],
+  "recoveryTrips": [],
   "workModel": "gpt-5.6-terra",
   "tasks": {
     "sequence": 10,
