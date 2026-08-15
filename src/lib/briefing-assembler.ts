@@ -52,7 +52,7 @@ export async function assembleLiveBriefingMarkdown(input: AssembleLiveBriefingIn
     '',
     '- Persistent memory across sessions through observations, status updates, and rollups.',
     '- Situational awareness from the live dashboard read model.',
-    '- Issue-scoped workspaces, beads, xBRIEF plans, and role handoffs for autonomous work.',
+    '- Issue-scoped workspaces, xBRIEF plans, and role handoffs for autonomous work.',
     '- Cross-workspace reach through `pan memory search --all-workspaces` when sibling context is relevant.',
     '- Searchable feature ownership through the Knowledge Registry.',
     '',
