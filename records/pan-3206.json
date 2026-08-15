@@ -77,7 +77,7 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T20:19:41.702Z",
+  "updated": "2026-08-15T16:52:42.875Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "passed",
@@ -262,16 +262,7 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3206",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-27T14:13:57.830Z"
-    }
-  ],
+  "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
