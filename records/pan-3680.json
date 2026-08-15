@@ -384,7 +384,7 @@
     "recordedAt": "2026-08-14T13:16:21.774Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-15T15:44:15.718Z",
+  "updated": "2026-08-15T15:44:39.947Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -697,16 +697,7 @@
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3680",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-14T01:58:08.578Z"
-    }
-  ],
+  "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 28,
