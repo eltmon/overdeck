@@ -3,19 +3,55 @@
  * One test per orbit, plus the overlap rules (yield ≠ park, warm-idle ≠ park,
  * idle-running is the orbit of last resort) and population-level sort/dedup.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const gather = vi.hoisted(() => ({
+  statuses: {} as Record<string, unknown>,
+  agents: [] as unknown[],
+  liveAgents: [] as unknown[],
+}));
+vi.mock('../../review-status.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../review-status.js')>();
+  return { ...actual, loadReviewStatuses: () => gather.statuses };
+});
+vi.mock('../../agents/queries.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../agents/queries.js')>();
+  return { ...actual, listAgentStates: () => gather.agents, listRunningAgentsSync: () => gather.liveAgents };
+});
+
+const projects = vi.hoisted(() => ({
+  registry: new Map<string, { projectKey: string; projectPath: string }>(),
+}));
+vi.mock('../../projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: vi.fn((issueId: string) => projects.registry.get(issueId.toUpperCase()) ?? null),
+    getProjectSync: vi.fn((key: string) => {
+      for (const value of projects.registry.values()) {
+        if (value.projectKey === key) return { name: key, path: value.projectPath };
+      }
+      return null;
+    }),
+  };
+});
+
 import {
   classifyParked,
+  defaultReadRecordTerminal,
   IDLE_RUNNING_THRESHOLD_MS,
   PARKED_ORBITS,
+  resolveParkedPopulation,
   summarizeParked,
   type ParkedSignals,
 } from '../resolver.js';
 import type { ReviewStatus } from '../../review-status.js';
 import type { AgentState } from '../../agents.js';
+import type { ProjectConfig } from '../../projects.js';
 
 const NOW = Date.parse('2026-08-02T13:40:00.000Z');
 const HOUR = 60 * 60_000;
@@ -248,5 +284,120 @@ describe('completed-handoff is not an operator park (pan done suppression)', () 
     }));
     expect(rows).toHaveLength(0);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('resolveParkedPopulation record-first terminality (PAN-3727)', () => {
+  beforeEach(() => {
+    gather.statuses = {};
+    gather.agents = [];
+    gather.liveAgents = [];
+  });
+
+  it('AC1: a record-terminal issue with an open trip and a stoppedByUser row produces zero rows without calling isClosed', async () => {
+    gather.agents = [baseAgent({ id: 'agent-pan-500', issueId: 'PAN-500', status: 'stopped', stoppedByUser: true, stoppedAt: new Date(NOW - HOUR).toISOString() })];
+    const isClosedSpy = vi.fn(async () => { throw new Error('isClosed must not be called for a record-terminal issue'); });
+
+    const rows = await resolveParkedPopulation({
+      now: NOW,
+      readRecordTerminal: async (issueId) => issueId === 'PAN-500',
+      readOpenTrips: async () => [{ recoveryPath: 'orphan-proposed-pickup-gate' }],
+      isClosed: isClosedSpy,
+    });
+
+    expect(rows.filter((row) => row.issueId === 'PAN-500')).toHaveLength(0);
+    expect(isClosedSpy).not.toHaveBeenCalled();
+  });
+
+  it('AC2: a record-terminal issue survives a tracker-blip isClosed=false with zero non-zombie rows', async () => {
+    const live = baseAgent({ id: 'agent-pan-501', issueId: 'PAN-501', status: 'running', lastActivity: new Date(NOW - HOUR).toISOString() });
+    gather.agents = [live];
+    gather.liveAgents = [{ ...live, tmuxActive: true }];
+    const isClosedSpy = vi.fn(async () => false);
+
+    const rows = await resolveParkedPopulation({
+      now: NOW,
+      readRecordTerminal: async (issueId) => issueId === 'PAN-501',
+      isClosed: isClosedSpy,
+    });
+
+    const nonZombie = rows.filter((row) => row.issueId === 'PAN-501' && row.orbit !== 'zombie-session');
+    expect(nonZombie).toHaveLength(0);
+    expect(isClosedSpy).not.toHaveBeenCalled();
+    // The live session itself is still a reap candidate.
+    expect(rows.some((row) => row.issueId === 'PAN-501' && row.orbit === 'zombie-session')).toBe(true);
+  });
+
+  it('AC3/AC4: a non-terminal record falls back to the tracker closed-check exactly as before', async () => {
+    const live = baseAgent({ id: 'agent-pan-502', issueId: 'PAN-502', status: 'running', lastActivity: new Date(NOW - HOUR).toISOString() });
+    gather.agents = [live];
+    gather.liveAgents = [{ ...live, tmuxActive: true }];
+    const isClosedSpy = vi.fn(async () => false);
+
+    const rows = await resolveParkedPopulation({
+      now: NOW,
+      readRecordTerminal: async () => false,
+      isClosed: isClosedSpy,
+    });
+
+    expect(isClosedSpy).toHaveBeenCalledWith('PAN-502');
+    // Not record-terminal and tracker says open — the issue classifies normally
+    // (no zombie-session row for a live agent on an open issue).
+    expect(rows.some((row) => row.issueId === 'PAN-502' && row.orbit === 'zombie-session')).toBe(false);
+  });
+});
+
+describe('defaultReadRecordTerminal (PAN-3727)', () => {
+  let root: string;
+  const ISSUE = 'RECTERM-1';
+
+  function git(...args: string[]): string {
+    return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  }
+
+  function seedRecord(pipeline: Record<string, unknown>): void {
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'records', 'recterm-1.json'), JSON.stringify({
+      issueId: ISSUE,
+      schemaVersion: 2,
+      pipeline: { issueId: ISSUE, reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString(), ...pipeline },
+    }));
+  }
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'pan-recterm-'));
+    git('init', '-q');
+    git('config', 'user.email', 'test@overdeck.local');
+    git('config', 'user.name', 'Overdeck Test');
+    projects.registry.set(ISSUE, { projectKey: 'fixture-recterm', projectPath: root });
+  });
+
+  afterEach(() => {
+    projects.registry.clear();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('closedOut=true is terminal', async () => {
+    seedRecord({ closedOut: true, closedOutAt: '2026-08-06T00:00:00.000Z' });
+    expect(await defaultReadRecordTerminal(ISSUE)).toBe(true);
+  });
+
+  it('mergeStatus=merged with no reopenedAt is terminal', async () => {
+    seedRecord({ mergeStatus: 'merged' });
+    expect(await defaultReadRecordTerminal(ISSUE)).toBe(true);
+  });
+
+  it('AC3 boundary: mergeStatus=merged WITH reopenedAt set is NOT terminal', async () => {
+    seedRecord({ mergeStatus: 'merged', reopenedAt: '2026-08-10T00:00:00.000Z' });
+    expect(await defaultReadRecordTerminal(ISSUE)).toBe(false);
+  });
+
+  it('AC4: no terminal evidence (open issue) is NOT terminal', async () => {
+    seedRecord({});
+    expect(await defaultReadRecordTerminal(ISSUE)).toBe(false);
+  });
+
+  it('an unresolvable issue id is NOT terminal', async () => {
+    expect(await defaultReadRecordTerminal('NO-SUCH-PROJECT-1')).toBe(false);
   });
 });
