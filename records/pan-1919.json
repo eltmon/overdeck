@@ -78,7 +78,7 @@
   "feedback": [],
   "beadsMapping": {},
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-07-27T04:51:46.218Z",
+  "updated": "2026-08-15T16:51:46.560Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
@@ -357,118 +357,5 @@
     "rec-helpers.ac3": "completed",
     "rec-helpers.ac4": "completed"
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-11T04:01:43.529Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-11T04:13:45.739Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-11T09:43:58.443Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-11T09:55:39.100Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-11T20:40:33.349Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-11T20:53:03.469Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-12T04:09:17.644Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-12T04:21:11.064Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-12T14:33:43.553Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-12T14:45:42.558Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-14T00:05:50.175Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-14T00:17:50.751Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-14T10:45:01.845Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-14T10:55:47.780Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-17T10:45:46.137Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-17T10:56:47.459Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-18T06:04:00.309Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-18T06:14:15.648Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-20T21:44:09.649Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-20T21:54:15.029Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-22T05:16:31.627Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-22T05:27:31.045Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-23T02:43:01.447Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-23T02:53:52.772Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-23T17:51:44.265Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-23T18:02:45.703Z"
-    },
-    {
-      "issue": "PAN-1919",
-      "recoveryPath": "dead-end-rebuild",
-      "obligationGeneration": "2026-07-24T15:04:29.392Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-24T15:14:36.118Z"
-    }
-  ]
+  "recoveryTrips": []
 }
