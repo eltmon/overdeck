@@ -23,6 +23,21 @@
     {
       "at": "2026-08-15T18:19:13.347Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-15T21:31:43.133Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": [
+        "lifecycle.log",
+        "state.json"
+      ]
     }
   ],
   "archiveRef": null,
