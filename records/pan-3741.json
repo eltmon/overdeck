@@ -3,17 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-15T17:01:39.699Z",
-  "updated": "2026-08-15T17:30:11.459Z",
+  "updated": "2026-08-15T17:33:33.128Z",
   "pipeline": {
     "issueId": "PAN-3741",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-15T17:30:09.406Z",
+    "updatedAt": "2026-08-15T17:33:32.978Z",
+    "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "54930ef36abd36000386bf3b324950272595bfcc",
     "strikeLandingState": "landed",
     "strikeRecoveryCount": 0,
@@ -38,9 +39,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 6803102,
-            "output": 7367,
-            "cacheRead": 6605312,
+            "input": 6968790,
+            "output": 7441,
+            "cacheRead": 6762752,
             "cacheWrite": 0
           }
         },
@@ -61,9 +62,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6803102,
-          "output": 7367,
-          "cacheRead": 6605312,
+          "input": 6968790,
+          "output": 7441,
+          "cacheRead": 6762752,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -74,8 +75,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 4.513883,
-        "pricingAsOf": "2026-08-15T17:30:11.449Z"
+        "usd": 4.636063,
+        "pricingAsOf": "2026-08-15T17:33:32.998Z"
       }
     },
     "merges": [],
