@@ -17,6 +17,11 @@
       "timestamp": "2026-08-16T09:31:00.507Z",
       "reason": "end",
       "note": "Anomalies: the full repository suite passed 13,864 tests but 28 unrelated tests timed out at the shared 5-second limit during concurrent database setup. The first sandboxed full-test attempt also hit spawnSync git EPERM. Plan deviations: the test-conv non-streaming assumption was stale, so the WebSocket mock now preserves explicit initial payloads; the skeleton component was extracted to satisfy the file-size guard. Delivered first-payload gating, transcript skeleton with reduced-motion support, delayed-stream and switch tests, and loading-state docs. Feature-targeted tests, typecheck, and lint pass; the branch is clean and fully pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-16T10:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-16T10:17:13.682Z"
     }
   ],
   "feedback": [
@@ -55,7 +60,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:17:13.666Z",
+  "updated": "2026-08-16T10:17:15.559Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "blocked",
@@ -65,9 +70,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:17:12.981Z",
+    "updatedAt": "2026-08-16T10:17:14.279Z",
     "reviewNotes": "Conversation switching can paint a false settled-empty state before the current stream emits its first payload.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
+    "reviewedAtCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
     "lastVerifiedCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
     "reviewSpawnedAt": "2026-08-16T10:12:07.370Z",
     "scopeDrift": {
@@ -131,7 +137,7 @@
       },
       "costAtCloseOut": {
         "usd": 20.730486,
-        "pricingAsOf": "2026-08-16T10:17:13.011Z"
+        "pricingAsOf": "2026-08-16T10:17:15.539Z"
       }
     },
     "merges": [
