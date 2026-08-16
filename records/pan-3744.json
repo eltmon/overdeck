@@ -12,11 +12,42 @@
       "timestamp": "2026-08-16T08:57:22.141Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-16T09:31:00.507Z",
+      "reason": "end",
+      "note": "Anomalies: the full repository suite passed 13,864 tests but 28 unrelated tests timed out at the shared 5-second limit during concurrent database setup. The first sandboxed full-test attempt also hit spawnSync git EPERM. Plan deviations: the test-conv non-streaming assumption was stale, so the WebSocket mock now preserves explicit initial payloads; the skeleton component was extracted to satisfy the file-size guard. Delivered first-payload gating, transcript skeleton with reduced-motion support, delayed-stream and switch tests, and loading-state docs. Feature-targeted tests, typecheck, and lint pass; the branch is clean and fully pushed."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+    ],
+    "recordedAt": "2026-08-16T09:30:53.223Z"
+  },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:30:56.553Z",
+  "updated": "2026-08-16T09:31:00.586Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -25,7 +56,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T09:30:56.551Z",
+    "updatedAt": "2026-08-16T09:31:00.501Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewRequestedAt": "2026-08-16T09:30:56.551Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -52,19 +84,48 @@
         "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
       ],
       "recordedAt": "2026-08-16T09:30:53.223Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3746"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 744256,
+            "output": 1141,
+            "cacheRead": 665344,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 15555634,
+            "output": 23444,
+            "cacheRead": 15176448,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 744256,
+          "output": 1141,
+          "cacheRead": 665344,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 15555634,
+          "output": 23444,
+          "cacheRead": 15176448,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-16T08:57:14.090Z"
+        "usd": 10.187474,
+        "pricingAsOf": "2026-08-16T09:31:00.548Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3746"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -187,31 +248,5 @@
     "docs-loading-states.ac1": "completed",
     "docs-loading-states.ac2": "completed",
     "docs-loading-states.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ISSUE-VIEW.md",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
-      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
-      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
-    ],
-    "actualChangedFiles": [
-      "docs/ISSUE-VIEW.md",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
-      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
-      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
-    ],
-    "recordedAt": "2026-08-16T09:30:53.223Z"
   }
 }
