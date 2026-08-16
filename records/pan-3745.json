@@ -12,11 +12,31 @@
       "timestamp": "2026-08-16T08:59:55.896Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-16T09:40:43.703Z",
+      "reason": "end",
+      "note": "Full npm test was run twice: the first run had 29 unrelated 5-second contention timeouts, and the second had one unrelated timeout plus four temporary overdeck.db cross-test failures; all affected files passed in an isolated 38-test rerun. Deviation: the file-size push gate required a follow-up no-history-rewrite commit to keep cost.ts under 1000 lines. No product hazards found. Delivered canonical cost.event_recorded announcements with full attributed payloads, null-attribution suppression, contract and persistence tests, and cost-tracking documentation. Typecheck, lint, targeted tests, and isolated failure reruns pass; branch is clean and pushed."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/cost-tracking.md",
+      "src/lib/overdeck/cost.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/cost-tracking.md",
+      "src/lib/overdeck/cost.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "recordedAt": "2026-08-16T09:40:36.934Z"
+  },
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T09:40:39.976Z",
+  "updated": "2026-08-16T09:40:43.781Z",
   "pipeline": {
     "issueId": "PAN-3745",
     "reviewStatus": "pending",
@@ -25,7 +45,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T09:40:39.975Z",
+    "updatedAt": "2026-08-16T09:40:43.696Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3747",
     "reviewRequestedAt": "2026-08-16T09:40:39.975Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -41,19 +62,48 @@
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
       "recordedAt": "2026-08-16T09:40:36.934Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3747"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 625772,
+            "output": 1263,
+            "cacheRead": 454656,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 24085848,
+            "output": 14510,
+            "cacheRead": 23771648,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 625772,
+          "output": 1263,
+          "cacheRead": 454656,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 24085848,
+          "output": 14510,
+          "cacheRead": 23771648,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-16T08:59:46.571Z"
+        "usd": 13.892124,
+        "pricingAsOf": "2026-08-16T09:40:43.734Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3747"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -135,20 +185,5 @@
     "docs-cost-announce": "completed",
     "docs-cost-announce.ac1": "completed",
     "docs-cost-announce.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/cost-tracking.md",
-      "src/lib/overdeck/cost.ts",
-      "tests/unit/lib/overdeck/cost.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/cost-tracking.md",
-      "src/lib/overdeck/cost.ts",
-      "tests/unit/lib/overdeck/cost.test.ts"
-    ],
-    "recordedAt": "2026-08-16T09:40:36.934Z"
   }
 }
