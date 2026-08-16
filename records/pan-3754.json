@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:25:34.629Z",
+  "updated": "2026-08-16T18:27:49.878Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "patrol-details-real-values": {
-        "writerId": "agent-pan-3754",
-        "agentId": "agent-pan-3754",
-        "pid": 321419,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:25:34.629Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3754",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Replaced current-reading misattribution with stored trigger provenance, current state, explicit exits, and numeric-consistency matrix tests.",
         "releasedAt": "2026-08-16T18:25:14.990Z"
+      },
+      {
+        "writerId": "agent-pan-3754",
+        "agentId": "agent-pan-3754",
+        "pid": 321419,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:25:34.629Z",
+        "itemId": "patrol-details-real-values",
+        "outcome": "completed",
+        "reason": "Populated psiSomeAvg10 on verdicts and replaced placeholder patrol details with real swap and per-value PSI readings plus explicit unreadable fallbacks.",
+        "releasedAt": "2026-08-16T18:27:49.877Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "patrol-trigger-messages": {
         "reason": "Replaced current-reading misattribution with stored trigger provenance, current state, explicit exits, and numeric-consistency matrix tests.",
         "updatedAt": "2026-08-16T18:25:14.990Z"
+      },
+      "patrol-details-real-values": {
+        "reason": "Populated psiSomeAvg10 on verdicts and replaced placeholder patrol details with real swap and per-value PSI readings plus explicit unreadable fallbacks.",
+        "updatedAt": "2026-08-16T18:27:49.877Z"
       }
     }
   },
@@ -130,6 +137,9 @@
     "patrol-trigger-messages.ac2": "completed",
     "patrol-trigger-messages.ac3": "completed",
     "patrol-trigger-messages.ac4": "completed",
-    "patrol-details-real-values": "running"
+    "patrol-details-real-values": "completed",
+    "patrol-details-real-values.ac1": "completed",
+    "patrol-details-real-values.ac2": "completed",
+    "patrol-details-real-values.ac3": "completed"
   }
 }
