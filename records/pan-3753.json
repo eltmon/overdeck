@@ -208,7 +208,7 @@
     "recordedAt": "2026-08-16T21:15:27.529Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T21:16:04.530Z",
+  "updated": "2026-08-16T21:16:07.121Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "passed",
@@ -218,10 +218,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-08-16T21:15:56.583Z",
+    "updatedAt": "2026-08-16T21:15:56.634Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "testNotes": "Automated gates run in the workspace against reviewed HEAD f262b6b5b4: `npm run typecheck` exit 0; `npm run lint` exit 0 (all guard steps including effect-diagnostics, circular-deps, ratchet-audit passed); the 12 xBRIEF-listed regression files (199 tests: merge-eligibility-gate, flywheel-merge-order, review-status-retirement, retired-records-skip, review-status-reconcile-candidates, uat-reconciler, review-status-reconcile-service, merge-train route, deacon-stuck-readyformerge, uat-generation-engine, verdict-restore, webhook-handlers) all passed; the three required doc greps (retiredAt in docs/MERGE-WORKFLOW.md, merge-eligibility in docs/PIPELINE-MEMBERSHIP.md, merge-eligible in docs/FLYWHEEL.md) all found the expected sections. However the project's own mechanical verification gate recorded a FAILED full `npm test` run against this same HEAD at 2026-08-16T20:35:08Z (.overdeck/verification-latest.json, failedCheck=test, attempt 1/3): tests/unit/helpers/overdeck-test-db.test.ts failed 2/4 ('round-trips an agent through the real overdeck.db', 'isolates state between tests') and tests/lib/cloister/deacon-ci-retry.test.ts failed 16/16. Independent read-only verification traced a concrete root cause tied to this branch's own change: reviewed HEAD's committed src/lib/overdeck/review-status-sync.ts unconditionally queries `WHERE retired_at IS NULL` against overdeck.db, but reviewed HEAD's committed drizzle/overdeck/0000_overdeck_init.sql (the locked migration tests/unit/scripts/create-overdeck-db.test.ts uses to create a fresh overdeck.db) does not define a retired_at column on review_status — a fresh-created overdeck.db will throw 'no such column: retired_at' wherever that query runs, which plausibly explains the overdeck-test-db.test.ts failures. IMPORTANT PROCESS NOTE for the operator: this test dispatch raced a still-alive work agent. tmux session agent-pan-3753 (and its codex app-server process) was confirmed alive and mid-turn during this run, actively responding to the same verification-gate-failed feedback by uncommitted-editing exactly three files (drizzle/overdeck/0000_overdeck_init.sql adding retired_at; tests/unit/scripts/create-overdeck-db.test.ts asserting the column; src/lib/runtimes/__tests__/registry-dispatch.test.ts adding DB-close cleanup) at 16:36-16:37 local time, and running its own `vitest run --changed origin/main` at 16:45 to verify its fix — none of that work was committed at verdict time, so it could not be credited to this verdict, and this FAILED verdict targets committed HEAD f262b6b5b4 only, not the agent's in-flight fix. The record's sessionHistory also shows five duplicate 'resume' entries firing within milliseconds at 20:10:44 and 20:28:39, consistent with a duplicate-agent-spawn flap dispatching work and test concurrently on the same issue — worth the operator's attention as a pipeline scheduling bug, separate from the code defect above. No UAT was required: the xBRIEF's own NonGoals state 'No flywheel UI row change' and every item is kind backend/api/docs verified by unit tests, typecheck, or doc greps; review synthesis (cycle 3, APPROVED) confirms this branch has no frontend surface.",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
     "reviewedAtCommit": "a8b038b478bfbe40bc40fbddbd948de01dfe5bde",
@@ -348,10 +347,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 126,
-            "output": 33402,
-            "cacheRead": 11395331,
-            "cacheWrite": 210087
+            "input": 128,
+            "output": 34787,
+            "cacheRead": 11517661,
+            "cacheWrite": 251104
           }
         }
       },
@@ -375,15 +374,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 126,
-          "output": 33402,
-          "cacheRead": 11395331,
-          "cacheWrite": 210087
+          "input": 128,
+          "output": 34787,
+          "cacheRead": 11517661,
+          "cacheWrite": 251104
         }
       },
       "costAtCloseOut": {
-        "usd": 62.459257,
-        "pricingAsOf": "2026-08-16T21:16:04.523Z"
+        "usd": 62.600120000000004,
+        "pricingAsOf": "2026-08-16T21:16:07.113Z"
       }
     },
     "merges": [
