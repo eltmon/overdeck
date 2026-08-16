@@ -65,7 +65,7 @@ describe('useConversationMessagesStream', () => {
     expect(result.current.receivedFirstPayload).toBe(true);
   });
 
-  it('resets the first-payload signal when the conversation changes', () => {
+  it('does not expose the prior first-payload signal when the conversation changes', () => {
     const { result, rerender } = renderHook(
       ({ name }) => useConversationMessagesStream({ ...conversation, name }),
       { initialProps: { name: 'conv-one' }, wrapper: createWrapper() },
@@ -77,6 +77,12 @@ describe('useConversationMessagesStream', () => {
     expect(result.current.receivedFirstPayload).toBe(true);
 
     rerender({ name: 'conv-two' });
+
+    expect(result.current.receivedFirstPayload).toBe(false);
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
 
     expect(result.current.receivedFirstPayload).toBe(false);
   });
