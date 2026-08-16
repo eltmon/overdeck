@@ -3,11 +3,34 @@ import { join } from 'node:path';
 
 import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
-import type { CostEvent, CostReconcileExtraRoot, SkippedCostSession } from '../overdeck/cost.js';
 import type { IssueId } from '../overdeck/issues.js';
 import { lookupSkipVerdict, type SkipVerdict } from './skip-cache.js';
 
 export type SkipVerdictEntry = { path: string; mtimeMs: number; size: number; verdict: SkipVerdict };
+
+type CollectedCostEvent = {
+  ts: Date;
+  issueId: IssueId | null;
+  agentId: string | null;
+  sessionId: string | null;
+  sessionType: string | null;
+  provider: string | null;
+  model: string | null;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+  requestId: string | null;
+  sourceFile: string | null;
+};
+
+type CostReconcileExtraRoot =
+  | { kind: 'codex-global'; root: string }
+  | { kind: 'ohmypi-global'; root: string }
+  | { kind: 'ohmypi-legacy-agents'; root: string };
+
+type SkippedCostSession = { file: string; reason: string };
 
 function walkJsonl(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -41,7 +64,7 @@ export async function collectCodexCostEvents(opts: {
     roots.push({ root: extra.root, agentName: 'codex-global', issueId: null, inferIssueFromCwd: true });
   }
 
-  const events: CostEvent[] = [];
+  const events: CollectedCostEvent[] = [];
   const verdicts: SkipVerdictEntry[] = [];
   const skipped: SkippedCostSession[] = [];
   const errors: string[] = [];
