@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:12:52.980Z",
+  "updated": "2026-08-16T18:16:53.603Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "trigger-provenance": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3754",
         "agentId": "agent-pan-3754",
         "pid": 151237,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:12:52.980Z"
+        "claimedAt": "2026-08-16T18:12:52.980Z",
+        "itemId": "trigger-provenance",
+        "outcome": "completed",
+        "reason": "Recorded all four non-admitting trigger kinds with trigger-time readings, thresholds, timestamps, reset/re-admit clearing, and cache round-trip tests.",
+        "releasedAt": "2026-08-16T18:16:53.603Z"
+      }
+    ],
+    "statusReasons": {
+      "trigger-provenance": {
+        "reason": "Recorded all four non-admitting trigger kinds with trigger-time readings, thresholds, timestamps, reset/re-admit clearing, and cache round-trip tests.",
+        "updatedAt": "2026-08-16T18:16:53.603Z"
       }
     }
   },
   "statusOverrides": {
-    "trigger-provenance": "running"
+    "trigger-provenance": "completed",
+    "trigger-provenance.ac1": "completed",
+    "trigger-provenance.ac2": "completed",
+    "trigger-provenance.ac3": "completed",
+    "trigger-provenance.ac4": "completed"
   }
 }
