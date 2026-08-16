@@ -17,11 +17,7 @@ import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
-import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
-import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
-import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
-import { parseKimiConversationMessages } from './services/kimi-conversation-parser.js';
+import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
@@ -96,84 +92,6 @@ type AgentIssueRecord = {
 export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent> {
   return Stream.succeed({ kind: 'discovering' } as ConversationEvent).pipe(
     Stream.repeat(Schedule.fixed('2 seconds')),
-  );
-}
-
-/**
- * Live message stream for transcripts that only support a FULL parse (pi, codex)
- * — PAN-1908. Unlike the Claude incremental watcher, pi/codex parsers re-read the
- * whole file, so we emit a full `snapshot: true` event on first subscribe and on
- * every file change (debounced). The client reducer adopts snapshots
- * idempotently and never shrinks a populated view, so re-emitting the full
- * transcript on each append is safe and dedupes by message id.
- *
- * Used for synthetic agent sessions (work/planning/specialist panels) whose pi
- * or codex transcript the operator watches live. fs.watch fires on each append
- * pi/codex makes; a 300ms debounce coalesces bursts during active generation.
- */
-function streamFullParseSnapshots(
-  sessionFile: string,
-  parse: (file: string) => Promise<ParseResult>,
-  model: string | null,
-): Stream.Stream<ConversationEvent, PanRpcError> {
-  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-    Effect.acquireRelease(
-      Effect.promise(async () => {
-        let parsing = false;
-        let pendingReparse = false;
-        const emit = async (): Promise<void> => {
-          if (parsing) { pendingReparse = true; return; }
-          parsing = true;
-          try {
-            const result = await parse(sessionFile);
-            try {
-              Queue.offerUnsafe(queue, {
-                kind: 'messages' as const,
-                messages: result.messages,
-                workLog: result.workLog,
-                streaming: result.streaming,
-                snapshot: true,
-                proposedPlan: result.proposedPlan,
-                compactBoundaries:
-                  result.compactBoundaries && result.compactBoundaries.length > 0
-                    ? result.compactBoundaries
-                    : undefined,
-                contextUsage: contextUsageFromParseResult(result, model),
-              });
-            } catch {
-              // Queue shut down (client disconnected) — ignore.
-            }
-          } catch {
-            // Transient parse failure (read during a write) — the next change
-            // event re-parses cleanly.
-          } finally {
-            parsing = false;
-            if (pendingReparse) { pendingReparse = false; void emit(); }
-          }
-        };
-
-        await emit(); // authoritative initial snapshot
-
-        let debounce: ReturnType<typeof setTimeout> | null = null;
-        let watcher: ReturnType<typeof fsWatch> | null = null;
-        try {
-          watcher = fsWatch(sessionFile, () => {
-            if (debounce) return;
-            debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-          });
-        } catch {
-          // If the watcher can't attach, the initial snapshot still rendered;
-          // the client's HTTP path is its own fallback on reconnect.
-        }
-        return {
-          stop: () => {
-            if (debounce) { clearTimeout(debounce); debounce = null; }
-            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
-          },
-        };
-      }),
-      (handle) => Effect.sync(() => handle.stop()),
-    ),
   );
 }
 
@@ -334,15 +252,6 @@ export function streamResolvedFullParseSnapshots(
 
 type FullParseSnapshotStream = Stream.Stream<ConversationEvent, PanRpcError>;
 
-function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<ParseResult> {
-  switch (harness) {
-    case 'pi':
-      return parsePiConversationMessages;
-    default:
-      return parseOhmypiConversationMessages;
-  }
-}
-
 export function streamHarnessFullParseSnapshots(
   sessionName: string,
   harness: unknown,
@@ -358,10 +267,22 @@ export function streamHarnessFullParseSnapshots(
 
   // A missing kind gets the caller's discovering stream (the kimi-code hang); `workspace` is the conversation cwd, which the kimi resolver needs because conversations have no AgentState row to derive it from.
   switch (behavior.transcriptKind) {
-    case 'ohmypi-jsonl': return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
-    case 'codex-rollout-jsonl': return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
-    case 'acp-jsonl': return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
-    case 'kimi-wire-jsonl': return streamResolved(() => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}), parseKimiConversationMessages);
+    case 'ohmypi-jsonl': return streamResolved(
+      () => resolvePiSessionPath(sessionName),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: harness === 'pi' ? 'pi' : 'ohmypi' }),
+    );
+    case 'codex-rollout-jsonl': return streamResolved(
+      () => resolveCodexRolloutPath(sessionName),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'codex' }),
+    );
+    case 'acp-jsonl': return streamResolved(
+      () => resolveAcpTranscriptPath(sessionName),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'acp' }),
+    );
+    case 'kimi-wire-jsonl': return streamResolved(
+      () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'kimi' }),
+    );
     default: return null;
   }
 }
