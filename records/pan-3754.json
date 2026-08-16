@@ -2,7 +2,7 @@
   "issueId": "PAN-3754",
   "schemaVersion": 2,
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:11:14.020Z",
+  "updated": "2026-08-16T18:11:59.015Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -37,5 +37,6 @@
       "open": true,
       "needsYouEmittedAt": "2026-08-16T18:11:13.994Z"
     }
-  ]
+  ],
+  "workModel": "gpt-5.6-sol"
 }
