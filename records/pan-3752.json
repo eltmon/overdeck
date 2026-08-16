@@ -51,10 +51,10 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:35:05.894Z",
+  "updated": "2026-08-16T19:35:09.727Z",
   "pipeline": {
     "issueId": "PAN-3752",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "testing",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -63,7 +63,7 @@
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
     "updatedAt": "2026-08-16T19:34:54.886Z",
-    "reviewNotes": "Verification failed at lint — fix and resubmit",
+    "reviewNotes": "Verification failed at lint",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -123,10 +123,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 52,
-            "output": 10180,
-            "cacheRead": 3917947,
-            "cacheWrite": 148290
+            "input": 54,
+            "output": 10702,
+            "cacheRead": 4097951,
+            "cacheWrite": 149446
           }
         }
       },
@@ -150,15 +150,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 52,
-          "output": 10180,
-          "cacheRead": 3917947,
-          "cacheWrite": 148290
+          "input": 54,
+          "output": 10702,
+          "cacheRead": 4097951,
+          "cacheWrite": 149446
         }
       },
       "costAtCloseOut": {
-        "usd": 26.282404,
-        "pricingAsOf": "2026-08-16T19:35:05.876Z"
+        "usd": 26.326519,
+        "pricingAsOf": "2026-08-16T19:35:09.707Z"
       }
     },
     "merges": [
