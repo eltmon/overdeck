@@ -1,0 +1,249 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T08:52:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3745: cost.recorded events rejected by DomainEvent schema at the ws-rpc boundary (log spam; decide broadcast vs filter)",
+    "updated": "2026-08-16T08:58:53.875Z"
+  },
+  "plan": {
+    "id": "pan-3745",
+    "title": "cost.recorded events rejected by DomainEvent schema at the ws-rpc boundary (log spam; decide broadcast vs filter)",
+    "status": "proposed",
+    "uid": "214d3cce-2a12-462f-a6f4-5e1be21e3c1e",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T08:52:23Z",
+    "updated": "2026-08-16T08:58:53.875Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3745",
+        "label": "PAN-3745",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3745.md",
+        "label": "PAN-3745 PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "cost",
+      "events",
+      "ws-rpc",
+      "contracts",
+      "god-view"
+    ],
+    "narratives": {
+      "Problem": "The cost write door (src/lib/overdeck/cost.ts:591) emits 'cost.recorded' with payload { issueId, cost }, but the contracts DomainEvent union only knows 'cost.event_recorded' with payload { agentId, issueId, workspaceId?, cost, inputTokens, outputTokens }. The PAN-2225 boundary guard in ws-rpc.ts drops and logs every door-recorded cost event, so cost-reconcile sweeps spam the dashboard log and God View live cost counters never see door-recorded costs.",
+      "Proposal": "Align the emitter with the existing contract: record() announces 'cost.event_recorded' with the full contract payload when both agentId and issueId are non-null, and skips the announcement otherwise. Extend the existing cost.test.ts suite to prove the payload decodes through the contracts CostEventRecordedEvent schema and that unattributed records emit nothing. Document the announcement in docs/cost-tracking.md.",
+      "NonGoals": "- Do not add 'cost.recorded' to the contracts DomainEvent union\n- Do not change shouldBroadcastDashboardEvent in agent-output-stream.ts\n- Do not modify the agent-event-utils.ts cost-event translator or any consumer (God View confluence, motionCatalog, read model)\n- No consumer-side dedupe of door-vs-translator duplicate announcements (windowed cosmetic counters only; durable totals are DB-backed)\n- No changes to cost dedup, JSONL archive, or reconcile sweep logic\n- Do not edit docs/TELEMETRY.md (anonymous-telemetry doc, no cost door section) or docs/GOD-VIEW.md (never names the event literal)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rename the emitter to 'cost.event_recorded' rather than adding 'cost.recorded' to the union or filtering it in shouldBroadcastDashboardEvent",
+        "rationale": "The canonical PRD (drafts/pan-3745.md on overdeck-state, authored by conv-20260816-9367) already decided this and planning re-verified it: the union member and every consumer already use 'cost.event_recorded', adding a second name for one concept violates one-term-per-concept, and filtering would keep God View live counters permanently blind to door-recorded costs."
+      },
+      {
+        "summary": "Extend tests/unit/lib/overdeck/cost.test.ts instead of creating a new cost-announce.test.ts",
+        "rationale": "The suite already covers record()'s announcement (assertion at line ~370 expects the old name), so the PRD's conditional new-file clause does not apply; the stale assertion flips in the same commit as the emitter change to keep the tree green."
+      },
+      {
+        "summary": "Doc target is docs/cost-tracking.md, not docs/TELEMETRY.md; docs/GOD-VIEW.md is unchanged",
+        "rationale": "Verified by grep on 2026-08-16: TELEMETRY.md documents anonymous usage telemetry only and has no cost write door section; GOD-VIEW.md never names the event literal, only 'cost pulses'."
+      },
+      {
+        "summary": "Emitted payload omits workspaceId",
+        "rationale": "CostEvent has no workspaceId field and the contract marks workspaceId optional; inventing a placeholder would fabricate attribution."
+      }
+    ],
+    "items": [
+      {
+        "id": "align-cost-emitter",
+        "title": "Align cost door announcement to the cost.event_recorded contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T08:52:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3745",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "tests/unit/lib/overdeck/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/cost.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cost.test.ts suite exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/cost.ts, inside record() at step 3 (line ~591), replace the emit of type 'cost.recorded' with a guarded emit of type 'cost.event_recorded' carrying the full contract payload: agentId, issueId, cost, inputTokens set from event.input, outputTokens set from event.output. Emit only when both event.agentId and event.issueId are non-null (both are Schema.NullOr on CostEvent); otherwise skip the announcement entirely. No cast is needed — bus.emit takes OverdeckEventInput whose type is a plain string, and the event store stamps sequence/timestamp before the ws-rpc guard re-validates. Replace the stale comment 'Announce — cost.subscribe + /api/costs/stream feed from this.' with one naming the real consumers (e.g. 'Announce on the canonical contract type — God View live counters feed from this.'). In the same commit, flip the stale assertion in tests/unit/lib/overdeck/cost.test.ts (line ~370) from expecting 'cost.recorded' to expecting 'cost.event_recorded' so the existing suite stays green. Exact before/after snippet is work item 1 in the PRD (.pan/drafts/PAN-3745.md)."
+        },
+        "items": [
+          {
+            "id": "align-cost-emitter.ac1",
+            "title": "Given an attributed CostEvent (non-null agentId and issueId), when record() persists it, then it emits exactly one bus event of type 'cost.event_recorded' whose payload contains agentId, issueId, cost, inputTokens equal to event.input, and outputTokens equal to event.output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "align-cost-emitter.ac2",
+            "title": "Given a CostEvent with null agentId or null issueId, when record() persists it, then it emits zero bus events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "align-cost-emitter.ac3",
+            "title": "grep -n 'cost\\.recorded' src/lib/overdeck/cost.ts produces no output — the old event literal and the stale cost.subscribe comment are gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "align-cost-emitter.ac4",
+            "title": "npx vitest run tests/unit/lib/overdeck/cost.test.ts exits 0 with the flipped announcement assertion expecting 'cost.event_recorded'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-announce-tests",
+        "title": "Add schema-decode and attribution-guard tests for the cost announcement",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:52:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3745",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/overdeck/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "cost.test.ts suite exits 0 including the new announcement tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend tests/unit/lib/overdeck/cost.test.ts (the suite already captures emitted bus events for the existing announcement assertion). Add three tests: (1) recording an attributed event emits one 'cost.event_recorded' whose payload validates through the contracts CostEventRecordedEvent payload struct from packages/contracts/src/events.ts — decode the payload only (sequence/timestamp are store-stamped), using Schema.decodeUnknownSync as in packages/contracts/src/events.test.ts; this decode is the mechanical guarantee the ws-rpc boundary guard passes the event. (2) Recording an event with null agentId produces zero emitted bus events. (3) Recording an event with null issueId produces zero emitted bus events. Follow the suite's existing pattern for capturing bus emissions; do not create a new test file."
+        },
+        "items": [
+          {
+            "id": "cost-announce-tests.ac1",
+            "title": "A new test validates that an attributed record emits a payload that Schema.decodeUnknownSync on the CostEventRecordedEvent payload struct accepts without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-announce-tests.ac2",
+            "title": "A new test shows that recording a CostEvent with null agentId produces zero emitted bus events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-announce-tests.ac3",
+            "title": "A new test shows that recording a CostEvent with null issueId produces zero emitted bus events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cost-announce",
+        "title": "Document the cost.event_recorded announcement in cost-tracking.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-08-16T08:52:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3745",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/cost-tracking.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'cost.event_recorded' docs/cost-tracking.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new announcement lines in the Path 1 section"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "In docs/cost-tracking.md, in the 'Path 1: Live Recording' flow (steps around lines 137-146), add a statement that record() announces 'cost.event_recorded' on the domain event bus with the full contract payload when both agentId and issueId are known, feeding the God View live cost counters through the ws-rpc broadcast, and that events with a null agentId or issueId are not announced (rollup read paths bucket them as 'unattributed'). Do not edit docs/TELEMETRY.md (anonymous-telemetry doc with no cost door section) or docs/GOD-VIEW.md (verified 2026-08-16: never names the event literal)."
+        },
+        "items": [
+          {
+            "id": "docs-cost-announce.ac1",
+            "title": "docs/cost-tracking.md Path 1 section contains the statement that record() announces 'cost.event_recorded' with the full contract payload when agentId and issueId are both known",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cost-announce.ac2",
+            "title": "docs/cost-tracking.md contains the statement that events with null agentId or null issueId are not announced and shows where they surface instead (rollups bucket them as 'unattributed')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "align-cost-emitter",
+        "to": "cost-announce-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3745-cost-recorded-events-rejected-by-domainevent-schema-at-the-ws-rpc-boundary-log-spam-decide-broadcast-vs-filter.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
