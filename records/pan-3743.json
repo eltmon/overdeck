@@ -2,7 +2,7 @@
   "issueId": "PAN-3743",
   "schemaVersion": 2,
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T08:44:12.633Z",
+  "updated": "2026-08-16T09:05:40.970Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -27,5 +27,15 @@
     }
   ],
   "harness": "claude-code",
-  "model": "k3[1m]"
+  "model": "k3[1m]",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3743",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-16T09:05:40.961Z"
+    }
+  ]
 }
