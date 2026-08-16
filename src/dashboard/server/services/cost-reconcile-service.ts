@@ -33,9 +33,10 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
           Effect.provide(CostDoorLive),
         ),
       );
-      if (codexResult.imported > 0) {
-        console.log(`[cost-reconciler] ${reason} codex sweep: ${codexResult.imported} imported`);
-      }
+      console.log(
+        `[cost-reconciler] ${reason} codex sweep: ${codexResult.sessionsScanned} scanned, ` +
+        `${codexResult.cacheSkipped} cache-skipped, ${codexResult.imported} imported`,
+      );
     } catch (err) {
       console.warn('[cost-reconciler] codex sweep failed:', err instanceof Error ? err.message : err);
     }

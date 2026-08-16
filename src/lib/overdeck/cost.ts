@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
@@ -19,6 +19,7 @@ import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.
 import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
+import { lookupSkipVerdict, recordSkipVerdict } from '../costs/skip-cache.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -168,6 +169,7 @@ export type BudgetStatus = typeof BudgetStatus.Type;
 
 export interface CostReconcileSummary {
   imported: number;
+  cacheSkipped: number;
   skipped: SkippedCostSession[];
   sessionsScanned: number;
   eventsImported: number;
@@ -606,6 +608,7 @@ export const CostWriterLive = Layer.effect(
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
           imported: 0,
+          cacheSkipped: 0,
           skipped: [],
           sessionsScanned: 0,
           eventsImported: 0,
@@ -626,6 +629,7 @@ export const CostWriterLive = Layer.effect(
         });
 
         let imported = 0;
+        let cacheSkipped = 0;
         const skipped: SkippedCostSession[] = [];
         let duplicatesSkipped = 0;
         let sessionsScanned = 0;
@@ -786,19 +790,29 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const events = yield* Effect.sync(() => {
-              try {
-                return parseCodexSessionCostEventsSync(sessionFile);
-              } catch (cause) {
-                errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                return [];
-              }
-            });
-            if (events.length === 0) {
-              markSkipped(sessionFile, 'no-usage');
+            const fileStat = yield* Effect.sync(() => statSync(sessionFile));
+            if (lookupSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size)) {
+              cacheSkipped++;
               continue;
             }
-            if (events.some((event) => event.model === 'unknown')) {
+
+            const parsed = yield* Effect.sync(() => {
+              try {
+                return { ok: true as const, events: parseCodexSessionCostEventsSync(sessionFile) };
+              } catch (cause) {
+                errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
+                return { ok: false as const, events: [] };
+              }
+            });
+            if (!parsed.ok) continue;
+            const events = parsed.events;
+            if (events.length === 0) {
+              markSkipped(sessionFile, 'no-usage');
+              recordSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size, 'no-usage');
+              continue;
+            }
+            const hasUnknownModel = events.some((event) => event.model === 'unknown');
+            if (hasUnknownModel) {
               markSkipped(sessionFile, 'unknown-model');
             }
             const codexSession = root.inferIssueFromCwd
@@ -833,11 +847,18 @@ export const CostWriterLive = Layer.effect(
                 duplicatesSkipped++;
               }
             }
+            recordSkipVerdict(
+              sessionFile,
+              fileStat.mtimeMs,
+              fileStat.size,
+              hasUnknownModel ? 'unknown-model' : 'imported',
+            );
           }
         }
 
         return {
           imported,
+          cacheSkipped,
           skipped,
           sessionsScanned,
           eventsImported: imported,
