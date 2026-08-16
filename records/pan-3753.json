@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:06:11.023Z",
+  "updated": "2026-08-16T19:11:47.257Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "terminal-uat-generations": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 959399,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T19:06:11.023Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Added persisted retiredAt schema marker, closed-PR/webhook/lazy retirement triggers, fresh-PR and work-restart clears, merge-gate rejection, and regression tests.",
         "releasedAt": "2026-08-16T18:59:31.235Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 959399,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:06:11.023Z",
+        "itemId": "terminal-uat-generations",
+        "outcome": "completed",
+        "reason": "Stamped contained live generations promoted before invalidation, minted collision-safe suffixed names across mono/polyrepo assembly, wired containment checks, and added regression coverage.",
+        "releasedAt": "2026-08-16T19:11:47.257Z"
       }
     ],
     "statusReasons": {
@@ -154,6 +157,10 @@
       "review-status-retirement": {
         "reason": "Added persisted retiredAt schema marker, closed-PR/webhook/lazy retirement triggers, fresh-PR and work-restart clears, merge-gate rejection, and regression tests.",
         "updatedAt": "2026-08-16T18:59:31.235Z"
+      },
+      "terminal-uat-generations": {
+        "reason": "Stamped contained live generations promoted before invalidation, minted collision-safe suffixed names across mono/polyrepo assembly, wired containment checks, and added regression coverage.",
+        "updatedAt": "2026-08-16T19:11:47.257Z"
       }
     }
   },
@@ -172,6 +179,9 @@
     "review-status-retirement.ac2": "completed",
     "review-status-retirement.ac3": "completed",
     "review-status-retirement.ac4": "completed",
-    "terminal-uat-generations": "running"
+    "terminal-uat-generations": "completed",
+    "terminal-uat-generations.ac1": "completed",
+    "terminal-uat-generations.ac2": "completed",
+    "terminal-uat-generations.ac3": "completed"
   }
 }
