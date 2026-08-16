@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:28:27.989Z",
+  "updated": "2026-08-16T18:32:39.705Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "claude-initial-parse-via-job": {
-        "writerId": "agent-pan-3752",
-        "agentId": "agent-pan-3752",
-        "pid": 369115,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:28:27.989Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3752",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Added parseTranscriptSnapshot to shared-job coalescing and preserved coalescing in Vitest inline execution; verified concurrent identical payloads invoke the parser once.",
         "releasedAt": "2026-08-16T18:28:12.450Z"
+      },
+      {
+        "writerId": "agent-pan-3752",
+        "agentId": "agent-pan-3752",
+        "pid": 369115,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:28:27.989Z",
+        "itemId": "claude-initial-parse-via-job",
+        "outcome": "completed",
+        "reason": "Added the claude-initial parser discriminator to both job dispatch switches, routed the incremental watcher's initial full parse through the parse worker, and proved fixture parity plus structured-clone safety for parser state collections.",
+        "releasedAt": "2026-08-16T18:32:39.705Z"
       }
     ],
     "statusReasons": {
@@ -154,6 +157,10 @@
       "parse-job-coalescing": {
         "reason": "Added parseTranscriptSnapshot to shared-job coalescing and preserved coalescing in Vitest inline execution; verified concurrent identical payloads invoke the parser once.",
         "updatedAt": "2026-08-16T18:28:12.450Z"
+      },
+      "claude-initial-parse-via-job": {
+        "reason": "Added the claude-initial parser discriminator to both job dispatch switches, routed the incremental watcher's initial full parse through the parse worker, and proved fixture parity plus structured-clone safety for parser state collections.",
+        "updatedAt": "2026-08-16T18:32:39.705Z"
       }
     }
   },
@@ -171,6 +178,10 @@
     "parse-job-coalescing": "completed",
     "parse-job-coalescing.ac1": "completed",
     "parse-job-coalescing.ac2": "completed",
-    "claude-initial-parse-via-job": "running"
+    "claude-initial-parse-via-job": "completed",
+    "claude-initial-parse-via-job.ac1": "completed",
+    "claude-initial-parse-via-job.ac2": "completed",
+    "claude-initial-parse-via-job.ac3": "completed",
+    "claude-initial-parse-via-job.ac4": "completed"
   }
 }
