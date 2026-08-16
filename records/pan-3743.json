@@ -62,6 +62,11 @@
       "timestamp": "2026-08-16T12:15:22.125Z",
       "reason": "end",
       "note": "Review cycle 2 fix is complete: cost reconciliation now uses one persistent worker scan with bounded 250-event progress batches and explicit main-thread acknowledgements, so each transcript is parsed once and the worker applies backpressure before continuing. Documentation describes the acknowledged single-pass protocol. Verification: 22 focused tests passed, root TypeScript check passed, targeted ESLint passed, and the circular-dependency guard passed. Commit a9ab794449 is pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-16T12:36:56.557Z"
     }
   ],
   "feedback": [
@@ -137,7 +142,7 @@
     "recordedAt": "2026-08-16T12:15:15.978Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T12:36:54.914Z",
+  "updated": "2026-08-16T12:36:56.557Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
