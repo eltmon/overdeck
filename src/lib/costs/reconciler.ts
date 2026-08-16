@@ -20,7 +20,7 @@
  * - Catches everything: scans all transcript files regardless of source
  */
 
-import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, closeSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -31,11 +31,13 @@ import { findConversationForCostSessionSync } from '../overdeck/conversations.js
 import type { IssueId } from '../overdeck/issues.js';
 import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
+import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
 
 // ============== Types ==============
 
 export interface ReconcileResult {
   sessionsScanned: number;
+  cacheSkipped: number;
   sessionsWithNewData: number;
   eventsImported: number;
   duplicatesSkipped: number;
@@ -438,29 +440,39 @@ export function extractPiCostEvents(
  * `{"type":"session","version":3,...}` header; we detect that and skip the
  * sibling non-transcripts (activity.jsonl, cost-events.jsonl, pending-events).
  */
-function findPiTranscriptFiles(agentDir: string): string[] {
+type TranscriptFileStat = { path: string; mtimeMs: number; size: number };
+
+function findPiTranscriptFiles(agentDir: string): { files: TranscriptFileStat[]; cacheSkipped: number } {
   let files: string[];
   try {
     files = readdirSync(agentDir).filter((f) => f.endsWith('.jsonl'));
   } catch {
-    return [];
+    return { files: [], cacheSkipped: 0 };
   }
-  const transcripts: string[] = [];
+  const transcripts: TranscriptFileStat[] = [];
+  let cacheSkipped = 0;
   for (const f of files) {
     if (f === 'activity.jsonl' || f === 'cost-events.jsonl' || f === 'pending-events.jsonl') continue;
     const full = join(agentDir, f);
     try {
+      const stat = statSync(full);
+      if (lookupSkipVerdict(full, stat.mtimeMs, stat.size)) {
+        cacheSkipped++;
+        continue;
+      }
       const fd = openSync(full, 'r');
       const buf = Buffer.alloc(128);
       const bytesRead = readSync(fd, buf, 0, 128, 0);
       closeSync(fd);
       const head = buf.toString('utf-8', 0, bytesRead);
-      if (/"type"\s*:\s*"session"/.test(head)) transcripts.push(full);
+      if (/"type"\s*:\s*"session"/.test(head)) {
+        transcripts.push({ path: full, mtimeMs: stat.mtimeMs, size: stat.size });
+      }
     } catch {
       // skip unreadable
     }
   }
-  return transcripts;
+  return { files: transcripts, cacheSkipped };
 }
 
 /**
@@ -473,6 +485,7 @@ function findPiTranscriptFiles(agentDir: string): string[] {
 export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
+    cacheSkipped: 0,
     sessionsWithNewData: 0,
     eventsImported: 0,
     duplicatesSkipped: 0,
@@ -511,19 +524,26 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     if (agentDirName.startsWith('planning-')) sessionType = 'planning';
 
     const transcripts = findPiTranscriptFiles(agentPath);
-    for (const transcriptPath of transcripts) {
+    result.cacheSkipped += transcripts.cacheSkipped;
+    result.sessionsScanned += transcripts.cacheSkipped;
+    for (const transcript of transcripts.files) {
+      const transcriptPath = transcript.path;
       const sessionId = basename(transcriptPath, '.jsonl');
       const resolvedIssueId = issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: agentDirName });
       result.sessionsScanned++;
       try {
         const content = readFileSync(transcriptPath, 'utf-8');
         const events = extractPiCostEvents(content, agentDirName, resolvedIssueId, sessionType, sessionId);
-        if (events.length === 0) continue;
+        if (events.length === 0) {
+          recordSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size, 'no-usage');
+          continue;
+        }
         result.sessionsWithNewData++;
         const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
         result.eventsImported += inserted;
         result.duplicatesSkipped += duplicates;
         mergeCoverage(result, { earliestEventTs, latestEventTs });
+        recordSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size, 'imported');
       } catch (err) {
         result.errors.push({
           path: transcriptPath,
@@ -597,6 +617,7 @@ function mergeCoverage(
 async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
+    cacheSkipped: 0,
     sessionsWithNewData: 0,
     eventsImported: 0,
     duplicatesSkipped: 0,
@@ -647,6 +668,11 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
       result.sessionsScanned++;
 
       try {
+        const transcriptStat = statSync(transcriptPath);
+        if (lookupSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size)) {
+          result.cacheSkipped++;
+          continue;
+        }
         // Look up agent mapping for this session
         const mapping = sessionIndex.get(sessionId);
         const agentId = mapping?.agentId || 'unattributed';
@@ -662,6 +688,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
           if (!opts.dryRun && readResult && readResult.newSize > lastOffset) {
             saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
           }
+          if (!opts.dryRun) recordSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size, 'no-usage');
           continue;
         }
 
@@ -684,6 +711,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
 
         if (!opts.dryRun) {
           saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+          recordSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size, 'imported');
         }
       } catch (err) {
         result.errors.push({
@@ -748,6 +776,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
   if (opts.includePi ?? true) {
     const piResult = await reconcilePiTranscripts();
     result.sessionsScanned += piResult.sessionsScanned;
+    result.cacheSkipped += piResult.cacheSkipped;
     result.sessionsWithNewData += piResult.sessionsWithNewData;
     result.eventsImported += piResult.eventsImported;
     result.duplicatesSkipped += piResult.duplicatesSkipped;

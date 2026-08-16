@@ -12,10 +12,11 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
   if (inFlight) return inFlight;
   inFlight = (async () => {
     const result = await reconcilePiTranscripts();
-    if (result.eventsImported > 0 || result.errors.length > 0) {
+    if (result.eventsImported > 0 || result.cacheSkipped > 0 || result.errors.length > 0) {
       console.log(
         `[cost-reconciler] ${reason} sweep: ${result.eventsImported} imported, ` +
-        `${result.duplicatesSkipped} duplicate(s), ${result.errors.length} error(s)`,
+        `${result.cacheSkipped} cache-skipped, ${result.duplicatesSkipped} duplicate(s), ` +
+        `${result.errors.length} error(s)`,
       );
     }
     if (result.errors.length > 0) {
