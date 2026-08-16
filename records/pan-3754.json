@@ -83,17 +83,18 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:54:25.732Z",
+  "updated": "2026-08-16T18:59:27.240Z",
   "pipeline": {
     "issueId": "PAN-3754",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T18:54:19.779Z",
-    "reviewNotes": "PSI-calm timing, config validation, swap provenance, and governor documentation require correction",
+    "updatedAt": "2026-08-16T18:59:27.089Z",
+    "reviewNotes": "All four review dimensions are clean; prior blockers are fixed and focused tests pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
     "reviewSpawnedAt": "2026-08-16T18:54:19.777Z",
     "scopeDrift": {
@@ -140,9 +141,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 21135062,
-            "output": 44882,
-            "cacheRead": 20536576,
+            "input": 24325944,
+            "output": 51771,
+            "cacheRead": 23623168,
             "cacheWrite": 0
           }
         }
@@ -155,15 +156,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21135062,
-          "output": 44882,
-          "cacheRead": 20536576,
+          "input": 24325944,
+          "output": 51771,
+          "cacheRead": 23623168,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.607178,
-        "pricingAsOf": "2026-08-16T18:54:22.074Z"
+        "usd": 16.878594,
+        "pricingAsOf": "2026-08-16T18:59:27.221Z"
       }
     },
     "merges": [
