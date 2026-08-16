@@ -22,9 +22,22 @@
       "timestamp": "2026-08-16T19:19:46.395Z",
       "reason": "end",
       "note": "Specialist retry: the reported failure was dispatch lock contention, not a test failure. Verified the PAN-3752 record lock is now absent and the prior owner PID has exited. No code change was required; the branch remains clean and pushed. Existing final gates remain green: npm run typecheck, npm run lint, and npm test (13,940 backend tests plus 64 frontend tests passed). Re-dispatch review and test."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-16T19:45Z] uat-agent → FAILED — seq 1",
+      "timestamp": "2026-08-16T19:45:54.789Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "uat-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-16T19:45:54Z",
+      "markdownBody": "# UAT FAILED for PAN-3752\n\n## Failed acceptance criteria\n\nRequired per NFR-1/AC-1/AC-2 (drafts/pan-3752.md: 'verified live by the test role, not in Vitest'). Stayed scoped to the isolated feature-workspace container (roles/test.md) — host :3011 dashboard never touched. Rebuilt+restarted workspace server+frontend containers on fresh dist (parseTranscriptSnapshot confirmed present). Container starts with 0 conversations by design (no host ~/.claude/~/.overdeck mount); seeded a legitimate 25MB pi-format transcript fixture via the shipped no-DB-row synthetic-agent-session path (ws-rpc.ts PAN-1908 'agent-' regex), no code/DB edits. Blocked before opening any conversation: the workspace frontend's own origin 403s on POST /api/dashboard/session ('Missing origin') while the api- origin succeeds (200), so EventRouter/WsTransport retry-loop and the UI never leaves 'Waiting for backend data'/'Reconnecting...' — reproduced after restarting both containers, so not a stale-process artifact. Pre-existing container connectivity defect, outside this branch's files_scope (no frontend/session/CORS files touched), left unfixed per test-role boundaries. AC-1 (no event-loop-monitor warning on a 25MB open) and AC-2 (no staleness reconnect in a second tab) remain unproven.\n\n## Required action\n\nRead the failed UAT acceptance criteria above, reproduce each failure, then implement and verify the required rework before committing and pushing your fix.\n"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -51,7 +64,7 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:45:00.804Z",
+  "updated": "2026-08-16T19:45:54.790Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
