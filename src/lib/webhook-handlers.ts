@@ -231,8 +231,6 @@ function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumbe
 
 export async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
   try {
-    const status = await Effect.runPromise(getReviewStatus(issueId));
-    if (!status || status.retiredAt) return;
     // Resolve PR merge state. Prefer the GitHub App REST path (installation
     // token, separate rate-limit budget, no GraphQL) when configured; fall back
     // to `gh pr view` (GraphQL) only when the App is not set up. Previously this
@@ -242,13 +240,19 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const [owner, repoName] = repo.split('/');
     if (!owner || !repoName) return;
 
+    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
+    const githubAppConfigured = isGitHubAppConfigured();
+    if (!githubAppConfigured && isInGraphQLCooldown()) return;
+
+    const status = await Effect.runPromise(getReviewStatus(issueId));
+    if (!status || status.retiredAt) return;
+
     let mergeable: string;
     let mergeState: string;
     let isDraft: boolean;
     let checksFailed: boolean;
 
-    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
-    if (isGitHubAppConfigured()) {
+    if (githubAppConfigured) {
       // App REST path — installation token, separate rate-limit budget, no GraphQL.
       const prState = await Effect.runPromise(getPullRequestState(owner, repoName, prNumber));
       mergeable = prState.mergeable === null ? 'UNKNOWN' : prState.mergeable ? 'MERGEABLE' : 'CONFLICTING';
@@ -257,7 +261,6 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       checksFailed = prState.checksFailed;
     } else {
       // gh CLI fallback (GraphQL) — only when the App is not configured.
-      if (isInGraphQLCooldown()) return;
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFile);

@@ -17,14 +17,12 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
 import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
-import { gatherMergeEligibility, isMergeEligible } from './merge-eligibility.js';
 
 export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
 export { reconcileAutoMergeRows } from './deacon-auto-merge-reconcile.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-
 interface MergeReminderState {
   mergeStuckAttempts?: Record<string, number>;
 }
@@ -433,7 +431,8 @@ const STALE_MERGE_BLOCKER_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
  * mergeability probe.
  */
 export async function reconcileStaleMergeBlockers(
-  gatherEligibility: typeof gatherMergeEligibility = gatherMergeEligibility,
+  gatherEligibility: typeof import('./merge-eligibility.js').gatherMergeEligibility = async (ids) =>
+    (await import('./merge-eligibility.js')).gatherMergeEligibility(ids),
   workspaceExists: typeof existsSync = existsSync,
   resolveWorkspace: (issueId: string) => string | null = (issueId) => {
     const resolved = resolveProjectFromIssueSync(issueId);
@@ -460,7 +459,7 @@ export async function reconcileStaleMergeBlockers(
       staleMergeBlockerCooldowns.set(issueId, now + STALE_MERGE_BLOCKER_COOLDOWN_MS);
 
       const membership = memberships.get(issueId.toUpperCase());
-      if (!membership || !isMergeEligible(membership)) {
+      if (!membership || membership.bucket !== 'in_flight') {
         if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date(now).toISOString() });
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
         continue;
@@ -493,7 +492,8 @@ export async function reconcileStaleMergeBlockers(
  * prevents restoration without an open PR; successful restoration is idempotent.
  */
 export async function reconcileStuckReadyForMerge(
-  gatherEligibility: typeof gatherMergeEligibility = gatherMergeEligibility,
+  gatherEligibility: typeof import('./merge-eligibility.js').gatherMergeEligibility = async (ids) =>
+    (await import('./merge-eligibility.js')).gatherMergeEligibility(ids),
 ): Promise<string[]> {
   const actions: string[] = [];
   try {
@@ -505,7 +505,7 @@ export async function reconcileStuckReadyForMerge(
     const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
     for (const [issueId] of candidates) {
       const membership = memberships.get(issueId.toUpperCase());
-      if (!membership || !isMergeEligible(membership)) {
+      if (!membership || membership.bucket !== 'in_flight') {
         if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
         continue;

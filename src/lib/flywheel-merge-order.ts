@@ -2,7 +2,6 @@ import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
-import { gatherMergeEligibility, isMergeEligible } from './cloister/merge-eligibility.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
@@ -256,6 +255,7 @@ export async function listEligibleCandidatesByProject(projectRoot: string): Prom
     return issueProject?.projectPath === project.path &&
       rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible;
   });
+  const { gatherMergeEligibility, isMergeEligible } = await import('./cloister/merge-eligibility.js');
   const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
   const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
 
