@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T15:00:30.955Z",
+  "updated": "2026-08-16T15:03:36.646Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -351,16 +351,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "preflight-fallback-regression-test": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 2523796,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T15:00:30.954Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -498,6 +490,17 @@
         "outcome": "completed",
         "reason": "Bound health response body reads to 5 seconds, skipped duplicate known-unhealthy probes, enforced one 30-second startup deadline, and added fake-timer timeout/retry coverage.",
         "releasedAt": "2026-08-16T14:59:11.968Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2523796,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T15:00:30.954Z",
+        "itemId": "preflight-fallback-regression-test",
+        "outcome": "completed",
+        "reason": "Added regression coverage proving the stopped-agent fresh-launch fallback awaits the Ollama provider preflight before createSession and aborts without session creation when preflight fails.",
+        "releasedAt": "2026-08-16T15:03:36.645Z"
       }
     ],
     "statusReasons": {
@@ -521,6 +524,10 @@
       "bound-ollama-health-timeouts": {
         "reason": "Bound health response body reads to 5 seconds, skipped duplicate known-unhealthy probes, enforced one 30-second startup deadline, and added fake-timer timeout/retry coverage.",
         "updatedAt": "2026-08-16T14:59:11.968Z"
+      },
+      "preflight-fallback-regression-test": {
+        "reason": "Added regression coverage proving the stopped-agent fresh-launch fallback awaits the Ollama provider preflight before createSession and aborts without session creation when preflight fails.",
+        "updatedAt": "2026-08-16T15:03:36.645Z"
       }
     }
   },
@@ -577,7 +584,9 @@
     "bound-ollama-health-timeouts.ac1": "completed",
     "bound-ollama-health-timeouts.ac2": "completed",
     "bound-ollama-health-timeouts.ac3": "completed",
-    "preflight-fallback-regression-test": "running"
+    "preflight-fallback-regression-test": "completed",
+    "preflight-fallback-regression-test.ac1": "completed",
+    "preflight-fallback-regression-test.ac2": "completed"
   },
   "recoveryTrips": [
     {
