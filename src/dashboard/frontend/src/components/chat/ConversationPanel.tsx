@@ -185,7 +185,7 @@ export function ConversationPanel({
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
-  const streamMessagesEnabled = useConversationMessagesStream(conversation);
+  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);

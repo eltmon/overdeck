@@ -46,7 +46,7 @@ interface SimpleActivityFeedProps {
 
 export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state, needsYouReason }: SimpleActivityFeedProps) {
   const conversation = useMemo(() => agentToConversation(agent), [agent]);
-  const streamEnabled = useConversationMessagesStream(conversation);
+  const { enabled: streamEnabled } = useConversationMessagesStream(conversation);
   const queryClient = useQueryClient();
 
   const queryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
