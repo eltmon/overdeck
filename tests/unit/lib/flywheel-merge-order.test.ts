@@ -287,8 +287,12 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
         return { eligible: true };
       },
     }));
+    const gatherMergeEligibility = vi.fn(async (issueIds: string[]) => {
+      if (issueIds.some((issueId) => issueId.startsWith('MIN-'))) throw new Error('unrelated project unavailable');
+      return new Map(issueIds.map((issueId) => [issueId, { bucket: issueId === 'PAN-3' ? 'in_flight' : 'planned_backlog' }]));
+    });
     vi.doMock('../../../src/lib/cloister/merge-eligibility.js', () => ({
-      gatherMergeEligibility: async (issueIds: string[]) => new Map(issueIds.map((issueId) => [issueId, { bucket: issueId === 'PAN-3' ? 'in_flight' : 'planned_backlog' }])),
+      gatherMergeEligibility,
       isMergeEligible: (membership: { bucket: string }) => membership.bucket === 'in_flight',
     }));
 
@@ -299,6 +303,7 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
     // deacon-ignored, PAN-5 is not ready, PAN-6 is merged, and MIN-9 belongs to another project.
     expect(candidates.map((candidate) => candidate.issueId)).toEqual(['PAN-3']);
     expect(candidates[0]).toMatchObject({ issueId: 'PAN-3', pr: 3 });
+    expect(gatherMergeEligibility).toHaveBeenCalledWith(['PAN-3']);
     vi.resetModules();
   });
 });

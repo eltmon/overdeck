@@ -395,6 +395,24 @@ describe('handlePullRequest', () => {
     }));
   });
 
+  it('retires a closed PR when the stored head SHA is stale', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [], prNumber: 1, prHeadSha: 'older-sha' });
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'closed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-123', sha: 'final-sha' },
+        merged: false,
+      },
+    })));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', expect.objectContaining({
+      readyForMerge: false,
+      retiredAt: expect.any(String),
+    }));
+  });
+
   it.each(['opened', 'closed', 'reopened'])('enqueues membership refresh for %s PRs', async (action) => {
     await Effect.runPromise(handlePullRequest(makePayload({
       action,

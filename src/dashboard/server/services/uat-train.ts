@@ -213,7 +213,7 @@ async function runUatTrainReconcileForProject(
       getBaseAnchor: async () => getPolyrepoBaseAnchor(projectPath, await readySet()),
       getFeatureAnchor: (feature) => getPolyrepoFeatureAnchor(feature),
       isGenerationContainedInMain: async (generation) => {
-        const repoGit = buildPolyrepoGitDeps(await resolveProjectRepos(projectPath));
+        const repoGit = buildPolyrepoGitDeps(await resolveProjectRepos(projectPath), { includeReadOnly: true });
         const repos = generation.repos ?? [];
         return repos.length > 0 && Promise.all(repos.map((repo) =>
           repoGit.get(repo.repoKey)?.isBranchContainedInMain?.(repo.branch) ?? Promise.resolve(false)))

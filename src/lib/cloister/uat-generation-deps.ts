@@ -264,14 +264,15 @@ export function featureNamespaceOf(sourceBranch: string): string {
  */
 export function buildPolyrepoGitDeps(
   repos: readonly ResolvedProjectRepo[],
+  /** Containment-only callers include read-only repos recorded on old generations. */
+  options: { includeReadOnly?: boolean } = {},
 ): Map<string, PolyrepoRepoGit> {
   return new Map(
     repos
       // A repo configured `readonly: true` (required === false) is never a
-      // write target. Omitting it here means assembly cannot branch or push to
-      // it even if a caller passes it in — the ready-set filter is the first
-      // line of defense, this is the second.
-      .filter((repo) => repo.required)
+      // write target. Assembly uses the default filter; terminal containment
+      // opts in because historical generations can record read-only repos.
+      .filter((repo) => repo.required || options.includeReadOnly)
       .map((repo) => {
         let worktreePath = '';
         let generationBranch = '';

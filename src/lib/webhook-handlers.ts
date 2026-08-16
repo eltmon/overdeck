@@ -502,7 +502,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   // For synchronize/opened/reopened the head SHA may have changed — skip SHA
   // validation so the handler can refresh prHeadSha and recompute blockers.
-  const headMayHaveMoved = ['synchronize', 'opened', 'reopened'].includes(payload.action ?? '');
+  const headMayHaveMoved = ['synchronize', 'opened', 'reopened', 'closed'].includes(payload.action ?? '');
   const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
   if (!status) return;
 

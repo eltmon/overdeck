@@ -251,16 +251,15 @@ export async function listEligibleCandidatesByProject(projectRoot: string): Prom
   if (!project) return [];
 
   const allStatuses = loadReviewStatuses();
-  const readyStatuses = Object.entries(allStatuses).filter(([, rs]) =>
-    rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible);
+  const readyStatuses = Object.entries(allStatuses).filter(([issueId, rs]) => {
+    const issueProject = resolveProjectFromIssueSync(issueId);
+    return issueProject?.projectPath === project.path &&
+      rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible;
+  });
   const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
   const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
 
   for (const [issueId, rs] of readyStatuses) {
-    // Check if this issue belongs to this project
-    const issueProject = resolveProjectFromIssueSync(issueId);
-    if (!issueProject || issueProject.projectPath !== project.path) continue;
-
     const membership = memberships.get(issueId.toUpperCase());
     if (!membership || !isMergeEligible(membership)) continue;
 

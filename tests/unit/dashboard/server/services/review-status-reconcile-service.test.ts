@@ -139,6 +139,20 @@ describe('review status reconcile service', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('forgets reconciliation tracking when an issue retires', async () => {
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent('2026-07-22T20:00:00.000Z')]);
+    startReviewStatusReconcileService();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledOnce();
+
+    mockGetReviewStatusSync.mockReturnValue({ ...canonical, retiredAt: '2026-08-16T00:00:00Z' });
+    await vi.advanceTimersByTimeAsync(60_000);
+    mockGetReviewStatusSync.mockReturnValue(canonical);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledTimes(2);
+  });
+
   it('does not emit across several ticks when persisted JSON matches canonical status', async () => {
     const canonicalWithUndefined = { ...canonical, mergeNotes: undefined };
     const persisted = JSON.parse(JSON.stringify({
