@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T09:01:20.902Z",
+  "updated": "2026-08-16T09:04:35.603Z",
   "pipeline": {
     "issueId": "PAN-3745",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "align-cost-emitter": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3745",
         "agentId": "agent-pan-3745",
         "pid": 2231133,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:01:20.902Z"
+        "claimedAt": "2026-08-16T09:01:20.902Z",
+        "itemId": "align-cost-emitter",
+        "outcome": "completed",
+        "reason": "Aligned the cost writer with cost.event_recorded, emitted the full contract payload only for attributed events, and added schema/attribution tests.",
+        "releasedAt": "2026-08-16T09:04:35.603Z"
+      }
+    ],
+    "statusReasons": {
+      "align-cost-emitter": {
+        "reason": "Aligned the cost writer with cost.event_recorded, emitted the full contract payload only for attributed events, and added schema/attribution tests.",
+        "updatedAt": "2026-08-16T09:04:35.603Z"
       }
     }
   },
   "statusOverrides": {
-    "align-cost-emitter": "running"
+    "align-cost-emitter": "completed",
+    "align-cost-emitter.ac1": "completed",
+    "align-cost-emitter.ac2": "completed",
+    "align-cost-emitter.ac3": "completed",
+    "align-cost-emitter.ac4": "completed"
   }
 }
