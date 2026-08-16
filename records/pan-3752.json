@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:20:58.589Z",
+  "updated": "2026-08-16T18:24:28.810Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "snapshot-streams-via-job": {
-        "writerId": "agent-pan-3752",
-        "agentId": "agent-pan-3752",
-        "pid": 264525,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:20:58.588Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3752",
@@ -118,12 +110,27 @@
         "outcome": "completed",
         "reason": "Added the parseTranscriptSnapshot operation to both dispatch switches, isolated it on a dedicated parse worker lane, and covered routing, Pi parser parity, and unknown-parser rejection.",
         "releasedAt": "2026-08-16T18:10:00.890Z"
+      },
+      {
+        "writerId": "agent-pan-3752",
+        "agentId": "agent-pan-3752",
+        "pid": 264525,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:20:58.588Z",
+        "itemId": "snapshot-streams-via-job",
+        "outcome": "completed",
+        "reason": "Routed pi, ohmypi, codex, ACP, and Kimi snapshot parsing through parseTranscriptSnapshot jobs while preserving the resolved-stream callback body and wire semantics; removed the dead direct-parse stream.",
+        "releasedAt": "2026-08-16T18:24:28.810Z"
       }
     ],
     "statusReasons": {
       "parse-worker-op-and-lane": {
         "reason": "Added the parseTranscriptSnapshot operation to both dispatch switches, isolated it on a dedicated parse worker lane, and covered routing, Pi parser parity, and unknown-parser rejection.",
         "updatedAt": "2026-08-16T18:10:00.890Z"
+      },
+      "snapshot-streams-via-job": {
+        "reason": "Routed pi, ohmypi, codex, ACP, and Kimi snapshot parsing through parseTranscriptSnapshot jobs while preserving the resolved-stream callback body and wire semantics; removed the dead direct-parse stream.",
+        "updatedAt": "2026-08-16T18:24:28.810Z"
       }
     }
   },
@@ -133,6 +140,10 @@
     "parse-worker-op-and-lane.ac2": "completed",
     "parse-worker-op-and-lane.ac3": "completed",
     "parse-worker-op-and-lane.ac4": "completed",
-    "snapshot-streams-via-job": "running"
+    "snapshot-streams-via-job": "completed",
+    "snapshot-streams-via-job.ac1": "completed",
+    "snapshot-streams-via-job.ac2": "completed",
+    "snapshot-streams-via-job.ac3": "completed",
+    "snapshot-streams-via-job.ac4": "completed"
   }
 }
