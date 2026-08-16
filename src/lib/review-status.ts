@@ -890,6 +890,7 @@ export async function fixStuckReadyForMerge(
 ): Promise<void> {
   const statuses = loadReviewStatuses();
   const stuck = Object.values(statuses).filter(s =>
+    !s.retiredAt &&
     s.readyForMerge === false &&
     s.reviewStatus === 'passed' &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&

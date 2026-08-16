@@ -102,6 +102,22 @@ describe('readyForMerge pipeline-membership gates', () => {
     expect(loadReviewStatuses()['PAN-3753'].readyForMerge).toBe(false);
   });
 
+  it('does not gather or write retired records during the boot sweep', async () => {
+    seed('PAN-3753');
+    odb.raw().prepare('UPDATE review_status SET retired_at = ? WHERE issue_id = ?')
+      .run(Date.parse('2026-08-16T06:00:00Z'), 'PAN-3753');
+    const gather = vi.fn(eligibility('in_flight'));
+
+    await fixStuckReadyForMerge(gather);
+
+    expect(gather).not.toHaveBeenCalled();
+    expect(loadReviewStatuses()['PAN-3753']).toMatchObject({
+      readyForMerge: false,
+      retiredAt: '2026-08-16T06:00:00.000Z',
+      updatedAt: '2026-08-16T00:00:00.000Z',
+    });
+  });
+
   it('does not gather project lenses when there are no candidates', async () => {
     const gather = vi.fn(async () => []);
     const memberships = await gatherMergeEligibility([], {
