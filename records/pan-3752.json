@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:36:52.213Z",
+  "updated": "2026-08-16T18:43:26.748Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "parse-slow-bytes-and-routing-suite": {
-        "writerId": "agent-pan-3752",
-        "agentId": "agent-pan-3752",
-        "pid": 516464,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:36:52.212Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3752",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Replaced the direct getConversationByName call in subscribeConversationMessages with the existing database job operation and retained the discovering fallback.",
         "releasedAt": "2026-08-16T18:36:38.250Z"
+      },
+      {
+        "writerId": "agent-pan-3752",
+        "agentId": "agent-pan-3752",
+        "pid": 516464,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:36:52.212Z",
+        "itemId": "parse-slow-bytes-and-routing-suite",
+        "outcome": "completed",
+        "reason": "Added parse byte counts to slow-job telemetry and a routing suite covering all parse discriminators, parser parity, a generated 20 MB transcript, and full snapshot wire-shape preservation.",
+        "releasedAt": "2026-08-16T18:43:26.748Z"
       }
     ],
     "statusReasons": {
@@ -184,6 +187,10 @@
       "conversation-row-via-job": {
         "reason": "Replaced the direct getConversationByName call in subscribeConversationMessages with the existing database job operation and retained the discovering fallback.",
         "updatedAt": "2026-08-16T18:36:38.250Z"
+      },
+      "parse-slow-bytes-and-routing-suite": {
+        "reason": "Added parse byte counts to slow-job telemetry and a routing suite covering all parse discriminators, parser parity, a generated 20 MB transcript, and full snapshot wire-shape preservation.",
+        "updatedAt": "2026-08-16T18:43:26.748Z"
       }
     }
   },
@@ -210,6 +217,11 @@
     "conversation-row-via-job.ac1": "completed",
     "conversation-row-via-job.ac2": "completed",
     "conversation-row-via-job.ac3": "completed",
-    "parse-slow-bytes-and-routing-suite": "running"
+    "parse-slow-bytes-and-routing-suite": "completed",
+    "parse-slow-bytes-and-routing-suite.ac1": "completed",
+    "parse-slow-bytes-and-routing-suite.ac2": "completed",
+    "parse-slow-bytes-and-routing-suite.ac3": "completed",
+    "parse-slow-bytes-and-routing-suite.ac4": "completed",
+    "parse-slow-bytes-and-routing-suite.ac5": "completed"
   }
 }
