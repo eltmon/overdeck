@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:33:36.161Z",
+  "updated": "2026-08-16T09:37:09.991Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "pi-skip-cache": {
-        "writerId": "agent-pan-3743",
-        "agentId": "agent-pan-3743",
-        "pid": 2848329,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:33:36.161Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Cached terminal codex reconcile verdicts by exact file stat, suppressed cache-hit log floods, added sweep summaries and focused invalidation/error tests",
         "releasedAt": "2026-08-16T09:33:26.279Z"
+      },
+      {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 2848329,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:33:36.161Z",
+        "itemId": "pi-skip-cache",
+        "outcome": "completed",
+        "reason": "Cached unchanged Pi and Claude transcript verdicts by file stat, avoided opening cached Pi files, preserved retries for unreadable files, and reported cache-skip counts",
+        "releasedAt": "2026-08-16T09:37:09.990Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "codex-skip-cache": {
         "reason": "Cached terminal codex reconcile verdicts by exact file stat, suppressed cache-hit log floods, added sweep summaries and focused invalidation/error tests",
         "updatedAt": "2026-08-16T09:33:26.279Z"
+      },
+      "pi-skip-cache": {
+        "reason": "Cached unchanged Pi and Claude transcript verdicts by file stat, avoided opening cached Pi files, preserved retries for unreadable files, and reported cache-skip counts",
+        "updatedAt": "2026-08-16T09:37:09.990Z"
       }
     }
   },
@@ -109,6 +116,9 @@
     "codex-skip-cache.ac2": "completed",
     "codex-skip-cache.ac3": "completed",
     "codex-skip-cache.ac4": "completed",
-    "pi-skip-cache": "running"
+    "pi-skip-cache": "completed",
+    "pi-skip-cache.ac1": "completed",
+    "pi-skip-cache.ac2": "completed",
+    "pi-skip-cache.ac3": "completed"
   }
 }
