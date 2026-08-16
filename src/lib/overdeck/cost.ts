@@ -619,7 +619,6 @@ export const CostWriterLive = Layer.effect(
           warnings: [],
         };
         if (source !== 'ohmypi' && source !== 'codex') return empty;
-
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
           if (!existsSync(agentsDir)) return [] as string[];
@@ -627,7 +626,6 @@ export const CostWriterLive = Layer.effect(
             .filter(e => e.isDirectory())
             .map(e => e.name);
         });
-
         let imported = 0;
         let cacheSkipped = 0;
         const skipped: SkippedCostSession[] = [];
@@ -647,7 +645,6 @@ export const CostWriterLive = Layer.effect(
             `[cost-reconcile] warning ${warning.file}: ${warning.reason} provider=${warning.provider ?? 'unknown'} model=${warning.model}`,
           );
         };
-
         const noteImportedTimestamp = (ts: Date) => {
           const iso = ts.toISOString();
           if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
@@ -795,7 +792,6 @@ export const CostWriterLive = Layer.effect(
               cacheSkipped++;
               continue;
             }
-
             const parsed = yield* Effect.sync(() => {
               try {
                 return { ok: true as const, events: parseCodexSessionCostEventsSync(sessionFile) };
@@ -812,9 +808,7 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
             const hasUnknownModel = events.some((event) => event.model === 'unknown');
-            if (hasUnknownModel) {
-              markSkipped(sessionFile, 'unknown-model');
-            }
+            if (hasUnknownModel) markSkipped(sessionFile, 'unknown-model');
             const codexSession = root.inferIssueFromCwd
               ? yield* Effect.sync(() => parseCodexSessionSync(sessionFile))
               : null;
@@ -847,20 +841,12 @@ export const CostWriterLive = Layer.effect(
                 duplicatesSkipped++;
               }
             }
-            recordSkipVerdict(
-              sessionFile,
-              fileStat.mtimeMs,
-              fileStat.size,
-              hasUnknownModel ? 'unknown-model' : 'imported',
-            );
+            recordSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size,
+              hasUnknownModel ? 'unknown-model' : 'imported');
           }
         }
-
         return {
-          imported,
-          cacheSkipped,
-          skipped,
-          sessionsScanned,
+          imported, cacheSkipped, skipped, sessionsScanned,
           eventsImported: imported,
           duplicatesSkipped,
           errors,
