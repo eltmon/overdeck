@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:18:58.895Z",
+  "updated": "2026-08-16T19:21:43.688Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "converging-heal-loop": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 1138735,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T19:18:58.895Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Excluded retired rows from six deacon patrols, blocker candidate queries, GitHub refresh, and commit-status reporting; added zero-action/no-query tests.",
         "releasedAt": "2026-08-16T19:18:43.917Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 1138735,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:18:58.895Z",
+        "itemId": "converging-heal-loop",
+        "outcome": "completed",
+        "reason": "Tracked one heal per canonical updatedAt, suppressed repeated re-emits with a one-time NOT CONVERGING warning, re-enabled heals on canonical advance, and skipped retired rows.",
+        "releasedAt": "2026-08-16T19:21:43.688Z"
       }
     ],
     "statusReasons": {
@@ -184,6 +187,10 @@
       "consumers-skip-retired-records": {
         "reason": "Excluded retired rows from six deacon patrols, blocker candidate queries, GitHub refresh, and commit-status reporting; added zero-action/no-query tests.",
         "updatedAt": "2026-08-16T19:18:43.917Z"
+      },
+      "converging-heal-loop": {
+        "reason": "Tracked one heal per canonical updatedAt, suppressed repeated re-emits with a one-time NOT CONVERGING warning, re-enabled heals on canonical advance, and skipped retired rows.",
+        "updatedAt": "2026-08-16T19:21:43.688Z"
       }
     }
   },
@@ -210,6 +217,9 @@
     "consumers-skip-retired-records.ac1": "completed",
     "consumers-skip-retired-records.ac2": "completed",
     "consumers-skip-retired-records.ac3": "completed",
-    "converging-heal-loop": "running"
+    "converging-heal-loop": "completed",
+    "converging-heal-loop.ac1": "completed",
+    "converging-heal-loop.ac2": "completed",
+    "converging-heal-loop.ac3": "completed"
   }
 }
