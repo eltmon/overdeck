@@ -95,7 +95,7 @@
     "recordedAt": "2026-08-16T11:44:16.754Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T11:44:33.728Z",
+  "updated": "2026-08-16T11:46:50.736Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -111,7 +111,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3749",
     "reviewedAtCommit": "c62a5d27e68065481021c391e2d6fda1725bb703",
     "lastVerifiedCommit": "c62a5d27e68065481021c391e2d6fda1725bb703",
-    "reviewRequestedAt": "2026-08-16T11:44:17.900Z",
+    "reviewRequestedAt": "2026-08-16T11:46:50.257Z",
     "reviewSpawnedAt": "2026-08-16T11:09:27.894Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -168,7 +168,8 @@
         "tests/unit/lib/overdeck/cost-reconcile.test.ts"
       ],
       "recordedAt": "2026-08-16T11:44:16.754Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-16T11:46:50.257Z"
   },
   "closeOut": {
     "usage": {
