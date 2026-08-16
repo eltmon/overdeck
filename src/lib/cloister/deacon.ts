@@ -3051,7 +3051,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-2198: re-derive readyForMerge for the no-blocker "stuck after review" strand
   // (review+test+verify passed, no blocker, but readyForMerge stuck false) so it
   // converges on the deacon tick instead of only on the server-restart repair sweep.
-  const stuckReadyActions = reconcileStuckReadyForMerge();
+  const stuckReadyActions = await reconcileStuckReadyForMerge();
   actions.push(...stuckReadyActions);
   for (const a of stuckReadyActions) addLog('action', a, state.patrolCycle);
 

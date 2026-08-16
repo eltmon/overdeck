@@ -894,7 +894,9 @@ export function clearStuckMergeStatuses(): void {
  * With verificationSatisfied now only blocking on 'failed', these issues should be
  * re-evaluated and readyForMerge restored so they reappear on the Awaiting Merge page.
  */
-export function fixStuckReadyForMerge(): void {
+export async function fixStuckReadyForMerge(
+  gatherEligibility?: typeof import('./cloister/merge-eligibility.js').gatherMergeEligibility,
+): Promise<void> {
   const statuses = loadReviewStatuses();
   const stuck = Object.values(statuses).filter(s =>
     s.readyForMerge === false &&
@@ -908,8 +910,15 @@ export function fixStuckReadyForMerge(): void {
     (s.uatStatus === undefined || s.uatStatus === 'passed')
   );
   if (stuck.length === 0) return;
+  const mergeEligibility = await import('./cloister/merge-eligibility.js');
+  const memberships = await (gatherEligibility ?? mergeEligibility.gatherMergeEligibility)(stuck.map((status) => status.issueId));
   console.log(`[review-status] Restoring readyForMerge for ${stuck.length} issue(s) with passed review+test`);
   for (const s of stuck) {
+    const membership = memberships.get(s.issueId.toUpperCase());
+    if (!membership || !mergeEligibility.isMergeEligible(membership)) {
+      console.log(`[review-status] skipping ${s.issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
+      continue;
+    }
     console.log(`[review-status] Restoring readyForMerge=true for ${s.issueId} (verif=${s.verificationStatus}, merge=${s.mergeStatus})`);
     setReviewStatusSync(s.issueId, { readyForMerge: true });
   }
