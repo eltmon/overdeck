@@ -97,7 +97,7 @@ describe('pan cost backfill', () => {
     }
   });
 
-  it('--write imports a synthetic Claude event once and reports duplicates on rerun', async () => {
+  it('--write imports a synthetic Claude event once and cache-skips it on rerun', async () => {
     const home = makeFixtureHome();
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -119,7 +119,8 @@ describe('pan cost backfill', () => {
       expect(second[0]).toMatchObject({
         source: 'claude',
         eventsImported: 0,
-        duplicatesSkipped: 1,
+        duplicatesSkipped: 0,
+        cacheSkipped: 1,
       });
       expect(rows).toEqual([
         {

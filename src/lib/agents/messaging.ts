@@ -67,27 +67,65 @@ export interface MessageDeliveryOutcome {
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
 
+/** PAN-3736 — the one phrase for "the message went to the mail file because the
+ * agent was busy". It states that the agent is alive, and names the file, so a
+ * reader never mistakes a mid-turn agent for a dead one. Turn-end delivery is
+ * real for `.pending.md` mail: the codex notify hook replays the oldest pending
+ * file at every turn boundary. The phrase still stops short of promising it,
+ * because the hook only runs for codex sessions. */
+function busyAgentQueuedReason(mailPath: string): string {
+  return `agent is alive and mid-turn; message queued to its mail file (${mailPath})`;
+}
+
+/**
+ * How a mail file is named — which is the same thing as saying who drains it
+ * (PAN-3738):
+ *
+ * - `queued` → `<ts>.md` / `dedup-<hash>.md`. Plain mail: `pan monitor` drains
+ *   and prints it (`isPlainMailFile`), `pan inbox` re-reads it.
+ * - `pending` → `<ts>.pending.md` / `dedup-<hash>.pending.md`. Busy-turn mail
+ *   the codex notify hook replays at the next turn end. The hook drains ONLY
+ *   `*.pending.md`, so keyed busy mail must carry the suffix too or it strands.
+ * - `delivered` → `<ts>.delivered.md` / `dedup-<hash>.delivered.md`. A
+ *   post-delivery durable backup: the message already landed, and the suffix
+ *   stops a receipt from reading as queued mail to anyone inspecting `mail/`.
+ *   It stays plain mail for the monitor (`.delivered.md` ends with `.md` and
+ *   not `.pending.md`), so monitor and inbox behavior is unchanged.
+ */
+type MailKind = 'queued' | 'pending' | 'delivered';
+
+const MAIL_FILENAME_SUFFIX: Record<MailKind, string> = {
+  queued: '.md',
+  pending: '.pending.md',
+  delivered: '.delivered.md',
+};
+
+/** Writes the message to the agent's durable mail dir and returns the file path
+ * it wrote, so callers can name it in operator-facing output (PAN-3736). */
 function queueAgentMail(
   agentId: string,
   message: string,
-  pendingTurnEndDelivery = false,
+  kind: MailKind = 'queued',
   dedupKey?: string,
   source?: string,
-): void {
+): string {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
   const now = new Date();
+  const suffix = MAIL_FILENAME_SUFFIX[kind];
   // Keyed messages get a deterministic filename so a crash-replayed send
-  // overwrites the same durable backup instead of stacking a second copy.
+  // overwrites the same durable file instead of stacking a second copy.
   const filename = dedupKey !== undefined
-    ? `dedup-${createHash('sha256').update(dedupKey).digest('hex').slice(0, 24)}.md`
-    : `${now.toISOString().replace(/[:.]/g, '-')}${pendingTurnEndDelivery ? '.pending' : ''}.md`;
+    ? `dedup-${createHash('sha256').update(dedupKey).digest('hex').slice(0, 24)}${suffix}`
+    : `${now.toISOString().replace(/[:.]/g, '-')}${suffix}`;
   // The provenance header is only written when a source is known (the monitor
   // tier, PAN-3015). Callers that replay mail verbatim (codex notify hook
   // pastes `.pending.md` content) keep the legacy `# Message\n\n<body>` shape.
   const content = source ? formatMailFileContent(message, source, now) : `# Message\n\n${message}\n`;
-  writeFileSync(join(mailDir, filename), content
+  const mailPath = join(mailDir, filename);
+  writeFileSync(mailPath, content
   );
+  return mailPath;
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
@@ -211,7 +249,7 @@ export async function messageAgent(
   };
   if (agentState?.paused === true) {
     const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason ?? 'agent is paused';
-    queueAgentMail(normalizedId, message, false, opts.dedupKey);
+    queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
     logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
     return { delivered: false, queuedToMail: true, reason: gateBlockReason };
@@ -223,7 +261,7 @@ export async function messageAgent(
     const suspendedGate = decideMessageGate();
     if (suspendedGate.decision !== 'proceed') {
       const gateBlockReason = suspendedGate.reason ?? 'agent is gated';
-      queueAgentMail(normalizedId, message, false, opts.dedupKey);
+      queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
@@ -262,7 +300,7 @@ export async function messageAgent(
     const stoppedGate = decideMessageGate();
     if (stoppedGate.decision !== 'proceed') {
       const gateBlockReason = stoppedGate.reason ?? 'agent is gated';
-      queueAgentMail(normalizedId, message, false, opts.dedupKey);
+      queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
@@ -281,7 +319,7 @@ export async function messageAgent(
     const resumeResult = await resumeAgent(normalizedId, message);
 
     // Save to mail queue regardless so the agent can re-read feedback if needed
-    queueAgentMail(normalizedId, message, false);
+    queueAgentMail(normalizedId, message);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
       await appendTellInterventionForUserSource(normalizedId, caller);
@@ -458,7 +496,7 @@ export async function messageAgent(
       const remoteOutcome = await sendToRemoteAgentKeyed(normalizedId, remoteState.vmName, message, opts.dedupKey);
       // Durable backup (idempotent keyed filename); the remote agent never
       // drains the local mail dir, so this cannot replay.
-      queueAgentMail(normalizedId, message, false, opts.dedupKey);
+      queueAgentMail(normalizedId, message, 'delivered', opts.dedupKey);
       await appendTellInterventionForUserSource(normalizedId, caller);
       return {
         delivered: true,
@@ -470,8 +508,8 @@ export async function messageAgent(
     }
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
-    // Also save to mail queue for persistence
-    queueAgentMail(normalizedId, message, false);
+    // Also save a durable backup of the delivered message.
+    queueAgentMail(normalizedId, message, 'delivered');
     await appendTellInterventionForUserSource(normalizedId, caller);
     return { delivered: true, queuedToMail: true };
   }
@@ -494,7 +532,7 @@ export async function messageAgent(
   // enforce the key across the complete model-visible side effect. Keyed
   // messages fall through to the supervisor/tmux door, which can.
   if (expectedHarness === 'claude-code' && opts.dedupKey === undefined && isMonitorLive(normalizedId)) {
-    queueAgentMail(normalizedId, message, false, opts.dedupKey, caller);
+    queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
     logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
     console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
     await appendTellInterventionForUserSource(normalizedId, caller);
@@ -511,16 +549,25 @@ export async function messageAgent(
   if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
     const promptReady = claimCodexIdleTurn(normalizedId);
     if (!promptReady) {
-      queueAgentMail(normalizedId, message, true, opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
-      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
+      // PAN-3736: a busy agent is a WORKING agent, not a dead one. Say that in
+      // one phrase everywhere this outcome surfaces, and name the mail file so
+      // a human or peer can read or hand-deliver it.
+      //
+      // PAN-3738: the file is `pending` mail whether or not the send is keyed.
+      // The codex notify hook drains `*.pending.md` only, so a keyed message
+      // named `dedup-<hash>.md` used to strand here forever — the keyed name
+      // stays deterministic, it just carries the drainable suffix now.
+      const mailPath = queueAgentMail(normalizedId, message, 'pending', opts.dedupKey);
+      const busyReason = busyAgentQueuedReason(mailPath);
+      logAgentLifecycleSync(normalizedId, `messageAgent: ${busyReason}`);
+      console.log(`[agents] ${normalizedId}: ${busyReason}`);
       await appendTellInterventionForUserSource(normalizedId, caller);
-      return { delivered: true, queuedToMail: true, reason: 'queued for turn-end delivery' };
+      return { delivered: true, queuedToMail: true, reason: busyReason };
     }
 
     const deliveryMethod = resolveAgentDeliveryMethod(agentState);
     const delivery = await deliverWithOptionalKey(normalizedId, message, `messageAgent:${caller}`, deliveryMethod, opts.dedupKey);
-    queueAgentMail(normalizedId, message, false, opts.dedupKey);
+    queueAgentMail(normalizedId, message, 'delivered', opts.dedupKey);
     await appendTellInterventionForUserSource(normalizedId, caller);
     return {
       delivered: delivery.ok,
@@ -590,12 +637,13 @@ export async function messageAgent(
   );
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
-  // does not replay ordinary `.md` backups because they have already landed.
+  // does not replay `.delivered.md` backups because they have already landed —
+  // and the suffix says so to anyone reading `mail/` (PAN-3738).
   // Keyed deliveries skip the backup: the caller's outbox is the durable
   // receipt, and a keyed mail file is a replay channel — a monitor started
   // later would drain and print it as a second visible copy (cycle 7).
   if (opts.dedupKey === undefined) {
-    queueAgentMail(normalizedId, message, false);
+    queueAgentMail(normalizedId, message, 'delivered');
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
 

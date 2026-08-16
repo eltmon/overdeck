@@ -136,7 +136,7 @@ async function spawnRunWithoutConsentClaim(
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
-      await ensureRegisteredSlotWorktree(workspace, slot);
+      await ensureRegisteredSlotWorktree(issueId, workspace, slot);
     }
     const prompt = slot
       ? buildRegisteredSlotPrompt(issueId, workspace, slot, options.prompt)
@@ -155,7 +155,7 @@ async function spawnRunWithoutConsentClaim(
       autoSpawnConsentRequired: options.autoSpawnConsentRequired,
       effort: options.effort,
       slotIndex: slot?.slotIndex,
-      slotItemId: slot?.slotItemId,
+      slotItemId: slot?.slotItemId, foreman: options.foreman,
     }, acceptConsent);
   }
 
@@ -223,7 +223,7 @@ async function spawnRunWithoutConsentClaim(
     issueId,
     workspace,
     harness: resolvedHarness,
-    role,
+    role, foreman: options.foreman || undefined,
     model: selectedModel,
     modelSpawnKey,
     status: 'starting',
@@ -613,7 +613,7 @@ async function spawnAgentWithoutConsentClaim(
     issueId: options.issueId,
     workspace: options.workspace,
     harness: resolvedHarness,
-    role,
+    role, foreman: options.foreman || undefined,
     model: selectedModel,
     modelSpawnKey,
     status: 'starting',

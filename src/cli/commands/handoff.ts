@@ -72,7 +72,8 @@ export async function handoffCommand(
   }
 
   const focus = focusArgs.join(' ').trim() || undefined;
-  const FOCUS_MAX_CHARS = 500;
+  // PAN-3737: sanity ceiling only — must match parseSummaryForkFocus on the server.
+  const FOCUS_MAX_CHARS = 10_000;
   if (focus && focus.length > FOCUS_MAX_CHARS) {
     console.log(chalk.yellow(`Focus is ${focus.length} characters — the limit is ${FOCUS_MAX_CHARS}. No conversation was created.`));
     console.log(chalk.gray('  Put the full brief in a file in the target cwd and point a short focus at it,'));

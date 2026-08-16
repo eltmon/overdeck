@@ -13,6 +13,7 @@ import {
   inferIssueIdFromStackContainerName,
 } from '../../lib/workspace/stack-health.js';
 import { detectConcurrentRestartWriters, readRestartEvents, readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
+import { readRestartGate, type RestartGateSnapshot } from '../../lib/restart-gate-client.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -66,6 +67,19 @@ export function formatRestartStatusLines(status: RestartStatus | null, events: R
     lines.push(chalk.yellow(`⚠ Concurrent restart writers detected: ${descriptions}`));
   }
   return lines;
+}
+
+/**
+ * One line when voluntary restarts are blocked waiting for the operator, so a
+ * `pan reload` or post-merge deploy that looks stuck is explained where the
+ * operator already looks. Null when nothing is waiting.
+ */
+export function formatRestartGateLine(gate: RestartGateSnapshot | null): string | null {
+  const waiting = gate?.pending.length ?? 0;
+  if (waiting === 0) return null;
+  return chalk.yellow(
+    `${waiting} restart request(s) waiting for operator approval — approve in the dashboard banner or \`pan restart approve\``,
+  );
 }
 
 function renderRestartStatus(status: RestartStatus | null, events: RestartStatus[]): void {
@@ -174,6 +188,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
 
   renderRestartStatus(restartStatus, restartEvents);
+
+  const restartGateLine = formatRestartGateLine(await readRestartGate({}, 250));
+  if (restartGateLine) {
+    console.log(restartGateLine);
+    console.log('');
+  }
 
   if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));

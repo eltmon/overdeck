@@ -84,6 +84,7 @@ import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
 import { tieredCalloutsRouteLayer } from './routes/tiered-callouts.js';
 import { internalEventsRouteLayer } from './routes/internal-events.js';
+import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
@@ -382,6 +383,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   tieredCalloutsRouteLayer,
   backlogRouteLayer,
   internalEventsRouteLayer,
+  restartGateRouteLayer,
   knowledgeViewerRouteLayer,
   staticRouteLayer,
 );

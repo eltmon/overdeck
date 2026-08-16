@@ -56,6 +56,7 @@ function statusFor(type: TaskOperationType): XBriefItemStatus {
   if (type === 'done') return 'completed';
   if (type === 'block') return 'blocked';
   if (type === 'unblock') return 'pending';
+  if (type === 'reopen') return 'pending';
   return 'cancelled';
 }
 
@@ -68,6 +69,8 @@ function allowedFrom(type: TaskOperationType, status: XBriefItemStatus): boolean
   if (type === 'done') return status === 'running';
   if (type === 'block') return status === 'pending' || status === 'running';
   if (type === 'unblock') return status === 'blocked';
+  // PAN-3691: reopen is the canonical recovery for a falsely completed task.
+  if (type === 'reopen') return status === 'completed';
   return status === 'pending' || status === 'running' || status === 'blocked';
 }
 
@@ -127,7 +130,7 @@ export async function applyTaskStatusChange(
     const subIds = operation.subItemIds?.length
       ? new Set(operation.subItemIds)
       : new Set(
-          operation.type === 'done' || operation.type === 'cancel'
+          operation.type === 'done' || operation.type === 'cancel' || operation.type === 'reopen'
             ? subItems.map(({ id }) => id)
             : [],
         );
@@ -138,13 +141,13 @@ export async function applyTaskStatusChange(
         { issueId: normalizedIssueId, itemId: operation.itemId, operation: operation.type, currentStatus, currentSequence },
       );
     }
-    if (TERMINAL.has(currentStatus) && !repeatedCancellation) {
+    if (TERMINAL.has(currentStatus) && !repeatedCancellation && operation.type !== 'reopen') {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId);
     }
     if (operation.force && !operation.reason) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId, 'A forced transition requires --reason.');
     }
-    if ((operation.type === 'block' || operation.type === 'cancel') && !operation.reason) {
+    if ((operation.type === 'block' || operation.type === 'cancel' || operation.type === 'reopen') && !operation.reason) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId, 'This transition requires --reason.');
     }
     if (repeatedCancellation && subItems.every((subItem) => subItem.status === 'cancelled')) {

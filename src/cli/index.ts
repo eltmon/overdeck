@@ -431,7 +431,7 @@ program
 
 program
   .command('handoff [conv] [focus...]')
-  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters. Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 10000 characters (keep it short; long briefs belong in a file the focus points at). Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
@@ -1236,7 +1236,7 @@ program
 // Scoped restart: `pan restart` defaults to the dashboard only and never
 // touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
 // See src/cli/commands/restart.ts for the scope contract.
-program
+const restart = program
   .command('restart')
   .description('Restart a platform component (default: dashboard only — leaves CLIProxy, Traefik, TLDR running)')
   .option('--dashboard', 'Restart only the dashboard (default)')
@@ -1249,7 +1249,19 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
   .option('--no-resume', 'Disable agent auto-resume on restart (opt out of the default-on auto-resume)')
+  .option('--now', 'Skip the operator-approval wait: approve everything already waiting, then restart the dashboard immediately')
   .action(restartCommand);
+
+// Dashboard, reload and post-merge deploy restarts wait for operator approval so
+// they cannot interrupt live work. This releases whatever is waiting — the same
+// thing the dashboard banner's "Restart now" button does.
+restart
+  .command('approve')
+  .description('Approve every dashboard restart request that is waiting for the operator')
+  .action(async () => {
+    const { restartApproveCommand } = await import('./commands/restart.js');
+    await restartApproveCommand();
+  });
 
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');

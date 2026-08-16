@@ -40,7 +40,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan reset-to-planned <id> [--dry-run]` | Clear task progress, claims, execution, and specialist state while preserving finalized planning and code; leaves `pan start` as the next action |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
 | `pan strike-ready <id>` | Persist the pushed `strike/<id>` HEAD so Deacon can land it through the verified merge door; Flywheel is not required |
-| `pan swarm <id>` | Per-item DAG dispatch across plan items (slot-per-item). See [SWARM.md](./SWARM.md). `--dry-run`, `--max-slots`, `--auto-advance`, `--host`, `--task <next\|show\|claim\|done\|block\|unblock\|cancel>` |
+| `pan swarm <id>` | Start or attach to the resident foreman. Gates: `dispatch <id> [--json]`, `merge <id> <slot> [--json]`, `status <id> [--json]`, `wait <id> [--timeout <seconds>] [--json]`, and `recover <id> <slot> --action retry\|drop\|handoff\|reclaim [--operator]`. Controls: `freeze`, `resume`, `stop`, and `reset`. See [SWARM.md](./SWARM.md). |
 | `pan staffing <id>` | Show or set per-issue work-model and swarm overrides. Use `--model <model>\|default` and `--swarm off\|auto\|always\|default`. |
 | Issue-header Policies control | Open **Policies** from an issue header to set Review (mode, model) and Work (model, swarm) overrides. Active overrides surface as chips beside the control. Model changes apply to the next fresh run; they never restart agents automatically. |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |

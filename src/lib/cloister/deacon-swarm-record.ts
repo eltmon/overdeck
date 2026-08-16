@@ -1,6 +1,7 @@
 import {
   readIssueRecordForWorkspaceSync,
   type PanIssueRecord,
+  type PanIssueSwarmRecord,
   type PanIssueSwarmSlotCompletion,
 } from '../pan-dir/record.js';
 import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
@@ -41,6 +42,135 @@ export async function writeSwarmFinalizedAt(workspacePath: string, issueId: stri
       finalizedAt,
     },
   }));
+}
+
+export function readSwarmHold(workspacePath: string, issueId: string): PanIssueSwarmRecord['hold'] {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.hold;
+}
+
+export async function writeSwarmHold(
+  workspacePath: string,
+  issueId: string,
+  hold: NonNullable<PanIssueSwarmRecord['hold']>,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => ({
+    ...record,
+    swarm: { ...(record.swarm ?? {}), hold },
+  }));
+}
+
+export async function clearSwarmHold(workspacePath: string, issueId: string): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
+    if (!record.swarm?.hold) return record;
+    const swarm = { ...record.swarm };
+    delete swarm.hold;
+    return { ...record, swarm };
+  });
+}
+
+export function readSwarmInterventionCount(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  failureClass: string,
+): number {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
+    ?.swarm?.interventions?.[String(slotIndex)]?.[failureClass] ?? 0;
+}
+
+export function readSwarmInterventions(
+  workspacePath: string,
+  issueId: string,
+): NonNullable<PanIssueSwarmRecord['interventions']> {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.interventions ?? {};
+}
+
+export function readSwarmCompletionObservation(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+): NonNullable<PanIssueSwarmRecord['completionObservations']>[string] | undefined {
+  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
+    ?.swarm?.completionObservations?.[progressKey];
+}
+
+export async function writeSwarmCompletionObservation(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+  observation: NonNullable<PanIssueSwarmRecord['completionObservations']>[string],
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      completionObservations: {
+        ...(record.swarm?.completionObservations ?? {}),
+        [progressKey]: observation,
+      },
+    },
+  }));
+}
+
+export async function clearSwarmCompletionObservationRecord(
+  workspacePath: string,
+  issueId: string,
+  progressKey: string,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
+    const existing = record.swarm?.completionObservations;
+    if (!existing?.[progressKey]) return record;
+    const completionObservations = { ...existing };
+    delete completionObservations[progressKey];
+    return { ...record, swarm: { ...(record.swarm ?? {}), completionObservations } };
+  });
+}
+
+export async function writeSwarmForemanTakeover(
+  workspacePath: string,
+  issueId: string,
+  itemId: string,
+  slotIndex: number,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      reclaimedItems: {
+        ...(record.swarm?.reclaimedItems ?? {}),
+        [itemId]: { slotIndex, reclaimedAt: new Date().toISOString() },
+      },
+    },
+  }));
+}
+
+export async function writeSwarmIntervention(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  failureClass: string,
+  options: { operator?: boolean } = {},
+): Promise<number | null> {
+  let count: number | null = null;
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
+    const slotKey = String(slotIndex);
+    const interventions = record.swarm?.interventions ?? {};
+    const slotInterventions = interventions[slotKey] ?? {};
+    const current = slotInterventions[failureClass] ?? 0;
+    if (current >= 3 && !options.operator) return record;
+    count = current + 1;
+    return {
+      ...record,
+      swarm: {
+        ...(record.swarm ?? {}),
+        interventions: {
+          ...interventions,
+          [slotKey]: { ...slotInterventions, [failureClass]: count as number },
+        },
+      },
+    };
+  });
+  return count;
 }
 
 /**
@@ -109,6 +239,97 @@ export async function clearSwarmSlotCompletion(workspacePath: string, issueId: s
     delete next[String(slotIndex)];
     return { ...record, swarm: { ...record.swarm, slotCompletions: next } };
   });
+}
+
+/**
+ * Consume all durable ownership for a slot in one record update. Merged-slot
+ * GC uses this after it removes the worktree and branch so a completion marker
+ * cannot outlive the assignment and keep the freed index occupied.
+ */
+export async function clearSwarmSlotOwnership(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  _itemId?: string,
+): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
+    const swarm = record.swarm ?? {};
+    const slotAssignments = (swarm.slotAssignments ?? []).filter(
+      assignment => assignment.slotIndex !== slotIndex,
+    );
+    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+    delete slotCompletions[String(slotIndex)];
+    return { ...record, swarm: { ...swarm, slotAssignments, slotCompletions } };
+  });
+}
+
+export async function releaseBlockedSwarmSlot(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+  itemId: string,
+  branch?: string,
+  archived?: { archivedBranch: string; archivedWorktree: string; replacementBranch: string; releasedAt: string },
+): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
+    const swarm = record.swarm ?? {};
+    const slotAssignments = (swarm.slotAssignments ?? []).filter(
+      assignment => assignment.slotIndex !== slotIndex,
+    );
+    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+    delete slotCompletions[String(slotIndex)];
+    return {
+      ...record,
+      swarm: {
+        ...swarm,
+        slotAssignments,
+        slotCompletions,
+        releasedBlockedSlots: {
+          ...(swarm.releasedBlockedSlots ?? {}),
+          [String(slotIndex)]: {
+            slotIndex,
+            itemId,
+            branch,
+            ...archived,
+            releasedAt: archived?.releasedAt ?? new Date().toISOString(),
+          },
+        },
+      },
+    };
+  });
+}
+
+export async function clearReleasedBlockedSwarmSlot(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): Promise<void> {
+  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
+    const releasedBlockedSlots = { ...(record.swarm?.releasedBlockedSlots ?? {}) };
+    delete releasedBlockedSlots[String(slotIndex)];
+    return { ...record, swarm: { ...(record.swarm ?? {}), releasedBlockedSlots } };
+  });
+}
+
+/**
+ * Drop every superseded-attempt record (PAN-3694). A work-preserving swarm
+ * reset removes all slot worktrees and branches, so the slot indexes the
+ * superseded attempts occupied are genuinely free — but
+ * `applySupersededSlotHighWater` kept reserving indexes 1..high-water,
+ * leaving a fresh swarm able to dispatch only high-water+1. The archived
+ * branches remain on origin; only the index-blocking record is cleared.
+ */
+export async function clearSupersededSwarmAttempts(workspacePath: string, issueId: string): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      supersededAttempts: [],
+    },
+  }));
 }
 
 /**

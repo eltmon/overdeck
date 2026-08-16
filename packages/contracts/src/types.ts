@@ -541,6 +541,56 @@ export const ProjectCiSnapshot = Schema.Struct({
 })
 export type ProjectCiSnapshot = typeof ProjectCiSnapshot.Type
 
+// ─── Restart Gate (PAN-3729) ─────────────────────────────────────────────────
+
+/** What kind of process asked for the voluntary dashboard restart. */
+export const RestartGateKind = Schema.Literals(["deploy", "reload", "restart"])
+export type RestartGateKind = typeof RestartGateKind.Type
+
+/**
+ * One live restart request. `requesterId` is stable for a single requester
+ * invocation (e.g. `deploy:PAN-3724:<pid>`), so a re-poll refreshes the same
+ * row instead of adding another.
+ */
+export const RestartGateRequest = Schema.Struct({
+  requesterId: Schema.String,
+  kind: RestartGateKind,
+  reason: Schema.String,
+  builtSha: Schema.optional(Schema.String),
+  requestedAt: Schema.String,
+})
+export type RestartGateRequest = typeof RestartGateRequest.Type
+
+/**
+ * How the last approval cycle ended, when the ending is worth telling the
+ * operator about (PAN-3731). Present only inside the brief window after it
+ * happened, so the banner can explain a click that restarted nothing.
+ *
+ * `pruned-unclaimed` — an approved epoch expired with nobody left to perform
+ * the restart: every requester died before claiming, or a claimant lapsed and
+ * the rest gave up. Either way nothing was restarted.
+ */
+export const RestartGateOutcome = Schema.Struct({
+  type: Schema.Literals(["pruned-unclaimed"]),
+  at: Schema.String,
+})
+export type RestartGateOutcome = typeof RestartGateOutcome.Type
+
+/**
+ * The operator-facing view of the restart gate — identical to the body of
+ * `GET /api/restart-gate`, so the banner and the CLI read the same shape.
+ *
+ * `idle` no live requests; `pending` requests are waiting for approval;
+ * `approved` the operator approved an epoch that nobody has claimed yet;
+ * `claimed` one requester holds the exclusive right to perform the restart.
+ */
+export const RestartGateSnapshot = Schema.Struct({
+  status: Schema.Literals(["idle", "pending", "approved", "claimed"]),
+  pending: Schema.Array(RestartGateRequest),
+  lastOutcome: Schema.optional(RestartGateOutcome),
+})
+export type RestartGateSnapshot = typeof RestartGateSnapshot.Type
+
 // ─── Dashboard Snapshot ──────────────────────────────────────────────────────
 
 export const DashboardSnapshot = Schema.Struct({
@@ -559,6 +609,7 @@ export const DashboardSnapshot = Schema.Struct({
   enrichProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EnrichProgressSnapshot)),
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
+  restartGate: Schema.optional(RestartGateSnapshot),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

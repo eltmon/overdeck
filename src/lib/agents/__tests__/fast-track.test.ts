@@ -135,6 +135,9 @@ describe('autoMergeFastTrackBatch', () => {
     const calls: Array<{ command: string; cwd: string }> = [];
     const run = async (command: string, cwd: string) => {
       calls.push({ command, cwd });
+      // PAN-3691: model one ahead commit on the slot branch so the
+      // zero-current-item-work guard passes and the merge proceeds.
+      if (command.startsWith('git rev-list --count')) return { stdout: '1', stderr: '' };
       return { stdout: 'ok', stderr: '' };
     };
     return { calls, run };
@@ -154,14 +157,25 @@ describe('autoMergeFastTrackBatch', () => {
 
   it('auto-merges a trivial batch to the feature branch after typecheck and lint pass', async () => {
     const { calls, run } = recordingRun();
+    const resolveRepoRoots = (_issueId: string, workspacePath: string) => [{
+      repoKey: 'pan-1',
+      dir: workspacePath,
+      sourceBranch: 'feature/pan-1',
+      targetBranch: 'main',
+      isPolyrepo: false,
+    }];
     const outcome = await autoMergeFastTrackBatch(ISSUE, 3, makeBatch(), {
       enabled: true,
-      mergeOptions: { deps: { run } },
+      mergeOptions: { deps: { run, resolveRepoRoots } },
     });
     expect(outcome.refused).toBe(false);
     expect(outcome.result?.verified).toBe(true);
     expect(outcome.result?.merged).toBe(true);
-    expect(calls.map(c => c.command)).toEqual([...FAST_TRACK_GATE_COMMANDS, 'git merge --no-ff "feature/pan-1-slot-3"']);
+    expect(calls.map(c => c.command)).toEqual([
+      ...FAST_TRACK_GATE_COMMANDS,
+      'git rev-list --count "feature/pan-1".."feature/pan-1-slot-3"',
+      'git merge --no-ff "feature/pan-1-slot-3"',
+    ]);
   });
 
   it('does not merge when the typecheck gate fails and surfaces the failure', async () => {

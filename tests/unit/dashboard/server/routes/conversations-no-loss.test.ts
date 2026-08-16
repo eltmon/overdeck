@@ -4,13 +4,19 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { conversationsRouteLayer } from '../../../../../src/dashboard/server/routes/conversations.js';
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = join(__dirname, '..', '..', '..', '..', '..');
+const CONVERSATIONS_ROUTE_FILE = join(
+  WORKSPACE_ROOT,
+  'src',
+  'dashboard',
+  'server',
+  'routes',
+  'conversations.ts',
+);
 
 const CONVERSATION_ROUTE_SURFACE_FILES = [
-  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversations.ts'),
+  CONVERSATIONS_ROUTE_FILE,
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-archive.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-delivery.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-diffs.ts'),
@@ -28,6 +34,7 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'GET /api/conversations/:name/handoff-doc',
   'POST /api/conversations',
   'POST /api/conversations/:name/stop',
+  'POST /api/conversations/:name/clear-fork-state',
   'POST /api/conversations/:name/resume',
   'POST /api/conversations/:name/switch-model',
   'POST /api/conversations/:name/thinking-level',
@@ -75,11 +82,19 @@ function enumerateConversationRoutes(): Set<string> {
 }
 
 describe('PAN-2145 conversations route no-loss audit', () => {
-  it('keeps the legacy conversationsRouteLayer export available', () => {
-    expect(conversationsRouteLayer).toBeDefined();
+  it('does not import the conversations route graph during the Vitest worker lifecycle', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+
+    expect(source).not.toMatch(/from\s+['"][^'"]*routes\/conversations(?:\.js)?['"]/);
   });
 
-  it('keeps all 36 conversationsRouteLayer method/path registrations', () => {
+  it('keeps the legacy conversationsRouteLayer export available', () => {
+    const source = readFileSync(CONVERSATIONS_ROUTE_FILE, 'utf8');
+
+    expect(source).toMatch(/export\s+const\s+conversationsRouteLayer\s*=/);
+  });
+
+  it('keeps all 37 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -102,6 +117,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(36);
+    expect(liveRoutes.size).toBe(37);
   });
 });

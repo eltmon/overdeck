@@ -28,12 +28,17 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../dashboard/server/routes/jsonl-resolver.js', () => ({
+  resolveCodexRolloutPath: vi.fn(),
+}));
+
 import {
   generateSmartSummary as mockedGenerateSmartSummary,
   summarizeSerializedText as mockedSummarize,
 } from '../smart-compaction.js';
 import { getTranscriptAdapter } from '../transcript-adapter.js';
 import { kimiSessionsRoot } from '../../runtimes/kimi-code.js';
+import { resolveCodexRolloutPath } from '../../../dashboard/server/routes/jsonl-resolver.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;
@@ -67,6 +72,60 @@ function writeJsonl(name: string, lines: unknown[]): Promise<string> {
 }
 
 describe('ConversationTranscriptAdapter.compactSummary', () => {
+  it('registers Codex with its own source capabilities', () => {
+    const adapter = getTranscriptAdapter('codex');
+
+    expect(adapter.name).toBe('codex');
+    expect(adapter.supportsPlainForkAsSource).toBe(false);
+    expect(adapter.supportsSourceAuthoredHandoff).toBe(true);
+  });
+
+  it('serializes visible Codex rollout messages and tool calls', async () => {
+    const file = join(workDir, 'codex-rollout.jsonl');
+    await writeFile(file, [
+      JSON.stringify({ type: 'session_meta', payload: { id: 't1' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'hello codex' } }),
+      JSON.stringify({ type: 'response_item', payload: { type: 'reasoning', summary: [] } }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"ls"}' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'custom_tool_call', name: 'apply_patch', input: '*** Begin Patch' },
+      }),
+      JSON.stringify({ type: 'response_item', payload: { type: 'function_call_output', output: 'file.txt' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'done' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'token_count', info: { total_token_usage: { total_tokens: 10 } } },
+      }),
+      'garbage non-JSON line',
+    ].join('\n') + '\n', 'utf-8');
+
+    const serialized = await getTranscriptAdapter('codex').serializeTranscript(file);
+
+    expect(serialized).toContain('[user]\nhello codex');
+    expect(serialized).toContain('[tool_use: exec_command]');
+    const customToolCall = serialized.split('\n\n').find((part) => part.startsWith('[tool_use: apply_patch]'));
+    expect(customToolCall).toContain(JSON.stringify('*** Begin Patch'));
+    expect(serialized).toContain('[assistant]\ndone');
+    expect(serialized).not.toContain('file.txt');
+    expect(serialized).not.toContain('reasoning');
+    expect(serialized).not.toContain('token_count');
+    expect(serialized).not.toContain('garbage non-JSON line');
+  });
+
+  it('resolves a Codex rollout from the conversation tmux session', async () => {
+    const rolloutPath = join(workDir, 'rollout-test.jsonl');
+    vi.mocked(resolveCodexRolloutPath).mockResolvedValueOnce(rolloutPath);
+    const adapter = getTranscriptAdapter('codex');
+    const conv = { tmuxSession: 'conv-codex-source' } as Parameters<typeof adapter.resolveSessionFile>[0];
+
+    await expect(adapter.resolveSessionFile(conv)).resolves.toBe(rolloutPath);
+    expect(resolveCodexRolloutPath).toHaveBeenCalledWith('conv-codex-source');
+  });
+
   it('produces a non-empty summary from a Pi source transcript', async () => {
     // Pi records: top-level type:'message', role nested in message.role,
     // blocks of type text/thinking/toolCall.

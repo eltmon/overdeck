@@ -6,7 +6,7 @@ import { join, resolve } from 'path';
 import { homedir, tmpdir } from 'os';
 import { createHash, randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
-import { getOverdeckHome } from './paths.js';
+import { getCanonicalOverdeckHome, getOverdeckHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
@@ -242,18 +242,32 @@ function warnIfServerCmdlineIsDirtySync(): boolean {
  * HOME and drop into the onboarding/login screen.
  *
  * Detecting this and only warning (the old behaviour) left the poison in place.
- * Since `ensureOverdeckTmuxServer*` runs before every `new-session`, overwrite the
- * critical vars in the server's global environment with the clean child env so new
- * sessions are always spawned with the correct HOME/OVERDECK_HOME — even on a
- * dirtily-founded server — and strip known test pollution. Non-destructive: existing
- * sessions keep their captured env; only future sessions change.
+ * Since `ensureOverdeckTmuxServer*` runs before every `new-session`, always pin
+ * canonical HOME/OVERDECK_HOME on the shared socket. Isolated sockets instead get
+ * the caller's resolved values. Non-destructive: existing sessions keep their
+ * captured env; only future sessions change.
  */
-function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
+/** @internal Exported only for focused sanitizer tests. */
+export function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
   const sock = getManagedTmuxSocketName();
+  const canonicalOverdeckHome = getCanonicalOverdeckHome();
+  const sharedSocket = sock === DEFAULT_MANAGED_TMUX_SOCKET;
+  const callerOverdeckHome = getOverdeckHome();
+  const pinnedEnv = sharedSocket
+    ? { HOME: homedir(), OVERDECK_HOME: canonicalOverdeckHome }
+    : { HOME: cleanEnv.HOME ?? homedir(), OVERDECK_HOME: callerOverdeckHome };
+
+  if (sharedSocket && resolve(callerOverdeckHome) !== resolve(canonicalOverdeckHome)) {
+    console.warn(
+      `[tmux] WARNING (PAN-3671): refusing to pin non-canonical OVERDECK_HOME ` +
+        `'${callerOverdeckHome}' on shared socket '${sock}'. Set ` +
+        `OVERDECK_TMUX_SOCKET_NAME to isolate this Overdeck instance.`,
+    );
+  }
+
   // Pin the vars that, if wrong, break agent auth / overdeck-home resolution.
   for (const key of ['HOME', 'OVERDECK_HOME'] as const) {
-    const value = cleanEnv[key];
-    if (!value) continue;
+    const value = pinnedEnv[key];
     try {
       execFileSync('tmux', ['-L', sock, 'set-environment', '-g', key, value], { stdio: 'ignore' });
     } catch {

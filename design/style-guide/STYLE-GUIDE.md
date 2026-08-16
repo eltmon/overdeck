@@ -1,8 +1,8 @@
 # Overdeck Style Guide
 
-**Version:** 2.0
-**Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening) · v1.3 control-ring brand mark · PAN-3410 (v2.0 — Broadsheet theme, Ledger legacy)
-**Last Updated:** 2026-08-01
+**Version:** 2.1
+**Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening) · v1.3 control-ring brand mark · PAN-3410 (v2.0 — Broadsheet theme, Ledger legacy) · PAN-3706 (v2.1 — Broadsheet color, surface, elevation, radius, body-type, and texture tokens; §4a four-scope selector contract)
+**Last Updated:** 2026-08-14
 **Design Reference:** T3Code (`/home/eltmon/Projects/t3code/apps/web/src/index.css`)
 
 ---
@@ -47,7 +47,7 @@ Overdeck ships two complete, named design languages, selectable via the **Overde
 
 ### Theme Scope
 
-A single `data-theme="ledger"` or `data-theme="broadsheet"` attribute on `<html>` carries the theme. Every theme-varying token — font-family CSS variables and the display-scale utilities' custom properties — is defined per-scope: Ledger's values are declared on **both** `:root` (the document-level default, unscoped) **and** `[data-theme="ledger"]` explicitly, and `[data-theme="broadsheet"]` overrides them. Declaring Ledger's values a second time, on the attribute selector and not just `:root`, is what makes nesting work: a component that sets its own `data-theme` attribute on a container (e.g. a side-by-side theme specimen) re-declares — and so resets — every token underneath it at that DOM level, independently of the document root, regardless of which theme the ancestor document is in. This is how the Settings → Appearance picker renders both mini-specimens in their own fonts simultaneously, in either direction (Ledger nested in Broadsheet, or Broadsheet nested in Ledger). Relying on `:root` alone would only reset the tokens for the true document root, not for a nested scope — see `src/dashboard/frontend/src/index.css`'s `:root, [data-theme="ledger"] { ... }` and the `[data-theme="broadsheet"]` / `[data-theme="ledger"]` custom-property pairs for `.display-xl`/`.display-lg`/`.eyebrow`.
+A single `data-theme="ledger"` or `data-theme="broadsheet"` attribute on `<html>` carries the theme, alongside the independent `.dark` class that carries light/dark color-scheme (§12 — the two axes never interact). Every theme-varying token — font-family CSS variables, the display-scale utilities' custom properties, and (as of PAN-3706) the full color/surface/elevation/type/motion vocabulary in §4-§4a — is defined per-scope: Ledger's values are declared on **both** `:root`/`.dark` (the document-level default, unscoped) **and** `[data-theme="ledger"]`/its `.dark` combination explicitly, and the `[data-theme="broadsheet"]` forms override them. Declaring Ledger's values a second time, on the attribute selector and not just `:root`/`.dark`, is what makes nesting work: a component that sets its own `data-theme` attribute on a container (e.g. a side-by-side theme specimen) re-declares — and so resets — every token underneath it at that DOM level, independently of the document root, regardless of which theme the ancestor document is in. This is how the Settings → Appearance picker renders both mini-specimens in their own fonts and colors simultaneously, in either direction (Ledger nested in Broadsheet, or Broadsheet nested in Ledger). Relying on `:root`/`.dark` alone would only reset the tokens for the true document root, not for a nested scope. The exact four-scope mechanics — and why a token-level PAN-3706 change now needs four blocks instead of two — are spelled out in the new §4a "The Four-Scope Selector Contract" below; see `src/dashboard/frontend/src/index.css`'s `:root, [data-theme="ledger"] { ... }` for the font-token instance of the pattern and §4a's block for the color-token instance.
 
 ### Ledger-Safe Fallbacks
 
@@ -72,11 +72,13 @@ A surface written *only* against the three utilities in the table above (`.displ
 
 ### What Does NOT Change (both themes)
 
-Everything below is unchanged from v1 and applies identically under Ledger and Broadsheet, stated verbatim so agents don't over-rotate on a typography/texture/scale revision:
+PAN-3410 was scoped as a typography/texture/scale revision only, and left the entire color, surface, elevation, radius, body-text-size, and background-texture system on Ledger's values under Broadsheet too. PAN-3706 closed that gap: as of this revision, **the neutral ramp, surfaces, borders, elevation (shadows), radius, body type size, and the background wash/noise treatment are theme-scoped and differ between Ledger and Broadsheet.** The carve-out below is what's left unchanged — it is deliberately narrower than the old v1 statement, so don't assume the color system is off-limits the way it used to be.
 
-> Semantic tokens only; color restraint (one signal per row, amber/blue/emerald/red meanings); badge tint formula (radius may move `rounded-sm`→`rounded-md` for texture consistency — single deliberate change, called out in the diff); no hardcoded hex; no decorative color.
+Unchanged from v1, identically under both themes:
 
-This is a typography/texture/scale revision, not a color rebrand — the color system (§4), signal semantics, and the badge tint formula (8% background / 32% border) are identical in both themes.
+> Semantic tokens only (never hardcoded hex, never decorative color); color restraint (one colored signal per card/row; amber=human, blue=machine, emerald=outcome, red=broken, purple=specialist verb, cyan=money); the signal-color **semantics** table in §4 (`--destructive`/`--warning`/`--info`/`--success`/`--signal-review`/`--signal-cost`, what each always means and never means); the badge tint **formula** — 8% background / 32% border color-mix — is the same math in both themes, only the badge **radius** moves (`rounded-sm` Ledger → `rounded-md` Broadsheet, §6, still the one deliberate radius change to the *badge* component specifically, not to `--radius` overall — see §6).
+
+What changed, and is documented in the new §4a and the F-1..F-11 references throughout this guide: the neutral hue and lightness ramp (§4, F-1/F-2/F-3), the shadow/elevation scale (§5, F-4), the ambient background wash replacing the fractal-noise film (§10, F-5), body font-size/line-height/smoothing and the type-scale token vocabulary (§3, F-6), `--radius` itself — not just the badge (§6, F-7), `--primary-ink` and the four-tier text ramp (§4, F-8), the easing/duration motion vocabulary (§13, F-9), the split code/UI mono role (§3, F-10), and the four previously-unauthored §8 patterns — Chips, Soft Card, Large CTA + Keycap, Dot-Metadata Line (§8, F-11). Every one of these values differs by theme through the four-scope selector contract in §4a; none of them is a hardcoded literal in component code.
 
 ---
 
@@ -91,11 +93,12 @@ Each font-family CSS variable resolves differently per theme. Components referen
 | `--font-sans` | `font-body` | `"DM Sans", system-ui, sans-serif` | `"Geist Variable", system-ui, sans-serif` |
 | `--font-display` | `font-display` | `"Space Grotesk", system-ui, sans-serif` | `"Geist Variable", system-ui, sans-serif` |
 | `--font-mono` | `font-mono` | `"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace` | `"Geist Mono Variable", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace` |
+| `--font-mono-ui` (PAN-3706 F-10) | `font-mono-ui` | `"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace` (same as `--font-mono`) | `"SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace` |
 
 ### Why These Fonts
 
 - **Geist Variable** — Vercel's open-source (SIL OFL 1.1) variable grotesque, weights 100–900 in one file. Broadsheet's UI sans and display face: its wider weight range is what makes the 400–800 tier system (below) possible without a second family.
-- **Geist Mono Variable** — Geist's monospace companion, same OFL license, weights 100–900. Broadsheet's mono face: covers both technical identifiers and the new eyebrow-label pattern (§3 "Mono Rule").
+- **Geist Mono Variable** — Geist's monospace companion, same OFL license, weights 100–900. Broadsheet's `--font-mono` face: reserved for **code** (terminal output, log panes, fenced code blocks) plus the eyebrow-label pattern (§3 "Mono Rule"), which deliberately borrows the code face rather than the UI one. Chrome that happens to be monospaced but isn't the eyebrow pattern — plain labels, IDs, timestamps — instead uses the separate `--font-mono-ui` role (F-10, below), a tighter system UI-monospace stack that reads better at small sizes without code-face ligatures. Ledger never had this split: its `--font-mono` and `--font-mono-ui` resolve to the identical SF Mono stack, so nothing changes there.
 - **Space Grotesk** — geometric, technical, tight apertures. Under Ledger, reserved exclusively for the "Overdeck" sidebar wordmark (the single approved non–God-View display-font exception). Under Broadsheet, the wordmark uses the `font-display` token like everything else (Geist Variable) — Space Grotesk remains defined and self-hosted for Ledger only.
 - **DM Sans** — clean geometric sans with a distinctive single-story "g" (open tail). Variable weight gives fine typographic control. Ledger's universal default for all non–God-View UI text.
 - **SF Mono** — the standard for terminal and code rendering. Falls back gracefully across platforms. Remains the trailing fallback in the mono stack under both themes, and is Ledger's mono face outright.
@@ -154,14 +157,18 @@ All four families are self-hosted as variable `woff2` files under `src/dashboard
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-mono-ui: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 [data-theme="broadsheet"] {
   --font-sans: "Geist Variable", system-ui, sans-serif;
   --font-display: "Geist Variable", system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-mono-ui: "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 ```
+
+`--font-mono-ui` (PAN-3706 F-10) follows the same two-scope shape as its siblings, not the four-scope color-token contract in §4a — font tokens have never had a light/dark distinction in this file (no `--font-*` is redeclared inside `.dark`), so there's no dark-mode pair to restate.
 
 ```js
 // tailwind.config.js
@@ -171,6 +178,44 @@ fontFamily: {
   mono: ['var(--font-mono)', '"SF Mono"', '"SFMono-Regular"', 'Consolas', '"Liberation Mono"', 'monospace'],
 }
 ```
+
+### Body Typography (PAN-3706 F-6)
+
+`body`'s font-size, line-height, and font-smoothing are theme-scoped custom properties, consumed with an `inherit`/`auto` fallback so an unscoped context (SSR, a detached node, `data-theme` absent) degrades to the browser default rather than an invalid value:
+
+```css
+/* src/dashboard/frontend/src/index.css, @layer base body rule */
+body {
+  font-size: var(--body-font-size, inherit);
+  line-height: var(--body-line-height, inherit);
+  -webkit-font-smoothing: var(--body-font-smoothing, auto);
+  -moz-osx-font-smoothing: var(--body-font-smoothing-moz, auto);
+}
+```
+
+| Token | Ledger | Broadsheet |
+|---|---|---|
+| `--body-font-size` | `initial` (falls back to `inherit` → browser/Tailwind default, 16px) | `13px` |
+| `--body-line-height` | `initial` (falls back to `inherit`) | `1.6` |
+| `--body-font-smoothing` | `initial` (falls back to `auto`) | `antialiased` |
+| `--body-font-smoothing-moz` | `initial` (falls back to `auto`) | `grayscale` |
+
+Ledger explicitly sets its own tokens to `initial` rather than leaving them undeclared — see §4a for why an explicit `initial` restatement, not silence, is what makes this degrade correctly when nested inside a Broadsheet document.
+
+### Type Scale Token Vocabulary (PAN-3706 F-6)
+
+A font-size / line-height / letter-spacing token scale exists in both themes as a **vocabulary for future component adoption** — landing the tokens does not, by itself, rewire any existing component to consume them (the same "tokens now, adoption later" shape as the motion tokens in §13). Ledger's scope restates the identical values so a component that does start consuming these tokens renders the same under both themes today; Broadsheet is free to diverge later without a second migration.
+
+| Token | Value | Token | Value |
+|---|---|---|---|
+| `--type-size-11` | `0.6875rem` (11px) | `--type-leading-tight` | `1.3` |
+| `--type-size-13` | `0.8125rem` (13px) | `--type-leading-snug` | `1.45` |
+| `--type-size-14` | `0.875rem` (14px) | `--type-leading-normal` | `1.55` |
+| `--type-size-15` | `0.9375rem` (15px) | `--type-leading-relaxed` | `1.6` |
+| `--type-size-16` | `1rem` (16px) | `--type-tracking-tight` | `-0.012em` |
+| `--type-size-18` | `1.125rem` (18px) | `--type-tracking-normal` | `0em` |
+| `--type-size-20` | `1.25rem` (20px) | `--type-tracking-wide` | `0.01em` |
+| `--type-size-24` | `1.5rem` (24px) | | |
 
 ### Type Scale (both themes, UI text)
 
@@ -247,6 +292,8 @@ Broadsheet adds two display-tier utilities for page-level typography — a vocab
 
 **Broadsheet widens this by one sanctioned use: the eyebrow label (§8 "Eyebrow").** `font-mono` (resolving to Geist Mono Variable) is also used for uppercase category/kicker labels and quiet text-buttons (e.g. `CANCEL`). This is the one deliberate exception to "mono is identifiers-only," and it does not apply under Ledger — Ledger's `.eyebrow` fallback uses `font-body`, not mono (see the Ledger-Safe Fallbacks table in §2).
 
+**Rule 2a (Broadsheet only, PAN-3706 F-10): `font-mono-ui` is for monospaced chrome that is not code and not the eyebrow pattern.** Use the `font-mono-ui` Tailwind utility (`--font-mono-ui`, Broadsheet: `"SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace`) for run-of-the-mill monospaced UI text — a session ID chip, a timestamp column, a tabular numeral — where you want the tighter system UI-monospace metrics rather than Geist Mono's code-tuned ligatures and larger x-height. `font-mono` stays reserved for actual code and the eyebrow exception above. Ledger has no such distinction: `--font-mono-ui` resolves to the same SF Mono stack as `--font-mono` there, so a call site using either utility renders identically under Ledger.
+
 **Rule 3 (Ledger): `font-display` is ONLY for the sidebar "Overdeck" wordmark.** No other non–God-View Ledger surface uses `font-display` — this is what keeps Space Grotesk exclusive to the wordmark under Ledger (§3 "Why These Fonts"). **Under Broadsheet this exclusivity is relaxed by design:** `--font-display` resolves to the same Geist Variable family as `--font-sans`, so the wordmark (§9) and the two display-tier utilities (`.display-xl`, `.display-lg`, above) both use `font-display` — there is no separate "display font" to protect once Ledger's Space-Grotesk-vs-DM-Sans distinction no longer applies.
 
 **Rule 4 (both themes): God View has its own scoped typography system** (`src/dashboard/frontend/src/components/GodView/*`) and is the only deliberate exception to Rules 1–3.
@@ -277,7 +324,9 @@ These patterns have been eliminated from the codebase. Do not reintroduce them:
 
 ### Architecture
 
-Colors are defined as CSS custom properties on `:root` (light) and via `@variant dark` / `.dark` class (dark). Components reference these tokens via Tailwind utility classes. **No component may use hardcoded color values** like `bg-gray-800` or `text-white`. The color system is identical in both themes — this revision is typography/texture/scale only (§2).
+Colors are defined as CSS custom properties on `:root` (light) and via `@variant dark` / `.dark` class (dark). Components reference these tokens via Tailwind utility classes. **No component may use hardcoded color values** like `bg-gray-800` or `text-white`.
+
+**As of PAN-3706, the color system is theme-scoped — it is no longer identical between Ledger and Broadsheet.** `:root` and `.dark` below remain the unscoped document-level default (Ledger's own values, byte-for-byte unchanged from before PAN-3706) — read by anything that never sets `data-theme`. Broadsheet's actual values live in a second, later region of `index.css` (§4a below) that overrides `:root`/`.dark` via the four-scope selector contract. Signal-color **semantics** (what `--destructive`/`--warning`/`--info`/`--success`/`--signal-review`/`--signal-cost` mean) and the badge tint **formula** are unchanged in both themes (§2) — only the neutral/surface/border tokens and their derived text-tier tokens differ.
 
 ### Light Mode Tokens
 
@@ -451,6 +500,67 @@ NEVER: #22c55e, #ef4444, #f59e0b (hardcoded hex in components)
 USE:   text-success, text-destructive, text-warning (semantic tokens)
 ```
 
+### Broadsheet Color, Surface, and Text-Tier Values (PAN-3706 F-1/F-2/F-3/F-8)
+
+Ledger's neutrals are Tailwind's cool blue-gray scale (`--foreground: #1f2937`, `--background: #ffffff`/`#080b10`). Broadsheet replaces the neutral ramp with warm-hue (30–35) HSL values, steps `--background`/`--card`/`--popover` apart instead of collapsing them to one flat color, and makes `--border`/`--input` opaque instead of a near-invisible `color-mix()` overlay:
+
+| Token | Ledger light | Broadsheet light | Ledger dark | Broadsheet dark |
+|---|---|---|---|---|
+| `--background` | `#ffffff` | `hsl(0 0% 96.5%)` | `#080b10` | `hsl(0 0% 12.5%)` |
+| `--foreground` | `#1f2937` | `hsl(35 10% 14%)` | `#e5e7eb` | `hsl(30 8% 94%)` |
+| `--card` / `--popover` | `#ffffff` | `hsl(30 8% 94.5%)` | `#0c1018` | `hsl(0 0% 17%)` / `hsl(0 0% 18%)` |
+| `--secondary` / `--muted` | `black 4% color-mix` | `hsl(30 8% 94.5%)` | `white 6%`/`4% color-mix` | `hsl(0 0% 17.3%)` / `hsl(0 0% 15%)` |
+| `--muted-foreground` | `#6b7280` | `hsl(35 5% 42%)` | `#9ca3af` | `hsl(30 2% 66%)` |
+| `--border` / `--input` | `black 8%`/`10% color-mix` (near-invisible) | `hsl(30 4% 88.5%)` (opaque) | `white 6%`/`8% color-mix` | `hsl(0 0% 22.7%)` (opaque) |
+
+`--primary` itself is unchanged in this revision — both themes keep Overdeck's blue (`oklch(0.488 0.217 264)` light / `oklch(0.588 0.217 264)` dark). Adopting Subspace's lime accent is an explicitly deferred decision (PAN-3706 non-goals), not part of this token set.
+
+F-8 adds two things Ledger never had, both new tokens rather than retargeted existing ones:
+
+- **A four-tier text ramp** — `--foreground` > `--body-foreground` > `--muted-foreground` > `--faint-foreground`, each step lighter, approaching `--background`. Ledger gets the same four tokens, derived from its existing gray scale (e.g. light `--body-foreground: #4b5563` sits between `--foreground`'s gray-800 and `--muted-foreground`'s gray-500) so a shared component consuming the ramp resolves to an in-family value under either theme instead of an unset color.
+- **`--primary-ink`** — a darkened/lightened, text-safe variant of `--primary` (hue 264 unchanged, only lightness/chroma drop) for accent-colored text and borders that would be unreadable at `--primary`'s full chroma. Both themes get a `--primary-ink` (Ledger: `oklch(0.42 0.19 264)` light / `oklch(0.7 0.19 264)` dark) — it did not exist before PAN-3706 in either theme.
+
+`--wash` (F-5) is a new, Broadsheet-only standalone token for the ambient corner-gradient background — **not** a retargeting of `--accent`, which stays Overdeck's subtle hover-surface token in both themes (§4a explains why a new token was introduced rather than reusing `--accent`). See §10 for the wash/noise-suppression mechanism itself.
+
+---
+
+## 4a. The Four-Scope Selector Contract
+
+This is the mechanism that makes every PAN-3706 color, surface, and elevation token differ correctly by theme — it is now the load-bearing pattern for the whole theme system, not just the font tokens and display-scale utilities that introduced it in PAN-3410.
+
+### Why four scopes, not two
+
+Both the dark-mode class and the theme attribute live on `<html>` simultaneously: `useTheme.ts` toggles `.dark` on `document.documentElement`, and `useDesignLanguage.ts` sets `document.documentElement.dataset.theme` to `'ledger'` or `'broadsheet'` (default `'broadsheet'` when unset). A token that varies by *both* axes — which every PAN-3706 color token does — needs one block per combination of {theme} × {light/dark}, and each block needs both a same-element and a descendant form:
+
+```css
+[data-theme="ledger"]     { /* today's light value, restated verbatim */ }
+[data-theme="broadsheet"] { /* new light value */ }
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"]     { /* today's dark value, restated verbatim */ }
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] { /* new dark value */ }
+```
+
+- **Both `[data-theme="ledger"]` and `[data-theme="broadsheet"]` are needed**, not just the latter, because these are equal-specificity attribute selectors: whichever one appears **later in source order** wins the cascade for a given element, regardless of which theme is "the new one." Placing a bare `[data-theme="broadsheet"]` block after `.dark` without also restating `[data-theme="ledger"]` would let Broadsheet's declaration beat `.dark`'s declaration even while the document is Ledger-themed, because attribute selectors don't lose to class selectors on specificity alone — only source order decides between two selectors of equal specificity. Restating Ledger's value explicitly, in its own block placed in the same source-order neighborhood, is what keeps Ledger's declaration winning under Ledger.
+- **Both the same-element form (`.dark[data-theme="ledger"]`) and the descendant form (`.dark [data-theme="ledger"]`) are needed** because Settings → Appearance renders a *nested* `[data-theme]` scope for each theme-comparison specimen card (`AppearanceSection.tsx`) — a `[data-theme="ledger"]` div sitting inside the ambient `[data-theme="broadsheet"]` document, or vice versa. The same-element form matches `<html>` itself (theme attribute and `.dark` class on the same node); the descendant form matches the nested specimen card (theme attribute on a descendant of the `.dark` node). Without both forms, a nested specimen in dark mode would inherit the *ambient* document's theme values instead of its own, because a same-element-only selector never matches a descendant.
+
+### Placement rule
+
+All four-scope blocks for a given token MUST be placed **after** `:root` and `.dark` in `index.css` — the unscoped blocks stay first, as the untouched document-level default, and the four scoped blocks come after so equal-specificity attribute selectors win on source order rather than relying on specificity tricks. `index.css` marks the boundary with a banner comment (`PAN-3706 — Broadsheet completion: surface, shape, and type tokens`) immediately after the `.dark` block closes.
+
+### The custom-property technique — preferred over descendant-selector overrides
+
+For a *non-custom-property* rule (a `body` background, a utility class body, an `@font-face`-adjacent declaration), prefer gating it on a custom property with a `var()` fallback over writing `[data-theme="broadsheet"] .some-class { ... }` directly. Two existing examples in `index.css` establish this pattern:
+
+- **`--badge-radius`** — `[class*="badge-bg-"] { border-radius: var(--badge-radius, var(--radius-sm)); }`, with `--badge-radius: var(--radius-md)` set only under `[data-theme="broadsheet"]` and `--badge-radius: initial` under `[data-theme="ledger"]`.
+- **The display-scale utilities** (`.display-xl`/`.display-lg`/`.eyebrow`) — each property (`font-family`, `font-size`, `font-weight`, `letter-spacing`, `line-height`) is read via `var(--display-xl-size, <Ledger literal>)`, with the custom property itself set per-scope.
+
+The reason to prefer this over a bare descendant-selector override (`[data-theme="broadsheet"] .display-xl { font-size: ...; }`) is nesting: a descendant selector matches through **any** ancestor carrying that attribute, so a nested `[data-theme="ledger"]` specimen inside a `[data-theme="broadsheet"]` document would still match the outer document's descendant rule and inherit its value. A custom property instead cascades by DOM proximity — `[data-theme="ledger"]` on the nested node sets (or invalidates, via `initial`) the property at that exact scope, and the consuming rule's `var()` picks up whatever is nearest, regardless of nesting depth or direction. `--wash` (F-5) and the shadow scale (F-4) both follow this same shape: `[data-theme="ledger"] { --wash: initial; }` so `var(--wash)` at that scope resolves to nothing rather than leaking Broadsheet's gradient into a nested Ledger specimen.
+
+### Ledger's four-scope blocks restate, they never invent
+
+Every `[data-theme="ledger"]`/`.dark[data-theme="ledger"]` block introduced by PAN-3706 restates a value that already existed on the corresponding unscoped `:root`/`.dark` block, byte-for-byte — this is the no-loss invariant for the whole revision (see the guide's own no-loss-audit discipline). Where a token is genuinely new (`--body-foreground`, `--faint-foreground`, `--primary-ink`, `--wash`, the shadow/type/motion scales), Ledger's four-scope block still declares *something* — either a derived in-family value (e.g. `--body-foreground` from Ledger's own gray scale) or an explicit `initial` — rather than leaving the token silently undeclared under Ledger, which would resolve to an invalid/inherited value at any consuming call site.
+
 ---
 
 ## 5. Surfaces & Depth
@@ -479,16 +589,18 @@ Shadows are reserved for **floating elements only** — elements that overlap ot
 
 **Never use shadows on inline cards, panels, or layout sections.** These get their lift from tonal contrast with their parent surface.
 
-### Shadow Scale
+### Shadow Scale (PAN-3706 F-4)
+
+Prior to PAN-3706, `index.css` defined **zero** shadow custom properties, so every `shadow-sm`/`md`/`lg`/`xl` call site resolved to Tailwind's stock scale — values tuned for a white page that are close to invisible against a dark surface. PAN-3706 adds a role-named, seven-token, dark-mode-aware shadow scale, wired into `tailwind.config.js`'s `boxShadow` extension as `var(--shadow-*, <stock-or-new literal fallback>)`:
 
 ```css
-shadow-xs/5    — buttons, inputs (barely visible)
-shadow-sm/5    — floating badges, small popovers
-shadow-md/5    — tooltips, small menus
-shadow-lg/5    — dialogs, large menus, sheets
+--shadow-sm / --shadow-md / --shadow-lg / --shadow-xl   /* override Tailwind's stock keys */
+--shadow-card     /* subtle 1px card lift — one call site today, SimpleQuestionCard.tsx */
+--shadow-floating /* dropdowns, small popovers */
+--shadow-overlay  /* dialogs, large menus, sheets */
 ```
 
-The `/5` suffix means 5% opacity — shadows should be subtle.
+Both themes redefine all seven for dark mode at roughly 3–4× the light-mode alpha, so a shadow still reads against a dark card instead of disappearing into it — the same "redefine, don't just darken the background" idiom Subspace uses. `[data-theme="ledger"]`'s four scopes restate Tailwind v3's literal stock `sm`/`md`/`lg`/`xl` values verbatim (so those four keep rendering byte-identical to pre-PAN-3706 under Ledger); `--shadow-card`/`floating`/`overlay` get the same numeric values under both themes since neither theme had a prior rendered value to preserve. The identical stock `sm`/`md`/`lg`/`xl` values are also declared once more, unscoped, on `:root` — a CSS-only fallback so the ~120 existing `shadow-*` call sites don't break if `data-theme` is ever absent (SSR, a detached node, a failed hook) before `useDesignLanguage.ts`'s JS side effect has run.
 
 ### Inner Shadows (Cards)
 
@@ -508,35 +620,43 @@ This is applied via a `::before` pseudo-element.
 
 ## 6. Border Radius Scale
 
-Based on T3Code's 10px base radius with computed scale:
+Based on T3Code's 10px base radius, with the rest of the scale computed from it:
 
 ```css
---radius: 0.625rem;  /* 10px */
---radius-sm:  calc(var(--radius) - 4px);   /*  6px */
---radius-md:  calc(var(--radius) - 2px);   /*  8px */
---radius-lg:  var(--radius);               /* 10px */
---radius-xl:  calc(var(--radius) + 4px);   /* 14px */
---radius-2xl: calc(var(--radius) + 8px);   /* 18px */
---radius-3xl: calc(var(--radius) + 12px);  /* 22px */
---radius-4xl: calc(var(--radius) + 16px);  /* 26px */
+--radius: 0.625rem;  /* 10px, Ledger — see the per-theme table below */
+--radius-sm:  calc(var(--radius) - 4px);   /*  6px at Ledger's --radius */
+--radius-md:  calc(var(--radius) - 2px);   /*  8px at Ledger's --radius */
+--radius-lg:  var(--radius);               /* 10px at Ledger's --radius */
+--radius-xl:  calc(var(--radius) + 4px);   /* 14px at Ledger's --radius */
+--radius-2xl: calc(var(--radius) + 8px);   /* 18px at Ledger's --radius */
+--radius-3xl: calc(var(--radius) + 12px);  /* 22px at Ledger's --radius */
+--radius-4xl: calc(var(--radius) + 16px);  /* 26px at Ledger's --radius */
 ```
 
-The radius scale itself is identical in both themes — no new `--radius-*` variable is added by this revision.
+**As of PAN-3706 (F-7), `--radius` itself is theme-scoped and no longer identical between themes:**
+
+| | Ledger | Broadsheet |
+|---|---|---|
+| `--radius` | `0.625rem` (10px) | `0.375rem` (6px) |
+
+`--radius-sm` and `--radius-md` are declared once, in `:root`, as the `calc(var(--radius) - 4px)` / `calc(var(--radius) - 2px)` chain above — they are **not** redeclared inside the four-scope `--radius` blocks in §4a. A custom property holding a `var()` reference resolves lazily against whatever `--radius` is cascaded on that same element, so `--radius-sm`/`--radius-md` — and every Tailwind `rounded-*` utility built from them via `tailwind.config.js`'s `borderRadius` extension — follow `--radius`'s theme automatically. The badge-radius token (`--badge-radius: var(--radius-md)`, below) follows the same way: it now resolves to a proportionally smaller badge corner under Broadsheet without any change to the badge-radius block itself.
 
 ### Component Mapping
 
-| Component | Radius | Tailwind | Ledger | Broadsheet |
-|-----------|--------|----------|--------|------------|
-| Badges, small pills | 6–8px | `rounded-sm` / `rounded-md` | `rounded-sm` | `rounded-md` (§4, D-11 — the one deliberate radius change) |
-| Inline code blocks | 8px | `rounded-md` | same | same |
-| Buttons, inputs, selects, toggles | 10px | `rounded-lg` | same | same |
-| Large interactive elements | 14px | `rounded-xl` | same | same |
-| Cards, dialogs, panels | 18px | `rounded-2xl` | same | same |
-| Hero sections, God View cards | 22px | `rounded-3xl` | same | same |
-| Full-page overlays | 26px | `rounded-4xl` | same | same |
-| Circular elements (avatars, dots) | 50% | `rounded-full` | same | same |
+The Tailwind utility a component reaches for never changes by theme — only the pixel value that utility computes to, because `--radius` itself is now theme-scoped (F-7, above). The "Radius" column below is Ledger's computed value; Broadsheet's is smaller across the board since it computes off a 6px base instead of 10px.
 
-The badge radius is the **only** radius change in this revision (§2 "What Does NOT Change"). Broadsheet's slightly larger radius reads consistently against its softer, larger-radius vocabulary (soft cards, chips); Ledger keeps `rounded-sm` byte-for-byte.
+| Component | Tailwind | Ledger computed | Broadsheet computed |
+|-----------|----------|------------------|----------------------|
+| Badges, small pills | `rounded-sm` (Ledger) / `rounded-md` (Broadsheet) | 6px | 4px (§4, D-11 — the one deliberate *tier* change, on top of the smaller base) |
+| Inline code blocks | `rounded-md` | 8px | 4px |
+| Buttons, inputs, selects, toggles | `rounded-lg` | 10px | 6px |
+| Large interactive elements | `rounded-xl` | 14px | 10px |
+| Cards, dialogs, panels | `rounded-2xl` | 18px | 14px |
+| Hero sections, God View cards | `rounded-3xl` | 22px | 18px |
+| Full-page overlays | `rounded-4xl` | 26px | 22px |
+| Circular elements (avatars, dots) | `rounded-full` | 50% | 50% (unaffected by `--radius`) |
+
+Before PAN-3706, the badge `rounded-sm` → `rounded-md` bump was the *only* radius change in the whole theme revision — `--radius` itself was untouched. **That is no longer true.** PAN-3706 (F-7) drops Broadsheet's base `--radius` to `0.375rem`, which cascades through the whole computed scale above (badges, buttons, cards, dialogs, hero sections — everything in the Component Mapping table) via the `calc()` chain, not just the badge. The badge's `rounded-sm`→`rounded-md` swap is still a real, separate, deliberate change layered on top of the smaller base radius — Broadsheet badges get both a smaller `--radius` *and* the one-step-larger `--radius-md` instead of `--radius-sm` — but it is no longer the only radius delta between the two themes. Ledger keeps every radius value byte-for-byte identical to before PAN-3706.
 
 ---
 
@@ -969,7 +1089,7 @@ Mobile:
 
 ## 10. Fractal Noise Texture
 
-The signature visual detail. A barely-visible noise pattern overlaid on the entire viewport gives the UI a tactile, printed quality.
+Ledger's signature visual detail: a barely-visible noise pattern overlaid on the entire viewport, giving the UI a tactile, printed quality. **As of PAN-3706 (F-5), this is Ledger-only** — Broadsheet replaces it with an ambient corner-gradient wash instead (see below); the two themes now use opposite background treatments rather than sharing the noise film.
 
 ```css
 body::after {
@@ -989,6 +1109,23 @@ body::after {
 - **pointer-events: none** — doesn't interfere with interactions
 - **No external asset** — the SVG is inlined as a data URI
 - **256px tile** — small enough to not create visible patterns, stitched seamlessly
+- **Broadsheet suppresses this entirely** — `[data-theme="broadsheet"] body::after { content: none; }` fully de-generates the pseudo-element (rather than merely hiding it) in favor of the ambient wash below. Ledger's `body::after` rule itself is not edited, so Ledger's noise stays byte-for-byte untouched.
+
+### Ambient Corner Wash (Broadsheet only, PAN-3706 F-5)
+
+Subspace paints a soft radial light in the top-left corner instead of a noise film — Broadsheet ports that treatment:
+
+```css
+[data-theme="broadsheet"] body {
+  background:
+    radial-gradient(130% 190% at 0% 0%, var(--wash) 0%, transparent 55%),
+    var(--background);
+}
+```
+
+`--wash` is a standalone token (§4), not a retargeted `--accent` — Overdeck's `--accent` is the subtle hover-surface token and must keep that meaning in both themes, and Subspace's own `hsl(var(--accent) / .55)` trick doesn't translate anyway since Overdeck's color tokens are hex/oklch literals rather than bare H-S-L triplets that `var()` could partially substitute into. `--wash` uses `color-mix()` for its alpha, the same idiom `--secondary`/`--accent` already use. Ledger has no wash concept — its four-scope blocks set `--wash: initial`, so a nested Ledger specimen inside a Broadsheet document renders no gradient rather than inheriting the ambient one.
+
+Because the dashboard shell renders a single opaque `bg-background` div as `#root`'s only child, `body`'s background is otherwise invisible — Broadsheet also clears that shell's `background-color` (targeting "the lone direct child of `#root`" structurally, not by class name, so the rule survives a future className change) so the wash actually reaches the screen.
 
 ---
 
@@ -1089,6 +1226,27 @@ The double `requestAnimationFrame` ensures the browser has painted with the new 
 ---
 
 ## 13. Animation & Motion
+
+### Motion Token Vocabulary (PAN-3706 F-9)
+
+Prior to PAN-3706 there were no easing or duration custom properties — every animation in `index.css` and `tailwind.config.js` hardcoded its own timing keyword or number. PAN-3706 lands an easing/duration token vocabulary, theme-scoped through the same four-scope contract as every other PAN-3706 token, but **as tokens only** — landing them does not itself rewire any existing `@keyframes` or `animation` shorthand to consume them; that is deliberately left for a follow-on adoption task (the same "vocabulary now, adoption later" shape as the type-scale tokens in §3).
+
+| Token | Ledger | Broadsheet |
+|---|---|---|
+| `--ease-out` | `ease-out` | `cubic-bezier(.16, 1, .3, 1)` |
+| `--ease-notion` | `ease-out` | `cubic-bezier(.16, 1, .3, 1)` |
+| `--ease-in-out` | `ease-in-out` | `cubic-bezier(.65, 0, .35, 1)` |
+| `--ease-spring` | `ease-out` (no spring/overshoot curve in use today) | `cubic-bezier(.34, 1.56, .64, 1)` |
+| `--duration-instant` | `80ms` | `50ms` |
+| `--duration-fast` | `120ms` | `.1s` |
+| `--duration-normal` | `200ms` | `.15s` |
+| `--duration-slow` | `300ms` | `.2s` |
+| `--duration-enter` | `200ms` | `.2s` |
+| `--duration-exit` | `200ms` | `.15s` |
+
+Ledger's values restate timing already hardcoded in the file today (e.g. `--duration-instant: 80ms` matches the existing context-menu-out exit; `--duration-normal: 200ms` matches `.anim-error-shake` and `tailwind.config.js`'s `slide-in-right`/`slide-out-right`) rather than inventing new numbers — so, per the no-loss invariant, nothing about Ledger's actual rendered motion changes. Motion doesn't vary between light and dark mode, so each theme's `.dark`-prefixed scope restates its own light-scope values verbatim.
+
+The PAN-3706 audit (F-9) separately flagged that Overdeck runs continuous ambient motion — pulsing "alive" dots, badge shimmer, a stuck-shake animation — that reads fidgety next to Subspace's settled surfaces. Landing the token vocabulary does not address that; auditing which ambient animations earn their motion remains follow-through work, not part of this token change.
 
 ### Standard Timing
 
@@ -1301,21 +1459,25 @@ For developers implementing components, this is the TL;DR:
 
 ```
 SURFACES:      bg-background → bg-card → bg-accent (darker to lighter)
-TEXT:          text-foreground / text-muted-foreground / text-card-foreground
+TEXT:          text-foreground / text-body-foreground / text-muted-foreground / text-faint-foreground (F-8 four-tier ramp)
 BORDERS:       border-border (always — never hardcode gray)
-PRIMARY:       bg-primary / text-primary (blue)
-SIGNALS:       success/warning/destructive/info + signal-review/signal-cost
-BADGE BG:      badge-bg-{signal} (8% color-mix) + badge-border-{signal} (32%)
+PRIMARY:       bg-primary / text-primary (blue, unchanged both themes) / text-primary-ink (text-safe accent, F-8)
+SIGNALS:       success/warning/destructive/info + signal-review/signal-cost — semantics identical both themes
+BADGE BG:      badge-bg-{signal} (8% color-mix) + badge-border-{signal} (32%) — formula identical both themes
 CARDS:         rounded-2xl border border-border bg-card p-6
 BUTTONS:       rounded-lg h-9 px-3 text-sm font-medium
-DIALOGS:       rounded-2xl bg-popover shadow-lg/5 centered on viewport
-RADIUS:        sm=6 md=8 lg=10 xl=14 2xl=18 3xl=22 4xl=26
+DIALOGS:       rounded-2xl bg-popover shadow-lg centered on viewport
+RADIUS:        --radius = 10px (Ledger) / 6px (Broadsheet) — scale is sm=r-4 md=r-2 lg=r xl=r+4 2xl=r+8 3xl=r+12 4xl=r+16, computed off --radius so it now differs per theme (§6, F-7)
+SHADOWS:       shadow-sm/md/lg/xl (override Tailwind stock) + shadow-card/floating/overlay, theme- and dark-mode-scoped (§5, F-4) — no longer the invisible stock Tailwind shadows
 THEME:         ui.theme = ledger | broadsheet (default), data-theme attribute, Settings → Appearance
-FONT BODY:     font-body → DM Sans (Ledger) / Geist Variable (Broadsheet)
+FONT BODY:     font-body → DM Sans (Ledger) / Geist Variable (Broadsheet), 13px/1.6 antialiased under Broadsheet (F-6)
 FONT DISPLAY:  font-display → Space Grotesk (Ledger, wordmark ONLY) / Geist Variable (Broadsheet)
-FONT CODE:     font-mono → SF Mono (Ledger) / Geist Mono Variable (Broadsheet) — identifiers + eyebrows (Broadsheet only)
+FONT CODE:     font-mono → SF Mono (Ledger) / Geist Mono Variable (Broadsheet) — code + eyebrows only
+FONT UI-MONO:  font-mono-ui → SF Mono both themes (Ledger) / tighter system ui-monospace stack (Broadsheet) — chrome that isn't code or eyebrows (F-10)
 DISPLAY SCALE: display-xl / display-lg (Broadsheet only; Ledger-safe fallback = text-xl|text-lg font-medium)
-NOISE:         body::after with feTurbulence at 3.5% opacity
+BROADSHEET-ONLY: .chip / .soft-card / .keycap / .dot-metadata (F-11) — no Ledger fallback, authoring discipline only
+BACKGROUND:    Ledger = fractal-noise film (body::after, 3.5% opacity); Broadsheet = ambient corner wash via --wash, noise suppressed (F-5)
+MOTION:        --ease-* / --duration-* token vocabulary exists (F-9); not yet wired into existing keyframes/animations
 SCROLLBAR:     6px wide, transparent track, 10-15% opacity thumb
 TRANSITIONS:   200ms ease-in-out (default)
 

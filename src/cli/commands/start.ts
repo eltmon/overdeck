@@ -23,6 +23,7 @@ import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-uti
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { getIssueWorkspacePath, readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
@@ -818,6 +819,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // only recovery door for a frozen agent is closed to the one role that runs
   // unattended.
   const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  const swarmWorkspace = getIssueWorkspacePath(id);
+  const swarmActive = !!swarmWorkspace
+    && readIssueRecordForWorkspaceSync(swarmWorkspace, id)?.swarm?.policy?.mode === 'always';
   if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
     console.log('');
@@ -826,7 +830,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exitCode = 0;
     return;
   }
-  const conflict = describeConflictingWorkAgents(id, agentId);
+  const conflict = describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
   if (conflict) {
     process.stderr.write(chalk.red(conflict));
     return exitCli(1);
@@ -954,7 +958,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         console.error(chalk.red(fresh.error));
         return exitCli(1);
       }
-    } else {
+    } else if (!swarmActive) {
       try {
         assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
       } catch (error) {
@@ -1201,6 +1205,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
         autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
         effort: resolvedEffort,
+        foreman: readIssueRecordForWorkspaceSync(workspace, id)?.swarm?.policy?.mode === 'always' || undefined,
       })),
     );
     if (!admitted.check.decision.eligible || !admitted.result) {

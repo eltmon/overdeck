@@ -3531,6 +3531,83 @@
   font-size: 12px;
 }
 
+.transcriptSkeleton {
+  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 16px;
+}
+
+.transcriptSkeletonAssistant {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.transcriptSkeletonUser {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.transcriptSkeletonAvatar,
+.transcriptSkeletonLine,
+.transcriptSkeletonLineMedium,
+.transcriptSkeletonLineShort,
+.transcriptSkeletonBubble,
+.transcriptSkeletonBubbleShort {
+  display: block;
+  background: linear-gradient(90deg, var(--muted) 25%, var(--accent) 50%, var(--muted) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.transcriptSkeletonAvatar {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.transcriptSkeletonLines {
+  width: min(72%, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.transcriptSkeletonLine,
+.transcriptSkeletonLineMedium,
+.transcriptSkeletonLineShort {
+  height: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.transcriptSkeletonLine { width: 100%; }
+.transcriptSkeletonLineMedium { width: 82%; }
+.transcriptSkeletonLineShort { width: 58%; }
+
+.transcriptSkeletonBubble,
+.transcriptSkeletonBubbleShort {
+  height: 42px;
+  border-radius: var(--radius-xl);
+}
+
+.transcriptSkeletonBubble { width: min(56%, 400px); }
+.transcriptSkeletonBubbleShort { width: min(38%, 280px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .transcriptSkeletonAvatar,
+  .transcriptSkeletonLine,
+  .transcriptSkeletonLineMedium,
+  .transcriptSkeletonLineShort,
+  .transcriptSkeletonBubble,
+  .transcriptSkeletonBubbleShort {
+    animation: none;
+  }
+}
+
 /* ─── MessagesTimeline ──────────────────────────────────────────────────────── */
 
 .messagesTimeline {
@@ -5231,6 +5308,23 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  cursor: help;
+}
+
+/* PAN-3736: the same handoff-fallback reason, once the conversation has proven
+   it is alive. Red is reserved for live failures, so a historical seed note is
+   muted — same chip geometry as .conversationBranchChip. */
+.conversationForkFallbackNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
   cursor: help;
 }
 

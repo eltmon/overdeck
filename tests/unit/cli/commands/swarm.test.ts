@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand, isSlotWorkspaceDirectoryName, listSlotWorkspaceDirectoriesSync } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -73,6 +73,7 @@ function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
       '[swarm] considered PAN-2203: swarm eligible',
       '[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203',
     ]),
+    ensureSwarmForeman: vi.fn(async issueId => [`[swarm] spawned foreman agent-${issueId.toLowerCase()} for ${issueId}`]),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
     getFailedMergeBlocks: vi.fn(() => []),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
@@ -83,6 +84,9 @@ function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
       source: { mode: 'global', maxSlots: 'default', autoAdvance: 'default' },
     })),
     writeSwarmPolicyMode: vi.fn(async () => undefined),
+    readSwarmHold: vi.fn(() => undefined),
+    readSwarmInterventionCount: vi.fn(() => 0),
+    writeSwarmIntervention: vi.fn(async () => 1),
     console: {
       log: vi.fn(),
       error: vi.fn(),
@@ -108,7 +112,7 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(false);
     expect(deps.ensureWorkspace).not.toHaveBeenCalled();
-    expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
+    expect(deps.ensureSwarmForeman).not.toHaveBeenCalled();
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('PAN-2203 is not swarm eligible'));
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('missing files_scope'));
   });
@@ -129,7 +133,7 @@ describe('pan swarm command', () => {
     const result = await swarmCommand('PAN-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
+    expect(deps.ensureSwarmForeman).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203', { startedBy: 'cli:swarm' });
     expect(deps.console.error).not.toHaveBeenCalledWith(expect.stringContaining('not swarm eligible'));
   });
 
@@ -153,9 +157,12 @@ describe('pan swarm command', () => {
     // The opt-in must be durable BEFORE dispatch so a crash mid-coordination
     // cannot leave an orphaned swarm that patrols skip.
     const writeOrder = vi.mocked(deps.writeSwarmPolicyMode).mock.invocationCallOrder[0];
-    const coordinateOrder = vi.mocked(deps.coordinateSwarmSlots).mock.invocationCallOrder[0];
-    expect(writeOrder).toBeLessThan(coordinateOrder);
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('swarm.policy.mode=always'));
+    const foremanOrder = vi.mocked(deps.ensureSwarmForeman).mock.invocationCallOrder[0];
+    expect(writeOrder).toBeLessThan(foremanOrder);
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('swarm.policy.mode=always');
+    expect(output).toContain('prevent automatic foreman lifecycle management');
+    expect(output).not.toContain('stop the Deacon from coordinating this swarm');
   });
 
   it('does not touch the issue-level swarm policy when the effective mode already coordinates (PAN-3459)', async () => {
@@ -171,7 +178,7 @@ describe('pan swarm command', () => {
     expect(deps.writeSwarmPolicyMode).not.toHaveBeenCalled();
   });
 
-  it('ensures the workspace and dispatches through coordinateSwarmSlots with real reconcile (PAN-2214)', async () => {
+  it('ensures the workspace and starts the foreman without dispatching slots', async () => {
     const doc = makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
       makeEligibleItem('wi-2', 'src/b.ts'),
@@ -182,8 +189,9 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.ensureWorkspace).toHaveBeenCalledWith('PAN-2203', { projectName: 'overdeck', projectPath: '/repo' });
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('dispatched implementation slot 1'));
+    expect(deps.ensureSwarmForeman).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203', { startedBy: 'cli:swarm' });
+    expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('spawned foreman'));
   });
 
   it('prints the operator-hold skip and names pan swarm resume when the issue is held', async () => {
@@ -193,15 +201,14 @@ describe('pan swarm command', () => {
     ]);
     const deps = {
       ...makeDeps(doc),
-      coordinateSwarmSlots: vi.fn(async () => ['[swarm] skipped PAN-2203: deacon-ignored — operator hold']),
+      readSwarmHold: vi.fn(() => ({ reason: 'operator hold', setBy: 'test', at: '2026-08-13T00:00:00Z' })),
     };
 
     const result = await swarmCommand('PAN-2203', deps);
 
-    expect(result.ok).toBe(true);
-    expect(deps.console.log).toHaveBeenCalledWith('[swarm] skipped PAN-2203: deacon-ignored — operator hold');
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
-    expect(deps.console.log).not.toHaveBeenCalledWith(expect.stringContaining('continue in Deacon'));
+    expect(result.ok).toBe(false);
+    expect(deps.ensureSwarmForeman).not.toHaveBeenCalled();
+    expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
   });
 
   it('re-running pan swarm is idempotent: already-dispatched work is reconciled, not re-spawned', async () => {
@@ -267,13 +274,14 @@ describe('pan swarm command', () => {
         ...makeDeps(doc),
         ensureWorkspace: vi.fn(async () => workspacePath),
         coordinateSwarmSlots: vi.fn((opts) => coordinateSwarmSlots(opts, inner)),
+        ensureSwarmForeman: vi.fn(async () => []),
       };
 
       const result = await swarmCommand('PAN-2203', deps);
 
       expect(result.ok).toBe(true);
       expect(spawnRun).not.toHaveBeenCalled();
-      expect(result.actions).toContain('[swarm] considered PAN-2203: swarm eligible');
+      expect(deps.ensureSwarmForeman).toHaveBeenCalledTimes(1);
       expect(result.actions.some(action => action.includes('dispatched'))).toBe(false);
     } finally {
       rmSync(projectPath, { recursive: true, force: true });
@@ -312,7 +320,7 @@ describe('pan swarm command', () => {
     const result = await swarmRecoverCommand('PAN-2203', '3', { action: 'retry' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
     expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
   });
 
@@ -392,72 +400,85 @@ describe('pan swarm command', () => {
 });
 
 describe('pan swarm freeze / resume (PAN-2214)', () => {
-  function makeHoldDeps(status: { deaconIgnored?: boolean } | null): SwarmHoldCommandDeps {
+  function makeHoldDeps(hold: { reason: string; setBy: string; at: string } | undefined): SwarmHoldCommandDeps {
     return {
-      getReviewStatusSync: vi.fn(() => status as ReturnType<SwarmHoldCommandDeps['getReviewStatusSync']>),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       console: { log: vi.fn(), error: vi.fn() },
     };
   }
 
-  it('freeze persists deaconIgnored with the default reason and explains the hold', async () => {
-    const deps = makeHoldDeps(null);
+  it('freeze persists the hold and explains foreman and Deacon responsibilities', async () => {
+    const deps = makeHoldDeps(undefined);
 
     const result = await swarmFreezeCommand('pan-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm freeze via pan swarm freeze');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'swarm freeze via pan swarm freeze', setBy: 'pan swarm freeze', at: '2026-08-13T12:00:00.000Z',
+    });
     expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2203',
       kind: 'pause',
       source: 'pan swarm freeze',
     });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('skip all swarm coordination for PAN-2203'));
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('prevents the PAN-2203 foreman from running gated dispatch, merge, or recovery actions');
+    expect(output).toContain('Deacon patrols preserve the hold while continuing janitor, liveness, and event-delivery backstops');
+    expect(output).toContain('pan swarm resume PAN-2203');
+    expect(output).not.toContain('Deacon will now skip all swarm coordination');
   });
 
   it('freeze records a custom --reason', async () => {
-    const deps = makeHoldDeps(null);
+    const deps = makeHoldDeps(undefined);
 
     await swarmFreezeCommand('PAN-2203', { reason: 'investigating slot churn' }, deps);
 
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'investigating slot churn');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'investigating slot churn', setBy: 'pan swarm freeze', at: '2026-08-13T12:00:00.000Z',
+    });
   });
 
   it('freezing an already-frozen issue is an idempotent no-op with an already notice', async () => {
-    const deps = makeHoldDeps({ deaconIgnored: true });
+    const deps = makeHoldDeps({ reason: 'existing', setBy: 'test', at: 'now' });
 
     const result = await swarmFreezeCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.writeSwarmHold).not.toHaveBeenCalled();
     expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already frozen'));
   });
 
-  it('resume clears deaconIgnored and points at the next patrol cycle', async () => {
-    const deps = makeHoldDeps({ deaconIgnored: true });
+  it('resume clears the hold and explains foreman and Deacon responsibilities', async () => {
+    const deps = makeHoldDeps({ reason: 'existing', setBy: 'test', at: 'now' });
 
     const result = await swarmResumeCommand('pan-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', false);
+    expect(deps.clearSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
     expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2203',
       kind: 'unpause',
       source: 'pan swarm resume',
     });
-    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('next patrol'));
+    const output = vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('Its foreman may resume gated dispatch, merge, and recovery actions');
+    expect(output).toContain('Deacon patrols continue to provide janitor, liveness, and event-delivery backstops');
+    expect(output).not.toContain('Deacon will pick this issue back up');
   });
 
   it('resuming an unfrozen issue is an idempotent no-op with an already-resumed notice', async () => {
-    const deps = makeHoldDeps(null);
+    const deps = makeHoldDeps(undefined);
 
     const result = await swarmResumeCommand('PAN-2203', deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.clearSwarmHold).not.toHaveBeenCalled();
     expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already resumed'));
   });
@@ -465,14 +486,17 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
 
 describe('pan swarm stop (PAN-2214)', () => {
   function makeStopDeps(options: {
-    status?: { deaconIgnored?: boolean } | null;
+    hold?: { reason: string; setBy: string; at: string };
     sessionNames?: string[];
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
   } = {}): SwarmStopCommandDeps & { runGitCommand: ReturnType<typeof vi.fn> } {
     return {
-      getReviewStatusSync: vi.fn(() => (options.status ?? null) as ReturnType<SwarmStopCommandDeps['getReviewStatusSync']>),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => options.hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as ReturnType<SwarmStopCommandDeps['listSlotAgents']>),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       stopAgentSync: vi.fn(),
@@ -490,14 +514,16 @@ describe('pan swarm stop (PAN-2214)', () => {
     const result = await swarmStopCommand('pan-2203', { reason: 'runaway dispatch' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'runaway dispatch');
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', {
+      reason: 'runaway dispatch', setBy: 'pan swarm stop', at: '2026-08-13T12:00:00.000Z',
+    });
     const stopTargets = vi.mocked(deps.stopAgentSync).mock.calls.map(([agentId]) => agentId);
     expect(stopTargets).toEqual([
       'agent-pan-2203-slot-1',
       'agent-pan-2203-slot-2',
       'agent-pan-2203-slot-3',
     ]);
-    const holdOrder = vi.mocked(deps.setDeaconIgnored).mock.invocationCallOrder[0];
+    const holdOrder = vi.mocked(deps.writeSwarmHold).mock.invocationCallOrder[0];
     for (const stopOrder of vi.mocked(deps.stopAgentSync).mock.invocationCallOrder) {
       expect(holdOrder).toBeLessThan(stopOrder);
     }
@@ -511,7 +537,7 @@ describe('pan swarm stop (PAN-2214)', () => {
     const result = await swarmStopCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm stop via pan swarm stop');
+    expect(deps.writeSwarmHold).toHaveBeenCalled();
     expect(deps.stopAgentSync).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('nothing to stop'));
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
@@ -519,14 +545,14 @@ describe('pan swarm stop (PAN-2214)', () => {
 
   it('keeps an existing freeze in place instead of re-setting it', async () => {
     const deps = makeStopDeps({
-      status: { deaconIgnored: true },
+      hold: { reason: 'existing', setBy: 'test', at: 'now' },
       sessionNames: ['agent-pan-2203-slot-1'],
     });
 
     const result = await swarmStopCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.writeSwarmHold).not.toHaveBeenCalled();
     expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
   });
 
@@ -566,6 +592,7 @@ describe('pan swarm status (PAN-2214)', () => {
     getFailedMergeBlocks?: () => Array<Record<string, unknown>>;
     sessionNames?: string[];
     liveSlotCount?: number;
+    statusOverrides?: Record<string, string>;
   } = {}): SwarmStatusCommandDeps {
     const doc = options.doc ?? makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
@@ -592,6 +619,9 @@ describe('pan swarm status (PAN-2214)', () => {
       classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
       getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
       getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
+      readSwarmHold: vi.fn(() => undefined),
+      readSwarmInterventions: vi.fn(() => ({})),
+      readStatusOverrides: vi.fn(() => options.statusOverrides),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
         maxWorkAgents: 4,
@@ -646,12 +676,24 @@ describe('pan swarm status (PAN-2214)', () => {
     expect(output).toContain('Reason: operator freeze');
   });
 
-  it('prints that coordination is active when no hold is set', async () => {
+  it('prints foreman ownership and Deacon backstop duties when no hold is set', async () => {
     const deps = makeStatusDeps({ hold: null });
 
     await swarmStatusCommand('PAN-2203', deps);
 
-    expect(loggedText(deps)).toContain('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+    const output = loggedText(deps);
+    expect(output).toContain('the foreman may run gated dispatch, merge, and recovery actions');
+    expect(output).toContain('Deacon patrols provide janitor, liveness, and event-delivery backstops');
+    expect(output).not.toContain('Deacon is actively coordinating');
+  });
+
+  it('applies durable status overrides before reconciling slots', async () => {
+    const deps = makeStatusDeps({ statusOverrides: { 'wi-1': 'completed' } });
+
+    await swarmStatusCommand('PAN-2203', deps);
+
+    const effectiveDoc = vi.mocked(deps.reconcileSlotState).mock.calls[0]?.[2];
+    expect(effectiveDoc?.plan.items.find(item => item.id === 'wi-1')?.status).toBe('completed');
   });
 
   it('PAN-2364: lists blocked slots separately and overrides ready-to-merge mislabel', async () => {
@@ -712,6 +754,9 @@ describe('pan swarm status (PAN-2214)', () => {
       'getFailedMergeBlocks',
       'getReviewStatusSync',
       'listSessionNamesSync',
+      'readStatusOverrides',
+      'readSwarmHold',
+      'readSwarmInterventions',
       'reconcileSlotState',
       'resolveProjectFromIssueSync',
     ]);
@@ -725,26 +770,48 @@ describe('pan swarm reset (PAN-2214)', () => {
     pushFailsFor?: string[];
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
     liveSessions?: string[];
-    status?: { deaconIgnored?: boolean } | null;
+    hold?: { reason: string; setBy: string; at: string };
+    // PAN-3713: nested worktree registration per parent repo cwd, and whether
+    // nested slot branches still exist locally / on origin.
+    registeredNestedWorktrees?: Record<string, string[]>;
+    nestedBranchesPresent?: boolean;
+    nestedBranchesOnOrigin?: boolean;
+    // Ahead count returned for nested `feature..slot` rev-list probes.
+    nestedAheadCount?: string;
   } = {}): SwarmResetCommandDeps & { gitCalls: string[] } {
     const gitCalls: string[] = [];
     const branches = options.slotBranches ?? {};
+    const outerWorkspace = '/repo/workspaces/feature-pan-2203';
     const deps = {
-      getReviewStatusSync: vi.fn(() => (options.status ?? null) as never),
-      setDeaconIgnored: vi.fn(),
+      getIssueWorkspacePath: vi.fn(() => '/repo/workspaces/feature-pan-2203'),
+      readSwarmHold: vi.fn(() => options.hold),
+      writeSwarmHold: vi.fn(async () => undefined),
+      clearSwarmHold: vi.fn(async () => undefined),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      now: vi.fn(() => '2026-08-13T12:00:00.000Z'),
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as never),
       listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
       removeAgent: vi.fn(async () => {}),
+      listSlotWorkspaceDirectories: vi.fn(() => []),
+      resolveSlotWorkspaceWorktrees: vi.fn(() => ({ isPolyrepo: false, nested: [] })),
+      removeDirectory: vi.fn(async () => undefined),
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
+      clearSupersededSwarmAttempts: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
       getFailedMergeBlocks: vi.fn(() => [{ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' }]),
-      runGitCommand: vi.fn(async (command: string) => {
+      runGitCommand: vi.fn(async (command: string, cwd?: string) => {
         gitCalls.push(command);
         if (command.startsWith('git for-each-ref')) {
           return { stdout: `${Object.keys(branches).join('\n')}\n` };
+        }
+        if (command.startsWith('git branch --list ')) {
+          const branch = JSON.parse(command.slice('git branch --list '.length)) as string;
+          return { stdout: options.nestedBranchesPresent === false ? '' : `${branch}\n` };
+        }
+        if (command.startsWith('git ls-remote ')) {
+          return { stdout: options.nestedBranchesOnOrigin ? 'abc123\trefs/heads/x\n' : '' };
         }
         if (command.startsWith('git rev-list --count HEAD..')) {
           for (const [branch, count] of Object.entries(branches)) {
@@ -752,8 +819,18 @@ describe('pan swarm reset (PAN-2214)', () => {
           }
           return { stdout: '0\n' };
         }
+        if (command.startsWith('git rev-list --count ')) {
+          return { stdout: `${options.nestedAheadCount ?? '0'}\n` };
+        }
         if (command === 'git worktree list --porcelain') {
-          const lines = ['worktree /repo/workspaces/feature-pan-2203'];
+          if (cwd && cwd !== outerWorkspace) {
+            // A parent repo's porcelain list names its own main worktree plus
+            // whatever nested slot worktrees remain registered (PAN-3713).
+            const lines = [`worktree ${cwd}`];
+            for (const path of options.registeredNestedWorktrees?.[cwd] ?? []) lines.push(`worktree ${path}`);
+            return { stdout: `${lines.join('\n')}\n` };
+          }
+          const lines = [`worktree ${outerWorkspace}`];
           for (const path of options.worktreeSlotPaths ?? []) lines.push(`worktree ${path}`);
           return { stdout: `${lines.join('\n')}\n` };
         }
@@ -794,6 +871,111 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deleteIndex).toBeGreaterThan(pushIndex);
   });
 
+  it('removes stale polyrepo slot directories and nested worktrees left by reset', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-4';
+    const deps = makeResetDeps({
+      registeredNestedWorktrees: { '/repo/api': [`${slotWorkspace}/api`] },
+    });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [{
+        repoKey: 'api',
+        dir: `${slotWorkspace}/api`,
+        parentRepo: '/repo/api',
+        featureBranch: 'feature/pan-2203',
+      }],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-4/api"',
+      '/repo/api',
+    );
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+  });
+
+  it('treats an already-unregistered nested worktree as success and continues cleanup (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    // fe is still registered; api's worktree registration is already gone —
+    // the exact mix that crashed reset with "fatal: '<path>' is not a working tree".
+    const deps = makeResetDeps({
+      registeredNestedWorktrees: { '/repo/fe': [`${slotWorkspace}/fe`] },
+    });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'fe', dir: `${slotWorkspace}/fe`, parentRepo: '/repo/fe', featureBranch: 'feature/pan-2203' },
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    // The registered nested worktree is removed through git…
+    expect(deps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-2/fe"',
+      '/repo/fe',
+    );
+    // …the unregistered one is pruned, never force-removed (that call is the PAN-3713 crash)…
+    expect(deps.runGitCommand).not.toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-2/api"',
+      '/repo/api',
+    );
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git worktree prune', '/repo/api');
+    // …both merged slot branches are deleted without a push, the slot
+    // directory is removed, and slot state is cleared through the writer.
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git branch -D "feature/pan-2203-slot-2"', '/repo/fe');
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git branch -D "feature/pan-2203-slot-2"', '/repo/api');
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+  });
+
+  it('still pushes an unmerged nested branch before removing its unregistered worktree (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    // The nested slot branch exists locally with 2 commits the feature branch
+    // lacks; its worktree registration is already gone.
+    const deps = makeResetDeps({ nestedAheadCount: '2' });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.runGitCommand).toHaveBeenCalledWith('git push origin "feature/pan-2203-slot-2"', '/repo/api');
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+  });
+
+  it('re-running reset after partial cleanup succeeds when nested branches are already gone (PAN-3713)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({ nestedBranchesPresent: false });
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({
+      isPolyrepo: true,
+      nested: [
+        { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch: 'feature/pan-2203' },
+      ],
+    }));
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(loggedText(deps)).toContain('absent from /repo/api and origin');
+  });
+
   it('a push failure without --force aborts with the branch named and deletes nothing', async () => {
     const deps = makeResetDeps({
       slotBranches: { 'feature/pan-2203-slot-1': '2' },
@@ -809,6 +991,9 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deps.gitCalls.some(cmd => cmd.startsWith('git worktree remove'))).toBe(false);
     expect(deps.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
     expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+    // PAN-3694: an aborted reset must preserve the superseded-attempt history —
+    // clearing it is only valid once every slot workspace/branch removal succeeded.
+    expect(deps.clearSupersededSwarmAttempts).not.toHaveBeenCalled();
   });
 
   it('--force continues past a push failure and still deletes', async () => {
@@ -836,6 +1021,9 @@ describe('pan swarm reset (PAN-2214)', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    // PAN-3694: a successful reset also clears the superseded-attempt high-water
+    // so a fresh swarm may reuse indexes 1..N.
+    expect(deps.clearSupersededSwarmAttempts).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
     expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     // The running row is stopped twice at most (once via stop's enumeration, once via the
     // final sweep) — the essential guarantee is it is stopped and the stopped row is not touched.
@@ -895,10 +1083,13 @@ describe('pan swarm reset (PAN-2214)', () => {
     const result = await swarmResetCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, expect.any(String));
-    expect(deps.setDeaconIgnored).not.toHaveBeenCalledWith('PAN-2203', false);
+    expect(deps.writeSwarmHold).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', expect.any(Object));
+    expect(deps.clearSwarmHold).not.toHaveBeenCalled();
     expect(loggedText(deps)).toContain('hold REMAINS SET');
     expect(loggedText(deps)).toContain('pan swarm resume PAN-2203');
+    expect(loggedText(deps)).toContain('foreman cannot run gated dispatch, merge, or recovery actions');
+    expect(loggedText(deps)).toContain('Deacon patrols preserve the hold');
+    expect(loggedText(deps)).not.toContain('Deacon still skips all swarm coordination');
   });
 
   it('is idempotent on a clean issue and deletes merged branches without pushing', async () => {
@@ -913,5 +1104,107 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });
     expect(merged.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(merged.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
+  });
+
+  it('a stale slot directory removal failure is a controlled reset failure and clears no state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    // The PAN-3717 crash: root-owned container artifacts (fe/.pnpm-store)
+    // make the recursive host-side removal fail with EACCES.
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(
+        new Error(`EACCES: permission denied, rmdir '${slotWorkspace}/fe/.pnpm-store/v10'`),
+        { code: 'EACCES' },
+      );
+    });
+
+    // Must resolve with a controlled failure — never an uncaught exception.
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(false);
+    expect(loggedText(deps)).toContain(slotWorkspace);
+    expect(loggedText(deps)).toContain('EACCES');
+    expect(loggedText(deps)).toContain('NOT cleared');
+    expect(loggedText(deps)).toContain('pan swarm reset PAN-2203');
+    // Recorded slot state survives so a re-run picks up exactly here.
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+    expect(deps.clearSupersededSwarmAttempts).not.toHaveBeenCalled();
+    expect(deps.clearFailedMergeBlock).not.toHaveBeenCalled();
+    expect(deps.removeAgent).not.toHaveBeenCalled();
+  });
+
+  it('re-running reset after a failed directory removal succeeds and clears state (PAN-3717)', async () => {
+    const slotWorkspace = '/repo/workspaces/feature-pan-2203-slot-2';
+    const deps = makeResetDeps({});
+    deps.listSlotWorkspaceDirectories = vi.fn(() => [slotWorkspace]);
+    deps.resolveSlotWorkspaceWorktrees = vi.fn(() => ({ isPolyrepo: true, nested: [] }));
+    deps.removeDirectory = vi.fn(async () => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    });
+
+    await expect(swarmResetCommand('PAN-2203', {}, deps)).resolves.toEqual({ ok: false });
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+
+    // Removal now succeeds (e.g. the Docker fallback cleaned the root-owned
+    // artifacts): the same reset run reaches completion and clears state.
+    deps.removeDirectory = vi.fn(async () => undefined);
+    const rerun = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(rerun.ok).toBe(true);
+    expect(deps.removeDirectory).toHaveBeenCalledWith(slotWorkspace);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(deps.clearSupersededSwarmAttempts).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+  });
+});
+
+describe('listSlotWorkspaceDirectoriesSync (PAN-3717 containment)', () => {
+  it('returns only real exact-name slot directories — never symlinks or preserved archives', () => {
+    const root = mkdtempSync(join(tmpdir(), 'swarm-slots-'));
+    try {
+      const workspaces = join(root, 'workspaces');
+      mkdirSync(workspaces);
+      const realSlot = join(workspaces, 'feature-min-888-slot-1');
+      mkdirSync(realSlot);
+      // A symlink planted at a slot-shaped name must never reach the
+      // privileged Docker bind mount in removeWorkspaceDirectory.
+      const elsewhere = join(root, 'elsewhere');
+      mkdirSync(elsewhere);
+      symlinkSync(elsewhere, join(workspaces, 'feature-min-888-slot-2'));
+      // Operator-preserved archives share the -slot- prefix but are not slots.
+      mkdirSync(join(workspaces, 'feature-min-888-slot-3-reset-backup-20260814'));
+
+      const found = listSlotWorkspaceDirectoriesSync(join(workspaces, 'feature-min-888'));
+
+      expect(found).toEqual([realSlot]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('isSlotWorkspaceDirectoryName (PAN-3694)', () => {
+  const base = 'feature-min-888';
+
+  it('accepts exact slot workspace directory names', () => {
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1')).toBe(true);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-12')).toBe(true);
+  });
+
+  it('rejects preserved archive directories that share the -slot- prefix', () => {
+    // The MIN-888 recovery archives that crashed slotBranchFromPath.
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1-reset-backup-20260814')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-2-failed-20260814120000')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-3-quarantine')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1-backup')).toBe(false);
+  });
+
+  it('rejects non-numeric slot suffixes and other issues\' workspaces', () => {
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-1a')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888-slot-x')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-889-slot-1')).toBe(false);
+    expect(isSlotWorkspaceDirectoryName(base, 'feature-min-888')).toBe(false);
   });
 });

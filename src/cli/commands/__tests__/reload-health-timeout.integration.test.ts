@@ -59,6 +59,13 @@ vi.mock('../restart.js', () => ({
   spawnDashboardDetached: mocks.spawnDashboardDetached,
 }));
 
+// The restart-approval gate (PAN-3729) polls the dashboard over HTTP. This test
+// stands up its own health server, so let the reload through without a gate.
+vi.mock('../../../lib/restart-gate-client.js', () => ({
+  restartGateRequesterId: (kind: string) => `${kind}:1234`,
+  waitForRestartApproval: vi.fn(async () => ({ proceed: true, reason: 'ungated', detail: 'no gate in tests' })),
+}));
+
 import { reloadCommand } from '../reload.js';
 import {
   activeDashboardBundleFile,

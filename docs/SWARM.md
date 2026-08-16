@@ -1,35 +1,18 @@
 # Swarm v2
 
-Swarm v2 runs one work agent per xBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
+Swarm v2 uses one resident foreman work agent, `agent-<issue>`, to drive parallel xBRIEF items through deterministic CLI gates. Each slot remains an ordinary registered work agent in its own worktree. The Deacon only enumerates and garbage-collects slot resources, reports slot events, and revives a missing foreman.
 
-When resolved swarm mode is `off`, Deacon performs no automatic slot dispatch,
-recovery, merge, or cleanup. Existing slots are preserved but do not advance,
-and `pan start` refuses to launch a primary work agent while any slot is live.
-Use `pan stop <id>` to preserve the work and stop every issue session before
-returning to single-agent execution.
-
-The shipped operator entry point is:
+Start or attach to the foreman with:
 
 ```bash
-pan swarm <id>
+pan swarm PAN-2203
 ```
 
-Use `pan staffing <id> --swarm off|auto|always|default` to set or clear the durable per-issue
-swarm override. The issue-header Policies control exposes the same setting, and
-`GET/POST /api/issues/:issueId/swarm-policy` provides API parity; the issue layer beats project
-and global swarm modes.
+The command validates swarm readiness, ensures the feature workspace, and spawns or messages the foreman. It never dispatches a slot itself. The foreman stays resident and owns the wave loop until the plan is complete, held, or handed back to the operator.
 
-The shipped recovery entry point is:
+## Workspaces and state
 
-```bash
-pan swarm recover <id> <slotIndex> --action retry
-```
-
-`CLAUDE.md` and agent context references to `pan swarm <id>` are now accurate: the command exists, checks plan eligibility, ensures the feature workspace, dispatches the first wave through the same selection path Deacon uses, and then leaves ongoing coordination to Deacon.
-
-## Mental Model
-
-A swarm issue has one normal feature workspace:
+The parent feature workspace belongs to the foreman:
 
 ```text
 workspaces/feature-<issue>/
@@ -37,7 +20,7 @@ feature/<issue>
 agent-<issue>
 ```
 
-Each slot gets its own worktree, branch, and work-agent identity:
+Each parallel item gets an isolated slot:
 
 ```text
 workspaces/feature-<issue>-slot-<N>/
@@ -45,57 +28,50 @@ feature/<issue>-slot-<N>
 agent-<issue>-slot-<N>
 ```
 
-The xBRIEF DAG decides what can run. `getDispatchableItems(doc, mergedItemIds)` returns items whose blocking parents are merged or already terminal in the plan. `analyzeSwarmReadiness(doc)` decides which of those items are safe slot candidates based on item readiness, `files_scope`, `files_scope_confidence`, verify commands, and expected outputs.
+There is no canonical `SwarmRuntime` sidecar. The foreman derives current state from the xBRIEF DAG, issue record, branches, worktrees, agent rows, and tmux sessions. Durable swarm facts use the issue record write door, including holds, assignments, intervention counts, completion observations, completion markers, failed-merge blocks, superseded attempts, and reclaimed items.
 
-Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may dispatch a later item only after the overlapping item is merged.
+## Foreman wave loop
 
-## coordinateSwarmSlots Loop
+The foreman repeats these steps. Each mutation goes through a named gate, so reconnecting after a crash is safe.
 
-`coordinateSwarmSlots()` in `src/lib/cloister/deacon-swarm.ts` is the host-side orchestrator. The loop is intentionally derive-first:
+1. Run `pan swarm status <id> --json` to reconcile the foreman, hold, capacity, and slot lifecycle state.
+2. Select only items allowed by `getDispatchableItems()`. A blocking parent must be complete before its dependent can start.
+3. Run `pan swarm dispatch <id> --json` once. The dispatch gate applies readiness, file-overlap, capacity, hold, and duplicate-slot checks before it claims and spawns work.
+4. Run `pan swarm wait <id> --timeout 300 --json` instead of polling transcripts. Slot completion, failure, hold, or foreman state changes wake the loop.
+5. For each completion-ready slot, run `pan swarm merge <id> <slot> --json`. The merge gate refuses live or unsignaled work, verifies the item, merges it, marks it done, and clears its completion marker.
+6. Run the feature-branch integration checks named by the project before advancing the next wave.
+7. Resolve failures with `pan swarm recover <id> <slot> --action retry|drop|handoff|reclaim`. The foreman chooses the recovery action; the Deacon only reports the event.
+8. Repeat from status. If `autoAdvance` is false, wait for operator acknowledgement between waves.
 
-1. Enumerate feature workspaces.
-   Deacon lists regular `feature-*` workspaces and skips `feature-*-slot-N` workspaces for swarm enumeration.
+The Deacon patrol calls `swarmJanitorPass()`. That pass never dispatches, merges, or selects recovery. It removes merged or orphaned slot resources, emits `[swarm-event]` messages for stopped, completed, or stalled slots, and restores one missing foreman when policy and capacity allow. Three consecutive foreman respawn failures set `swarm.hold` and emit an operator halt report.
 
-2. Load and check the plan.
-   Deacon loads the main-side xBRIEF spec with `findSpecByIssue()` and runs `analyzeSwarmReadiness()`. Non-eligible plans are ignored by the patrol; the CLI prints the reason.
+## Command gates
 
-3. Reconcile slot state.
-   `reconcileSlotState()` derives merged, in-flight, pending, branch, and agent state from git branches, worktrees, agent state, and xBRIEF item status. Runtime truth is not stored in a swarm JSON file.
-
-4. Detect slot lifecycle.
-   `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. It checks a slot's durable completion marker first (see [Durable Slot Completion](#durable-slot-completion) below); a matching marker makes the slot `ready-to-merge` with signal `durable-completion` regardless of session state. Otherwise a pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
-
-5. Verify and merge ready slots.
-   `mergeReadySlots()` calls `verifyAndMergeSlot()` for each slot that is not blocked. On success it writes the item `done` through `applyTaskOperationToPlanFile()`. On merge conflicts it records a per-slot failed-merge recovery block; the coordinator then skips that slot on subsequent passes while continuing to merge and dispatch the remaining slots.
-
-6. Garbage collect merged slots.
-   `gcMergedSlots()` removes merged slot worktrees and branches after the slot has been incorporated into the parent feature branch.
-
-7. Dispatch the next wave.
-   `dispatchNextWave()` calls `getDispatchableItems(doc, mergedItemIds)`, filters to slot-eligible items, applies file-overlap serialization, checks global capacity, allocates the lowest free slot index, claims the xBRIEF item through the write door, and spawns `agent-<issue>-slot-N`.
-
-8. Recover failed or stalled slots.
-   Failed merge and stalled-slot records are stored per slot. A block pauses automatic advancement for that specific slot only; the coordinator keeps working on the rest of the issue. `pan swarm status` lists all blocked slots and labels them `failed-merge-blocked` so they are not misreported as `ready-to-merge`. Recovery is applied slot-by-slot with `pan swarm recover <id> <slotIndex>`.
-
-## CLI
-
-### Start
+### Status and wait
 
 ```bash
-pan swarm PAN-2203
+pan swarm status PAN-2203
+pan swarm status PAN-2203 --json
+pan swarm wait PAN-2203 --timeout 300 --json
 ```
 
-`pan swarm <id>`:
+Status is read-only. It reports the foreman session, durable hold, intervention counters, reserved capacity, and reconciled slots. Wait returns a structured delta after a slot, foreman, or hold transition.
 
-- resolves the issue to its project;
-- loads the main-side xBRIEF plan;
-- runs `analyzeSwarmReadiness()`;
-- exits non-zero with reasons when the plan is not swarm eligible;
-- ensures `workspaces/feature-<issue>/` exists;
-- dispatches wave 0 by calling `dispatchNextWave()`; and
-- prints the dispatched slot actions.
+### Dispatch
 
-It does not stay resident. After the first dispatch, Deacon continues merge, garbage collection, next-wave dispatch, stall detection, and recovery blocking.
+```bash
+pan swarm dispatch PAN-2203 --json
+```
+
+The gate dispatches at most one safe wave. It refuses held issues and blocked dependents, serializes overlapping `files_scope` values, uses the reserved swarm capacity, and releases a claim if spawn fails. It also refuses an occupied slot index when a live session, unmerged branch, recorded assignment, or existing slot worktree already owns it.
+
+### Merge
+
+```bash
+pan swarm merge PAN-2203 1 --json
+```
+
+The gate accepts only `ready-to-merge` slots. It runs the item's verification commands in the slot workspace, merges into the parent feature branch, writes item completion through the task door, clears the durable completion marker, and reaps merged slot resources. A conflict writes a per-slot failed-merge block.
 
 ### Recover
 
@@ -103,87 +79,54 @@ It does not stay resident. After the first dispatch, Deacon continues merge, gar
 pan swarm recover PAN-2203 1 --action retry
 pan swarm recover PAN-2203 1 --action drop
 pan swarm recover PAN-2203 1 --action handoff
+pan swarm recover PAN-2203 1 --action reclaim
 ```
 
-`pan swarm recover <id> <slotIndex> --action retry|drop|handoff` targets a single blocked slot. Failed-merge and stalled-slot blocks are stored per-slot, so one blocked slot does not halt the rest of the swarm. The coordinator continues merging and dispatching other slots while any slot remains blocked.
+Each action increments `swarm.interventions[slot][failureClass]`. The fourth automatic intervention in one class is refused unless the operator passes `--operator`.
 
-| Action | Effect |
+| Action | Result |
 | --- | --- |
-| `retry` | Archives the conflicted slot attempt (renames its branch and worktree to a superseded attempt record) so the old attempt cannot re-assert, unblocks the item, clears the per-slot block, and redispatches a fresh attempt through `dispatchNextWave()`. |
-| `drop` | Marks the item done through the xBRIEF write door and clears the block. Use only when the operator has verified the slot output is no longer needed. |
-| `handoff` | Keeps advancement paused and records an operator handoff note for manual resolution. |
+| `retry` | Archive the failed attempt, clear its block and assignment, and return the item to a future gated dispatch. |
+| `drop` | Mark the item complete after the operator confirms its output is unnecessary. |
+| `handoff` | Keep the block and record that manual resolution owns the slot. |
+| `reclaim` | Archive and unblock the slot, then record that the foreman will implement the item serially in the parent workspace. |
 
-## Derive, Do Not Store
+### Freeze, stop, resume, and reset
 
-Swarm v2 does not keep a canonical `SwarmRuntime` sidecar. The durable sources of truth are:
+```bash
+pan swarm freeze PAN-2203 --reason "investigating"
+pan swarm stop PAN-2203 --reason "stop slot work"
+pan swarm resume PAN-2203
+pan swarm reset PAN-2203 --reason "clean restart"
+```
 
-- the xBRIEF spec and item status;
-- git branches and worktrees;
-- agent state and tmux sessions; and
-- review or merge evidence written through existing writer surfaces.
+Freeze writes `swarm.hold`; running slots remain alive, but the foreman must stop mutation. Stop writes the hold first and then stops live slot agents without deleting branches or worktrees. Resume clears the hold. Reset preserves work by pushing unmerged slot branches before removing local slot resources; it aborts if that backup fails unless the operator explicitly uses `--force`. The hold remains after reset.
 
-Everything else is derived on patrol. This keeps recovery simple: if Deacon restarts, it re-enumerates workspaces, branches, agents, panes, and plan status instead of trusting a separate runtime file that can drift.
+## Policy
 
-Writes still go through the existing write doors. Deacon claims, unblocks, and completes items with `applyTaskOperationToPlanFile()`. It does not directly edit ad-hoc runtime state to make an item appear done.
+`off` uses serial work and prevents automatic foreman creation. `auto` lets the janitor create a foreman when the xBRIEF is swarm-eligible. `always` requires readiness rather than silently falling back to serial work. Manual `pan swarm <id>` remains available for an eligible plan regardless of inherited mode.
 
-## Duplicate-Spawn Guard
+`autoAdvance` controls foreman pacing. `true` lets the foreman advance after integration checks. `false` requires operator acknowledgement between waves. It never authorizes the Deacon to dispatch slots.
 
-Before any slot spawn, `dispatchNextWave()` refuses to claim and spawn when it detects that the target slot is already occupied by:
+Set issue policy with `pan staffing <id> --swarm off|auto|always|default`. Global and project settings use the same fields: `mode`, `maxSlots`, and `autoAdvance`.
 
-- a live `agent-<issue>-slot-N` tmux session;
-- an unmerged `feature/<issue>-slot-N` branch; or
-- an existing `workspaces/feature-<issue>-slot-N/` worktree.
+## Completion and stalls
 
-This protects reconnecting or paused slots from being double-spawned onto the same worktree.
+`pan done <issue>` from a slot writes `swarm.slotCompletions[slot]`. `classifyInFlightSlots()` checks that marker before runtime state, so a matching marker remains completion evidence after a session disappears. The merge gate clears it after success; requeue and supersede paths clear it before slot reuse.
 
-## Stalled Slots
+If the marker is missing, `swarm.infer_completion` controls git-based inference:
 
-Pane exit alone is not enough. A model can leave a pane alive while making no progress. Swarm v2 tracks per-slot progress by observing both:
+- `auto` and `nudge` request `pan done` from a live slot but never infer its completion from branch state alone.
+- `off` disables both behavior paths.
 
-- the branch-tip commit time for the slot branch; and
-- the captured pane output digest.
+When a slot has no live agent, clean current-item commits can still prove durable completion. Polyrepo checks count commits in the item's real repositories, not wrapper bookkeeping. Completion observations live in `swarm.completionObservations`, so a Deacon restart does not reset the evidence. State-plane-only worktree changes count as clean; uncommitted implementation changes do not.
 
-If neither changes before the stall threshold elapses, the slot becomes `stalled`. Deacon records a per-slot recovery block and stops advancing that specific slot until the operator chooses `retry`, `drop`, or `handoff` for that slot. Other slots continue normally.
+The Deacon retains progress fingerprints in its process for stall detection. If branch-tip and pane-output fingerprints do not change for 30 minutes, it sends one `[swarm-event] slot N stalled` message to the foreman. It writes no recovery block and makes no recovery decision. `PAN_SWARM_STALL_THRESHOLD_MS` overrides the threshold for tests or operations.
 
-The default stall threshold is 30 minutes. It can be overridden with `PAN_SWARM_STALL_THRESHOLD_MS` for test or operational tuning.
+## Tiered execution
 
-## Durable Slot Completion
+The foreman may execute a small, high-confidence item in context or delegate it to a standing tier session. This is still supervised work: the foreman owns the claim, verifies the result, commits one item, pushes it, and advances task state. Independent slot agents must still be created through `pan swarm dispatch`; an unsupervised subagent is never a slot.
 
-A slot can finish its work and exit its agent cleanly yet leave no durable signal: the workspace record's `statusOverrides` may be absent (the bug PAN-2372 fixed), and a vanished tmux session is rebuildable, not proof of completion. Swarm v2 now records completion on the permanent plane and, when that record is missing, infers it from git state.
+## Scope
 
-### Durable marker — `swarm.slotCompletions`
-
-When a slot work agent runs `pan done <issue>`, the CLI writes a completion marker into the per-issue record at `swarm.slotCompletions[String(slotIndex)]` and reads it back to confirm the write landed (`persistAndVerifySwarmSlotCompletion()` in `src/lib/cloister/deacon-swarm-record.ts`). A marker carries `slotIndex`, an optional `itemId`, `agentId`, and `completedAt`.
-
-`classifyInFlightSlots()` checks this marker at the top of the per-slot loop, before any session, agent, or pane classification. A marker whose `itemId` is absent or matches the slot classifies the slot `ready-to-merge` with signal `durable-completion`. Because the marker is the strongest completion evidence, it beats a vanished session that would otherwise classify as `failed`.
-
-The coordinator clears the marker through the record door when the slot leaves flight:
-
-- **merge** — `mergeReadySlots()` clears the slot's marker after it writes the item `done`;
-- **requeue / supersede** — `archiveFailedSwarmSlot()` clears the marker so a fresh attempt on the same `slotIndex` is not falsely observed as already complete.
-
-### Inferred completion — `swarm.infer_completion`
-
-For a slot that has committed clean, branch-ahead work but written no marker — the agent exited without signaling, or the marker write raced — `classifyDoneWithoutSignal()` infers completion from git state: a branch-ahead count of at least 1 and a state-plane-clean worktree (see below). The default mode is `auto`:
-
-- **`auto`** (default) — nudge the slot's agent once (`run pan done <issue>`), then after two consecutive stable observations (unchanged commit time, output digest, and ahead count) classify the slot `ready-to-merge` with signal `inferred`.
-- **`nudge`** — nudge once and never converge; the slot stays `awaiting-completion-signal` until an explicit `pan done` lands. Use this when an operator-visible signal is required.
-- **`off`** — no nudge and no inference; `classifyDoneWithoutSignal()` returns `null` and the slot is left to normal stall/failed classification.
-
-Set the mode in `~/.overdeck/cloister.toml` under `[swarm] infer_completion`, or override it per process with the `PAN_SWARM_INFER_COMPLETION=auto|nudge|off` environment variable. The previous default was `nudge`; it is now `auto`, so a slot that genuinely finished is not stuck awaiting a signal that never arrives.
-
-### State-plane-clean worktree
-
-Both inference paths treat the slot worktree as clean when the only `git status` dirt is state-plane state — `.pan/continue.json`, the workspace record door, and the other durable paths the swarm writes to the permanent plane (the full set is enumerated in `STATE_PLANE_PATHS`). Their presence must not block a slot from being inferred complete. `defaultIsSlotWorktreeClean()` in `src/lib/cloister/deacon-swarm-completion.ts` delegates to `isStatePlaneOnlyStatus()`. A genuinely dirty worktree — uncommitted implementation edits — still blocks inference.
-
-## Synthesis Slots
-
-When an xBRIEF item is a convergence point, Deacon may dispatch a synthesis slot before implementation. The synthesis slot writes concise context into item metadata. The following implementation slot receives an active-slice prompt containing that synthesis context.
-
-This keeps downstream implementation prompts bounded while preserving the relevant outputs from multiple parent items.
-
-## Out of Scope
-
-Remote Fly slots from PAN-1773 are layered on top of this model. Swarm v2 currently describes local slot worktrees and local tmux-backed agents.
-
-Difficulty-tier and model-routing behavior from PAN-1791 is also layered on top. The current coordinator enforces readiness, file scope, capacity, duplicate-spawn, merge, and recovery rules. Future routing can choose different models or tiers for a slot without changing the core derive/reconcile/dispatch loop.
+This document covers local tmux-backed slots. Remote execution and model-tier routing may choose where a gate starts work, but they do not change foreman ownership, the record write door, or the dispatch and merge gates.

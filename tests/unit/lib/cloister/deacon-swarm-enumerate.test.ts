@@ -96,7 +96,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     ]);
   });
 
-  it('enumerates feature workspaces whose main-side xBRIEF is swarm eligible', async () => {
+  it('does not automatically dispatch an eligible workspace through the legacy coordinator', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
     mkdirSync(join(projectPath, 'workspaces', 'feature-pan-100'), { recursive: true });
@@ -105,7 +105,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
 
     const actions = await coordinateSwarmSlots();
 
-    expect(actions).toContain('[swarm] considered PAN-100: swarm eligible');
+    expect(actions).not.toContain('[swarm] considered PAN-100: swarm eligible');
   });
 
   it('excludes single-item and non-swarm feature workspaces, and ignores slot workspaces', async () => {
@@ -133,7 +133,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
     const failedMergeIndex = source.indexOf('const failedMergeRetryActions = await checkFailedMergeRetry();');
     const strikeLandingIndex = source.indexOf('for (const a of await patrolStrikeLandings())');
-    const swarmIndex = source.indexOf('const swarmActions = await coordinateSwarmSlots();');
+    const swarmIndex = source.indexOf('const swarmActions = await swarmJanitorPass();');
     const staleMergeIndex = source.indexOf('const staleMergeActions = await reconcileStaleMergeStatus();');
 
     expect(failedMergeIndex).toBeGreaterThanOrEqual(0);
@@ -145,10 +145,10 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     expect(source).toContain("export { coordinateSwarmSlots } from './deacon-swarm.js';");
   });
 
-  it('routes slot done-resolution patrols to swarm coordination instead of issue-level pan done', () => {
+  it('routes slot done-resolution patrols to the foreman instead of issue-level pan done', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
-    const slotGuardIndex = source.indexOf("console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);");
-    const slotCoordinationIndex = source.indexOf('const swarmActions = await coordinateSwarmSlots({ issueId });', slotGuardIndex);
+    const slotGuardIndex = source.indexOf("console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: notifying its foreman`);");
+    const slotCoordinationIndex = source.indexOf("await messageAgent(`agent-${issueId.toLowerCase()}`, `[swarm-event]", slotGuardIndex);
     const panDoneIndex = source.indexOf("await execFileAsync(bin, ['work', 'done', issueId", slotGuardIndex);
 
     expect(slotGuardIndex).toBeGreaterThanOrEqual(0);

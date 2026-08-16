@@ -42,20 +42,33 @@ allowed-tools:
 3. **Written tightening:** `docs/prds/planned/pan-dashboard-unified-redesign.md`
    §4.5 ("Color & Style Discipline") — the PAN-1148 "Always means / Never used
    for" table now folded into the guide.
-4. **Tokens:** `src/dashboard/frontend/src/index.css` (light/dark color
-   blocks, `@font-face` declarations, theme font tokens, and the
-   `.display-xl`/`.display-lg`/`.eyebrow` Broadsheet utilities) and
-   `src/dashboard/frontend/tailwind.config.js`. Conformance is exercised by
-   `tests/e2e/styleguide-conformance.spec.ts`.
+4. **Tokens:** `src/dashboard/frontend/src/index.css` — the unscoped
+   `:root`/`.dark` blocks (Ledger's untouched default), `@font-face`
+   declarations, theme font tokens, the `.display-xl`/`.display-lg`/
+   `.eyebrow` Broadsheet utilities, and, after `.dark` closes, the PAN-3706
+   four-scope region carrying every color/surface/border/shadow/radius/
+   type/motion token plus the `.chip`/`.soft-card`/`.large-cta`/`.keycap`/
+   `.dot-metadata` component patterns — and `src/dashboard/frontend/
+   tailwind.config.js` (`boxShadow`, `fontFamily.mono-ui`, and the
+   `safelist` entries for classes not yet consumed by any `.tsx` file).
+   Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
 
 ## Themes: Ledger (legacy) vs. Broadsheet (default)
 
 Overdeck ships two named design languages behind a single `ui.theme` setting
 (`~/.overdeck/config.yaml`, default `broadsheet`) and a `data-theme` attribute
-on `<html>`. **Ledger** is the pre-PAN-3410 style — DM Sans, flat
-`font-medium` cap, no display tier — now frozen: bug fixes only, never new
-patterns. **Broadsheet** is the active theme: Geist/Geist Mono, a tiered
-weight system, a display scale, and the new component vocabulary below.
+on `<html>` (independent of the `.dark` class, which carries light/dark
+color-scheme — the two axes never interact). **Ledger** is the pre-PAN-3410
+style — DM Sans, flat `font-medium` cap, cool blue-gray neutrals, no display
+tier — now frozen: bug fixes only, never new patterns. **Broadsheet** is the
+active theme: Geist/Geist Mono, a tiered weight system, a display scale, and
+the new component vocabulary below — plus, as of PAN-3706, its own warm
+neutral color ramp, stepped surfaces, opaque borders, a shadow/elevation
+scale, a smaller base radius, 13px/1.6 body type, and an ambient-wash
+background in place of Ledger's noise film. Before PAN-3706 the color/
+surface/elevation/radius/texture system was accidentally shared between both
+themes (a font-only migration); it is not anymore — see "Color, surface, and
+elevation now differ by theme" below.
 
 **The theme rule for new surfaces:** author against the Broadsheet
 vocabulary (`.display-xl`, `.display-lg`, `.eyebrow`, chips, soft cards,
@@ -82,6 +95,59 @@ blocks their use under Ledger, they would just render unstyled (bare Tailwind
 utilities, no theming) if reached while Ledger is active. A component built
 with them is a Broadsheet-only component by construction; don't reach for
 them on a surface that must still render under Ledger.
+
+## Color, surface, and elevation now differ by theme (PAN-3706)
+
+The color system is no longer identical between themes (it was, pre-PAN-3706
+— see guide §2/§4). `:root`/`.dark` in `index.css` stay the untouched Ledger
+default; Broadsheet's real values live in a later region that overrides them
+per the four-scope contract below. What's still shared: signal-color
+*semantics* (what `--destructive`/`--warning`/etc. mean) and the badge tint
+*formula* (8%/32%). What now differs: the neutral ramp (warm HSL vs cool
+gray), `--background`/`--card`/`--popover` step apart under Broadsheet
+instead of collapsing to one flat color, `--border`/`--input` are opaque
+under Broadsheet instead of near-invisible `color-mix()`, `--radius` itself
+(10px Ledger / 6px Broadsheet — not just the badge tier), a role-named
+`--shadow-sm/md/lg/xl/card/floating/overlay` scale that actually resolves to
+something visible on dark surfaces, body type (13px/1.6/antialiased under
+Broadsheet vs. browser default under Ledger), and the background treatment
+(Ledger keeps the fractal-noise film; Broadsheet swaps it for an ambient
+corner wash via a new `--wash` token — not a retargeted `--accent`, which
+stays the hover-surface token in both themes). New tokens: `--primary-ink`
+(text-safe accent), `--body-foreground`/`--faint-foreground` (rounding
+`--foreground`/`--muted-foreground` out to a four-tier ramp), `--wash`, a
+`--type-size-*`/`--type-leading-*`/`--type-tracking-*` vocabulary (defined,
+not yet adopted by components), and `--ease-*`/`--duration-*` motion tokens
+(same — defined, not yet wired into existing animations). `--font-mono-ui`
+splits UI-chrome monospace (labels, IDs, timestamps) from `--font-mono`
+(code + the eyebrow exception) — Ledger resolves both to the same SF Mono
+stack, Broadsheet gives UI-mono a tighter system stack instead of Geist
+Mono's code-tuned metrics.
+
+**The four-scope selector contract** is what makes every one of those tokens
+resolve correctly by theme. Because `.dark` and `data-theme` both live on
+`<html>` at once, and because Settings → Appearance nests a `[data-theme]`
+scope inside the ambient document for its comparison specimens, a
+theme-varying token needs **four** blocks, placed after `:root`/`.dark` in
+source order (equal-specificity attribute selectors win on source order, not
+specificity):
+
+```
+[data-theme="ledger"]                                             — light, restate today's value
+[data-theme="broadsheet"]                                          — light, new value
+.dark[data-theme="ledger"], .dark [data-theme="ledger"]            — dark, restate today's value
+.dark[data-theme="broadsheet"], .dark [data-theme="broadsheet"]    — dark, new value
+```
+
+Same-element (`.dark[data-theme=...]`) matches `<html>` itself; descendant
+(`.dark [data-theme=...]`) matches a nested Appearance-picker specimen —
+both are required or a nested specimen inherits the wrong theme. For a
+non-color-token rule (a `body` background, a utility class), gate it on a
+custom property with a `var()` fallback rather than a bare descendant
+selector — `--badge-radius` and the `.display-xl`/`.display-lg`/`.eyebrow`
+properties are the established examples; a descendant selector matches
+through *any* ancestor with the attribute and breaks nesting, a custom
+property cascades by DOM proximity and doesn't. Full mechanics: guide §4a.
 
 ## The rules agents violate most (memorize these)
 
@@ -144,9 +210,12 @@ purple = specialist verb, cyan = money, neutral = everything else.**
   (`bg-{signal}/8 border-{signal}/32 text-{signal}-foreground`) — identical
   in both themes (D-11, unchanged). No pills (`rounded-full`) for status
   badges.
-- Radius: `rounded-sm` under Ledger, `rounded-md` under Broadsheet — the
-  **one** deliberate radius change in the whole theme revision. Nothing else
-  about the badge formula differs between themes.
+- Radius: `rounded-sm` under Ledger, `rounded-md` under Broadsheet — the one
+  deliberate radius-*tier* change from PAN-3410, layered on top of PAN-3706's
+  smaller Broadsheet base `--radius` (10px Ledger / 6px Broadsheet), which
+  now also shrinks every other `rounded-*` utility computed from it (buttons,
+  cards, dialogs — see "Color, surface, and elevation" above). Nothing else
+  about the badge *formula* (8%/32% tint) differs between themes.
 - Pick ONE indicator pattern per context — don't mix dots + badges + colored
   text for the same concept in one view.
 
@@ -186,9 +255,15 @@ hardcoded hex (#22c55e, #ef4444, …)          → semantic tokens
 slate-* grays (cold)                         → neutral-* (warm) — everywhere
 ```
 
-Surfaces: depth via tonal layering (`--card`, `--card-2`), not shadows;
-borders `white/6%` dark, `black/5%` light; light-mode cards are borderless
-(ambient shadow instead).
+Surfaces: depth via tonal layering (`--card`, `--card-2`), not shadows —
+shadows stay reserved for floating elements only (dialogs, dropdowns,
+tooltips, popovers, dragged items), never inline cards/panels. Border/wash
+values are theme-scoped and no longer share one description: Ledger keeps
+low-alpha `color-mix()` borders (`white/6%` dark, `black/8%` light,
+near-invisible by design, light-mode cards borderless with an ambient
+shadow instead) and the noise-film texture; Broadsheet uses opaque HSL
+borders and an ambient corner wash instead (see "Color, surface, and
+elevation" above).
 
 ### Brand mark — the control ring (guide §19)
 

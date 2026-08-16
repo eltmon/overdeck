@@ -130,6 +130,30 @@ describe('task mutation door', () => {
     })).rejects.toThrow(/is completed/i);
   });
 
+  // PAN-3691: reopen is the canonical recovery for a task falsely marked
+  // completed (e.g. a swarm slot that merged with no current-item changes).
+  it('reopens a falsely completed task back to pending with an audited reason', async () => {
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'reopen', itemId: 'wi-done', writerId: 'operator', reason: 'slot merged with no current-item changes (PAN-3691)',
+    })).resolves.toMatchObject({ status: 'pending', sequence: 1 });
+    expect(readIssueRecordSync(project, ISSUE_ID)).toMatchObject({
+      statusOverrides: { 'wi-done': 'pending' },
+      tasks: { statusReasons: { 'wi-done': { reason: 'slot merged with no current-item changes (PAN-3691)' } } },
+    });
+    // The item is dispatchable again: claim succeeds after reopen.
+    await expect(applyTaskStatusChange(project, ISSUE_ID, { type: 'claim', itemId: 'wi-done', writerId: 'agent-b' }))
+      .resolves.toMatchObject({ status: 'running' });
+  });
+
+  it('requires --reason for reopen and rejects reopen on non-completed tasks', async () => {
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'reopen', itemId: 'wi-done', writerId: 'operator',
+    })).rejects.toThrow(/requires --reason/i);
+    await expect(applyTaskStatusChange(project, ISSUE_ID, {
+      type: 'reopen', itemId: 'wi-1', writerId: 'operator', reason: 'not completed',
+    })).rejects.toThrow(/is pending, so reopen is not allowed/i);
+  });
+
   it('audits a forced transition and advances sequence exactly once', async () => {
     await expect(applyTaskStatusChange(project, ISSUE_ID, {
       type: 'done', itemId: 'wi-1', writerId: 'operator', force: true, reason: 'operator override', expectedSequence: 0,

@@ -435,14 +435,68 @@ async function generateSummarySeed(
 ): Promise<{ summary: string; summaryModel: string | null }> {
   if (localSummaryOnly) {
     return {
-      summary: await Effect.runPromise(generateFallbackSummary(sourceSessionFile)),
+      summary: await Effect.runPromise(generateFallbackSummary(sourceSessionFile, sourceHarness)),
       summaryModel: null,
     };
   }
   return generateSummaryForFork(sourceSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, sourceHarness);
 }
 
-async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
+function buildFallbackSummary(
+  userMessages: string[],
+  filesModified: Set<string>,
+  toolsUsed: Set<string>,
+): string {
+  let summary = `## Conversation Summary Fork\n\n`;
+  summary += `This is a continuation of a previous conversation, seeded with a summary of the earlier work.\n\n`;
+
+  if (userMessages.length > 0) {
+    summary += `### User Messages:\n`;
+    for (const msg of userMessages.slice(0, 10)) {
+      summary += `- ${msg.slice(0, 200)}${msg.length > 200 ? '...' : ''}\n`;
+    }
+    summary += '\n';
+  }
+
+  if (filesModified.size > 0) {
+    summary += `### Files Modified:\n`;
+    for (const f of [...filesModified].sort()) {
+      summary += `- \`${f.replace(/.*\/overdeck\//, '')}\`\n`;
+    }
+    summary += '\n';
+  }
+
+  if (toolsUsed.size > 0) {
+    summary += `### Tools Used: ${[...toolsUsed].sort().join(', ')}\n\n`;
+  }
+
+  summary += FORK_WAIT_INSTRUCTION;
+
+  return summary;
+}
+
+async function generateFallbackSummaryPromise(jsonlPath: string, harness?: RuntimeName): Promise<string> {
+  const adapter = getTranscriptAdapter(harness);
+  if (adapter.name !== 'claude-code') {
+    const serialized = await adapter.serializeTranscript(jsonlPath, { includeThinking: false });
+    const userMessages: string[] = [];
+    const filesModified = new Set<string>();
+    const toolsUsed = new Set<string>();
+
+    for (const part of serialized.split('\n\n')) {
+      if (part.startsWith('[user]\n')) {
+        userMessages.push(part.slice('[user]\n'.length));
+      } else if (part.startsWith('[tool_use: ')) {
+        const closingBracket = part.indexOf(']');
+        if (closingBracket !== -1) {
+          toolsUsed.add(part.slice('[tool_use: '.length, closingBracket));
+        }
+      }
+    }
+
+    return buildFallbackSummary(userMessages, filesModified, toolsUsed);
+  }
+
   const { readFile } = await import('node:fs/promises');
   const lines = (await readFile(jsonlPath, 'utf-8'))
     .split('\n')
@@ -491,32 +545,7 @@ async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string
     }
   }
 
-  let summary = `## Conversation Summary Fork\n\n`;
-  summary += `This is a continuation of a previous conversation, seeded with a summary of the earlier work.\n\n`;
-
-  if (userMessages.length > 0) {
-    summary += `### User Messages:\n`;
-    for (const msg of userMessages.slice(0, 10)) {
-      summary += `- ${msg.slice(0, 200)}${msg.length > 200 ? '...' : ''}\n`;
-    }
-    summary += '\n';
-  }
-
-  if (filesModified.size > 0) {
-    summary += `### Files Modified:\n`;
-    for (const f of [...filesModified].sort()) {
-      summary += `- \`${f.replace(/.*\/overdeck\//, '')}\`\n`;
-    }
-    summary += '\n';
-  }
-
-  if (toolsUsed.size > 0) {
-    summary += `### Tools Used: ${[...toolsUsed].sort().join(', ')}\n\n`;
-  }
-
-  summary += FORK_WAIT_INSTRUCTION;
-
-  return summary;
+  return buildFallbackSummary(userMessages, filesModified, toolsUsed);
 }
 
 export async function generateSummaryForFork(
@@ -725,9 +754,10 @@ export { runModelSummary };
 /** Effect variant of generateFallbackSummary. */
 export function generateFallbackSummary(
   jsonlPath: string,
+  harness?: RuntimeName,
 ): Effect.Effect<string, FsError> {
   return Effect.tryPromise({
-    try: () => generateFallbackSummaryPromise(jsonlPath),
+    try: () => generateFallbackSummaryPromise(jsonlPath, harness),
     catch: (cause) =>
       new FsError({ path: jsonlPath, operation: 'fallback-summary', cause }),
   });

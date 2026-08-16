@@ -11,6 +11,7 @@ import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
+import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
@@ -78,6 +79,10 @@ export function AppChrome({
         {/* Deacon-frozen state and stopped-agents are now compact pills in the
             app bar (PAN-1591), not persistent full-width banners. */}
         <OrphanTestAgentsSurface />
+
+        {/* A deploy script, `pan reload`, or `pan restart` is blocked waiting
+            for the operator to approve a dashboard restart (PAN-3729) */}
+        <RestartApprovalBanner />
 
         {/* Setup checklist — shown while a required host tool (tmux, git, node,
             claude) is missing from the server's PATH (PAN-774) */}

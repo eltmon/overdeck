@@ -10,6 +10,7 @@ import {
   findManagedServerPidSync,
   getManagedTmuxSocketName,
   _resetWarnedManagedServerDirtyForTest,
+  sanitizeManagedServerGlobalEnvSync,
 } from '../tmux.js';
 import { Effect } from 'effect';
 
@@ -460,6 +461,67 @@ describe('PAN-3673: socket name isolation per OVERDECK_HOME', () => {
     process.env.OVERDECK_HOME = '/tmp/pan-3668-dashboard-home-20260812';
     process.env.OVERDECK_TMUX_SOCKET_NAME = 'vitest-isolated';
     expect(getManagedTmuxSocketName()).toBe('vitest-isolated');
+  });
+});
+
+describe('PAN-3671: managed server global environment sanitizer', () => {
+  const savedHome = process.env.OVERDECK_HOME;
+  const savedSocket = process.env.OVERDECK_TMUX_SOCKET_NAME;
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    warnSpy.mockClear();
+  });
+
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedHome;
+    if (savedSocket === undefined) delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    else process.env.OVERDECK_TMUX_SOCKET_NAME = savedSocket;
+    warnSpy.mockClear();
+  });
+
+  function pinnedValue(key: 'HOME' | 'OVERDECK_HOME'): string | undefined {
+    const call = mockedExecFileSync.mock.calls.find((entry) => {
+      const args = entry[1] as string[];
+      return entry[0] === 'tmux' && args?.includes('set-environment') && args?.includes(key);
+    });
+    return (call?.[1] as string[] | undefined)?.at(-1);
+  }
+
+  it('refuses a non-canonical home on the shared socket', () => {
+    process.env.OVERDECK_HOME = '/tmp/fake';
+    process.env.OVERDECK_TMUX_SOCKET_NAME = 'overdeck';
+
+    sanitizeManagedServerGlobalEnvSync({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
+
+    expect(pinnedValue('HOME')).toBe(homedir());
+    expect(pinnedValue('OVERDECK_HOME')).toBe(join(homedir(), '.overdeck'));
+    expect(mockedExecFileSync.mock.calls.flatMap((entry) => entry[1] as string[])).not.toContain('/tmp/fake');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("'/tmp/fake'"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('OVERDECK_TMUX_SOCKET_NAME'));
+  });
+
+  it('pins both canonical values when the caller environment omits them', () => {
+    delete process.env.OVERDECK_HOME;
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+
+    sanitizeManagedServerGlobalEnvSync({});
+
+    expect(pinnedValue('HOME')).toBe(homedir());
+    expect(pinnedValue('OVERDECK_HOME')).toBe(join(homedir(), '.overdeck'));
+  });
+
+  it('pins caller values on an isolated custom socket', () => {
+    process.env.OVERDECK_HOME = '/tmp/fake';
+    process.env.OVERDECK_TMUX_SOCKET_NAME = 'custom';
+
+    sanitizeManagedServerGlobalEnvSync({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
+
+    expect(pinnedValue('HOME')).toBe('/tmp/fake-user');
+    expect(pinnedValue('OVERDECK_HOME')).toBe('/tmp/fake');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

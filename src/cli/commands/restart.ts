@@ -30,6 +30,14 @@ import {
 } from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
+import {
+  approveRestartGate,
+  claimRestartGate,
+  registerRestartGateRequest,
+  restartGateRequesterId,
+  waitForRestartApproval,
+  RESTART_GATE_CLAIMED_ENV,
+} from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
@@ -63,6 +71,7 @@ export interface RestartOptions {
   deacon?: boolean;
   resume?: boolean;
   noResume?: boolean;
+  now?: boolean;
 }
 
 async function resolveScope(options: RestartOptions): Promise<'dashboard' | 'cliproxy' | 'traefik' | 'full'> {
@@ -407,6 +416,104 @@ async function reportHeldRestartLock(startedAt: number): Promise<void> {
   process.exitCode = 2;
 }
 
+/**
+ * `pan restart approve` — the operator's terminal-side equivalent of the
+ * dashboard banner's "Restart now" button. It releases every restart request
+ * that is currently blocked; it does not start a restart of its own.
+ */
+export async function restartApproveCommand(): Promise<void> {
+  const result = await approveRestartGate();
+  if (!result) {
+    console.error(chalk.yellow(
+      'Could not reach the dashboard restart gate, so nothing was approved. The gate lives in the ' +
+        'dashboard server — check it is running with `pan status`, or run `pan restart --now` if you ' +
+        'simply want to restart the dashboard right now.',
+    ));
+    process.exitCode = 1;
+    return;
+  }
+  if (result.pendingCount === 0) {
+    console.log('No restart requests were waiting for approval, so nothing changed.');
+    return;
+  }
+  console.log(chalk.green(
+    `✓ Approved ${result.pendingCount} waiting restart request(s). One of them restarts the dashboard now; ` +
+      'the others skip their own restart because that one restart covers them.',
+  ));
+}
+
+/**
+ * `pan restart --now` — the operator bypass. It never waits on the gate: every
+ * gate call has a short budget and any failure falls straight through to a
+ * plain ungated restart.
+ *
+ * It still talks to the gate, because "now" has to mean "now" for everybody. By
+ * registering itself, approving the epoch and taking the claim, the restart it
+ * performs also satisfies every requester that was blocked, instead of leaving
+ * them waiting against the freshly booted server.
+ *
+ * Returns `handed-off` when another process already owns the restart lock: that
+ * process performs the restart this command just approved, so starting a second
+ * one here would restart the dashboard twice.
+ */
+async function runRestartNowBypass(scope: 'dashboard' | 'full'): Promise<'restart' | 'handed-off'> {
+  const requesterId = restartGateRequesterId('restart');
+  const lockHolder = await Effect.runPromise(readRestartLockHolder());
+  await registerRestartGateRequest({
+    requesterId,
+    kind: 'restart',
+    reason: `pan restart --now (${scope})`,
+  });
+  const approved = await approveRestartGate();
+
+  if (lockHolder && approved) {
+    console.log(chalk.green(
+      `✓ Approved ${approved.pendingCount} waiting restart request(s).`,
+    ));
+    console.log(
+      `  PID ${lockHolder.pid} (${lockHolder.caller}) already holds the restart lock and performs the restart, ` +
+        'so this command did not start a second one.',
+    );
+    return 'handed-off';
+  }
+
+  await claimRestartGate(requesterId);
+  return 'restart';
+}
+
+/**
+ * `OVERDECK_RESTART_INITIATOR` values that mark an *involuntary* restart —
+ * autonomous recovery, not somebody asking for a deploy. Those must never wait
+ * for an operator: the supervisor watchdog restarts a dashboard that is already
+ * failing its own users, so there is nothing left to interrupt.
+ */
+const INVOLUNTARY_RESTART_INITIATORS = new Set(['supervisor-watchdog']);
+
+/**
+ * Block until the operator approves this restart, unless the caller already
+ * cleared the gate (the deploy script sets RESTART_GATE_CLAIMED_ENV on the
+ * `pan restart` child it spawns to perform the restart it was granted) or the
+ * restart is involuntary recovery.
+ *
+ * Returns false when another approved requester already restarted the
+ * dashboard, in which case this command must not restart again.
+ */
+async function awaitRestartGate(scope: 'dashboard' | 'full'): Promise<boolean> {
+  if (process.env[RESTART_GATE_CLAIMED_ENV] === '1') return true;
+  if (INVOLUNTARY_RESTART_INITIATORS.has(process.env.OVERDECK_RESTART_INITIATOR ?? '')) return true;
+
+  const outcome = await waitForRestartApproval({
+    requesterId: restartGateRequesterId('restart'),
+    kind: 'restart',
+    reason: `pan restart --${scope}`,
+  });
+  if (outcome.proceed) return true;
+
+  console.log(chalk.green('✓ Dashboard already restarted by an approved request — nothing left to do here.'));
+  console.log(chalk.dim(`  ${outcome.detail}.`));
+  return false;
+}
+
 export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
   if (env.OVERDECK_SKIP_SUPERVISOR_CYCLE === '1') return false;
 
@@ -419,7 +526,7 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
 }
 
 export async function restartCommand(options: RestartOptions): Promise<void> {
-  const startedAt = Date.now();
+  let startedAt = Date.now();
   const scope = await resolveScope(options);
   if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
@@ -469,6 +576,24 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     console.log(chalk.yellow(
       '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
     ));
+  }
+
+  // A restart asked for from the CLI is voluntary, so it waits for the operator
+  // rather than interrupting live work. Gate after the cheap refusals above (no
+  // point registering a request this command would refuse anyway) and before
+  // the restart lock, so a blocked `pan restart` never holds the lock that
+  // `pan restart --now` needs. The supervisor watchdog reaches this command too
+  // (src/supervisor/restart-spawn.ts spawns `pan restart --dashboard`), and
+  // awaitRestartGate exempts it: that restart is involuntary recovery.
+  if (scope === 'dashboard' || scope === 'full') {
+    if (options.now) {
+      if (await runRestartNowBypass(scope) === 'handed-off') return;
+    } else if (!await awaitRestartGate(scope)) {
+      return;
+    }
+    // The wait is unbounded, so the pre-wait clock would report a restart that
+    // "took" as long as the operator was away.
+    startedAt = Date.now();
   }
 
   let restartLock: RestartLockHandle | null = null;

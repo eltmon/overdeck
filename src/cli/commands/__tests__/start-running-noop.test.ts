@@ -72,6 +72,7 @@ vi.mock('../../../lib/tmux.js', async () => {
 
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: resolveProjectMock,
+  getProjectSync: vi.fn(),
   findProjectByPathSync: vi.fn(),
   getIssuePrefix: vi.fn(() => 'PAN'),
 }));

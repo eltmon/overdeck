@@ -78,8 +78,13 @@ RESPONSE=$(printf '%s' "$INPUT" | jq -r '
 [ -n "$RESPONSE" ] || RESPONSE=''
 
 if [ "$TOOL_NAME" = 'mcp__linear__authenticate' ]; then
+  # Linear's hosted MCP server (mcp.linear.app) returns its authorization URL
+  # as https://mcp.linear.app/authorize?…; the older form was
+  # https://linear.app/oauth/authorize?…. Match both — a regex that only
+  # knows one host silently emits required with a null URL and the banner
+  # waits forever (observed 2026-08-15).
   AUTH_URL=$(printf '%s\n' "$RESPONSE" \
-    | grep -Eo 'https://linear\.app/oauth/authorize[^"[:space:]<>]*' 2>/dev/null \
+    | grep -Eo 'https://(mcp\.linear\.app/authorize|linear\.app/oauth/authorize)[^"[:space:]<>]*' 2>/dev/null \
     | sed -n '1p')
   emit_required "$AUTH_URL"
   exit 0

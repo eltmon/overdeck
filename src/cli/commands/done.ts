@@ -71,8 +71,8 @@ interface SlotCompletionContext {
   workspacePath: string | null;
 }
 
-function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
-  const match = /^agent-([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
+export function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
+  const match = /^(?:agent-)?([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
   if (!match) return null;
   const slotIndex = Number(match[2]);
   if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;

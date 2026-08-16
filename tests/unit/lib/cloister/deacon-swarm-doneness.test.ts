@@ -192,7 +192,7 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     }, null, 2));
   }
 
-  it('coordinator finalizes an issue whose only remaining items are override-completed', async () => {
+  it('leaves issue-level finalization to the foreman when all items are override-completed', async () => {
     const { execFileSync } = await import('node:child_process');
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
@@ -207,20 +207,12 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     writeRecordOverrides(projectPath, 'pan-900', { 'wi-1': 'completed', 'wi-2': 'completed' });
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
-    expect(actions).toContain('[swarm] finalized PAN-900: issue-level review requested');
+    expect(actions).toEqual([]);
     expect(actions).not.toContain('[swarm] considered PAN-900: swarm eligible');
-    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-900', expect.objectContaining({
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      reviewRequestedAt: expect.any(String),
-    }));
-    expect(mocks.spawnReviewRoleForIssue).toHaveBeenCalledWith({
-      issueId: 'PAN-900',
-      workspace: workspacePath,
-      branch: 'feature/pan-900',
-    });
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    expect(mocks.spawnReviewRoleForIssue).not.toHaveBeenCalled();
   });
 
   it('coordinator still considers an issue with remaining dispatchable items', async () => {
@@ -231,7 +223,7 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     writeRecordOverrides(projectPath, 'pan-901', { 'wi-1': 'completed' });
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] considered PAN-901: swarm eligible');
   });
@@ -246,7 +238,7 @@ describe('swarm terminal spec guard', () => {
     writeSpec(projectPath, 'PAN-906', makeAllCompletedDoc('PAN-906', 'completed'));
     const deps = makeCoordinateDeps('PAN-906', projectPath, workspacePath);
 
-    const actions = await coordinateSwarmSlots({}, deps);
+    const actions = await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(actions).toEqual([]);
     expect(deps.reconcileSlotState).not.toHaveBeenCalled();
@@ -261,7 +253,7 @@ describe('swarm terminal spec guard', () => {
     writeSpec(projectPath, 'PAN-907', makeAllCompletedDoc('PAN-907', 'cancelled'));
     const deps = makeCoordinateDeps('PAN-907', projectPath, workspacePath);
 
-    const actions = await coordinateSwarmSlots({}, deps);
+    const actions = await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(actions).toEqual([]);
     expect(deps.reconcileSlotState).not.toHaveBeenCalled();
@@ -277,7 +269,7 @@ describe('swarm terminal spec guard', () => {
     writeSpec(projectPath, 'PAN-908', doc);
     const deps = makeCoordinateDeps('PAN-908', projectPath, workspacePath);
 
-    await coordinateSwarmSlots({}, deps);
+    await coordinateSwarmSlots({ manual: true }, deps);
 
     expect(deps.reconcileSlotState).toHaveBeenCalledWith('PAN-908', workspacePath, expect.objectContaining({
       plan: expect.objectContaining({ status: 'approved' }),
@@ -316,11 +308,11 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
       },
     }, null, 2));
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] considered PAN-902: endgame (merge/cleanup only)');
     expect(actions).toContain('[swarm] gc slot 1 (item wi-1) for PAN-902');
-    expect(actions).toContain('[swarm] finalized PAN-902: issue-level review requested');
+    expect(actions).not.toContain('[swarm] finalized PAN-902: issue-level review requested');
     expect(actions).not.toContain('[swarm] considered PAN-902: swarm eligible');
   });
 });
@@ -341,7 +333,7 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     }, null, 2));
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).toContain('[swarm] considered PAN-904: swarm eligible');
   });
@@ -353,7 +345,7 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     writeSpec(projectPath, 'PAN-905', makeDoc('PAN-905', 1));
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).not.toContain('[swarm] considered PAN-905: swarm eligible');
   });
@@ -378,7 +370,7 @@ describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
     // coordinateSwarmSlots() with no deps uses defaultDeps, whose readStatusOverrides
     // IS the real defaultReadStatusOverrides under test.
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const actions = await coordinateSwarmSlots();
+    const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[swarm] record unreadable for PAN-910'));
     // Did not throw, and without readable overrides the plan's two pending items are
@@ -389,8 +381,102 @@ describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
   });
 });
 
-describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () => {
-  // defaultIsSlotWorktreeClean now classifies `git status --porcelain` output through the
+describe('PAN-3695: an uncleared merged slot holds finalization and dependent dispatch', () => {
+  it('nested push failure keeps the slot retryable and the dependent undispatched; retry releases both', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-911');
+    mkdirSync(workspacePath, { recursive: true });
+    // wi-2 depends on wi-1: it must not dispatch while wi-1's nested work is
+    // not integrated and pushed, even though wi-1 reads completed.
+    const doc = makeDoc('PAN-911', 2);
+    doc.plan.edges = [{ from: 'wi-1', to: 'wi-2', type: 'blocks' }];
+    writeSpec(projectPath, 'PAN-911', doc);
+
+    const parentRepo = join(projectPath, 'api');
+    const baseDir = join(workspacePath, 'api');
+    const slotWorkspace = `${workspacePath}-slot-1`;
+    const slotBranch = 'feature/pan-911-slot-1';
+    let merged = false;
+    let pushed = false;
+    let pushFails = true;
+
+    const runGitCommand = vi.fn(async (command: string, cwd: string) => {
+      if (command.startsWith('git rev-list --count')) {
+        if (cwd === baseDir && command.includes('origin/')) {
+          return { stdout: `${merged && !pushed ? '1' : '0'}\n` };
+        }
+        if (cwd === parentRepo) return { stdout: merged ? '0\n' : '1\n' };
+        return { stdout: '0\n' };
+      }
+      if (command.startsWith('git status --porcelain')) return { stdout: '' };
+      if (command.startsWith('git merge --no-ff')) {
+        merged = true;
+        return undefined;
+      }
+      if (command.startsWith('git push origin')) {
+        if (pushFails) throw new Error('failed to push some refs');
+        pushed = true;
+        return undefined;
+      }
+      if (command.startsWith('git branch --list')) return { stdout: '' };
+      if (command === 'git worktree list --porcelain') {
+        if (cwd === parentRepo) return { stdout: `worktree ${parentRepo}\n\nworktree ${slotWorkspace}/api\n` };
+        return { stdout: `worktree ${workspacePath}\n\nworktree ${slotWorkspace}\n` };
+      }
+      return undefined;
+    });
+
+    const deps = {
+      ...makeCoordinateDeps('PAN-911', projectPath, workspacePath),
+      reconcileSlotState: vi.fn(async (reconcileIssueId: string) => ({
+        issueId: reconcileIssueId,
+        merged: [{ itemId: 'wi-1', slotIndex: 1, status: 'merged' as const, branch: slotBranch, mergedVia: 'completed-status' as const }],
+        inFlight: [],
+        pending: [],
+        branches: [],
+        agents: [],
+      })),
+      readStatusOverrides: vi.fn(() => ({ 'wi-1': 'completed' })),
+      runGitCommand,
+      slotWorktreeExists: vi.fn((path: string) => path === slotWorkspace),
+      registeredSlotCapacityAvailable: vi.fn(() => true),
+      tryReserveSwarmSlot: vi.fn(() => true),
+      spawnRun: vi.fn(async () => null),
+      // Polyrepo plumbing consumed by gcMergedSlotsWithStatus through deps.
+      listSlotWorkspaceWorktrees: () => ({
+        isPolyrepo: true,
+        nested: [{ repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo, featureBranch: 'feature/pan-911' }],
+      }),
+      listFeatureWorkspaceRepoRoots: () => [
+        { repoKey: 'api', dir: baseDir, sourceBranch: 'feature/pan-911', targetBranch: 'main', isPolyrepo: true },
+      ],
+    } as unknown as CoordinateSwarmSlotsDeps;
+
+    // Pass 1: the merge succeeds but the push fails — the slot stays occupied,
+    // finalization is held, and the dependent wi-2 is NOT dispatched.
+    const holdActions = await coordinateSwarmSlots({ manual: true }, deps);
+
+    expect(holdActions.some(action => action.includes('[swarm] integration pending for PAN-911'))).toBe(true);
+    expect(holdActions.some(action => action.includes('slot 1 (item wi-1)'))).toBe(true);
+    expect(holdActions.some(action => action.includes('dispatched'))).toBe(false);
+    expect(holdActions.some(action => action.includes('finalized PAN-911'))).toBe(false);
+    expect(deps.spawnRun).not.toHaveBeenCalled();
+    expect(deps.requestIssueReview).not.toHaveBeenCalled();
+    expect(deps.clearSlotAssignment).not.toHaveBeenCalled();
+
+    // Pass 2: the push succeeds on retry — GC frees the slot and the dependent
+    // becomes dispatch-eligible in the same patrol.
+    pushFails = false;
+    const releasedActions = await coordinateSwarmSlots({ manual: true }, deps);
+
+    expect(releasedActions).toContain('[swarm] gc slot 1 (item wi-1) for PAN-911');
+    expect(releasedActions.some(action => action.includes('dispatched') && action.includes('wi-2'))).toBe(true);
+    expect(deps.spawnRun).toHaveBeenCalledWith('PAN-911', 'work', expect.objectContaining({ slotItemId: 'wi-2' }));
+  });
+});
+
+describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () => {  // defaultIsSlotWorktreeClean now classifies `git status --porcelain` output through the
   // shared isStatePlaneOnlyStatus classifier: state-plane-only dirt (.pan/continue.json,
   // .pan/records/...) reads clean, any source file reads dirty, empty porcelain reads clean.
   // These are real-git tests so the porcelain flows through the actual `git status` the

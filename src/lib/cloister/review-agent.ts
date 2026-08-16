@@ -44,7 +44,6 @@ import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
-import { isReviewSessionForIssue } from './specialists-registry.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
@@ -58,6 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
+import { isReviewSessionForIssue } from './specialists-registry.js';
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,

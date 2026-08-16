@@ -6,7 +6,7 @@ import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
 import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
-import { packageRoot } from './paths.js';
+import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
@@ -264,6 +264,10 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   // process only (see pty-supervisor.ts).
   lines.push('export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"');
   lines.push('unset TMUX TMUX_PANE STY');
+  // Remote launchers run on Fly VMs where the spawning host's home is invalid.
+  if (config.spawnMode !== 'remote') {
+    lines.push(`export OVERDECK_HOME=${shellQuote(getOverdeckHome())}`);
+  }
 
   // Pipefail
   if (config.setPipefail) {

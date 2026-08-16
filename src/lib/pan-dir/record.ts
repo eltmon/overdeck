@@ -117,6 +117,11 @@ export interface PanIssueSwarmRecord {
     autoAdvance?: boolean;
   };
   finalizedAt?: string;
+  /** Dedicated swarm mutation hold; generic Deacon holds remain in review status. */ hold?: { reason: string; setBy: string; at: string };
+  /** Recovery attempts keyed by slot index, then stable failure class. */
+  interventions?: Record<string, Record<string, number>>;
+  /** Completion-inference samples keyed by the slot progress identity. */
+  completionObservations?: Record<string, { signature: string; nudged: boolean; consecutiveDoneCount: number }>; /** Serial foreman takeovers. */ reclaimedItems?: Record<string, { slotIndex: number; reclaimedAt: string }>;
   /**
    * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
    * keyed by `String(slotIndex)`. `writeSwarmFailedMergeBlock` folds this into
@@ -124,6 +129,7 @@ export interface PanIssueSwarmRecord {
    */
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
+  releasedBlockedSlots?: Record<string, { slotIndex: number; itemId: string; branch?: string; archivedBranch?: string; archivedWorktree?: string; replacementBranch?: string; releasedAt: string }>;
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
   /**
    * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark

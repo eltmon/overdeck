@@ -1,6 +1,6 @@
 ---
 name: pan-handoff
-description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. The focus text MUST be ≤500 characters or the fork is rejected."
+description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737)."
 triggers:
   - pan handoff
   - hand off conversation
@@ -24,7 +24,14 @@ pan handoff [conv] [focus text...]
 
 The trailing text after the conversation reference becomes the focus — no flag required.
 
-> ⚠️ **The focus MUST be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and **no conversation is created** — so count it and keep it under 500 on the first try. Keep the focus short and steering; do NOT pack backstory/context into it — the author reads the full source transcript for that. This is the single most common handoff mistake.
+> Keep the focus short and steering; do NOT pack backstory/context into it — the author reads the full source transcript for that, and long briefs belong in a file the focus points at. The hard cap is 10,000 characters (multi-line is fine; PAN-3737) — a longer focus is rejected with `Fork request rejected: focus must be 10000 characters or fewer` and no conversation is created.
+
+## Where to run it, and where the successor lives
+
+Two separate directories are involved, and each has its own rule:
+
+- **Run the command from your project directory** (the directory your session was launched in). Do NOT `cd` into the `--cwd` target, a `/tmp` brief directory, or any other path first — `--cwd` is where the *successor* will live; you never need to stand there. Sandboxed harnesses (e.g. codex `workspace-write`) block network and non-workspace writes for commands run from untrusted directories. The failure signature is `attempt to write a readonly database` followed by `Could not reach the Overdeck dashboard at http://127.0.0.1:3011 … (fetch failed)` **while the dashboard is actually up** — if you see that pair, re-run from your project directory (PAN-3735).
+- **`--cwd` must be an absolute path to an existing directory under your home directory, inside a git working tree.** The server rejects violations and creates no conversation: `/tmp/...` fails the home-containment check (`Invalid cwd`), a relative path like `../worktree` fails the absolute-path check (the CLI does not resolve it for you), a not-yet-created directory fails the existence check, and a plain non-git directory fails with `Handoff cwd is not inside a git repository`. The reliable recipe is an isolated worktree: `git -C <repo> worktree add -b hoff/<slug> "$HOME/hoff-<slug>-wt" main`, put any brief files in it, then pass it as `--cwd`. In a polyrepo project whose parent directory is not itself a git repo, point `--cwd` at (a worktree of) the relevant sub-repo — the parent fails the git check.
 
 ## Handing off the conversation you are in (the common case)
 
@@ -61,8 +68,8 @@ pan handoff 42
 pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
 pan handoff source-conv --harness pi
-pan handoff source-conv --cwd /path/to/project
-pan handoff source-conv --cwd ../isolated-worktree --project mind-your-now
+pan handoff source-conv --cwd /home/you/Projects/project
+pan handoff source-conv --cwd /home/you/Projects/isolated-worktree --project mind-your-now
 pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into checkout
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
@@ -71,7 +78,7 @@ pan handoff source-conv --issue PAN-1234 continue the API wiring
 
 ## Project and issue association
 
-Use `--project <key-or-name>` when the successor runs from a `--cwd` outside the registered project's directory, such as an isolated worktree. The explicit project wins over the source association; without the flag, the successor inherits the source conversation's project. Unknown projects reject the request and create no conversation.
+Use `--project <key-or-name>` when the successor runs from a `--cwd` outside the registered project's directory, such as an isolated worktree. The `--cwd` value must be an absolute path to an existing directory under your home directory (see "Where to run it, and where the successor lives" above). The explicit project wins over the source association; without the flag, the successor inherits the source conversation's project. Unknown projects reject the request and create no conversation.
 
 Use `--issue <id>` to attach the new conversation to a specific issue (e.g. `PAN-1234`). The flag is validated; an invalid ID rejects the request and creates no conversation. When `--issue` is omitted, the new conversation inherits the source conversation's issue association, if any.
 
@@ -87,7 +94,7 @@ Use a normal summary fork when a quick passive summary is enough. Use a plain fo
 
 The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
 
-**Hard limit: the focus must be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and no conversation is created — so write it under 500 chars on the first try. Don't pack the backstory into the focus; the detail belongs in the transcript the author reads. The focus only steers what the author emphasizes.
+**Hard ceiling: 10,000 characters** (PAN-3737; multi-line focus is allowed). Don't pack the backstory into the focus even so; the detail belongs in the transcript the author reads or in a brief file in the successor cwd. The focus only steers what the author emphasizes, and its first ~70 characters become the new conversation's title.
 
 ## Authoring modes
 

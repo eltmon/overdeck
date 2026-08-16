@@ -20,7 +20,7 @@
  * - Catches everything: scans all transcript files regardless of source
  */
 
-import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, closeSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -31,11 +31,13 @@ import { findConversationForCostSessionSync } from '../overdeck/conversations.js
 import type { IssueId } from '../overdeck/issues.js';
 import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
+import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
 
 // ============== Types ==============
 
 export interface ReconcileResult {
   sessionsScanned: number;
+  cacheSkipped: number;
   sessionsWithNewData: number;
   eventsImported: number;
   duplicatesSkipped: number;
@@ -43,6 +45,15 @@ export interface ReconcileResult {
   earliestEventTs: string | null;
   latestEventTs: string | null;
 }
+
+export type PiCollectedEvent = { event: CostEvent; sourceFile: string };
+export type PiCollectResult = {
+  events: PiCollectedEvent[];
+  verdicts: Array<{ path: string; mtimeMs: number; size: number; verdict: 'imported' | 'no-usage' }>;
+  stats: { scanned: number; cacheSkipped: number; sessionsWithData: number };
+  errors: Array<{ path: string; error: string }>;
+};
+export type PiCollectBatch = Pick<PiCollectResult, 'events' | 'verdicts'>;
 
 interface SessionMapping {
   agentId: string;
@@ -438,24 +449,29 @@ export function extractPiCostEvents(
  * `{"type":"session","version":3,...}` header; we detect that and skip the
  * sibling non-transcripts (activity.jsonl, cost-events.jsonl, pending-events).
  */
-function findPiTranscriptFiles(agentDir: string): string[] {
+type TranscriptFileStat = { path: string; mtimeMs: number; size: number };
+
+function findPiTranscriptFiles(agentDir: string): TranscriptFileStat[] {
   let files: string[];
   try {
     files = readdirSync(agentDir).filter((f) => f.endsWith('.jsonl'));
   } catch {
     return [];
   }
-  const transcripts: string[] = [];
+  const transcripts: TranscriptFileStat[] = [];
   for (const f of files) {
     if (f === 'activity.jsonl' || f === 'cost-events.jsonl' || f === 'pending-events.jsonl') continue;
     const full = join(agentDir, f);
     try {
+      const stat = statSync(full);
       const fd = openSync(full, 'r');
       const buf = Buffer.alloc(128);
       const bytesRead = readSync(fd, buf, 0, 128, 0);
       closeSync(fd);
       const head = buf.toString('utf-8', 0, bytesRead);
-      if (/"type"\s*:\s*"session"/.test(head)) transcripts.push(full);
+      if (/"type"\s*:\s*"session"/.test(head)) {
+        transcripts.push({ path: full, mtimeMs: stat.mtimeMs, size: stat.size });
+      }
     } catch {
       // skip unreadable
     }
@@ -470,17 +486,13 @@ function findPiTranscriptFiles(agentDir: string): string[] {
  * Independent of the pi extension hook, so it captures cost even when the
  * extension emits null usage or the wrong model label.
  */
-export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
-  const result: ReconcileResult = {
-    sessionsScanned: 0,
-    sessionsWithNewData: 0,
-    eventsImported: 0,
-    duplicatesSkipped: 0,
-    errors: [],
-    earliestEventTs: null,
-    latestEventTs: null,
+export async function collectPiCostEvents(opts: {
+  maxEvents?: number;
+  onBatch?: (batch: PiCollectBatch) => Promise<void>;
+} = {}): Promise<PiCollectResult> {
+  const result: PiCollectResult = {
+    events: [], verdicts: [], stats: { scanned: 0, cacheSkipped: 0, sessionsWithData: 0 }, errors: [],
   };
-
   const agentsDir = getAgentsDir();
   if (!existsSync(agentsDir)) return result;
 
@@ -491,6 +503,11 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     return result;
   }
 
+  const candidates: Array<TranscriptFileStat & {
+    agentDirName: string;
+    issueId: string | null;
+    sessionType: string;
+  }> = [];
   for (const agentDirName of agentDirs) {
     const agentPath = join(agentsDir, agentDirName);
 
@@ -510,29 +527,73 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     }
     if (agentDirName.startsWith('planning-')) sessionType = 'planning';
 
-    const transcripts = findPiTranscriptFiles(agentPath);
-    for (const transcriptPath of transcripts) {
-      const sessionId = basename(transcriptPath, '.jsonl');
-      const resolvedIssueId = issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: agentDirName });
-      result.sessionsScanned++;
-      try {
-        const content = readFileSync(transcriptPath, 'utf-8');
-        const events = extractPiCostEvents(content, agentDirName, resolvedIssueId, sessionType, sessionId);
-        if (events.length === 0) continue;
-        result.sessionsWithNewData++;
-        const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
-        result.eventsImported += inserted;
-        result.duplicatesSkipped += duplicates;
-        mergeCoverage(result, { earliestEventTs, latestEventTs });
-      } catch (err) {
-        result.errors.push({
-          path: transcriptPath,
-          error: err instanceof Error ? err.message : String(err),
-        });
+    candidates.push(...findPiTranscriptFiles(agentPath).map(transcript => ({
+      ...transcript, agentDirName, issueId, sessionType,
+    })));
+  }
+
+  candidates.sort((a, b) => a.path.localeCompare(b.path));
+  const maxEvents = opts.maxEvents ?? Number.POSITIVE_INFINITY;
+  const flush = async () => {
+    if (!opts.onBatch || (result.events.length === 0 && result.verdicts.length === 0)) return;
+    const batch = { events: result.events, verdicts: result.verdicts };
+    result.events = [];
+    result.verdicts = [];
+    await opts.onBatch(batch);
+  };
+  for (const transcript of candidates) {
+    const transcriptPath = transcript.path;
+    const sessionId = basename(transcriptPath, '.jsonl');
+    const resolvedIssueId = transcript.issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: transcript.agentDirName });
+    result.stats.scanned++;
+    if (lookupSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size)) {
+      result.stats.cacheSkipped++;
+      continue;
+    }
+    try {
+      const content = readFileSync(transcriptPath, 'utf-8');
+      const events = extractPiCostEvents(content, transcript.agentDirName, resolvedIssueId, transcript.sessionType, sessionId);
+      if (events.length === 0) {
+        result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'no-usage' });
+        await flush();
+        continue;
       }
+      result.stats.sessionsWithData++;
+      for (const event of events) {
+        result.events.push({ event, sourceFile: `reconciler:${transcriptPath}` });
+        if (result.events.length >= maxEvents) await flush();
+      }
+      result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'imported' });
+      await flush();
+    } catch (err) {
+      result.errors.push({
+        path: transcriptPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
+  await flush();
+
+  return result;
+}
+
+export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
+  const collected = await collectPiCostEvents();
+  const result: ReconcileResult = {
+    sessionsScanned: collected.stats.scanned, cacheSkipped: collected.stats.cacheSkipped,
+    sessionsWithNewData: collected.stats.sessionsWithData, eventsImported: 0, duplicatesSkipped: 0,
+    errors: collected.errors, earliestEventTs: null, latestEventTs: null,
+  };
+  for (const { event, sourceFile } of collected.events) {
+    const recorded = await recordCostEventsThroughOverdeck([event], sourceFile);
+    result.eventsImported += recorded.inserted;
+    result.duplicatesSkipped += recorded.duplicates;
+    mergeCoverage(result, recorded);
+  }
+  for (const verdict of collected.verdicts) {
+    recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+  }
   return result;
 }
 
@@ -555,7 +616,7 @@ function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCost
   };
 }
 
-async function recordCostEventsThroughOverdeck(
+export async function recordCostEventsThroughOverdeck(
   events: CostEvent[],
   sourceFile: string,
   opts: { dryRun?: boolean } = {},
@@ -597,6 +658,7 @@ function mergeCoverage(
 async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
+    cacheSkipped: 0,
     sessionsWithNewData: 0,
     eventsImported: 0,
     duplicatesSkipped: 0,
@@ -647,6 +709,11 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
       result.sessionsScanned++;
 
       try {
+        const transcriptStat = statSync(transcriptPath);
+        if (lookupSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size)) {
+          result.cacheSkipped++;
+          continue;
+        }
         // Look up agent mapping for this session
         const mapping = sessionIndex.get(sessionId);
         const agentId = mapping?.agentId || 'unattributed';
@@ -662,6 +729,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
           if (!opts.dryRun && readResult && readResult.newSize > lastOffset) {
             saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
           }
+          if (!opts.dryRun) recordSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size, 'no-usage');
           continue;
         }
 
@@ -684,6 +752,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
 
         if (!opts.dryRun) {
           saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+          recordSkipVerdict(transcriptPath, transcriptStat.mtimeMs, transcriptStat.size, 'imported');
         }
       } catch (err) {
         result.errors.push({
@@ -748,6 +817,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
   if (opts.includePi ?? true) {
     const piResult = await reconcilePiTranscripts();
     result.sessionsScanned += piResult.sessionsScanned;
+    result.cacheSkipped += piResult.cacheSkipped;
     result.sessionsWithNewData += piResult.sessionsWithNewData;
     result.eventsImported += piResult.eventsImported;
     result.duplicatesSkipped += piResult.duplicatesSkipped;

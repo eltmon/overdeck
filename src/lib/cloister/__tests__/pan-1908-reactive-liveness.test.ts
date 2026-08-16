@@ -74,6 +74,7 @@ vi.mock('../../../lib/agents.js', () => ({
 }));
 
 vi.mock('../../../lib/tmux.js', () => ({
+  listSessionNamesSync: () => [],
   sessionExists: (...args: unknown[]) => Effect.succeed(mockSessionExists(...args)),
   sessionExistsSync: (...args: unknown[]) => mockSessionExistsSync(...args),
   querySessionSync: (...args: unknown[]) => mockQuerySessionSync(...args),
@@ -212,6 +213,15 @@ describe('PAN-1908 reactive liveness handlers', () => {
     it('returns null and skips non-existent agents', async () => {
       mockGetAgentStateSync.mockReturnValue(null);
       const result = await handleAgentStoppedEvent('agent-pan-1908');
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('leaves stopped swarm foremen for the swarm janitor', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ foreman: true }));
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
       expect(result).toBeNull();
       expect(mockResumeAgent).not.toHaveBeenCalled();
     });

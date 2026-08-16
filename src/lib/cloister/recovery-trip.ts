@@ -71,3 +71,45 @@ export async function acknowledgeRecoveryTrip(workspacePath: string, issue: stri
     recoveryTrips: (record.recoveryTrips ?? []).filter(trip => !(trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration)),
   }));
 }
+
+/**
+ * Acknowledge every open recovery trip on one issue via the record door.
+ * Returns the count acked; unresolvable/unreadable issues return 0.
+ *
+ * Removes every open trip in ONE `updateIssueRecordForWorkspace` mutation
+ * (one locked read/write/commit/push cycle) instead of one durable write per
+ * trip — N open trips on close-out or the residue patrol previously meant N
+ * serial git-backed writes for a single record (review finding, PAN-3727).
+ * The write is atomic per issue: if the mutation itself fails (e.g. record
+ * lock contention), the whole ack for that issue is warned and skipped
+ * rather than partially applied — the caller's per-issue isolation (see
+ * closeOut() and reconcileTerminalIssueResidue()) is what keeps one issue's
+ * failure from blocking the rest.
+ */
+export async function acknowledgeAllOpenRecoveryTrips(issueId: string): Promise<number> {
+  const normalized = issueId.toUpperCase();
+  const resolved = resolveProjectFromIssueSync(normalized);
+  if (!resolved) return 0;
+  const project = getProjectSync(resolved.projectKey);
+  if (!project) return 0;
+  const record = await readIssueRecord(project, normalized);
+  const openTrips = (record?.recoveryTrips ?? []).filter(trip => trip.open === true);
+  if (openTrips.length === 0) return 0;
+
+  const isOpenTrip = (trip: PanIssueRecoveryTrip) => openTrips.some(open =>
+    trip.issue === open.issue && trip.recoveryPath === open.recoveryPath && trip.obligationGeneration === open.obligationGeneration);
+
+  let acked = 0;
+  try {
+    await updateIssueRecordForWorkspace(resolved.projectPath, normalized, current => {
+      const before = current.recoveryTrips ?? [];
+      const remaining = before.filter(trip => !isOpenTrip(trip));
+      acked = before.length - remaining.length;
+      return { ...current, recoveryTrips: remaining };
+    });
+  } catch (error) {
+    console.warn(`  ! failed to ack open trips for ${normalized}: ${error instanceof Error ? error.message : String(error)}`);
+    return 0;
+  }
+  return acked;
+}
