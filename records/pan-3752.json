@@ -22,6 +22,11 @@
       "timestamp": "2026-08-16T19:19:46.395Z",
       "reason": "end",
       "note": "Specialist retry: the reported failure was dispatch lock contention, not a test failure. Verified the PAN-3752 record lock is now absent and the prior owner PID has exited. No code change was required; the branch remains clean and pushed. Existing final gates remain green: npm run typecheck, npm run lint, and npm test (13,940 backend tests plus 64 frontend tests passed). Re-dispatch review and test."
+    },
+    {
+      "timestamp": "2026-08-16T19:49:31.768Z",
+      "reason": "end",
+      "note": "Verification rework: lint:skills intermittently read the shared dist CLI while another specialist rebuilt it. Extended its bounded retry window to cover a competing build without suppressing genuine command failures. npm run lint:skills and the complete npm run lint gate pass. Commit a578b38330 is pushed; pan review request returned a stale-review no-op, so this completion call records the newer reviewed head and re-enters verification."
     }
   ],
   "feedback": [],
@@ -54,7 +59,7 @@
     "recordedAt": "2026-08-16T19:49:22.663Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:49:23.999Z",
+  "updated": "2026-08-16T19:49:31.829Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -65,7 +70,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:49:23.994Z",
+    "updatedAt": "2026-08-16T19:49:31.762Z",
     "testNotes": "npm run typecheck: exits 0 (contracts build, tsc, hooks/evals/dashboard/frontend/acp type-guard scripts all pass, 0 new errors). npm run lint: exits 0 (skills/slash-commands/prompts/file-size/source-introspection/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass). npm test (vitest full suite + frontend issueActions/fr7 suites): 13920 passed, 20 failed, 51 skipped across 1482 files. All 20 failures are in tests/unit/lib/lifecycle/workflows.test.ts, a close-out lifecycle suite unrelated to this branch's scope (files_scope: src/dashboard/server/services/dashboard-db-task.ts, dashboard-db-worker.ts, ws-rpc.ts, docs/DASHBOARD-ARCHITECTURE.md, tests/unit/dashboard/*). Re-ran that file in isolation: 57 passed, 1 skipped, 0 failed — confirms a full-suite-only flake (matches the same 'transient anomaly, passes on isolated rerun' pattern the work agent's own session history already recorded for this issue), not a regression from this diff. `npm run build` bundling itself succeeded (frontend + server dist rebuilt, dist/dashboard/server.js now contains parseTranscriptSnapshot); the script's overall non-zero exit came only from a post-build `lint:dist-externals` check flagging a stale, pre-existing playwright allowlist entry in scripts/dist-externals-allowlist.txt (added by PAN-1645, unrelated to this branch — this PR touches no tsdown config or dist-externals files).",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -106,15 +111,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3010752,
-            "output": 2950,
-            "cacheRead": 2467328,
+            "input": 3285027,
+            "output": 3118,
+            "cacheRead": 2607104,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 46120344,
-            "output": 53612,
-            "cacheRead": 45240320,
+            "input": 49669514,
+            "output": 56127,
+            "cacheRead": 48763904,
             "cacheWrite": 0
           }
         },
@@ -128,24 +133,24 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 154,
-            "output": 43776,
-            "cacheRead": 15261091,
-            "cacheWrite": 229065
+            "input": 156,
+            "output": 44651,
+            "cacheRead": 15519485,
+            "cacheWrite": 230876
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3010752,
-          "output": 2950,
-          "cacheRead": 2467328,
+          "input": 3285027,
+          "output": 3118,
+          "cacheRead": 2607104,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 46120344,
-          "output": 53612,
-          "cacheRead": 45240320,
+          "input": 49669514,
+          "output": 56127,
+          "cacheRead": 48763904,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -155,15 +160,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 154,
-          "output": 43776,
-          "cacheRead": 15261091,
-          "cacheWrite": 229065
+          "input": 156,
+          "output": 44651,
+          "cacheRead": 15519485,
+          "cacheWrite": 230876
         }
       },
       "costAtCloseOut": {
-        "usd": 32.692614,
-        "pricingAsOf": "2026-08-16T19:46:28.634Z"
+        "usd": 34.722746,
+        "pricingAsOf": "2026-08-16T19:49:31.790Z"
       }
     },
     "merges": [
