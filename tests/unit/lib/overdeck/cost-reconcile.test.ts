@@ -12,6 +12,7 @@ vi.mock('node:fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn(),
     readdirSync: vi.fn(),
+    statSync: vi.fn(() => ({ mtimeMs: 1, size: 1 })),
   };
 });
 
@@ -23,6 +24,11 @@ vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
   parseCodexSessionCostEventsSync: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/costs/skip-cache.js', () => ({
+  lookupSkipVerdict: vi.fn(() => null),
+  recordSkipVerdict: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {

@@ -1,5 +1,92 @@
-import { describe, expect, it } from 'vitest';
-import { applyConversationMessagesEvent, shouldStreamConversationMessages } from '../useConversationMessagesStream';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ConversationEvent } from '../chat-types';
+
+const transportMock = vi.hoisted(() => ({
+  listeners: [] as Array<(event: ConversationEvent) => void>,
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  getTransport: () => ({
+    subscribe: (_createStream: unknown, listener: (event: ConversationEvent) => void) => {
+      transportMock.listeners.push(listener);
+      return vi.fn();
+    },
+  }),
+}));
+
+import {
+  applyConversationMessagesEvent,
+  shouldStreamConversationMessages,
+  useConversationMessagesStream,
+} from '../useConversationMessagesStream';
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+beforeEach(() => {
+  transportMock.listeners.length = 0;
+});
+
+describe('useConversationMessagesStream', () => {
+  const conversation = {
+    id: 1,
+    name: 'conv-one',
+    sessionAlive: true,
+    harness: 'claude-code' as const,
+  };
+
+  it('reports no first payload before the stream emits an event', () => {
+    const { result } = renderHook(
+      () => useConversationMessagesStream(conversation),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current).toEqual({ enabled: true, receivedFirstPayload: false });
+  });
+
+  it('reports the first payload after the stream emits an event', () => {
+    const { result } = renderHook(
+      () => useConversationMessagesStream(conversation),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+
+    expect(result.current.receivedFirstPayload).toBe(true);
+  });
+
+  it('does not expose the prior first-payload signal when the conversation changes', () => {
+    const { result, rerender } = renderHook(
+      ({ name }) => useConversationMessagesStream({ ...conversation, name }),
+      { initialProps: { name: 'conv-one' }, wrapper: createWrapper() },
+    );
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+    expect(result.current.receivedFirstPayload).toBe(true);
+
+    rerender({ name: 'conv-two' });
+
+    expect(result.current.receivedFirstPayload).toBe(false);
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+
+    expect(result.current.receivedFirstPayload).toBe(false);
+  });
+});
 
 describe('applyConversationMessagesEvent', () => {
   it('replaces cache contents for full snapshots', () => {

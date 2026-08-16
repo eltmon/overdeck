@@ -40,6 +40,8 @@ The cockpit is organized around the live run. Its header carries one phase sente
 
 Legacy `?tab=` values keep working: `?tab=conversation` and `?tab=terminal` open the consolidated Session surface in the matching view mode, while Tasks, Code, Files, Artifacts, Timeline, Costs, and Ship normalize into the other five destinations. Costs opens Overview with the persistent cost rail available, while Ship opens Overview with the full merge progress and live log visible. When no route selection is present, an issue with any session opens Session; an issue without a run opens Overview.
 
+The conversation panel distinguishes loading from settled empty states. The awaiting-payload skeleton means the transcript has not arrived and makes no claim about its contents. “How can I help you?” means the first payload arrived and confirmed an empty live conversation. “Starting…” means a new session remains within its spawn window. The orphaned state means a non-live session loaded with no saved activity. The fetch-failed state offers Retry because the request failed and the saved history may remain intact.
+
 The body uses a collapsible crew spine, a main tab workspace, and a persistent awareness rail. The crew spine nests review specialists beneath Review and uses one semantic status signal per row. The awareness rail keeps Now, Run details, Gates, Cost, Environment, and Recent activity visible; its links promote the full cost rollup or switch to Activity. On narrower containers the rail reflows below the spine and main workspace rather than disappearing. See the [cockpit redesign v2 mockup](../design/issue-detail-redesign-mockup-v2.html).
 
 To add or move an issue-view section without losing an existing surface:
