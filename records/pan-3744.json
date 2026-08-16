@@ -60,18 +60,18 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:22:48.956Z",
+  "updated": "2026-08-16T10:22:53.164Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:22:43.527Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-08-16T10:22:45.210Z",
+    "reviewNotes": "Conversation switching can paint a false settled-empty state before the current stream emits its first payload.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
     "lastVerifiedCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
@@ -137,7 +137,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.037618,
-        "pricingAsOf": "2026-08-16T10:22:43.822Z"
+        "pricingAsOf": "2026-08-16T10:22:53.050Z"
       }
     },
     "merges": [
