@@ -46,17 +46,17 @@
     "recordedAt": "2026-08-16T19:09:21.222Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:09:30.026Z",
+  "updated": "2026-08-16T19:09:36.608Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:09:29.920Z",
+    "updatedAt": "2026-08-16T19:09:32.593Z",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3756",
     "reviewRequestedAt": "2026-08-16T19:09:25.075Z",
@@ -97,9 +97,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 35281810,
-            "output": 33934,
-            "cacheRead": 34826240,
+            "input": 35456312,
+            "output": 34367,
+            "cacheRead": 34998784,
             "cacheWrite": 0
           }
         },
@@ -120,9 +120,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 35281810,
-          "output": 33934,
-          "cacheRead": 34826240,
+          "input": 35456312,
+          "output": 34367,
+          "cacheRead": 34998784,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -133,8 +133,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 20.710011,
-        "pricingAsOf": "2026-08-16T19:09:29.975Z"
+        "usd": 20.819063,
+        "pricingAsOf": "2026-08-16T19:09:36.581Z"
       }
     },
     "merges": [
