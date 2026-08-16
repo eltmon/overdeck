@@ -70,6 +70,18 @@ const mergeBatchMocks = vi.hoisted(() => ({
   ),
 }));
 
+const mergeEligibilityMocks = vi.hoisted(() => ({
+  gatherMergeEligibility: vi.fn(async (issueIds: string[]) => new Map(issueIds.map((issueId) => [issueId, {
+    issueId, bucket: 'in_flight', inPipeline: true, reasons: ['open PR'], labelDrift: null,
+    lenses: { L1_openPr: true, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+  }]))),
+}));
+
+vi.mock('../../../../lib/cloister/merge-eligibility.js', () => ({
+  gatherMergeEligibility: mergeEligibilityMocks.gatherMergeEligibility,
+  isMergeEligible: (membership: { bucket: string }) => membership.bucket === 'in_flight',
+}));
+
 /**
  * The real batch semantics, used by the ported PAN-1691 case: merge one at a
  * time and stop at the first failure, because everything after it would need
@@ -471,6 +483,22 @@ describe('PAN-1696 merge-train-routes', () => {
 
   // ── AC3: merge-next from a named project's ready set ───────────────────────
   describe('POST /api/merge-train/merge-next (ac3)', () => {
+    it('returns 409 without merging when the queue head needs disposition', async () => {
+      const gatherEligibility = vi.fn(async () => new Map([['MIN-831', {
+        issueId: 'MIN-831', bucket: 'planned_backlog' as const, inPipeline: true,
+        reasons: ['open issue with an unmerged branch but no PR — needs disposition'], labelDrift: null,
+        lenses: { L1_openPr: false, L2_unmergedBranch: true, L3_issueOpen: true, L4_phaseLabel: 'planned' },
+      }]]));
+
+      const result = await postMergeTrainMergeNextPayload(
+        { n: 1, project: 'myn' },
+        { getOrderedIssueIds: async () => ['MIN-831'], gatherEligibility },
+      );
+
+      expect(result).toEqual({ status: 409, body: { error: expect.stringContaining('MIN-831 is not merge-eligible:') } });
+      expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
+    });
+
     it('merges the first n issues of the named project ready set', async () => {
       mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation((path: string) =>
         path === '/repos/myn'
