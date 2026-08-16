@@ -231,6 +231,8 @@ function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumbe
 
 export async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
   try {
+    const status = await Effect.runPromise(getReviewStatus(issueId));
+    if (!status || status.retiredAt) return;
     // Resolve PR merge state. Prefer the GitHub App REST path (installation
     // token, separate rate-limit budget, no GraphQL) when configured; fall back
     // to `gh pr view` (GraphQL) only when the App is not set up. Previously this
@@ -294,9 +296,6 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
         && FAILING_CHECK_CONCLUSIONS.has((check.conclusion || check.state || '').toUpperCase()),
       );
     }
-
-    const status = await Effect.runPromise(getReviewStatus(issueId));
-    if (!status) return;
 
     const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
 

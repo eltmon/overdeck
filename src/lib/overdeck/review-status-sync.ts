@@ -554,10 +554,11 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
   const rows = db.prepare(`
     SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
     FROM review_status
-    WHERE ready_for_merge = 1
+    WHERE retired_at IS NULL AND (
+      ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
       OR blocker_reasons LIKE '%not_mergeable%'
-      OR blocker_reasons LIKE '%failing_checks%'
+      OR blocker_reasons LIKE '%failing_checks%')
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;

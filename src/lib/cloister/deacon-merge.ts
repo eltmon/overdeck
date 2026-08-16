@@ -155,7 +155,7 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 
     for (const [issueId, status] of Object.entries(statuses)) {
       const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
-      if (status.mergeStatus === 'merged' && !postMergeIncomplete) continue;
+      if (status.retiredAt || (status.mergeStatus === 'merged' && !postMergeIncomplete)) continue;
       if (isStuckMergingState(status, Date.now())) continue;
       if (!postMergeIncomplete && staleMergeReconciled.has(issueId)) continue;
 
@@ -289,7 +289,7 @@ export async function reconcileFalseMerged(): Promise<string[]> {
     const statuses = loadReviewStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus !== 'merged') continue;
+      if (status.retiredAt || status.mergeStatus !== 'merged') continue;
       if (!status.prUrl) continue;
       if (falseMergedReset.has(issueId)) continue;
 
@@ -360,7 +360,7 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (!status.readyForMerge) continue;
+      if (status.retiredAt || !status.readyForMerge) continue;
       if (!status.prUrl) continue;
 
       const cooledUntil = closedPrReadyReconcileCooldowns.get(issueId);
@@ -449,7 +449,7 @@ export async function reconcileStaleMergeBlockers(
     const now = Date.now();
     const deps = buildRealConflictGateDeps();
     const candidates = Object.entries(statuses).filter(([, status]) =>
-      status.mergeStatus !== 'merged' && (status.blockerReasons ?? []).some(
+      !status.retiredAt && status.mergeStatus !== 'merged' && (status.blockerReasons ?? []).some(
         (b) => b.type === 'merge_conflict' || b.type === 'not_mergeable',
       ));
     const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
@@ -489,7 +489,6 @@ export async function reconcileStaleMergeBlockers(
 /**
  * Reconciler (PAN-2198): periodic twin of the boot-only fixStuckReadyForMerge,
  * for the NO-BLOCKER strand of "stuck after review".
- *
  * Blocker strands remain owned by reconcileStaleMergeBlockers. Membership
  * prevents restoration without an open PR; successful restoration is idempotent.
  */
@@ -499,7 +498,8 @@ export async function reconcileStuckReadyForMerge(
   const actions: string[] = [];
   try {
     const candidates = Object.entries(loadReviewStatuses()).filter(([, status]) =>
-      status.readyForMerge === false
+      !status.retiredAt
+      && status.readyForMerge === false
       && (status.blockerReasons?.length ?? 0) === 0
       && reviewGatesPassedSync(status));
     const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
@@ -528,7 +528,7 @@ export async function reconcileMergedButReviewing(): Promise<string[]> {
     const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus !== 'merged') continue;
+      if (status.retiredAt || status.mergeStatus !== 'merged') continue;
       const reviewNonTerminal = nonTerminal.has(status.reviewStatus as string | undefined);
       const testNonTerminal = nonTerminal.has(status.testStatus as string | undefined);
       if (!reviewNonTerminal && !testNonTerminal) continue;

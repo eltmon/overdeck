@@ -321,7 +321,7 @@ export function setReviewStatusSync(
   });
 
   // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
-  if (readyForMerge && !status.readyForMerge && updated.prUrl) {
+  if (readyForMerge && !status.readyForMerge && !updated.retiredAt && updated.prUrl) {
     (async () => {
       try {
         const { isGitHubAppConfigured, reportCommitStatus } = await import('./github-app.js');

@@ -1126,6 +1126,16 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
     ghPrViewStdout = '';
   });
 
+  it('does not query GitHub for a retired record', async () => {
+    mockGetReviewStatus.mockReturnValue({ retiredAt: '2026-08-16T00:00:00Z', blockerReasons: [] });
+
+    await refreshMergeStateFromGitHub('PAN-3753', 'test-owner/test-repo', 42);
+
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
   it('uses the App REST path (not gh) when the App is configured', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
     mockGetPullRequestState.mockReturnValue(makeAppPrState({ mergeable: false, mergeableState: 'dirty' }));
