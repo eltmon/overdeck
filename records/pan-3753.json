@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T18:41:53.124Z",
+  "updated": "2026-08-16T18:48:05.978Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "projection-gate-merge-eligibility": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 589813,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:41:53.124Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added canonical per-project membership gathers and gated stale-blocker, patrol, and startup readyForMerge restoration; added fake-timer regression tests.",
         "releasedAt": "2026-08-16T18:41:36.981Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 589813,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:41:53.124Z",
+        "itemId": "projection-gate-merge-eligibility",
+        "outcome": "completed",
+        "reason": "Made merge-train candidate projection async, filtered through canonical in_flight membership, updated every caller, and added projection regression coverage.",
+        "releasedAt": "2026-08-16T18:48:05.978Z"
       }
     ],
     "statusReasons": {
       "membership-gate-readyformerge": {
         "reason": "Added canonical per-project membership gathers and gated stale-blocker, patrol, and startup readyForMerge restoration; added fake-timer regression tests.",
         "updatedAt": "2026-08-16T18:41:36.981Z"
+      },
+      "projection-gate-merge-eligibility": {
+        "reason": "Made merge-train candidate projection async, filtered through canonical in_flight membership, updated every caller, and added projection regression coverage.",
+        "updatedAt": "2026-08-16T18:48:05.978Z"
       }
     }
   },
@@ -89,6 +96,9 @@
     "membership-gate-readyformerge.ac2": "completed",
     "membership-gate-readyformerge.ac3": "completed",
     "membership-gate-readyformerge.ac4": "completed",
-    "projection-gate-merge-eligibility": "running"
+    "projection-gate-merge-eligibility": "completed",
+    "projection-gate-merge-eligibility.ac1": "completed",
+    "projection-gate-merge-eligibility.ac2": "completed",
+    "projection-gate-merge-eligibility.ac3": "completed"
   }
 }
