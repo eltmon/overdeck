@@ -17,9 +17,22 @@
       "timestamp": "2026-08-16T18:32:10.539Z",
       "reason": "end",
       "note": "Anomalies: the schema size gate required a PAN-3754 allowlist audit commit, and one state-write ref race succeeded on retry. Deviation: that audit is a second commit because history rewriting is forbidden. Delivered trigger provenance, calm-PSI early re-admission, accurate patrol messages, real swap/PSI details, tests, and docs. Full tests, typecheck, and lint pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-16T18:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-16T18:44:06.869Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-16T18:44:06Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3754\n\n# Review Synthesis — PAN-3754 — 2026-08-16T18:43:37Z\n\n## Verdict: CHANGES REQUESTED — the PSI-calm timer can predate a new pressure hold and permit immediate re-admission\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/context.json`\n- Branch: `feature/pan-3754`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754`\n- HEAD reviewed: `f49a667a9ef2f1f95ea4a67397a4ae229c569f9d`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/correctness.md` | 3 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] PSI-calm time can accumulate before a pressure hold — `src/lib/cloister/memory-governor.ts:225`\n`psiCalmSinceMs` starts whenever PSI is calm, including while the governor is admitting. A later soft dip can therefore enter `holding` with an already-expired calm window and re-admit on the next qualifying sample. The clock must start from a calm sample after the non-admitting transition and reset for each new hold or shedding trigger. A fake-timer regression test must prove that calm time accumulated while admitting does not count.\n\n### [correctness] Invalid calm configuration can bypass or disable the dwell gate — `src/lib/config-yaml/merge.ts:691`\nThe new values accept every JavaScript number. A zero or negative window permits immediate re-admission, while non-finite or negative threshold values produce invalid comparisons. Accept only a finite, non-negative PSI threshold and a finite, positive window; otherwise retain defaults. Cover zero, negative, `NaN`, and infinity at the supported parsing boundary.\n\n### [correctness] Swap trigger provenance stores the wrong active threshold — `src/lib/cloister/memory-governor.ts:174`\nWhen the governor is already non-admitting, `swapLow` compares against the recovery threshold, but `swap-psi` and `psi-unavailable` provenance stores the lower soft threshold. Operator messages can then claim a reading is under a threshold that it exceeds. Compute the active threshold once and use it for both the comparison and stored trigger, with a transition test whose swap reading lies between the two thresholds.\n\n### [requirements] The governor guide gives contradictory swap recovery rules — `docs/RESOURCE-GOVERNOR.md:136`\n**Scope:** `in_pr_scope`. The PR documents PSI-calm early re-admission at SOFT, but the swap-runway section still says re-admission requires both RAM and swap recovery. Clarify that swap recovery applies to the normal recovery path and that PSI-calm early re-admission is the exception.\n\n## Non-blocking Findings\n\n### [correctness] Patrol test fixtures omit the required `thresholds` field — `tests/unit/lib/cloister/memory-pressure-patrol.test.ts:128`\nSeveral newly added `MemoryVerdict` fixtures omit `thresholds`. Production typecheck excludes these tests, so this does not block shipping, but the fixtures no longer represent the declared runtime contract.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Performance found no regressions or advisories.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3754/.pan/review/agent-pan-3754-review-f49a667a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3754 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -53,18 +66,18 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:36:01.881Z",
+  "updated": "2026-08-16T18:44:06.869Z",
   "pipeline": {
     "issueId": "PAN-3754",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T18:36:01.753Z",
+    "updatedAt": "2026-08-16T18:44:05.936Z",
+    "reviewNotes": "PSI-calm timing, config validation, swap provenance, and governor documentation require correction",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
-    "reviewRequestedAt": "2026-08-16T18:32:06.251Z",
     "reviewSpawnedAt": "2026-08-16T18:36:01.752Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -110,9 +123,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 13318193,
-            "output": 26952,
-            "cacheRead": 13087744,
+            "input": 16330476,
+            "output": 37583,
+            "cacheRead": 15797248,
             "cacheWrite": 0
           }
         }
@@ -125,15 +138,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13318193,
-          "output": 26952,
-          "cacheRead": 13087744,
+          "input": 16330476,
+          "output": 37583,
+          "cacheRead": 15797248,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.504677000000001,
-        "pricingAsOf": "2026-08-16T18:36:01.817Z"
+        "usd": 11.692254,
+        "pricingAsOf": "2026-08-16T18:44:05.968Z"
       }
     },
     "merges": [
