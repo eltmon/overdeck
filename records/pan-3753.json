@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:26:38.193Z",
+  "updated": "2026-08-16T19:27:58.609Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-retirement-terminal-generations": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 1217757,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T19:26:38.193Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -183,6 +175,16 @@
         "itemId": "merge-next-membership-validation",
         "outcome": "completed",
         "releasedAt": "2026-08-16T19:25:41.717Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 1217757,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:26:38.193Z",
+        "itemId": "docs-retirement-terminal-generations",
+        "outcome": "completed",
+        "releasedAt": "2026-08-16T19:27:58.609Z"
       }
     ],
     "statusReasons": {
@@ -242,6 +244,9 @@
     "merge-next-membership-validation": "completed",
     "merge-next-membership-validation.ac1": "completed",
     "merge-next-membership-validation.ac2": "completed",
-    "docs-retirement-terminal-generations": "running"
+    "docs-retirement-terminal-generations": "completed",
+    "docs-retirement-terminal-generations.ac1": "completed",
+    "docs-retirement-terminal-generations.ac2": "completed",
+    "docs-retirement-terminal-generations.ac3": "completed"
   }
 }
