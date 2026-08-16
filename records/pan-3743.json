@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:27:05.821Z",
+  "updated": "2026-08-16T09:33:26.279Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "codex-skip-cache": {
-        "writerId": "agent-pan-3743",
-        "agentId": "agent-pan-3743",
-        "pid": 2720090,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:27:05.821Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added runtime schema top-up, exact-stat skip verdict persistence, and focused schema/cache/type-boundary tests",
         "releasedAt": "2026-08-16T09:26:52.932Z"
+      },
+      {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 2720090,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:27:05.821Z",
+        "itemId": "codex-skip-cache",
+        "outcome": "completed",
+        "reason": "Cached terminal codex reconcile verdicts by exact file stat, suppressed cache-hit log floods, added sweep summaries and focused invalidation/error tests",
+        "releasedAt": "2026-08-16T09:33:26.279Z"
       }
     ],
     "statusReasons": {
       "skip-verdict-store": {
         "reason": "Added runtime schema top-up, exact-stat skip verdict persistence, and focused schema/cache/type-boundary tests",
         "updatedAt": "2026-08-16T09:26:52.932Z"
+      },
+      "codex-skip-cache": {
+        "reason": "Cached terminal codex reconcile verdicts by exact file stat, suppressed cache-hit log floods, added sweep summaries and focused invalidation/error tests",
+        "updatedAt": "2026-08-16T09:33:26.279Z"
       }
     }
   },
@@ -89,6 +96,10 @@
     "skip-verdict-store.ac2": "completed",
     "skip-verdict-store.ac3": "completed",
     "skip-verdict-store.ac4": "completed",
-    "codex-skip-cache": "running"
+    "codex-skip-cache": "completed",
+    "codex-skip-cache.ac1": "completed",
+    "codex-skip-cache.ac2": "completed",
+    "codex-skip-cache.ac3": "completed",
+    "codex-skip-cache.ac4": "completed"
   }
 }
