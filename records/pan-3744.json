@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:03:31.513Z",
+  "updated": "2026-08-16T09:04:32.942Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "transcript-skeleton-component": {
+        "writerId": "agent-pan-3744",
+        "agentId": "agent-pan-3744",
+        "pid": 2272304,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:04:32.942Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3744",
@@ -100,6 +108,7 @@
     "gate-empty-states-on-first-payload.ac1": "completed",
     "gate-empty-states-on-first-payload.ac2": "completed",
     "gate-empty-states-on-first-payload.ac3": "completed",
-    "gate-empty-states-on-first-payload.ac4": "completed"
+    "gate-empty-states-on-first-payload.ac4": "completed",
+    "transcript-skeleton-component": "running"
   }
 }
