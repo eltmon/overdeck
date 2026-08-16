@@ -354,11 +354,37 @@ async function spawnInspectAgentPromise(
     const deliver = deps.deliver ?? deliverAgentMessage;
     const result = await deliver(workAgentId, message, 'inspect-verdict');
     if (!result.ok) {
-      console.error(`[inspect] FAILED to deliver ${status} verdict for ${issueId} item ${itemId} to ${workAgentId}: ${result.failure ?? 'unknown'}`);
+      await reportInspectVerdictDeliveryFailure(issueId, itemId, workAgentId, status, result.failure ?? 'unknown');
     }
   } catch (err) {
-    console.error(`[inspect] FAILED to deliver ${status} verdict for ${issueId} item ${itemId} to ${workAgentId}: ${err instanceof Error ? err.message : String(err)}`);
+    await reportInspectVerdictDeliveryFailure(issueId, itemId, workAgentId, status, err instanceof Error ? err.message : String(err));
   }
+}
+
+/**
+ * A lost inspect verdict deadlocks a waiting work agent by design (PAN-3078),
+ * so a delivery failure must be operator-visible, not only logged. Surface the
+ * same needs-you mark the review-verdict path uses (PAN-2228) — observed
+ * 2026-08-16 when a state-projected strict 'supervisor' method threw
+ * socket-missing for a codex app-server work agent and the PAN-3743 review
+ * loop stalled with only a console.error to show for it (PAN-2848 family).
+ */
+async function reportInspectVerdictDeliveryFailure(
+  issueId: string,
+  itemId: string,
+  workAgentId: string,
+  status: 'passed' | 'failed',
+  reason: string,
+): Promise<void> {
+  console.error(`[inspect] FAILED to deliver ${status} verdict for ${issueId} item ${itemId} to ${workAgentId}: ${reason}`);
+  try {
+    const { surfaceIssueFeedbackNeedsYou } = await import('./feedback-target.js');
+    await surfaceIssueFeedbackNeedsYou(
+      issueId,
+      `Inspect verdict (${status}) for item ${itemId} could not be delivered to ${workAgentId}: ${reason}`,
+      { specialist: 'inspect-agent' },
+    );
+  } catch { /* best-effort — the error above still records the failure */ }
 }
 
 // ─── PAN-1249: additive Effect variants ───────────────────────────────────────

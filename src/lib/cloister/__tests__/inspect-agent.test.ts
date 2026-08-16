@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   saveAgentState: vi.fn(),
   sessionExists: vi.fn(),
   spawnTierSupervisor: vi.fn(),
+  surfaceIssueFeedbackNeedsYou: vi.fn(),
   writeFileSync: vi.fn(),
 }));
 
@@ -110,6 +111,10 @@ vi.mock('../../agents/tier-supervisor.js', () => ({
 
 vi.mock('../../agents/delivery.js', () => ({
   deliverAgentMessage: mocks.deliverAgentMessage,
+}));
+
+vi.mock('../feedback-target.js', () => ({
+  surfaceIssueFeedbackNeedsYou: mocks.surfaceIssueFeedbackNeedsYou,
 }));
 
 import { onInspectComplete, spawnInspectAgent } from '../inspect-agent.js';
@@ -505,6 +510,52 @@ describe('onInspectComplete verdict delivery (PAN-3078)', () => {
     await Effect.runPromise(onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'failed', '/workspace'));
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('pane dead'));
+    errorSpy.mockRestore();
+  });
+
+  // PAN-3743 stall hardening: a lost verdict deadlocks the work agent, so a
+  // delivery failure must reach the operator via the same needs-you surface
+  // the review-verdict path uses (PAN-2228) — not only the console.
+  it('surfaces needs-you when delivery reports ok=false', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, path: 'tmux', failure: 'pane dead' });
+
+    await Effect.runPromise(onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'failed', '/workspace'));
+
+    expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
+    const [issueId, message, opts] = mocks.surfaceIssueFeedbackNeedsYou.mock.calls[0];
+    expect(issueId).toBe('PAN-1613');
+    expect(message).toContain('workspace-b95lw');
+    expect(message).toContain('agent-pan-1613');
+    expect(message).toContain('pane dead');
+    expect(opts).toEqual({ specialist: 'inspect-agent' });
+  });
+
+  it('surfaces needs-you when delivery throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deliverAgentMessage.mockRejectedValue(
+      new Error('PTY supervisor delivery failed (socket-missing)'),
+    );
+
+    await Effect.runPromise(onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'passed', '/workspace'));
+
+    expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
+    const [issueId, message, opts] = mocks.surfaceIssueFeedbackNeedsYou.mock.calls[0];
+    expect(issueId).toBe('PAN-1613');
+    expect(message).toContain('socket-missing');
+    expect(opts).toEqual({ specialist: 'inspect-agent' });
+  });
+
+  it('still logs when the needs-you surface itself fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deliverAgentMessage.mockRejectedValue(new Error('socket-missing'));
+    mocks.surfaceIssueFeedbackNeedsYou.mockRejectedValue(new Error('db locked'));
+
+    await expect(Effect.runPromise(
+      onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'passed', '/workspace'),
+    )).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED to deliver passed verdict'));
     errorSpy.mockRestore();
   });
 });
