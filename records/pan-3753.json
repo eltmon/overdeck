@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:12:30.857Z",
+  "updated": "2026-08-16T19:18:43.917Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "consumers-skip-retired-records": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 1054947,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T19:12:30.857Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -151,6 +143,17 @@
         "outcome": "completed",
         "reason": "Stamped contained live generations promoted before invalidation, minted collision-safe suffixed names across mono/polyrepo assembly, wired containment checks, and added regression coverage.",
         "releasedAt": "2026-08-16T19:11:47.257Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 1054947,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:12:30.857Z",
+        "itemId": "consumers-skip-retired-records",
+        "outcome": "completed",
+        "reason": "Excluded retired rows from six deacon patrols, blocker candidate queries, GitHub refresh, and commit-status reporting; added zero-action/no-query tests.",
+        "releasedAt": "2026-08-16T19:18:43.917Z"
       }
     ],
     "statusReasons": {
@@ -169,6 +172,10 @@
       "terminal-uat-generations": {
         "reason": "Stamped contained live generations promoted before invalidation, minted collision-safe suffixed names across mono/polyrepo assembly, wired containment checks, and added regression coverage.",
         "updatedAt": "2026-08-16T19:11:47.257Z"
+      },
+      "consumers-skip-retired-records": {
+        "reason": "Excluded retired rows from six deacon patrols, blocker candidate queries, GitHub refresh, and commit-status reporting; added zero-action/no-query tests.",
+        "updatedAt": "2026-08-16T19:18:43.917Z"
       }
     }
   },
@@ -191,6 +198,9 @@
     "terminal-uat-generations.ac1": "completed",
     "terminal-uat-generations.ac2": "completed",
     "terminal-uat-generations.ac3": "completed",
-    "consumers-skip-retired-records": "running"
+    "consumers-skip-retired-records": "completed",
+    "consumers-skip-retired-records.ac1": "completed",
+    "consumers-skip-retired-records.ac2": "completed",
+    "consumers-skip-retired-records.ac3": "completed"
   }
 }
