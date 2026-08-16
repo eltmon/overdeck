@@ -27,9 +27,22 @@
       "timestamp": "2026-08-16T11:44:23.058Z",
       "reason": "end",
       "note": "Review cycle 1 fixes are complete: Codex dry runs no longer persist skip verdicts; Codex and Pi worker reconciliation now transfers bounded 250-event jobs; the architecture documentation names the correct worker and task paths. Added dry-run-then-write and bounded-batch regression tests. Verification: 18 focused tests passed, full typecheck passed, targeted ESLint passed, and the circular-dependency guard passed. Commit cf7c333b90 is pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-16T11:47:06.893Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-16T11:13:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3743\n\n# Review Synthesis — PAN-3743 — 2026-08-16T11:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — Codex dry runs persist skip verdicts and suppress the later write run\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/context.json`\n- Branch: `feature/pan-3743`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743`\n- HEAD reviewed: `c62a5d27e68065481021c391e2d6fda1725bb703`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Codex dry runs cache files as imported and suppress the later write — `src/lib/overdeck/cost.ts:640`\nThe Codex path calls `recordSkipVerdict` after `record` even when `opts?.dryRun` is true. The default preview can therefore cache unchanged transcripts as processed, causing a later `--write` run to skip events that were never persisted. Guard verdict persistence during dry runs and add a dry-run-then-write regression test.\n\n### [performance] Cold reconciliation accumulates and transfers the entire event corpus — `src/lib/costs/codex-collector.ts:67`\nThe Codex and Pi collectors retain every parsed event, then the worker sends the complete result through one `postMessage`. Peak memory and main-thread structured-clone work grow with all uncached usage records, so a cold sweep can stall the dashboard or exhaust a worker or server heap. Use a bounded chunked protocol with backpressure, or split the scan into bounded jobs.\n\n### [requirements] Architecture documentation points to the wrong worker implementation path — `docs/DASHBOARD-ARCHITECTURE.md:50`\nThe required architecture documentation names `src/dashboard/server/workers/dashboard-db-worker.ts`, which does not exist. The implementation is at `src/dashboard/server/services/dashboard-db-worker.ts`. Correct the path and, if useful, name `src/dashboard/server/services/dashboard-db-task.ts` as the task contract.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3743 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/cost-backfill.test.ts",
@@ -87,7 +100,7 @@
     "recordedAt": "2026-08-16T11:44:16.754Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T11:47:05.385Z",
+  "updated": "2026-08-16T11:47:06.894Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -98,7 +111,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T11:46:50.257Z",
-    "updatedAt": "2026-08-16T11:47:03.744Z",
+    "updatedAt": "2026-08-16T11:47:04.831Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC4 REGRESSION (blocking): src/lib/costs/codex-collector.ts:20 reimplements issueIdFromAgentName as /(?:agent|planning)-((?:[a-z]+-)?\\d+)/i instead of reusing cost.ts:236 /(?:^|-)((?:pan|min|aud|krux|cli)-\\d+)(?:-|$)/i. Measured against the 1381 real dirs in ~/.overdeck/agents, 183 resolve differently: every strike-pan-* and conv-pan-* agent now yields issueId=null (was PAN-<n>). 18 of those dirs hold codex-home sessions today (strike-pan-3740 has 10 jsonl files, strike-pan-3663 has 7, conv-pan-1223-gpt56-mrlfm5fx has 2) so live codex cost events lose issue attribution. FIX: import and reuse the existing issueIdFromAgentName from cost.ts (export it) rather than writing a second regex. AC4 REGRESSION (blocking): codex-collector.ts:25 inferIssueFromPath now REQUIRES a feature-/feature/ or workspaces/feature- prefix and accepts any [a-z]+ prefix, where cost.ts:241 matched (pan|min|aud|krux|cli)[-/]\\d+ anywhere in the cwd. codex-global sessions whose cwd is e.g. ~/Projects/hoff-pan-3743 now fall through to UNKNOWN. FIX: reuse the cost.ts helper. AC3 NOT MET: no test subscribes to the server EventBus and asserts cost.recorded fires for events recorded after a worker sweep. tests/unit/dashboard/cost-reconcile-sweep-job.test.ts only covers workerLane routing and that runDashboardDbJob dispatches the collector; the only cost.recorded assertion in the repo is the pre-existing tests/unit/lib/overdeck/cost.test.ts:370 record() unit test, which predates this bead and never exercises the sweep path. FIX: add a test that drives the post-sweep record loop (fake collector result with >=1 event) through CostWriter with a fake bus layer and asserts the subscription receives cost.recorded. SECONDARY (non-blocking, note for FR-1): cost-reconcile-service.ts now calls recordSkipVerdict per scanned file on the main thread — that is a synchronous better-sqlite3 write per file, exactly the main-thread DB work FR-1 targets. The worker already opens the same DB for lookupSkipVerdict, so the verdict writes belong in collectCodexCostEvents. Also cosmetic: cost.ts:~789 leaves an empty tail inside the per-file loop where the codex branch was removed. AC1 and AC2 are satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3749",
@@ -211,7 +224,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.045944,
-        "pricingAsOf": "2026-08-16T11:47:03.805Z"
+        "pricingAsOf": "2026-08-16T11:47:05.028Z"
       }
     },
     "merges": [
