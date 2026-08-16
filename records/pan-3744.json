@@ -77,10 +77,10 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T11:00:57.043Z",
+  "updated": "2026-08-16T11:01:39.997Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "running",
@@ -88,13 +88,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T11:00:54.765Z",
+    "updatedAt": "2026-08-16T11:01:39.946Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
     "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
     "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
-    "reviewSpawnedAt": "2026-08-16T10:35:19.158Z",
+    "reviewSpawnedAt": "2026-08-16T11:01:39.946Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
@@ -133,9 +133,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 47691347,
-            "output": 67203,
-            "cacheRead": 46698752,
+            "input": 48086811,
+            "output": 68591,
+            "cacheRead": 47076352,
             "cacheWrite": 0
           }
         },
@@ -156,9 +156,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 47691347,
-          "output": 67203,
-          "cacheRead": 46698752,
+          "input": 48086811,
+          "output": 68591,
+          "cacheRead": 47076352,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -169,8 +169,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.949481,
-        "pricingAsOf": "2026-08-16T11:00:56.987Z"
+        "usd": 34.269241,
+        "pricingAsOf": "2026-08-16T11:01:39.959Z"
       }
     },
     "merges": [
