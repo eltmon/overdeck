@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T14:52:56.351Z",
+  "updated": "2026-08-16T14:53:55.781Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -351,8 +351,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "bound-ollama-health-timeouts": {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2435537,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T14:53:55.781Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -549,7 +557,8 @@
     "async-omp-provisioning.ac2": "completed",
     "async-omp-provisioning.ac3": "completed",
     "async-omp-provisioning.ac4": "completed",
-    "async-omp-provisioning.ac5": "completed"
+    "async-omp-provisioning.ac5": "completed",
+    "bound-ollama-health-timeouts": "running"
   },
   "recoveryTrips": [
     {
