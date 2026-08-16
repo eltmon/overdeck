@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:21:56.549Z",
+  "updated": "2026-08-16T19:25:41.717Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "merge-next-membership-validation": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 1171977,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T19:21:56.549Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -173,6 +165,16 @@
         "outcome": "completed",
         "reason": "Tracked one heal per canonical updatedAt, suppressed repeated re-emits with a one-time NOT CONVERGING warning, re-enabled heals on canonical advance, and skipped retired rows.",
         "releasedAt": "2026-08-16T19:21:43.688Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 1171977,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:21:56.549Z",
+        "itemId": "merge-next-membership-validation",
+        "outcome": "completed",
+        "releasedAt": "2026-08-16T19:25:41.717Z"
       }
     ],
     "statusReasons": {
@@ -229,6 +231,8 @@
     "converging-heal-loop.ac1": "completed",
     "converging-heal-loop.ac2": "completed",
     "converging-heal-loop.ac3": "completed",
-    "merge-next-membership-validation": "running"
+    "merge-next-membership-validation": "completed",
+    "merge-next-membership-validation.ac1": "completed",
+    "merge-next-membership-validation.ac2": "completed"
   }
 }
