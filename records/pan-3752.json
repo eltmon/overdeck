@@ -27,6 +27,11 @@
       "timestamp": "2026-08-16T19:49:31.768Z",
       "reason": "end",
       "note": "Verification rework: lint:skills intermittently read the shared dist CLI while another specialist rebuilt it. Extended its bounded retry window to cover a competing build without suppressing genuine command failures. npm run lint:skills and the complete npm run lint gate pass. Commit a578b38330 is pushed; pan review request returned a stale-review no-op, so this completion call records the newer reviewed head and re-enters verification."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-16T19:50:32.427Z"
     }
   ],
   "feedback": [],
@@ -59,7 +64,7 @@
     "recordedAt": "2026-08-16T19:49:22.663Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:50:31.129Z",
+  "updated": "2026-08-16T19:50:32.427Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "reviewing",
