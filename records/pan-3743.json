@@ -29,15 +29,7 @@
       "note": "Review cycle 1 fixes are complete: Codex dry runs no longer persist skip verdicts; Codex and Pi worker reconciliation now transfers bounded 250-event jobs; the architecture documentation names the correct worker and task paths. Added dry-run-then-write and bounded-batch regression tests. Verification: 18 focused tests passed, full typecheck passed, targeted ESLint passed, and the circular-dependency guard passed. Commit cf7c333b90 is pushed."
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-16T11:13:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3743\n\n# Review Synthesis — PAN-3743 — 2026-08-16T11:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — Codex dry runs persist skip verdicts and suppress the later write run\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/context.json`\n- Branch: `feature/pan-3743`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743`\n- HEAD reviewed: `c62a5d27e68065481021c391e2d6fda1725bb703`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Codex dry runs cache files as imported and suppress the later write — `src/lib/overdeck/cost.ts:640`\nThe Codex path calls `recordSkipVerdict` after `record` even when `opts?.dryRun` is true. The default preview can therefore cache unchanged transcripts as processed, causing a later `--write` run to skip events that were never persisted. Guard verdict persistence during dry runs and add a dry-run-then-write regression test.\n\n### [performance] Cold reconciliation accumulates and transfers the entire event corpus — `src/lib/costs/codex-collector.ts:67`\nThe Codex and Pi collectors retain every parsed event, then the worker sends the complete result through one `postMessage`. Peak memory and main-thread structured-clone work grow with all uncached usage records, so a cold sweep can stall the dashboard or exhaust a worker or server heap. Use a bounded chunked protocol with backpressure, or split the scan into bounded jobs.\n\n### [requirements] Architecture documentation points to the wrong worker implementation path — `docs/DASHBOARD-ARCHITECTURE.md:50`\nThe required architecture documentation names `src/dashboard/server/workers/dashboard-db-worker.ts`, which does not exist. The implementation is at `src/dashboard/server/services/dashboard-db-worker.ts`. Correct the path and, if useful, name `src/dashboard/server/services/dashboard-db-task.ts` as the task contract.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3743/.pan/review/agent-pan-3743-review-c62a5d27/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3743 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/cost-backfill.test.ts",
@@ -95,7 +87,7 @@
     "recordedAt": "2026-08-16T11:44:16.754Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T11:47:03.840Z",
+  "updated": "2026-08-16T11:47:05.385Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
