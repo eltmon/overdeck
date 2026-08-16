@@ -51,7 +51,7 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:34:58.493Z",
+  "updated": "2026-08-16T19:35:02.611Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "failed",
@@ -62,7 +62,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:34:54.814Z",
+    "updatedAt": "2026-08-16T19:34:54.851Z",
     "reviewNotes": "Verification failed at lint",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
@@ -158,7 +158,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.235481,
-        "pricingAsOf": "2026-08-16T19:34:58.472Z"
+        "pricingAsOf": "2026-08-16T19:34:58.036Z"
       }
     },
     "merges": [
