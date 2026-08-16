@@ -103,7 +103,7 @@
     "recordedAt": "2026-08-16T19:42:45.970Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:42:54.614Z",
+  "updated": "2026-08-16T19:43:01.853Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -113,7 +113,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:42:54.506Z",
+    "updatedAt": "2026-08-16T19:42:54.824Z",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
     "reviewRequestedAt": "2026-08-16T19:42:50.058Z",
@@ -248,7 +248,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.770354,
-        "pricingAsOf": "2026-08-16T19:42:54.558Z"
+        "pricingAsOf": "2026-08-16T19:43:01.812Z"
       }
     },
     "merges": [
