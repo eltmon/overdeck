@@ -202,6 +202,82 @@ describe('assessMemoryPressure', () => {
     expect((await assessMemoryPressure()).band).toBe('ok');
   });
 
+  it('records the MemAvailable reading that triggered a soft hold', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(7 * GIB));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: {
+        kind: 'soft-dip',
+        readingBytes: 7 * GIB,
+        thresholdBytes: 8 * GIB,
+        at: expect.any(Number),
+      },
+    });
+  });
+
+  it('records the MemAvailable reading that triggered hard shedding', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(2 * GIB));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: {
+        kind: 'hard',
+        readingBytes: 2 * GIB,
+        thresholdBytes: 4 * GIB,
+        at: expect.any(Number),
+      },
+    });
+  });
+
+  it('records the swap reading that triggered PSI-backed shedding', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 1 * GIB,
+      psiFullAvg10: 2,
+    }));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: {
+        kind: 'swap-psi',
+        readingBytes: 1 * GIB,
+        thresholdBytes: 2 * GIB,
+        at: expect.any(Number),
+      },
+    });
+  });
+
+  it('records the swap reading that triggered a hold when PSI is unavailable', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 1 * GIB,
+      psiFullAvg10: null,
+    }));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: {
+        kind: 'psi-unavailable',
+        readingBytes: 1 * GIB,
+        thresholdBytes: 2 * GIB,
+        at: expect.any(Number),
+      },
+    });
+  });
+
+  it('updates trigger provenance when the trigger kind changes during a hold', async () => {
+    readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+    expect((await assessMemoryPressure()).trigger?.kind).toBe('soft-dip');
+
+    readProcMemoryMock.mockResolvedValue(procMemory(2 * GIB));
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: { kind: 'hard', readingBytes: 2 * GIB, thresholdBytes: 4 * GIB },
+    });
+  });
+
+  it('clears trigger provenance when the governor re-admits', async () => {
+    readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+    expect((await assessMemoryPressure()).trigger?.kind).toBe('soft-dip');
+
+    readProcMemoryMock.mockResolvedValue(procMemory(13 * GIB));
+    expect((await assessMemoryPressure()).trigger).toBeNull();
+  });
+
   it('admits when swap is full but PSI shows no stalls (swap residency is not pressure)', async () => {
     // Operator-approved correction (PAN-3485 follow-up): full-but-idle swap
     // with PSI 0.00 must NOT hold admissions — pages swapped during a leak era
@@ -290,6 +366,7 @@ describe('assessMemoryPressure', () => {
     readProcMemoryMock.mockResolvedValue(procMemory(2 * GIB));
     const verdict = await assessMemoryPressure();
     expect(getCachedMemoryVerdict()).toEqual(verdict);
+    expect(getCachedMemoryVerdict()?.trigger).toEqual(verdict.trigger);
   });
 });
 

@@ -13,6 +13,8 @@ import { stopAgentSync } from '../agents/termination.js';
 import {
   getCachedMemoryVerdict,
   setCachedMemoryVerdict,
+  type GovernorTrigger,
+  type GovernorTriggerKind,
   type MemoryPressureBand,
   type MemoryPressureThresholds,
   type MemoryVerdict,
@@ -24,7 +26,7 @@ const GIB = 1024 ** 3;
 
 // Re-exported for backward compatibility — memory-verdict-cache.ts is now the
 // canonical source (it must have no imports of its own to stay cycle-free).
-export type { MemoryPressureBand, MemoryPressureThresholds, MemoryVerdict };
+export type { GovernorTrigger, GovernorTriggerKind, MemoryPressureBand, MemoryPressureThresholds, MemoryVerdict };
 export { getCachedMemoryVerdict };
 
 /**
@@ -76,10 +78,23 @@ export interface GovernorRunwayThresholds {
 }
 
 let governorMode: GovernorMode = 'admitting';
+let governorTrigger: GovernorTrigger | null = null;
+
+export interface GovernorTriggerSeed {
+  kind: GovernorTriggerKind;
+  readingBytes: number;
+  thresholdBytes: number;
+}
+
+export interface GovernorTransition {
+  mode: GovernorMode;
+  trigger: GovernorTriggerSeed | null;
+}
 
 /** Test-only: reset the module-level hysteresis state between test cases. */
 export function resetGovernorModeForTests(): void {
   governorMode = 'admitting';
+  governorTrigger = null;
   setCachedMemoryVerdict(null);
 }
 
@@ -132,9 +147,14 @@ export function nextGovernorModeWithRunway(
   runway: GovernorRunway,
   runwayThresholds: GovernorRunwayThresholds,
   previousMode: GovernorMode,
-): GovernorMode {
+): GovernorTransition {
   const memoryMode = nextGovernorMode(availableBytes, reserves, previousMode);
-  if (runway.swapTotalBytes <= 0) return memoryMode;
+  const memoryTrigger: GovernorTriggerSeed | null = availableBytes < reserves.hardBytes
+    ? { kind: 'hard', readingBytes: availableBytes, thresholdBytes: reserves.hardBytes }
+    : previousMode === 'admitting' && memoryMode === 'holding'
+      ? { kind: 'soft-dip', readingBytes: availableBytes, thresholdBytes: reserves.softBytes }
+      : null;
+  if (runway.swapTotalBytes <= 0) return { mode: memoryMode, trigger: memoryTrigger };
 
   const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
   const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
@@ -145,7 +165,13 @@ export function nextGovernorModeWithRunway(
     && runway.psiFullAvg10 != null
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
 
-  if (memoryMode === 'shedding' || psiShed) return 'shedding';
+  if (memoryMode === 'shedding') return { mode: 'shedding', trigger: memoryTrigger };
+  if (psiShed) {
+    return {
+      mode: 'shedding',
+      trigger: { kind: 'swap-psi', readingBytes: runway.swapFreeBytes, thresholdBytes: swapSoftBytes },
+    };
+  }
   // Operator-approved correction (PAN-3485 follow-up, 2026-08-02): swap
   // RESIDENCY is not pressure. Pages swapped during a leak era sit idle for
   // weeks while PSI pins at 0.00 — and holding admissions for them wedges the
@@ -154,8 +180,13 @@ export function nextGovernorModeWithRunway(
   // stall evidence: PSI at/above the shed threshold sheds above; below it we
   // admit. When PSI is UNAVAILABLE we cannot prove safety, so the
   // conservative hold (with its swap-recovery hysteresis) still stands.
-  if (swapLow && runway.psiFullAvg10 == null) return 'holding';
-  return memoryMode;
+  if (swapLow && runway.psiFullAvg10 == null) {
+    return {
+      mode: 'holding',
+      trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: swapSoftBytes },
+    };
+  }
+  return { mode: memoryMode, trigger: memoryTrigger };
 }
 
 function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
@@ -175,7 +206,8 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const reserves = readGovernorReserves();
   const runwayThresholds = readGovernorRunwayThresholds();
   const snapshot = await readProcMemory();
-  governorMode = nextGovernorModeWithRunway(
+  const previousMode = governorMode;
+  const transition = nextGovernorModeWithRunway(
     snapshot.memAvailable,
     reserves,
     {
@@ -186,6 +218,15 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     runwayThresholds,
     governorMode,
   );
+  governorMode = transition.mode;
+  if (governorMode === 'admitting') {
+    governorTrigger = null;
+  } else if (
+    transition.trigger
+    && (previousMode === 'admitting' || transition.trigger.kind !== governorTrigger?.kind)
+  ) {
+    governorTrigger = { ...transition.trigger, at: Date.now() };
+  }
   const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),
     availableBytes: snapshot.memAvailable,
@@ -193,6 +234,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     swapTotalBytes: snapshot.swapTotal,
     swapFreeBytes: snapshot.swapFree,
     psiFullAvg10: snapshot.psiFullAvg10,
+    trigger: governorTrigger,
   };
   setCachedMemoryVerdict(verdict);
   return verdict;
