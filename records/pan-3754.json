@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:17:25.558Z",
+  "updated": "2026-08-16T18:21:35.199Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "psi-calm-early-readmit": {
-        "writerId": "agent-pan-3754",
-        "agentId": "agent-pan-3754",
-        "pid": 229929,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:17:25.558Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3754",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Recorded all four non-admitting trigger kinds with trigger-time readings, thresholds, timestamps, reset/re-admit clearing, and cache round-trip tests.",
         "releasedAt": "2026-08-16T18:16:53.603Z"
+      },
+      {
+        "writerId": "agent-pan-3754",
+        "agentId": "agent-pan-3754",
+        "pid": 229929,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:17:25.558Z",
+        "itemId": "psi-calm-early-readmit",
+        "outcome": "completed",
+        "reason": "Added configurable sustained-calm PSI early re-admission, fresh-window re-arm, YAML resolution, and fake-timer coverage.",
+        "releasedAt": "2026-08-16T18:21:35.198Z"
       }
     ],
     "statusReasons": {
       "trigger-provenance": {
         "reason": "Recorded all four non-admitting trigger kinds with trigger-time readings, thresholds, timestamps, reset/re-admit clearing, and cache round-trip tests.",
         "updatedAt": "2026-08-16T18:16:53.603Z"
+      },
+      "psi-calm-early-readmit": {
+        "reason": "Added configurable sustained-calm PSI early re-admission, fresh-window re-arm, YAML resolution, and fake-timer coverage.",
+        "updatedAt": "2026-08-16T18:21:35.198Z"
       }
     }
   },
@@ -89,6 +96,11 @@
     "trigger-provenance.ac2": "completed",
     "trigger-provenance.ac3": "completed",
     "trigger-provenance.ac4": "completed",
-    "psi-calm-early-readmit": "running"
+    "psi-calm-early-readmit": "completed",
+    "psi-calm-early-readmit.ac1": "completed",
+    "psi-calm-early-readmit.ac2": "completed",
+    "psi-calm-early-readmit.ac3": "completed",
+    "psi-calm-early-readmit.ac4": "completed",
+    "psi-calm-early-readmit.ac5": "completed"
   }
 }
