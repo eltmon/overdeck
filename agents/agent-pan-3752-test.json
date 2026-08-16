@@ -14,11 +14,21 @@
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3752",
     "branch": null
   },
-  "sessions": [],
+  "sessions": [
+    {
+      "id": "cbf68f4b-b410-4249-bc51-c319ac88ba5e",
+      "startedAt": "2026-08-16T19:24:26.923Z",
+      "reason": "spawn"
+    }
+  ],
   "lifecycle": [
     {
       "at": "2026-08-16T19:20:41.206Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-16T19:24:26.923Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
