@@ -1,6 +1,9 @@
 import { Effect } from 'effect';
 import { reclassifyUnknownCostEventsSync } from '../../../lib/costs/attribution.js';
-import { reconcilePiTranscripts } from '../../../lib/costs/reconciler.js';
+import {
+  recordCostEventsThroughOverdeck,
+  type PiCollectResult,
+} from '../../../lib/costs/reconciler.js';
 import { CostDoorLive, CostWriter, type CostEvent, type SkipVerdictEntry } from '../../../lib/overdeck/cost.js';
 import { recordSkipVerdict } from '../../../lib/costs/skip-cache.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
@@ -13,7 +16,21 @@ let inFlight: Promise<void> | null = null;
 async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const result = await reconcilePiTranscripts();
+    const piCollected = await runDashboardDbJob<PiCollectResult>('costReconcileSweep', { source: 'pi' });
+    const result = {
+      eventsImported: 0,
+      duplicatesSkipped: 0,
+      cacheSkipped: piCollected.stats.cacheSkipped,
+      errors: piCollected.errors,
+    };
+    for (const { event, sourceFile } of piCollected.events) {
+      const recorded = await recordCostEventsThroughOverdeck([event], sourceFile);
+      result.eventsImported += recorded.inserted;
+      result.duplicatesSkipped += recorded.duplicates;
+    }
+    for (const verdict of piCollected.verdicts) {
+      recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+    }
     if (result.eventsImported > 0 || result.cacheSkipped > 0 || result.errors.length > 0) {
       console.log(
         `[cost-reconciler] ${reason} sweep: ${result.eventsImported} imported, ` +

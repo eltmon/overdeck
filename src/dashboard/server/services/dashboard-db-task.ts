@@ -23,6 +23,7 @@ import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
+import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
 
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -265,7 +266,9 @@ async function runInline(
       return unshareArtifactBySlugJob(payload as string);
     }
     case 'costReconcileSweep':
-      return collectCodexCostEvents();
+      return (payload as { source: 'codex' | 'pi' }).source === 'pi'
+        ? collectPiCostEvents()
+        : collectCodexCostEvents();
   }
 }
 

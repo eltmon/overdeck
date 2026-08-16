@@ -46,6 +46,14 @@ export interface ReconcileResult {
   latestEventTs: string | null;
 }
 
+export type PiCollectedEvent = { event: CostEvent; sourceFile: string };
+export type PiCollectResult = {
+  events: PiCollectedEvent[];
+  verdicts: Array<{ path: string; mtimeMs: number; size: number; verdict: 'imported' | 'no-usage' }>;
+  stats: { scanned: number; cacheSkipped: number; sessionsWithData: number };
+  errors: Array<{ path: string; error: string }>;
+};
+
 interface SessionMapping {
   agentId: string;
   issueId: string | null;
@@ -482,18 +490,10 @@ function findPiTranscriptFiles(agentDir: string): { files: TranscriptFileStat[];
  * Independent of the pi extension hook, so it captures cost even when the
  * extension emits null usage or the wrong model label.
  */
-export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
-  const result: ReconcileResult = {
-    sessionsScanned: 0,
-    cacheSkipped: 0,
-    sessionsWithNewData: 0,
-    eventsImported: 0,
-    duplicatesSkipped: 0,
-    errors: [],
-    earliestEventTs: null,
-    latestEventTs: null,
+export async function collectPiCostEvents(): Promise<PiCollectResult> {
+  const result: PiCollectResult = {
+    events: [], verdicts: [], stats: { scanned: 0, cacheSkipped: 0, sessionsWithData: 0 }, errors: [],
   };
-
   const agentsDir = getAgentsDir();
   if (!existsSync(agentsDir)) return result;
 
@@ -524,26 +524,23 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     if (agentDirName.startsWith('planning-')) sessionType = 'planning';
 
     const transcripts = findPiTranscriptFiles(agentPath);
-    result.cacheSkipped += transcripts.cacheSkipped;
-    result.sessionsScanned += transcripts.cacheSkipped;
+    result.stats.cacheSkipped += transcripts.cacheSkipped;
+    result.stats.scanned += transcripts.cacheSkipped;
     for (const transcript of transcripts.files) {
       const transcriptPath = transcript.path;
       const sessionId = basename(transcriptPath, '.jsonl');
       const resolvedIssueId = issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: agentDirName });
-      result.sessionsScanned++;
+      result.stats.scanned++;
       try {
         const content = readFileSync(transcriptPath, 'utf-8');
         const events = extractPiCostEvents(content, agentDirName, resolvedIssueId, sessionType, sessionId);
         if (events.length === 0) {
-          recordSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size, 'no-usage');
+          result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'no-usage' });
           continue;
         }
-        result.sessionsWithNewData++;
-        const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
-        result.eventsImported += inserted;
-        result.duplicatesSkipped += duplicates;
-        mergeCoverage(result, { earliestEventTs, latestEventTs });
-        recordSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size, 'imported');
+        result.stats.sessionsWithData++;
+        result.events.push(...events.map(event => ({ event, sourceFile: `reconciler:${transcriptPath}` })));
+        result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'imported' });
       } catch (err) {
         result.errors.push({
           path: transcriptPath,
@@ -553,6 +550,25 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     }
   }
 
+  return result;
+}
+
+export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
+  const collected = await collectPiCostEvents();
+  const result: ReconcileResult = {
+    sessionsScanned: collected.stats.scanned, cacheSkipped: collected.stats.cacheSkipped,
+    sessionsWithNewData: collected.stats.sessionsWithData, eventsImported: 0, duplicatesSkipped: 0,
+    errors: collected.errors, earliestEventTs: null, latestEventTs: null,
+  };
+  for (const { event, sourceFile } of collected.events) {
+    const recorded = await recordCostEventsThroughOverdeck([event], sourceFile);
+    result.eventsImported += recorded.inserted;
+    result.duplicatesSkipped += recorded.duplicates;
+    mergeCoverage(result, recorded);
+  }
+  for (const verdict of collected.verdicts) {
+    recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+  }
   return result;
 }
 
@@ -575,7 +591,7 @@ function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCost
   };
 }
 
-async function recordCostEventsThroughOverdeck(
+export async function recordCostEventsThroughOverdeck(
   events: CostEvent[],
   sourceFile: string,
   opts: { dryRun?: boolean } = {},
