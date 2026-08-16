@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:05:17.115Z",
+  "updated": "2026-08-16T18:10:00.890Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "parse-worker-op-and-lane": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3752",
         "agentId": "agent-pan-3752",
         "pid": 67654,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:05:17.111Z"
+        "claimedAt": "2026-08-16T18:05:17.111Z",
+        "itemId": "parse-worker-op-and-lane",
+        "outcome": "completed",
+        "reason": "Added the parseTranscriptSnapshot operation to both dispatch switches, isolated it on a dedicated parse worker lane, and covered routing, Pi parser parity, and unknown-parser rejection.",
+        "releasedAt": "2026-08-16T18:10:00.890Z"
+      }
+    ],
+    "statusReasons": {
+      "parse-worker-op-and-lane": {
+        "reason": "Added the parseTranscriptSnapshot operation to both dispatch switches, isolated it on a dedicated parse worker lane, and covered routing, Pi parser parity, and unknown-parser rejection.",
+        "updatedAt": "2026-08-16T18:10:00.890Z"
       }
     }
   },
   "statusOverrides": {
-    "parse-worker-op-and-lane": "running"
+    "parse-worker-op-and-lane": "completed",
+    "parse-worker-op-and-lane.ac1": "completed",
+    "parse-worker-op-and-lane.ac2": "completed",
+    "parse-worker-op-and-lane.ac3": "completed",
+    "parse-worker-op-and-lane.ac4": "completed"
   }
 }
