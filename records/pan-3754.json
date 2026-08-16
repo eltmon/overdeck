@@ -83,17 +83,18 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:59:40.733Z",
+  "updated": "2026-08-16T19:19:06.822Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-16T18:59:40.696Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-16T19:18:05.277Z",
     "reviewNotes": "All four review dimensions are clean; prior blockers are fixed and focused tests pass",
+    "testNotes": "Automated gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3754 on branch feature/pan-3754. npm run typecheck: clean (tsc --noEmit, hooks, evals, dashboard-types guard, frontend-types guard, acp all pass, no new errors). npm run lint: clean (eslint + all repo lint gates including state-write/state-path/pipeline-membership/workspace-doors/file-size/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass with 0 new findings). Full suite `npx vitest run --configLoader runner`: 1476 test files passed, 4 skipped; 13943 tests passed, 51 skipped, 0 failed (577s). Diff vs origin/main (local main ref was stale, verified against fetched origin/main) touches only src/lib/cloister/memory-governor.ts, memory-pressure-patrol.ts, memory-verdict-cache.ts, src/lib/config-yaml/{schema,defaults,merge}.ts, docs/RESOURCE-GOVERNOR.md, scripts/file-size-allowlist.txt, and their tests — matches xBRIEF declared scope plus the two audited scope-drift files (file-size-allowlist.txt, tests/lib/config-yaml.test.ts) already noted in the record. No UI/dashboard files touched; UAT not required per xBRIEF NonGoals ('No frontend/dashboard UI changes — activity.entry rendering already handles the messages') and confirmed by the file-scoped diff.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
     "reviewSpawnedAt": "2026-08-16T18:54:19.777Z",
@@ -141,10 +142,18 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 24572870,
-            "output": 52901,
-            "cacheRead": 23855872,
+            "input": 24657127,
+            "output": 52986,
+            "cacheRead": 23939584,
             "cacheWrite": 0
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 60,
+            "output": 6629,
+            "cacheRead": 4310507,
+            "cacheWrite": 163147
           }
         }
       },
@@ -156,15 +165,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 24572870,
-          "output": 52901,
-          "cacheRead": 23855872,
+          "input": 24657127,
+          "output": 52986,
+          "cacheRead": 23939584,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 60,
+          "output": 6629,
+          "cacheRead": 4310507,
+          "cacheWrite": 163147
         }
       },
       "costAtCloseOut": {
-        "usd": 17.099956,
-        "pricingAsOf": "2026-08-16T18:59:40.703Z"
+        "usd": 18.483467,
+        "pricingAsOf": "2026-08-16T19:18:36.066Z"
       }
     },
     "merges": [
