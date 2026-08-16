@@ -102,18 +102,18 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T11:29:57.653Z",
+  "updated": "2026-08-16T11:30:03.295Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T11:29:57.556Z",
+    "updatedAt": "2026-08-16T11:29:58.784Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
     "testNotes": "npm run typecheck: exit 0 (tsc --noEmit + hooks/evals/dashboard/frontend/acp sub-checks all clean, dashboard-types and frontend-types guards passed with zero new known errors). npm run lint: exit 0 (eslint + all repo guard scripts including effect-diagnostics, circular-deps, ratchet-audit, quarantine-audit passed with no new findings). npm test: exit 0 — 1469 test files / 13892 tests passed (51 pre-existing quarantined skips, unrelated to this change), plus the frontend leg (4 files / 64 tests) passed. Also ran the two feature-specific vitest files named in the xBRIEF verify_commands directly: src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts and ConversationPanel.test.tsx — 2 files / 43 tests passed, covering receivedFirstPayload signal timing, conversation-switch reset, awaitingFirstPayload gating of greeting/orphaned/fetch-failed states, and the delayed-stream-payload scenario the issue AC describes.",
     "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
@@ -196,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 40.726877,
-        "pricingAsOf": "2026-08-16T11:29:57.621Z"
+        "pricingAsOf": "2026-08-16T11:29:59.074Z"
       }
     },
     "merges": [
