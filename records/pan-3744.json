@@ -19,7 +19,15 @@
       "note": "Anomalies: the full repository suite passed 13,864 tests but 28 unrelated tests timed out at the shared 5-second limit during concurrent database setup. The first sandboxed full-test attempt also hit spawnSync git EPERM. Plan deviations: the test-conv non-streaming assumption was stale, so the WebSocket mock now preserves explicit initial payloads; the skeleton component was extracted to satisfy the file-size guard. Delivered first-payload gating, transcript skeleton with reduced-motion support, delayed-stream and switch tests, and loading-state docs. Feature-targeted tests, typecheck, and lint pass; the branch is clean and fully pushed."
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-16T10:17:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3744\n\n# Review Synthesis — PAN-3744 — 2026-08-16T10:25:00-04:00\n\n## Verdict: CHANGES REQUESTED — conversation switching can paint a false settled-empty state before the first payload\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/context.json`\n- Branch: `feature/pan-3744`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744`\n- HEAD reviewed: `9eb3ab971bce980b9d673c174058f5efca43edc6`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Conversation switching can paint a false settled-empty state — `src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts:159`\nFR-1, FR-2, and NFR-1 require the current conversation to remain in the loading state until its stream emits the first payload, including after switching conversations. The hook retains `receivedFirstPayload === true` from the prior conversation during the new conversation's render and resets it only in a passive effect. The panel can therefore select and paint the greeting once before the effect runs. The existing switch test observes state after Testing Library flushes effects, so it does not prove that the false greeting cannot paint. Reset the signal before paint when `conversation.name` or `enabled` changes, keep subscription setup in the passive effect, and add a test that proves the pre-effect frame cannot expose a settled-empty state.\n\n## Non-blocking Findings\n\n### [correctness] Conversation switch can briefly retain the prior loaded state — `src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts:159`\nThis is the same behavior as the requirements blocker above. The correctness reviewer classified its runtime impact as advisory; the requirements reviewer correctly raises it to blocking because preventing this stale empty-state flash is an explicit acceptance criterion.\n\n### [requirements] Orphaned-state documentation is narrower than the implemented predicate — `docs/ISSUE-VIEW.md:43`\nThe document says an orphaned state requires an ended session, while the implementation requires a non-live session with no saved activity and does not require `endedAt`. Update the wording for accuracy. This is advisory and does not independently block the review.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Performance found no regressions or advisories.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3744/.pan/review/agent-pan-3744-review-9eb3ab97/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3744 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
@@ -47,21 +55,20 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:12:08.257Z",
+  "updated": "2026-08-16T10:17:13.666Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:12:07.372Z",
-    "reviewNotes": "Verification failed at typecheck",
+    "updatedAt": "2026-08-16T10:17:12.981Z",
+    "reviewNotes": "Conversation switching can paint a false settled-empty state before the current stream emits its first payload.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "lastVerifiedCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
-    "reviewRequestedAt": "2026-08-16T09:33:35.916Z",
     "reviewSpawnedAt": "2026-08-16T10:12:07.370Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -101,9 +108,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 28087750,
-            "output": 35015,
-            "cacheRead": 27564288,
+            "input": 31555692,
+            "output": 45187,
+            "cacheRead": 30756352,
             "cacheWrite": 0
           }
         }
@@ -116,15 +123,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28087750,
-          "output": 35015,
-          "cacheRead": 27564288,
+          "input": 31555692,
+          "output": 45187,
+          "cacheRead": 30756352,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.449904,
-        "pricingAsOf": "2026-08-16T10:12:07.778Z"
+        "usd": 20.730486,
+        "pricingAsOf": "2026-08-16T10:17:13.011Z"
       }
     },
     "merges": [
