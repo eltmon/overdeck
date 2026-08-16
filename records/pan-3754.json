@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:21:52.446Z",
+  "updated": "2026-08-16T18:25:14.990Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "patrol-trigger-messages": {
-        "writerId": "agent-pan-3754",
-        "agentId": "agent-pan-3754",
-        "pid": 275476,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:21:52.446Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3754",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Added configurable sustained-calm PSI early re-admission, fresh-window re-arm, YAML resolution, and fake-timer coverage.",
         "releasedAt": "2026-08-16T18:21:35.198Z"
+      },
+      {
+        "writerId": "agent-pan-3754",
+        "agentId": "agent-pan-3754",
+        "pid": 275476,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:21:52.446Z",
+        "itemId": "patrol-trigger-messages",
+        "outcome": "completed",
+        "reason": "Replaced current-reading misattribution with stored trigger provenance, current state, explicit exits, and numeric-consistency matrix tests.",
+        "releasedAt": "2026-08-16T18:25:14.990Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "psi-calm-early-readmit": {
         "reason": "Added configurable sustained-calm PSI early re-admission, fresh-window re-arm, YAML resolution, and fake-timer coverage.",
         "updatedAt": "2026-08-16T18:21:35.198Z"
+      },
+      "patrol-trigger-messages": {
+        "reason": "Replaced current-reading misattribution with stored trigger provenance, current state, explicit exits, and numeric-consistency matrix tests.",
+        "updatedAt": "2026-08-16T18:25:14.990Z"
       }
     }
   },
@@ -110,6 +117,10 @@
     "psi-calm-early-readmit.ac3": "completed",
     "psi-calm-early-readmit.ac4": "completed",
     "psi-calm-early-readmit.ac5": "completed",
-    "patrol-trigger-messages": "running"
+    "patrol-trigger-messages": "completed",
+    "patrol-trigger-messages.ac1": "completed",
+    "patrol-trigger-messages.ac2": "completed",
+    "patrol-trigger-messages.ac3": "completed",
+    "patrol-trigger-messages.ac4": "completed"
   }
 }
