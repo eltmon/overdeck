@@ -73,6 +73,7 @@ interface BackfillSourceSummary {
   sessionsScanned: number;
   eventsImported: number;
   duplicatesSkipped: number;
+  cacheSkipped: number;
   errors: number;
   earliestEventTs: string | null;
   latestEventTs: string | null;
@@ -84,6 +85,7 @@ function fromClaudeReconcile(result: ReconcileResult): BackfillSourceSummary {
     sessionsScanned: result.sessionsScanned,
     eventsImported: result.eventsImported,
     duplicatesSkipped: result.duplicatesSkipped,
+    cacheSkipped: result.cacheSkipped,
     errors: result.errors.length,
     earliestEventTs: result.earliestEventTs,
     latestEventTs: result.latestEventTs,
@@ -96,6 +98,7 @@ function fromDoorReconcile(source: 'ohmypi' | 'codex', result: CostReconcileSumm
     sessionsScanned: result.sessionsScanned,
     eventsImported: result.eventsImported,
     duplicatesSkipped: result.duplicatesSkipped,
+    cacheSkipped: result.cacheSkipped,
     errors: result.errors.length,
     earliestEventTs: result.earliestEventTs,
     latestEventTs: result.latestEventTs,
@@ -111,6 +114,7 @@ function printBackfillSummary(summaries: BackfillSourceSummary[], write: boolean
     console.log(`  Sessions scanned:     ${summary.sessionsScanned}`);
     console.log(`  ${importedLabel}:        ${write ? chalk.green(summary.eventsImported) : chalk.yellow(summary.eventsImported)}`);
     console.log(`  Duplicates skipped:   ${chalk.dim(summary.duplicatesSkipped)}`);
+    console.log(`  Cache skipped:        ${chalk.dim(summary.cacheSkipped)}`);
     console.log(`  Errors:               ${summary.errors === 0 ? summary.errors : chalk.yellow(summary.errors)}`);
     console.log(`  Earliest event ts:    ${summary.earliestEventTs ?? chalk.dim('none')}`);
     console.log(`  Latest event ts:      ${summary.latestEventTs ?? chalk.dim('none')}`);

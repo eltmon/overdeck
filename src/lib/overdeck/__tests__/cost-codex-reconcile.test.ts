@@ -49,7 +49,13 @@ describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
     const unchanged = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(unchanged).toMatchObject({ imported: 0, eventsImported: 0, duplicatesSkipped: 1, skipped: [] });
+    expect(unchanged).toMatchObject({
+      imported: 0,
+      eventsImported: 0,
+      duplicatesSkipped: 0,
+      cacheSkipped: 1,
+      skipped: [],
+    });
     expect(readRows(odb)).toHaveLength(1);
 
     appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });
