@@ -1,0 +1,660 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T08:56:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3743: Dashboard REST requests queue >20s during 5-minute burst windows (Awareness 'signal timed out', slow conversation opens)",
+    "updated": "2026-08-16T09:05:27.246Z"
+  },
+  "plan": {
+    "id": "pan-3743",
+    "title": "Dashboard REST requests queue >20s during 5-minute burst windows (Awareness 'signal timed out', slow conversation opens)",
+    "status": "proposed",
+    "uid": "59968067-afef-48b7-9297-7545884c0a60",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T08:56:42Z",
+    "updated": "2026-08-16T09:05:27.246Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3743",
+        "label": "PAN-3743",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3743.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "cost-reconcile",
+      "worker-threads",
+      "event-loop"
+    ],
+    "narratives": {
+      "Problem": "Every 5 minutes the dashboard server runs the cost-reconcile sweep on its main thread: sync fs walks and JSONL parses across hundreds of codex-home and pi/claude transcript files, re-reading and re-logging the same historical files every sweep. During these burst windows REST reads stall past the frontend's 20s fetchWithTimeout, so the Awareness panel renders 'signal timed out' and conversation opens hang. Verified during planning: /api/activity and /api/agents/:id/conversation do NOT sit behind the DB-job queue — the mechanism is main-thread starvation from sweep sync I/O and parse CPU, plus the per-file '[cost-reconcile] skipped' log flood emitted by markSkipped in src/lib/overdeck/cost.ts.",
+      "Proposal": "Three moves, per the PRD: (1) a persistent per-file skip-verdict cache (cost_reconcile_file_state, keyed by path+mtime+size) so unchanged historical files are never re-opened or re-logged; (2) worker-ize the sweep's walk+parse behind a new costReconcileSweep DB-job operation on the 'long' lane, with events returned to the main thread for recording so CostWriter.record's in-process cost.recorded bus emits are preserved (parse-in-worker / record-on-main); (3) queue instrumentation on runDashboardDbJob (waitMs/runMs/depth, [db-jobs] slow: log line over 1s) plus a pinned lane-mapping test.",
+      "NonGoals": "- No new HTTP stats/metrics endpoint for queue depth; instrumentation is log-only (one read door).\n- No changes to the GitHub tracker sync or to the 5-minute reconcile interval.\n- No changes to ws/rpc client reconnect behavior (client-side amplification fixed in d06a4cb889).\n- No worker-ization of the conversation transcript parse route (/api/agents/:id/conversation) — verified it does not use the DB-job queue; revisit only via the PRD implementation-checkpoint follow-up.\n- No changes to searchSessionsSemantic lane cancellation or SEMANTIC_SEARCH_TIMEOUT_MS.\n- No changes to the frontend fetchWithTimeout 20s timeout."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Parse-in-worker / record-on-main is the primary worker-ization shape (promoted from the previous draft's fallback).",
+        "rationale": "Verified CostWriter.record emits cost.recorded on the in-process Effect EventBus (src/lib/overdeck/cost.ts:591) for every recorded event, and both sweeps record through that writer; a worker thread has no such bus, so whole-sweep-in-worker would silently drop announcements feeding cost.subscribe and /api/costs/stream."
+      },
+      {
+        "summary": "The skip-verdict cache covers both the codex sweep (src/lib/overdeck/cost.ts) and the pi reconciler (src/lib/costs/reconciler.ts).",
+        "rationale": "The '[cost-reconcile] skipped' flood named in the issue is emitted by markSkipped in cost.ts (~line 636) during the codex sweep over codex-home JSONL files; a reconciler-only cache (previous draft's scope) would not fix the observed symptom."
+      },
+      {
+        "summary": "Queue instrumentation is log-only with no new HTTP endpoint.",
+        "rationale": "One-read-door rule; the [db-jobs] slow: log line is the diagnostic surface the PRD's implementation checkpoint needs."
+      },
+      {
+        "summary": "reclassifyUnknownCostEventsSync stays on the main thread.",
+        "rationale": "It is two SQL statements; moving it to the worker buys nothing and complicates the job contract."
+      },
+      {
+        "summary": "costReconcileSweep is routed to the 'long' lane via an explicit workerLane check, not COALESCED_OPERATIONS membership.",
+        "rationale": "Coalescing identical sweep payloads would merge concurrent sweep jobs and defeat the queue-wait measurement this plan adds."
+      }
+    ],
+    "items": [
+      {
+        "id": "skip-verdict-store",
+        "title": "Add cost_reconcile_file_state table and skip-cache module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "codex-skip-cache",
+            "pi-skip-cache"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "src/lib/costs/skip-cache.ts",
+            "tests/unit/lib/costs/skip-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/costs/skip-cache.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/costs/skip-cache.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1. Add a runSchemaTopUp statement in src/lib/overdeck/infra.ts (alongside the cost_events indexes at lines 185-187) creating cost_reconcile_file_state (path TEXT PRIMARY KEY, mtime_ms INTEGER NOT NULL, size INTEGER NOT NULL, verdict TEXT NOT NULL). Create src/lib/costs/skip-cache.ts exporting SkipVerdict ('imported' | 'no-usage' | 'unknown-model' | 'unpriced-model'), lookupSkipVerdict(path, mtimeMs, size) (returns the verdict only on exact stat match, else null), and recordSkipVerdict(path, mtimeMs, size, verdict). Error outcomes are never stored — the type only admits terminal verdicts. Same DB as cost_events so a DB rebuild wipes verdicts with events. Tests: roundtrip hit, mtime bump → miss, size bump → miss, unknown path → null."
+        },
+        "items": [
+          {
+            "id": "skip-verdict-store.ac1",
+            "title": "the overdeck DB schema creates table cost_reconcile_file_state with columns path, mtime_ms, size, verdict (test asserts PRAGMA table_info output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-verdict-store.ac2",
+            "title": "recordSkipVerdict persists a verdict and lookupSkipVerdict returns it for the same (path, mtimeMs, size)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-verdict-store.ac3",
+            "title": "lookupSkipVerdict returns null when the file's mtime or size has changed since the verdict was stored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-verdict-store.ac4",
+            "title": "recordSkipVerdict rejects non-terminal outcomes at the type level: 'error' and 'unreadable' are not valid SkipVerdict values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-skip-cache",
+        "title": "Wire skip-verdict cache into the codex sweep in cost.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "src/dashboard/server/services/cost-reconcile-service.ts",
+            "tests/unit/lib/costs/codex-skip-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/costs/codex-skip-cache.test.ts",
+            "npx vitest run tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "codex-skip-cache tests pass",
+            "existing cost/reconcile tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. In CostWriterLive.reconcile (src/lib/overdeck/cost.ts, line 599), before parsing a session file: statSync it and call lookupSkipVerdict; on hit increment a cacheSkipped counter and continue WITHOUT markSkipped (no per-file log). After processing, recordSkipVerdict with the outcome: 'imported' when events were offered to record() (regardless of dedup outcome), else the skip reason ('no-usage' | 'unknown-model' | 'unpriced-model'). 'unknown-model' is cached because its priced events were still recorded (markSkipped there does not continue) and record() dedups; thrown parse errors are never cached. Add cacheSkipped to CostReconcileSummary and make cost-reconcile-service.ts always log one summary line per sweep: [cost-reconciler] <reason> codex sweep: N scanned, M cache-skipped, K imported. Build fixture codex sessions trees in tests; spy the parse function."
+        },
+        "items": [
+          {
+            "id": "codex-skip-cache.ac1",
+            "title": "when reconcile({source:'codex'}) reruns over an unchanged fixture tree, it produces zero '[cost-reconcile] skipped' log lines and logs one summary line whose cache-skipped count equals the scanned file count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-skip-cache.ac2",
+            "title": "given a cached verdict with unchanged file stat, the sweep produces no parseCodexSessionCostEventsSync spy call for that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-skip-cache.ac3",
+            "title": "when a cached file's mtime changes, the sweep re-parses it and stores the fresh verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-skip-cache.ac4",
+            "title": "a file whose parse throws receives no verdict row, so the next sweep produces a parse call for it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-skip-cache",
+        "title": "Wire skip-verdict cache into reconcilePiTranscripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/reconciler.ts",
+            "tests/unit/lib/costs/reconciler-skip-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/costs/reconciler-skip-cache.test.ts",
+            "npx vitest run tests/unit/lib/costs",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconciler-skip-cache tests pass",
+            "existing costs tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. Apply the skip-verdict cache inside reconcilePiTranscripts() (src/lib/costs/reconciler.ts, line 473): stat + lookupSkipVerdict before each transcript read/parse in the agent-dir walk (lines 444-519) and the claude-projects walk (lines 617-700); recordSkipVerdict after each file with 'imported' or the skip reason; never cache files that land in result.errors. Extend ReconcileResult with cacheSkipped: number and log one summary line per sweep (reuse/extend the existing service log at cost-reconcile-service.ts:15-20). Suppress per-file skip logging for cache hits."
+        },
+        "items": [
+          {
+            "id": "pi-skip-cache.ac1",
+            "title": "a second reconcilePiTranscripts() over an unchanged corpus logs zero per-file skipped lines and one summary line containing the cache-skipped count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-skip-cache.ac2",
+            "title": "files with cached terminal verdicts and unchanged stats produce no readFileSync/openSync calls during the walk (fs spy assertions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-skip-cache.ac3",
+            "title": "files that errored on the previous sweep are retried: the walk opens them again on the next sweep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-sweep-worker",
+        "title": "Worker-ize the codex sweep walk+parse behind costReconcileSweep",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pi-sweep-worker"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "src/dashboard/server/services/cost-reconcile-service.ts",
+            "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
+            "npx vitest run tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cost-reconcile-sweep-job tests pass",
+            "existing CostWriter.reconcile tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 (decision D1: parse-in-worker / record-on-main). (1) In src/lib/overdeck/cost.ts extract the walk + stat + cache-check + parse core of reconcile into an exported async collectCodexCostEvents(opts) returning { events, verdicts, stats: { scanned, cacheSkipped } } — no record(), no EventBus, no Effect Layer dependencies (reading the verdict table via skip-cache.ts is fine; existing worker jobs already open the same DBs). CostWriterLive.reconcile keeps its full signature (dryRun, extraRoots, extraRootSpecs) and becomes collect + per-event record(). (2) Add 'costReconcileSweep' to the DashboardDbOperation union and the switch in BOTH dashboard-db-task.ts (runInline, Vitest path) and dashboard-db-worker.ts (runJob) — payload { source: 'codex' }, returns the collect result. Route it in workerLane (dashboard-db-task.ts:129) via an explicit `if (operation === 'costReconcileSweep') return 'long';` — do NOT add to COALESCED_OPERATIONS. (3) In cost-reconcile-service.ts replace the direct CostWriter.reconcile call (lines 31-35) with runDashboardDbJob('costReconcileSweep', { source: 'codex' }), then loop returned events through CostWriter.record on the main thread and upsert verdicts via recordSkipVerdict; preserve failure logging."
+        },
+        "items": [
+          {
+            "id": "codex-sweep-worker.ac1",
+            "title": "DashboardDbOperation contains 'costReconcileSweep' in both dashboard-db-task.ts and dashboard-db-worker.ts, and workerLane routes it to the 'long' lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-sweep-worker.ac2",
+            "title": "runCostReconcileOnce sends the codex walk+parse to runDashboardDbJob('costReconcileSweep') and records the returned events through CostWriter.record on the main thread",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-sweep-worker.ac3",
+            "title": "events recorded after a worker sweep still emit cost.recorded on the server EventBus (a subscription test receives the emits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-sweep-worker.ac4",
+            "title": "CostWriter.reconcile still accepts dryRun, extraRoots and extraRootSpecs, and the existing reconcile unit tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-sweep-worker",
+        "title": "Worker-ize the pi reconciler walk+parse behind costReconcileSweep",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/reconciler.ts",
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "src/dashboard/server/services/cost-reconcile-service.ts",
+            "tests/unit/lib/costs/reconciler-collect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/costs/reconciler-collect.test.ts",
+            "npx vitest run tests/unit/lib/costs",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconciler-collect tests pass",
+            "existing reconciler tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5, following the pattern established by codex-sweep-worker. Extract walk + cache-check + parse from reconcilePiTranscripts() into an exported async collectPiCostEvents() returning { events, verdicts, stats }; extend the costReconcileSweep payload to { source: 'pi' } in both dashboard-db-task.ts and dashboard-db-worker.ts. The service shell (cost-reconcile-service.ts:14) calls the job and records through recordCostEventsThroughOverdeck on the main thread, preserving issue attribution / classifySessionBucket behavior. reconcilePiTranscripts keeps its exported signature for other callers and becomes collect + record."
+        },
+        "items": [
+          {
+            "id": "pi-sweep-worker.ac1",
+            "title": "the costReconcileSweep job accepts { source: 'pi' } and returns parsed pi/claude transcript events plus verdicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-sweep-worker.ac2",
+            "title": "the service shell sends the pi walk+parse to the worker and preserves issue attribution via classifySessionBucket when recording the returned events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-sweep-worker.ac3",
+            "title": "the extracted collect + record split produces green results from the existing reconciler unit tests without modifying them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "db-job-instrumentation",
+        "title": "Instrument runDashboardDbJob queue wait and run time",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "tests/unit/dashboard/db-task-instrumentation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/db-task-instrumentation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "db-task-instrumentation tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. Parent (dashboard-db-task.ts): stamp enqueuedAt: Date.now() on the PendingJob at creation (line 311); in the completion message handler (line 158+) read worker-reported startedAt/finishedAt, compute waitMs = startedAt - enqueuedAt and runMs = finishedAt - startedAt. Worker (dashboard-db-worker.ts): stamp startedAt immediately before running the job and finishedAt after it settles; include both on the response message for success and error shapes. Log `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<pending-in-that-lane>` when waitMs > 1000 || runMs > 1000. runInline (VITEST) path: startedAt = enqueuedAt = Date.now(), measure runMs around the switch, same log line. Extract an exported pure formatter formatSlowJobLine({op, lane, waitMs, runMs, depth}): string | null and unit-test it. Log-only: no new HTTP endpoint. Do not alter searchSessionsSemantic cancellation or timeout handling."
+        },
+        "items": [
+          {
+            "id": "db-job-instrumentation.ac1",
+            "title": "a worker job exceeding 1s of run time logs a line matching '[db-jobs] slow: op=… lane=… waitMs=… runMs=… depth=…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-job-instrumentation.ac2",
+            "title": "the formatter returns waitMs as startedAt-minus-enqueuedAt and runMs as finishedAt-minus-startedAt (unit test feeds stamped times)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-job-instrumentation.ac3",
+            "title": "a job at or under the 1s threshold on both measures produces no [db-jobs] slow line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-job-instrumentation.ac4",
+            "title": "the runInline (VITEST) path emits the same line shape for slow inline jobs with waitMs 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-audit-test",
+        "title": "Pin the workerLane mapping with a unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "tests/unit/dashboard/db-task-lanes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/db-task-lanes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "db-task-lanes test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. Export workerLane from src/dashboard/server/services/dashboard-db-task.ts (mapping verified correct during planning — this item pins it, it does not change it) and add tests/unit/dashboard/db-task-lanes.test.ts asserting the full mapping, including the costReconcileSweep → 'long' routing added by codex-sweep-worker."
+        },
+        "items": [
+          {
+            "id": "lane-audit-test.ac1",
+            "title": "when workerLane resolves the interactive ops (listSessionsFeed, getSessionsFeedFacets, getConversationByName, getDiscoveredSessionById), then it returns 'read' for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-audit-test.ac2",
+            "title": "when workerLane resolves scanConversations, enrichSessions, embedSessions, listSubstrateBugWeights or costReconcileSweep, then it returns 'long', and searchSessionsSemantic returns 'semantic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-audit-test.ac3",
+            "title": "the test fails if any interactive op is moved onto the 'long' lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-worker-lanes",
+        "title": "Document worker lanes, slow-job log line, and sweep delegation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:56:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3743",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/TELEMETRY.md",
+            "src/dashboard/server/services/cost-reconcile-service.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'DB job worker lanes' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'db-jobs' docs/TELEMETRY.md",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep finds the 'DB job worker lanes' subsection",
+            "grep finds the [db-jobs] slow: line documented",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8. docs/DASHBOARD-ARCHITECTURE.md: add a 'DB job worker lanes' subsection naming the read/long/semantic lanes, which ops are interactive vs bulk, that the worker body lives in dashboard-db-worker.ts (new ops must be added in both files), the [db-jobs] slow: log line format, and the costReconcileSweep job's parse-in-worker / record-on-main shape. docs/TELEMETRY.md: record the [db-jobs] slow: line as a diagnostic surface. Rewrite the cost-reconcile-service.ts module header to describe the worker delegation and the skip-verdict cache."
+        },
+        "items": [
+          {
+            "id": "docs-worker-lanes.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'DB job worker lanes' subsection naming the read/long/semantic lanes and the costReconcileSweep job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-worker-lanes.ac2",
+            "title": "docs/TELEMETRY.md records the '[db-jobs] slow:' line format as a diagnostic surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-worker-lanes.ac3",
+            "title": "the cost-reconcile-service.ts module header contains a description of the worker delegation and the skip-verdict cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "skip-verdict-store",
+        "to": "codex-skip-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-verdict-store",
+        "to": "pi-skip-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-skip-cache",
+        "to": "codex-sweep-worker",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-skip-cache",
+        "to": "pi-sweep-worker",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sweep-worker",
+        "to": "pi-sweep-worker",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sweep-worker",
+        "to": "lane-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sweep-worker",
+        "to": "docs-worker-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-sweep-worker",
+        "to": "docs-worker-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "db-job-instrumentation",
+        "to": "docs-worker-lanes",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3743-dashboard-rest-requests-queue-20s-during-5-minute-burst-windows-awareness-signal-timed-out-slow-conversation-opens.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
