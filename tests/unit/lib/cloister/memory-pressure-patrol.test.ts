@@ -3,6 +3,7 @@ import { memoryFeedLevel, patrolMemoryPressure, __resetMemoryPressurePatrolState
 import type { MemoryVerdict, MemoryPressureBand } from '../../../../src/lib/cloister/memory-governor.js';
 
 const GIB = 1024 ** 3;
+const THRESHOLDS = { warningBytes: 8 * GIB, criticalBytes: 4 * GIB };
 
 describe('memory-pressure-patrol', () => {
   beforeEach(() => {
@@ -38,6 +39,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -46,6 +48,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -69,6 +72,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -77,6 +81,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -96,6 +101,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'soft' as const,
         availableBytes: 7 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -104,6 +110,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -119,12 +126,41 @@ describe('memory-pressure-patrol', () => {
       expect(actions).toHaveLength(1);
     });
 
+    it('explains a hold from its stored trigger, current reading, and both exit conditions', async () => {
+      const emitted: any[] = [];
+      const triggerAt = Date.UTC(2026, 0, 1, 14, 22);
+      const verdict: MemoryVerdict = {
+        band: 'soft',
+        availableBytes: 12.5 * GIB,
+        thresholds: THRESHOLDS,
+        trigger: { kind: 'soft-dip', readingBytes: 7 * GIB, thresholdBytes: 8 * GIB, at: triggerAt },
+      };
+
+      await patrolMemoryPressure({
+        assess: async () => verdict,
+        readWatchReserveBytes: () => 14 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].message).toContain('14:22 UTC');
+      expect(emitted[0].message).toContain('dipped to 7.0 GiB, under the 8.0 GiB soft reserve');
+      expect(emitted[0].message).toContain('12.5 GiB is available now');
+      expect(emitted[0].message).toContain('16.0 GiB recovery reserve');
+      expect(emitted[0].message).toContain('8.0 GiB soft reserve');
+      expect(emitted[0].message).toContain('below 0.05 for 10 minutes');
+    });
+
     it('emits an error-level entry for hard band (shedding)', async () => {
       const emitted: object[] = [];
 
       const mockVerdict: MemoryVerdict = {
         band: 'hard' as const,
         availableBytes: 3 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -133,6 +169,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -147,12 +184,86 @@ describe('memory-pressure-patrol', () => {
       expect(actions).toHaveLength(1);
     });
 
+    it('attributes swap/PSI shedding without claiming current memory is below hard', async () => {
+      const emitted: any[] = [];
+      const verdict: MemoryVerdict = {
+        band: 'hard',
+        availableBytes: 12.5 * GIB,
+        thresholds: THRESHOLDS,
+        trigger: {
+          kind: 'swap-psi',
+          readingBytes: 1 * GIB,
+          thresholdBytes: 2 * GIB,
+          at: Date.UTC(2026, 0, 1, 14, 22),
+        },
+      };
+
+      await patrolMemoryPressure({
+        assess: async () => verdict,
+        readWatchReserveBytes: () => 14 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].message).toContain('swap free fell to 1.0 GiB');
+      expect(emitted[0].message).toContain('memory pressure stalls were active');
+      expect(emitted[0].message).not.toContain('12.5 GiB available is under the 4.0 GiB hard reserve');
+    });
+
+    it('keeps every availability-versus-reserve claim numerically true across bands and triggers', async () => {
+      const triggerCases = [
+        { kind: 'soft-dip' as const, readingBytes: 7 * GIB, thresholdBytes: 8 * GIB },
+        { kind: 'hard' as const, readingBytes: 3 * GIB, thresholdBytes: 4 * GIB },
+        { kind: 'swap-psi' as const, readingBytes: 1 * GIB, thresholdBytes: 2 * GIB },
+        { kind: 'psi-unavailable' as const, readingBytes: 1 * GIB, thresholdBytes: 2 * GIB },
+      ];
+      const bands: MemoryPressureBand[] = ['ok', 'soft', 'hard'];
+
+      for (const band of bands) {
+        for (const trigger of triggerCases) {
+          for (const availableGib of [3, 6, 10, 20]) {
+            __resetMemoryPressurePatrolState();
+            const emitted: any[] = [];
+            await patrolMemoryPressure({
+              assess: async () => ({
+                band,
+                availableBytes: availableGib * GIB,
+                thresholds: THRESHOLDS,
+                trigger: { ...trigger, at: Date.UTC(2026, 0, 1, 14, 22) },
+              }),
+              readWatchReserveBytes: () => 12 * GIB,
+              readSoftReserveBytes: () => 8 * GIB,
+              readHardReserveBytes: () => 4 * GIB,
+              readRecoveryReserveBytes: () => 16 * GIB,
+              readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+              emit: (entry) => emitted.push(entry),
+            });
+
+            const message = emitted[0].message as string;
+            for (const match of message.matchAll(/([\d.]+) GiB available, below the ([\d.]+) GiB/g)) {
+              expect(Number(match[1])).toBeLessThan(Number(match[2]));
+            }
+            for (const match of message.matchAll(/([\d.]+) GiB available, at or above the ([\d.]+) GiB/g)) {
+              expect(Number(match[1])).toBeGreaterThanOrEqual(Number(match[2]));
+            }
+            for (const match of message.matchAll(/(?:dipped|fell) to ([\d.]+) GiB, under the ([\d.]+) GiB/g)) {
+              expect(Number(match[1])).toBeLessThan(Number(match[2]));
+            }
+          }
+        }
+      }
+    });
+
     it('emits an info-level entry when recovering from watch to ok', async () => {
       const emitted: object[] = [];
 
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -161,6 +272,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -174,6 +286,7 @@ describe('memory-pressure-patrol', () => {
       const recoverVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 15 * GIB,
+        thresholds: THRESHOLDS,
       };
       const recoverDeps = {
         ...deps,
@@ -196,6 +309,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -204,6 +318,7 @@ describe('memory-pressure-patrol', () => {
         readSoftReserveBytes: () => 8 * GIB,
         readHardReserveBytes: () => 4 * GIB,
         readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
         emit: (entry: object) => emitted.push(entry),
       };
 
@@ -214,6 +329,57 @@ describe('memory-pressure-patrol', () => {
       expect(typeof details).toBe('string');
       expect(details).toContain('MemAvailable');
       expect(details).toContain('Watch reserve');
+    });
+
+    it('prints real swap and PSI readings in the details block', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
+          swapFreeBytes: 0,
+          swapTotalBytes: 8 * GIB,
+          psiSomeAvg10: 0,
+          psiFullAvg10: 0,
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].details).toContain('Swap: 0.0 GiB free of 8.0 GiB');
+      expect(emitted[0].details).toContain('PSI some avg10: 0.00 | full avg10: 0.00');
+      expect(emitted[0].details).not.toContain('Swap free: unavailable');
+    });
+
+    it('labels only unreadable PSI values unavailable while preserving swap readings', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
+          swapFreeBytes: 2 * GIB,
+          swapTotalBytes: 8 * GIB,
+          psiSomeAvg10: 0.12,
+          psiFullAvg10: null,
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].details).toContain('Swap: 2.0 GiB free of 8.0 GiB');
+      expect(emitted[0].details).toContain(
+        'PSI some avg10: 0.12 | full avg10: unavailable (pressure stall data not readable)',
+      );
     });
   });
 
