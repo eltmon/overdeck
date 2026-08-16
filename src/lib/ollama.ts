@@ -36,6 +36,7 @@ export interface EnsureOllamaOptions {
   autoInstall?: boolean;
   retryDelayMs?: number;
   maxHealthAttempts?: number;
+  startupDeadlineMs?: number;
   fetchImpl?: typeof fetch;
   runCommand?: CommandRunner;
   startServer?: () => Promise<void>;
@@ -79,7 +80,8 @@ export interface OllamaLifecycleOptions {
   startServer?: () => Promise<void>;
   sleep?: (ms: number) => Promise<void>;
   retryDelayMs?: number;
-  maxHealthAttempts?: number;
+  startupDeadlineMs?: number;
+  knownUnhealthy?: boolean;
 }
 
 export function resolveOllamaBaseUrl(config: OllamaProviderConfig = {}): string {
@@ -96,9 +98,9 @@ export async function checkOllamaHealth(
   fetchImpl: typeof fetch = fetch,
 ): Promise<OllamaHealth> {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-  let response: Response;
+  let probe: Awaited<ReturnType<typeof fetchOllamaTags>>;
   try {
-    response = await fetchOllamaTags(normalizedBaseUrl, fetchImpl);
+    probe = await fetchOllamaTags(normalizedBaseUrl, fetchImpl);
   } catch {
     return {
       endpointReachable: false,
@@ -106,40 +108,48 @@ export async function checkOllamaHealth(
       message: `Ollama is not reachable at ${normalizedBaseUrl}. Start it with \`ollama serve\`.`,
     };
   }
-  if (!response.ok) {
-    await response.body?.cancel();
-    return {
-      endpointReachable: false,
-      modelPresent: false,
-      message: `Ollama is not reachable at ${normalizedBaseUrl} (HTTP ${response.status}). Start it with \`ollama serve\`.`,
-    };
-  }
-
-  let data: { models?: Array<{ name?: string; model?: string }> };
   try {
-    data = await response.json() as { models?: Array<{ name?: string; model?: string }> };
-  } catch (cause) {
-    throw new OllamaError(
-      'endpoint-unreachable',
-      `Ollama returned an invalid /api/tags response from ${normalizedBaseUrl}.`,
-      cause,
-    );
-  }
-  const bareModel = model.replace(/^ollama:/, '');
-  const modelPresent = data.models?.some((entry) => entry.name === bareModel || entry.model === bareModel) ?? false;
-  return modelPresent
-    ? { endpointReachable: true, modelPresent: true }
-    : {
-        endpointReachable: true,
+    if (!probe.response.ok) {
+      void probe.response.body?.cancel().catch(() => undefined);
+      return {
+        endpointReachable: false,
         modelPresent: false,
-        message: `Ollama model ${bareModel} is not pulled. Run \`ollama pull ${bareModel}\`.`,
+        message: `Ollama is not reachable at ${normalizedBaseUrl} (HTTP ${probe.response.status}). Start it with \`ollama serve\`.`,
       };
+    }
+
+    let data: { models?: Array<{ name?: string; model?: string }> };
+    try {
+      data = await probe.response.json() as { models?: Array<{ name?: string; model?: string }> };
+    } catch (cause) {
+      if (probe.signal.aborted) {
+        void probe.response.body?.cancel().catch(() => undefined);
+        return unreachableHealth(normalizedBaseUrl);
+      }
+      throw new OllamaError(
+        'endpoint-unreachable',
+        `Ollama returned an invalid /api/tags response from ${normalizedBaseUrl}.`,
+        cause,
+      );
+    }
+    const bareModel = model.replace(/^ollama:/, '');
+    const modelPresent = data.models?.some((entry) => entry.name === bareModel || entry.model === bareModel) ?? false;
+    return modelPresent
+      ? { endpointReachable: true, modelPresent: true }
+      : {
+          endpointReachable: true,
+          modelPresent: false,
+          message: `Ollama model ${bareModel} is not pulled. Run \`ollama pull ${bareModel}\`.`,
+        };
+  } finally {
+    probe.dispose();
+  }
 }
 
 export async function ensureOllamaServeRunning(options: OllamaLifecycleOptions = {}): Promise<void> {
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL);
   const fetchImpl = options.fetchImpl ?? fetch;
-  if (await isOllamaHealthy(baseUrl, fetchImpl)) return;
+  if (!options.knownUnhealthy && await isOllamaHealthy(baseUrl, fetchImpl)) return;
 
   if (!await isOllamaInstalled(options.runCommand)) {
     throw new OllamaError('not-installed', 'Ollama is not installed. Install it from https://ollama.com/download.');
@@ -152,7 +162,7 @@ export async function ensureOllamaServeRunning(options: OllamaLifecycleOptions =
       fetchImpl,
       options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
       options.retryDelayMs ?? 1_000,
-      options.maxHealthAttempts ?? 30,
+      options.startupDeadlineMs ?? 30_000,
     );
   } catch (cause) {
     throw new OllamaError('start-failed', `Ollama did not become reachable at ${baseUrl} after starting \`ollama serve\`.`, cause);
@@ -171,7 +181,8 @@ export async function ensureOllama(options: EnsureOllamaOptions = {}): Promise<E
   const startServer = options.startServer ?? startOllamaServerWithSpawn;
   const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const retryDelayMs = options.retryDelayMs ?? 1_000;
-  const maxHealthAttempts = options.maxHealthAttempts ?? 30;
+  const startupDeadlineMs = options.startupDeadlineMs ??
+    (options.maxHealthAttempts ? options.maxHealthAttempts * retryDelayMs : 30_000);
 
   const alreadyHealthy = await isOllamaHealthy(baseUrl, fetchImpl);
 
@@ -185,7 +196,7 @@ export async function ensureOllama(options: EnsureOllamaOptions = {}): Promise<E
     }
 
     await startServer();
-    await waitForOllamaHealth(baseUrl, fetchImpl, sleep, retryDelayMs, maxHealthAttempts);
+    await waitForOllamaHealth(baseUrl, fetchImpl, sleep, retryDelayMs, startupDeadlineMs);
   }
 
   await runCommand('ollama', ['pull', model]);
@@ -203,24 +214,31 @@ async function hasOllamaBinary(runCommand: CommandRunner): Promise<boolean> {
 
 async function isOllamaHealthy(baseUrl: string, fetchImpl: typeof fetch): Promise<boolean> {
   try {
-    const response = await fetchOllamaTags(baseUrl, fetchImpl);
+    const probe = await fetchOllamaTags(baseUrl, fetchImpl);
     try {
-      return response.ok;
+      return probe.response.ok;
     } finally {
-      await response.body?.cancel();
+      probe.dispose();
+      void probe.response.body?.cancel().catch(() => undefined);
     }
   } catch {
     return false;
   }
 }
 
-async function fetchOllamaTags(baseUrl: string, fetchImpl: typeof fetch): Promise<Response> {
+async function fetchOllamaTags(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+  timeoutMs = OLLAMA_PROBE_TIMEOUT_MS,
+): Promise<{ response: Response; signal: AbortSignal; dispose: () => void }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OLLAMA_PROBE_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetchImpl(`${baseUrl}/api/tags`, { method: 'GET', signal: controller.signal });
-  } finally {
+    const response = await fetchImpl(`${baseUrl}/api/tags`, { method: 'GET', signal: controller.signal });
+    return { response, signal: controller.signal, dispose: () => clearTimeout(timeout) };
+  } catch (cause) {
     clearTimeout(timeout);
+    throw cause;
   }
 }
 
@@ -229,13 +247,38 @@ async function waitForOllamaHealth(
   fetchImpl: typeof fetch,
   sleep: (ms: number) => Promise<void>,
   retryDelayMs: number,
-  maxAttempts: number,
+  startupDeadlineMs: number,
 ): Promise<void> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    if (await isOllamaHealthy(baseUrl, fetchImpl)) return;
-    if (attempt < maxAttempts) await sleep(retryDelayMs);
+  const deadline = Date.now() + startupDeadlineMs;
+  while (Date.now() < deadline) {
+    const remaining = deadline - Date.now();
+    if (await isOllamaHealthyWithin(baseUrl, fetchImpl, Math.min(OLLAMA_PROBE_TIMEOUT_MS, remaining))) return;
+    const retryBudget = deadline - Date.now();
+    if (retryBudget > 0) await sleep(Math.min(retryDelayMs, retryBudget));
   }
   throw new OllamaEnsureError(`Ollama did not become healthy at ${baseUrl}`);
+}
+
+async function isOllamaHealthyWithin(baseUrl: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<boolean> {
+  try {
+    const probe = await fetchOllamaTags(baseUrl, fetchImpl, timeoutMs);
+    try {
+      return probe.response.ok;
+    } finally {
+      probe.dispose();
+      void probe.response.body?.cancel().catch(() => undefined);
+    }
+  } catch {
+    return false;
+  }
+}
+
+function unreachableHealth(baseUrl: string): OllamaHealth {
+  return {
+    endpointReachable: false,
+    modelPresent: false,
+    message: `Ollama is not reachable at ${baseUrl}. Start it with \`ollama serve\`.`,
+  };
 }
 
 async function installOllamaWithPlatformCommand(): Promise<void> {

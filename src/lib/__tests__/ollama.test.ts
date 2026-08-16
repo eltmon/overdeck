@@ -186,6 +186,31 @@ describe('Pi harness Ollama lifecycle', () => {
     }
   });
 
+  it('bounds a stalled health response body and cancels it', async () => {
+    vi.useFakeTimers();
+    try {
+      const cancel = vi.fn(async () => {});
+      const fetchImpl = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const signal = init?.signal;
+        return Promise.resolve({
+          ok: true,
+          body: { cancel },
+          json: () => new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+        } as unknown as Response);
+      });
+
+      const result = checkOllamaHealth('ollama:gemma4:12b', undefined, fetchImpl);
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      await expect(result).resolves.toMatchObject({ endpointReachable: false, modelPresent: false });
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not spawn ollama serve when the endpoint already responds', async () => {
     const fetchImpl = vi.fn(async () => response(true));
     const runCommand = vi.fn(async () => {});
@@ -211,13 +236,60 @@ describe('Pi harness Ollama lifecycle', () => {
         runCommand,
         startServer,
         retryDelayMs: 100,
-        maxHealthAttempts: 3,
       });
       await vi.advanceTimersByTimeAsync(100);
       await result;
 
       expect(runCommand).toHaveBeenCalledWith('ollama', ['--version']);
       expect(startServer).toHaveBeenCalledOnce();
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('enforces one 30-second startup deadline for a stalled endpoint', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      }));
+      const result = ensureOllamaServeRunning({
+        knownUnhealthy: true,
+        fetchImpl,
+        runCommand: vi.fn(async () => {}),
+        startServer: vi.fn(async () => {}),
+      });
+      const rejection = expect(result).rejects.toMatchObject({ code: 'start-failed' });
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await rejection;
+      expect(fetchImpl.mock.calls.length).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries connection refusal every second and succeeds once the endpoint responds', async () => {
+    vi.useFakeTimers();
+    try {
+      let attempts = 0;
+      const fetchImpl = vi.fn(async () => {
+        attempts += 1;
+        if (attempts < 3) throw new Error('connection refused');
+        return response(true);
+      });
+      const result = ensureOllamaServeRunning({
+        knownUnhealthy: true,
+        fetchImpl,
+        runCommand: vi.fn(async () => {}),
+        startServer: vi.fn(async () => {}),
+      });
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      await result;
+
       expect(fetchImpl).toHaveBeenCalledTimes(3);
     } finally {
       vi.useRealTimers();

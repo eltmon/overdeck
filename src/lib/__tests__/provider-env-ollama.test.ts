@@ -78,6 +78,7 @@ describe('Ollama provider environment', () => {
 
     expect(ollamaMock.ensureOllamaServeRunning).toHaveBeenCalledWith({
       baseUrl: 'http://127.0.0.1:22434',
+      knownUnhealthy: true,
     });
     expect(ollamaMock.checkOllamaHealth).toHaveBeenCalledTimes(2);
   });
