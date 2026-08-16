@@ -84,6 +84,8 @@ const GOVERNOR_RESOURCES = {
   governorSwapSoftFreePercent: 25,
   governorSwapRecoveryFreePercent: 50,
   governorPsiFullShedAvg10: 1,
+  governorPsiCalmReadmitAvg10: 0.05,
+  governorPsiCalmWindowMs: 600_000,
 };
 
 function procMemory(
@@ -276,6 +278,59 @@ describe('assessMemoryPressure', () => {
 
     readProcMemoryMock.mockResolvedValue(procMemory(13 * GIB));
     expect((await assessMemoryPressure()).trigger).toBeNull();
+  });
+
+  it('re-admits above the soft reserve after PSI stays calm for the configured window', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(600_000);
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB));
+      await expect(assessMemoryPressure()).resolves.toMatchObject({ band: 'ok', trigger: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stays holding below recovery while PSI is not calm', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB, { psiFullAvg10: 0.3 }));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(600_000);
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB, { psiFullAvg10: 0.3 }));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      readProcMemoryMock.mockResolvedValue(procMemory(13 * GIB, { psiFullAvg10: 0.3 }));
+      expect((await assessMemoryPressure()).band).toBe('ok');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('requires a fresh calm window after an early re-admit and a second dip', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+      await vi.advanceTimersByTimeAsync(600_000);
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(9 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('ok');
+
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+      await vi.advanceTimersByTimeAsync(599_999);
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(9 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+      await vi.advanceTimersByTimeAsync(1);
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('ok');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('admits when swap is full but PSI shows no stalls (swap residency is not pressure)', async () => {

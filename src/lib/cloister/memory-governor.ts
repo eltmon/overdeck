@@ -77,8 +77,14 @@ export interface GovernorRunwayThresholds {
   psiFullShedAvg10: number;
 }
 
+export interface GovernorPsiCalmConfig {
+  readmitAvg10: number;
+  windowMs: number;
+}
+
 let governorMode: GovernorMode = 'admitting';
 let governorTrigger: GovernorTrigger | null = null;
+let psiCalmSinceMs: number | null = null;
 
 export interface GovernorTriggerSeed {
   kind: GovernorTriggerKind;
@@ -95,6 +101,7 @@ export interface GovernorTransition {
 export function resetGovernorModeForTests(): void {
   governorMode = 'admitting';
   governorTrigger = null;
+  psiCalmSinceMs = null;
   setCachedMemoryVerdict(null);
 }
 
@@ -118,6 +125,14 @@ export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
     swapRecoveryFreePercent: resources.governorSwapRecoveryFreePercent,
     psiFullShedAvg10: resources.governorPsiFullShedAvg10,
+  };
+}
+
+export function readGovernorPsiCalmConfig(): GovernorPsiCalmConfig {
+  const resources = loadConfigSync().config.resources;
+  return {
+    readmitAvg10: resources.governorPsiCalmReadmitAvg10,
+    windowMs: resources.governorPsiCalmWindowMs,
   };
 }
 
@@ -205,7 +220,14 @@ function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
 export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const reserves = readGovernorReserves();
   const runwayThresholds = readGovernorRunwayThresholds();
+  const psiCalmConfig = readGovernorPsiCalmConfig();
   const snapshot = await readProcMemory();
+  const now = Date.now();
+  if (snapshot.psiFullAvg10 != null && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10) {
+    psiCalmSinceMs ??= now;
+  } else {
+    psiCalmSinceMs = null;
+  }
   const previousMode = governorMode;
   const transition = nextGovernorModeWithRunway(
     snapshot.memAvailable,
@@ -225,7 +247,17 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     transition.trigger
     && (previousMode === 'admitting' || transition.trigger.kind !== governorTrigger?.kind)
   ) {
-    governorTrigger = { ...transition.trigger, at: Date.now() };
+    governorTrigger = { ...transition.trigger, at: now };
+  }
+  if (
+    governorMode === 'holding'
+    && psiCalmSinceMs != null
+    && now - psiCalmSinceMs >= psiCalmConfig.windowMs
+    && snapshot.memAvailable >= reserves.softBytes
+  ) {
+    governorMode = 'admitting';
+    governorTrigger = null;
+    psiCalmSinceMs = now;
   }
   const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),
