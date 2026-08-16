@@ -102,7 +102,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T11:05:21.217Z",
+  "updated": "2026-08-16T11:05:22.210Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
@@ -204,8 +204,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3744",
