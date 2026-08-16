@@ -60,18 +60,18 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:17:15.559Z",
+  "updated": "2026-08-16T10:22:48.956Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:17:14.279Z",
-    "reviewNotes": "Conversation switching can paint a false settled-empty state before the current stream emits its first payload.",
+    "updatedAt": "2026-08-16T10:22:43.527Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
     "lastVerifiedCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
@@ -108,36 +108,36 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1176776,
-            "output": 1475,
-            "cacheRead": 924160,
+            "input": 1278993,
+            "output": 1539,
+            "cacheRead": 929024,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 31555692,
-            "output": 45187,
-            "cacheRead": 30756352,
+            "input": 35571900,
+            "output": 50573,
+            "cacheRead": 34742016,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1176776,
-          "output": 1475,
-          "cacheRead": 924160,
+          "input": 1278993,
+          "output": 1539,
+          "cacheRead": 929024,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31555692,
-          "output": 45187,
-          "cacheRead": 30756352,
+          "input": 35571900,
+          "output": 50573,
+          "cacheRead": 34742016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.730486,
-        "pricingAsOf": "2026-08-16T10:17:15.539Z"
+        "usd": 23.037618,
+        "pricingAsOf": "2026-08-16T10:22:43.822Z"
       }
     },
     "merges": [
