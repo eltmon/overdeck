@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:59:28.359Z",
+  "updated": "2026-08-16T10:03:00.491Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "db-job-instrumentation": {
-        "writerId": "agent-pan-3743",
-        "agentId": "agent-pan-3743",
-        "pid": 3229179,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:59:28.359Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Split Pi transcript collection from recording, dispatched pi costReconcileSweep through the long worker, and preserved main-thread CostWriter recording and verdict persistence",
         "releasedAt": "2026-08-16T09:59:18.089Z"
+      },
+      {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 3229179,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:59:28.359Z",
+        "itemId": "db-job-instrumentation",
+        "outcome": "completed",
+        "reason": "Added enqueue/start/finish timing across inline and worker paths with per-lane depth and >1s slow-job logging",
+        "releasedAt": "2026-08-16T10:03:00.491Z"
       }
     ],
     "statusReasons": {
@@ -184,6 +187,10 @@
       "pi-sweep-worker": {
         "reason": "Split Pi transcript collection from recording, dispatched pi costReconcileSweep through the long worker, and preserved main-thread CostWriter recording and verdict persistence",
         "updatedAt": "2026-08-16T09:59:18.089Z"
+      },
+      "db-job-instrumentation": {
+        "reason": "Added enqueue/start/finish timing across inline and worker paths with per-lane depth and >1s slow-job logging",
+        "updatedAt": "2026-08-16T10:03:00.491Z"
       }
     }
   },
@@ -211,6 +218,10 @@
     "pi-sweep-worker.ac1": "completed",
     "pi-sweep-worker.ac2": "completed",
     "pi-sweep-worker.ac3": "completed",
-    "db-job-instrumentation": "running"
+    "db-job-instrumentation": "completed",
+    "db-job-instrumentation.ac1": "completed",
+    "db-job-instrumentation.ac2": "completed",
+    "db-job-instrumentation.ac3": "completed",
+    "db-job-instrumentation.ac4": "completed"
   }
 }
