@@ -2,7 +2,7 @@
   "issueId": "PAN-3754",
   "schemaVersion": 2,
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T17:58:49.533Z",
+  "updated": "2026-08-16T17:58:51.117Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3754: Memory governor: hysteresis hold wedges admissions on a healthy host; operator messages misattribute the trigger",
       "timestamp": "2026-08-16T17:58:49.533Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
