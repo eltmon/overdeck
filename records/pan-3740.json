@@ -1,19 +1,72 @@
 {
   "issueId": "PAN-3740",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-08-15T13:56:03.035Z",
-  "updated": "2026-08-15T13:56:03.035Z",
+  "updated": "2026-08-16T10:01:22.979Z",
   "pipeline": {
     "issueId": "PAN-3740",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-15T13:56:03.035Z"
+    "updatedAt": "2026-08-16T10:01:22.952Z",
+    "strikeReadyHead": "a8ab83ab4e430ee169781a787b9f94db85fe4f80",
+    "strikeReadyAt": "2026-08-16T10:01:22.951Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 974326,
+            "output": 3650,
+            "cacheRead": 609792,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 33489809,
+            "output": 25491,
+            "cacheRead": 32615680,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 787,
+            "output": 102,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 974326,
+          "output": 3650,
+          "cacheRead": 609792,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 33489809,
+          "output": 25491,
+          "cacheRead": 32615680,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 787,
+          "output": 102,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 21.444512,
+        "pricingAsOf": "2026-08-16T10:01:22.964Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
