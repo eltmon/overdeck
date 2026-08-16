@@ -12,11 +12,98 @@
       "timestamp": "2026-08-16T18:27:52.960Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-16T19:42:54.511Z",
+      "reason": "end",
+      "note": "Delivered canonical merge-eligibility gating, review-status retirement, terminal UAT generations, converging healing, merge-next validation, and documentation. Targeted tests, no-loss audit, lint, and typecheck pass. Full npm test exposed and then cleared the PAN-3753 no-loss audit omission; its remaining failures were unrelated shared-state/environment failures across pre-existing suites (including agent-state/deacon/runtime registry isolation and dist-externals fixture output). Branch is clean and fully pushed."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/main.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/uat-generation-engine.ts",
+      "src/lib/cloister/uat-polyrepo-engine.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/infra.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+      "tests/unit/lib/cloister/uat-generation-engine.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/server/routes/__tests__/merge-train.test.ts",
+      "src/dashboard/server/routes/merge-train.ts",
+      "src/dashboard/server/services/review-status-reconcile-service.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/merge-eligibility.ts",
+      "src/lib/cloister/uat-candidate-name.ts",
+      "src/lib/cloister/uat-generation-deps.ts",
+      "src/lib/cloister/uat-reconciler.ts",
+      "src/lib/database/review-status-db.ts",
+      "src/lib/flywheel-merge-order.ts",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/review-status-types.ts",
+      "src/lib/review-status.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+      "tests/unit/lib/cloister/merge-eligibility-gate.test.ts",
+      "tests/unit/lib/cloister/retired-records-skip.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts",
+      "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
+      "tests/unit/lib/review-status-retirement.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/merge-train.test.ts",
+      "src/dashboard/server/routes/merge-train.ts",
+      "src/dashboard/server/services/review-status-reconcile-service.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/merge-eligibility.ts",
+      "src/lib/cloister/uat-candidate-name.ts",
+      "src/lib/cloister/uat-generation-deps.ts",
+      "src/lib/cloister/uat-generation-engine.ts",
+      "src/lib/cloister/uat-polyrepo-engine.ts",
+      "src/lib/cloister/uat-reconciler.ts",
+      "src/lib/database/review-status-db.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/flywheel-merge-order.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/review-status-types.ts",
+      "src/lib/review-status.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+      "tests/unit/lib/cloister/merge-eligibility-gate.test.ts",
+      "tests/unit/lib/cloister/retired-records-skip.test.ts",
+      "tests/unit/lib/cloister/uat-generation-engine.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts",
+      "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
+      "tests/unit/lib/review-status-retirement.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "recordedAt": "2026-08-16T19:42:45.970Z"
+  },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:42:50.066Z",
+  "updated": "2026-08-16T19:42:54.614Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -26,8 +113,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:42:50.058Z",
+    "updatedAt": "2026-08-16T19:42:54.506Z",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
     "reviewRequestedAt": "2026-08-16T19:42:50.058Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -110,23 +198,22 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-16T19:42:45.970Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3757"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 642789,
-            "output": 1631,
-            "cacheRead": 475648,
+            "input": 1791925,
+            "output": 2609,
+            "cacheRead": 1398016,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 22751206,
-            "output": 30322,
-            "cacheRead": 22471936,
+            "input": 45872350,
+            "output": 52778,
+            "cacheRead": 45372416,
             "cacheWrite": 0
           }
         },
@@ -141,15 +228,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 642789,
-          "output": 1631,
-          "cacheRead": 475648,
+          "input": 1791925,
+          "output": 2609,
+          "cacheRead": 1398016,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22751206,
-          "output": 30322,
-          "cacheRead": 22471936,
+          "input": 45872350,
+          "output": 52778,
+          "cacheRead": 45372416,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -160,11 +247,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 13.543114,
-        "pricingAsOf": "2026-08-16T19:04:41.783Z"
+        "usd": 26.770354,
+        "pricingAsOf": "2026-08-16T19:42:54.558Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3757"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -332,87 +421,5 @@
     "docs-retirement-terminal-generations.ac1": "completed",
     "docs-retirement-terminal-generations.ac2": "completed",
     "docs-retirement-terminal-generations.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/flywheel.ts",
-      "src/dashboard/server/main.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/uat-generation-engine.ts",
-      "src/lib/cloister/uat-polyrepo-engine.ts",
-      "src/lib/database/schema.ts",
-      "src/lib/overdeck/infra.ts",
-      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
-      "tests/unit/lib/cloister/uat-generation-engine.test.ts",
-      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/FLYWHEEL.md",
-      "docs/MERGE-WORKFLOW.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/dashboard/server/routes/__tests__/merge-train.test.ts",
-      "src/dashboard/server/routes/merge-train.ts",
-      "src/dashboard/server/services/review-status-reconcile-service.ts",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/merge-eligibility.ts",
-      "src/lib/cloister/uat-candidate-name.ts",
-      "src/lib/cloister/uat-generation-deps.ts",
-      "src/lib/cloister/uat-reconciler.ts",
-      "src/lib/database/review-status-db.ts",
-      "src/lib/flywheel-merge-order.ts",
-      "src/lib/overdeck/review-status-sync.ts",
-      "src/lib/review-status-types.ts",
-      "src/lib/review-status.ts",
-      "src/lib/webhook-handlers.ts",
-      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-      "tests/unit/lib/cloister/merge-eligibility-gate.test.ts",
-      "tests/unit/lib/cloister/retired-records-skip.test.ts",
-      "tests/unit/lib/cloister/uat-reconciler.test.ts",
-      "tests/unit/lib/flywheel-merge-order.test.ts",
-      "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
-      "tests/unit/lib/review-status-retirement.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/FLYWHEEL.md",
-      "docs/MERGE-WORKFLOW.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/cli/commands/flywheel.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/routes/__tests__/merge-train.test.ts",
-      "src/dashboard/server/routes/merge-train.ts",
-      "src/dashboard/server/services/review-status-reconcile-service.ts",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/merge-eligibility.ts",
-      "src/lib/cloister/uat-candidate-name.ts",
-      "src/lib/cloister/uat-generation-deps.ts",
-      "src/lib/cloister/uat-generation-engine.ts",
-      "src/lib/cloister/uat-polyrepo-engine.ts",
-      "src/lib/cloister/uat-reconciler.ts",
-      "src/lib/database/review-status-db.ts",
-      "src/lib/database/schema.ts",
-      "src/lib/flywheel-merge-order.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/overdeck/review-status-sync.ts",
-      "src/lib/review-status-types.ts",
-      "src/lib/review-status.ts",
-      "src/lib/webhook-handlers.ts",
-      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
-      "tests/unit/lib/cloister/merge-eligibility-gate.test.ts",
-      "tests/unit/lib/cloister/retired-records-skip.test.ts",
-      "tests/unit/lib/cloister/uat-generation-engine.test.ts",
-      "tests/unit/lib/cloister/uat-reconciler.test.ts",
-      "tests/unit/lib/flywheel-merge-order.test.ts",
-      "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
-      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
-      "tests/unit/lib/review-status-retirement.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
-    ],
-    "recordedAt": "2026-08-16T19:42:45.970Z"
   }
 }
