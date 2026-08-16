@@ -195,31 +195,22 @@
       "timestamp": "2026-08-16T14:24:22.993Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-13T16:37:51Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1641\n\n# Review Synthesis — PAN-1641 — 2026-08-13T12:37:24-04:00\n\n## Verdict: CHANGES REQUESTED — Ollama launcher provisioning blocks the dashboard event loop, and the required Overdeck-spawned end-to-end verification remains missing\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/context.json`\n- Branch: `feature/pan-1641`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641`\n- HEAD reviewed: `6370a390f0e0655f14b33f55b0dea3d8a26b3477`\n- Cycle number: 2\n- Prior cycle SHA: `3ed79d282bd8948f92535b676320de7ecff8fe0e`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [performance] Ollama launcher provisioning blocks the dashboard event loop — `src/lib/ohmypi-models.ts:97`\nAdding Ollama to `PROVISIONED_PROVIDERS` routes every Ollama launcher through synchronous reads and atomic rewrites of `~/.omp/agent/models.json`. Dashboard launch and relaunch routes call this path in the long-lived Node server, so a slow or contended home filesystem blocks all HTTP, WebSocket, and terminal activity. Move provisioning to asynchronous filesystem APIs before synchronous script generation, avoid unchanged writes, and serialize concurrent registry updates.\n\n### [requirements] End-to-end evidence bypasses the Overdeck work-agent spawn path — `docs/audits/pan-1641-local-ollama-verification.md:25`\nAC 28 and AC 29 require an Overdeck-spawned Pi work agent to complete a trivial Ollama task with localhost and no-cloud evidence. The audit still invokes `omp` directly, so it does not verify Overdeck spawning, launcher generation, registry provisioning, or preflight integration. Run the acceptance flow through Overdeck and record the agent identity, launch path, result, localhost request, and absent cloud credentials and endpoints.\n\n## Non-blocking Findings\n\n### correctness\n- `~` The health timeout ends after response headers arrive and does not bound `response.json()` at `src/lib/ollama.ts:211`; a stalled response body can leave preflight pending indefinitely.\n\n### performance\n- `~` A stalled local endpoint can extend a failed startup to roughly three minutes because the five-second per-probe timeout compounds across retries at `src/lib/ollama.ts:217`.\n\n### requirements\n- `~` **[demoted: pre-existing]** The stopped-agent fresh-launch fallback does not perform the AC 19 preflight before session recreation. The cited fallback is in `src/lib/agents.ts`, which is outside the PR diff, so the mandatory scope gate prevents it from blocking.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1641/.pan/review/agent-pan-1641-review-6370a390/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1641 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T14:33:46.789Z",
+  "updated": "2026-08-16T14:35:37.596Z",
   "pipeline": {
     "issueId": "PAN-1641",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-13T16:37:51.402Z",
+    "updatedAt": "2026-08-16T14:35:36.999Z",
     "reviewNotes": "Ollama launcher provisioning blocks the dashboard event loop, and Overdeck-spawned E2E evidence remains missing",
     "inspectNotes": "CORRECTION + final verdict for 7ecbf09b: all five ACs pass. My prior FAILED note checked the legacy continues/pan-1641.vbrief.json; the canonical record is records/pan-1641.json, which DOES carry decision D8 (recordedAt 2026-08-13T14:25:05.563Z) and H1 flipped to RESOLVED. AC-4 is satisfied, and D8's stated contract matches what I independently verified against the installed prime-agent binary: baseUrl is taken literally (dist/core/model-registry.js:548,559,1218,1244 — never through resolveConfigValue) while apiKey/headers are env-resolved by BARE name (dist/core/resolve-config-value.js:17-19); D8's 'legacy pi normalizes to ohmypi' claim also checks out (src/lib/runtimes/index.ts:104-105, harness-policy.ts:138).\n\nAC-1: getProviderEnvForModel's ollama branch (agents/provider-env.ts:44-47) returns only OPENAI_BASE_URL (config base + '/v1') and OPENAI_API_KEY='ollama'; no ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN, asserted in provider-env-ollama.test.ts.\nAC-2: providers.ts:773-775 strips the 'ollama:' prefix and qualifies to 'ollama/<tag>' BEFORE the idempotency slash check, so both 'ollama:gemma4:12b' and the namespaced 'ollama:library/custom:latest' work; an already-qualified 'ollama/...' still short-circuits unchanged, and non-ollama routing is byte-identical to pre-bead behaviour. ohmypi-models.ts:48 strips the same prefix for the registry id, so the registry entry and the --model id now agree.\nAC-3: OPENAI_BASE_URL added to PROVIDER_ENV_KEYS (agents/provider-env.ts:116), child-env.ts:31 and launcher-generator.ts:449; exports test asserts the unset-then-export pair and buildSpawnEnvForModel strips a stale inherited value.\nAC-5: env shape and non-ollama routing both asserted; ohmypi-models-ollama.test.ts:5-11 now mocks loadConfigSync so it no longer depends on the operator's live config.yaml. Ran ohmypi-models-ollama, provider-env-ollama, launcher-generator and tests/lib/providers: 109 tests pass. Full typecheck/lint remain the verification gate's call.\n\nNon-blocking note for the follow-on beads: H5 (localhost-only SAFE_OLLAMA_HOST_RE validation of a configured base_url) is not enforced on this path — provider-env.ts and ohmypi-models.ts both consume config.providerBaseUrls.ollama directly. If resolveOllamaBaseUrl in config-yaml/merge.ts:251 is not already failing closed on a non-localhost host, that hazard is still open and belongs to whichever bead owns it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1679",
-    "reviewedAtCommit": "6370a390f0e0655f14b33f55b0dea3d8a26b3477",
     "reviewSpawnedAt": "2026-08-13T16:33:42.722Z"
   },
   "closeOut": {
@@ -227,15 +218,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9312727,
-            "output": 10561,
-            "cacheRead": 5289728,
+            "input": 9391272,
+            "output": 10953,
+            "cacheRead": 5325824,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 157576761,
-            "output": 124071,
-            "cacheRead": 154781440,
+            "input": 159748509,
+            "output": 132148,
+            "cacheRead": 156788992,
             "cacheWrite": 0
           }
         },
@@ -261,8 +252,8 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 38468,
-            "output": 1990,
+            "input": 48700,
+            "output": 2097,
             "cacheRead": 6,
             "cacheWrite": 0
           }
@@ -270,15 +261,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9312727,
-          "output": 10561,
-          "cacheRead": 5289728,
+          "input": 9391272,
+          "output": 10953,
+          "cacheRead": 5325824,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 157576761,
-          "output": 124071,
-          "cacheRead": 154781440,
+          "input": 159748509,
+          "output": 132148,
+          "cacheRead": 156788992,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -300,15 +291,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 38468,
-          "output": 1990,
+          "input": 48700,
+          "output": 2097,
           "cacheRead": 6,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 109.8227066,
-        "pricingAsOf": "2026-08-13T16:37:53.294Z"
+        "usd": 111.9005396,
+        "pricingAsOf": "2026-08-16T14:35:37.123Z"
       }
     },
     "merges": [
