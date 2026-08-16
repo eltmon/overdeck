@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T15:04:09.402Z",
+  "updated": "2026-08-16T15:04:42.593Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -351,16 +351,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "e2e-overdeck-spawn-evidence": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 2579344,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T15:04:09.401Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -509,6 +501,17 @@
         "outcome": "completed",
         "reason": "Added regression coverage proving the stopped-agent fresh-launch fallback awaits the Ollama provider preflight before createSession and aborts without session creation when preflight fails.",
         "releasedAt": "2026-08-16T15:03:36.645Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2579344,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T15:04:09.401Z",
+        "itemId": "e2e-overdeck-spawn-evidence",
+        "outcome": "blocked",
+        "reason": "Required live-verification precondition failed: Ollama is installed, but ollama list does not contain gemma4:12b and ollama show gemma4:12b reports model not found. The xBRIEF explicitly requires stopping rather than substituting or fabricating evidence.",
+        "releasedAt": "2026-08-16T15:04:42.592Z"
       }
     ],
     "statusReasons": {
@@ -536,6 +539,10 @@
       "preflight-fallback-regression-test": {
         "reason": "Added regression coverage proving the stopped-agent fresh-launch fallback awaits the Ollama provider preflight before createSession and aborts without session creation when preflight fails.",
         "updatedAt": "2026-08-16T15:03:36.645Z"
+      },
+      "e2e-overdeck-spawn-evidence": {
+        "reason": "Required live-verification precondition failed: Ollama is installed, but ollama list does not contain gemma4:12b and ollama show gemma4:12b reports model not found. The xBRIEF explicitly requires stopping rather than substituting or fabricating evidence.",
+        "updatedAt": "2026-08-16T15:04:42.592Z"
       }
     }
   },
@@ -595,7 +602,7 @@
     "preflight-fallback-regression-test": "completed",
     "preflight-fallback-regression-test.ac1": "completed",
     "preflight-fallback-regression-test.ac2": "completed",
-    "e2e-overdeck-spawn-evidence": "running"
+    "e2e-overdeck-spawn-evidence": "blocked"
   },
   "recoveryTrips": [
     {
