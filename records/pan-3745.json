@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T09:40:33.053Z",
+  "updated": "2026-08-16T09:40:36.935Z",
   "pipeline": {
     "issueId": "PAN-3745",
     "reviewStatus": "pending",
@@ -118,5 +118,20 @@
     "docs-cost-announce": "completed",
     "docs-cost-announce.ac1": "completed",
     "docs-cost-announce.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/cost-tracking.md",
+      "src/lib/overdeck/cost.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/cost-tracking.md",
+      "src/lib/overdeck/cost.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "recordedAt": "2026-08-16T09:40:36.934Z"
   }
 }
