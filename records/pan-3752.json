@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:43:26.748Z",
+  "updated": "2026-08-16T18:43:38.347Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "docs-parse-lane": {
+        "writerId": "agent-pan-3752",
+        "agentId": "agent-pan-3752",
+        "pid": 616471,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:43:38.346Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3752",
@@ -222,6 +230,7 @@
     "parse-slow-bytes-and-routing-suite.ac2": "completed",
     "parse-slow-bytes-and-routing-suite.ac3": "completed",
     "parse-slow-bytes-and-routing-suite.ac4": "completed",
-    "parse-slow-bytes-and-routing-suite.ac5": "completed"
+    "parse-slow-bytes-and-routing-suite.ac5": "completed",
+    "docs-parse-lane": "running"
   }
 }
