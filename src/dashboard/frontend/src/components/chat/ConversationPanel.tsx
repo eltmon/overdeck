@@ -1175,6 +1175,40 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
+function TranscriptLoadingSkeleton({ discovering }: { discovering: boolean }) {
+  return (
+    <div
+      className={styles.conversationConnecting}
+      role="status"
+      aria-label={discovering ? 'Discovering conversation' : 'Loading conversation'}
+    >
+      <div className={styles.transcriptSkeleton} aria-hidden="true">
+        <div className={styles.transcriptSkeletonAssistant}>
+          <span className={styles.transcriptSkeletonAvatar} />
+          <div className={styles.transcriptSkeletonLines}>
+            <span className={styles.transcriptSkeletonLine} />
+            <span className={styles.transcriptSkeletonLineShort} />
+          </div>
+        </div>
+        <div className={styles.transcriptSkeletonUser}>
+          <span className={styles.transcriptSkeletonBubble} />
+        </div>
+        <div className={styles.transcriptSkeletonAssistant}>
+          <span className={styles.transcriptSkeletonAvatar} />
+          <div className={styles.transcriptSkeletonLines}>
+            <span className={styles.transcriptSkeletonLineMedium} />
+            <span className={styles.transcriptSkeletonLineShort} />
+          </div>
+        </div>
+        <div className={styles.transcriptSkeletonUser}>
+          <span className={styles.transcriptSkeletonBubbleShort} />
+        </div>
+      </div>
+      {discovering && <span>Discovering conversation…</span>}
+    </div>
+  );
+}
+
 function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, receivedFirstPayload, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
@@ -1347,9 +1381,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   return (
     <div className={styles.conversationView}>
       {isLoading || isDiscovering || awaitingFirstPayload ? (
-        <div className={styles.conversationConnecting}>
-          <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
-        </div>
+        <TranscriptLoadingSkeleton discovering={isDiscovering} />
       ) : data?.error ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
