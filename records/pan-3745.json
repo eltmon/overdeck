@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T09:40:36.935Z",
+  "updated": "2026-08-16T09:40:39.976Z",
   "pipeline": {
     "issueId": "PAN-3745",
     "reviewStatus": "pending",
@@ -25,7 +25,24 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T08:59:46.544Z"
+    "updatedAt": "2026-08-16T09:40:39.975Z",
+    "reviewRequestedAt": "2026-08-16T09:40:39.975Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/cost-tracking.md",
+        "src/lib/overdeck/cost.ts",
+        "tests/unit/lib/overdeck/cost.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/cost-tracking.md",
+        "src/lib/overdeck/cost.ts",
+        "tests/unit/lib/overdeck/cost.test.ts"
+      ],
+      "recordedAt": "2026-08-16T09:40:36.934Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3747"
   },
   "closeOut": {
     "usage": {
