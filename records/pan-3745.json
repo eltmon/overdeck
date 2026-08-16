@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T09:04:50.122Z",
+  "updated": "2026-08-16T09:05:59.080Z",
   "pipeline": {
     "issueId": "PAN-3745",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "cost-announce-tests": {
-        "writerId": "agent-pan-3745",
-        "agentId": "agent-pan-3745",
-        "pid": 2286890,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:04:50.122Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3745",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Aligned the cost writer with cost.event_recorded, emitted the full contract payload only for attributed events, and added schema/attribution tests.",
         "releasedAt": "2026-08-16T09:04:35.603Z"
+      },
+      {
+        "writerId": "agent-pan-3745",
+        "agentId": "agent-pan-3745",
+        "pid": 2286890,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:04:50.122Z",
+        "itemId": "cost-announce-tests",
+        "outcome": "completed",
+        "reason": "Added contract decoding and attribution guard coverage, including proof that unattributed events remain archived and cached while producing no bus announcement.",
+        "releasedAt": "2026-08-16T09:05:59.080Z"
       }
     ],
     "statusReasons": {
       "align-cost-emitter": {
         "reason": "Aligned the cost writer with cost.event_recorded, emitted the full contract payload only for attributed events, and added schema/attribution tests.",
         "updatedAt": "2026-08-16T09:04:35.603Z"
+      },
+      "cost-announce-tests": {
+        "reason": "Added contract decoding and attribution guard coverage, including proof that unattributed events remain archived and cached while producing no bus announcement.",
+        "updatedAt": "2026-08-16T09:05:59.080Z"
       }
     }
   },
@@ -89,6 +96,9 @@
     "align-cost-emitter.ac2": "completed",
     "align-cost-emitter.ac3": "completed",
     "align-cost-emitter.ac4": "completed",
-    "cost-announce-tests": "running"
+    "cost-announce-tests": "completed",
+    "cost-announce-tests.ac1": "completed",
+    "cost-announce-tests.ac2": "completed",
+    "cost-announce-tests.ac3": "completed"
   }
 }
