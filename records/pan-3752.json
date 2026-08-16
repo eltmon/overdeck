@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:09:16.393Z",
+  "updated": "2026-08-16T19:09:21.224Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -237,5 +237,30 @@
     "docs-parse-lane.ac1": "completed",
     "docs-parse-lane.ac2": "completed",
     "docs-parse-lane.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "tests/unit/dashboard/claude-initial-parse-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/dashboard/transcript-parse-worker.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "tests/unit/dashboard/claude-initial-parse-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/dashboard/transcript-parse-worker.test.ts"
+    ],
+    "recordedAt": "2026-08-16T19:09:21.222Z"
   }
 }
