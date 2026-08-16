@@ -162,7 +162,7 @@
     "recordedAt": "2026-08-16T12:15:15.978Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T18:06:53.023Z",
+  "updated": "2026-08-16T18:20:23.229Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "passed",
@@ -297,18 +297,9 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3743",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-16T09:05:40.961Z"
-    }
-  ],
+  "harness": "claude-code",
+  "model": "k3[1m]",
+  "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
