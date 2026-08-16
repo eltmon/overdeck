@@ -490,22 +490,9 @@ export async function reconcileStaleMergeBlockers(
  * Reconciler (PAN-2198): periodic twin of the boot-only fixStuckReadyForMerge,
  * for the NO-BLOCKER strand of "stuck after review".
  *
- * readyForMerge is re-derived on every setReviewStatusSync write. When the last
- * write left it false and there is NO merge-blocker, nothing re-derives it until
- * the next write — so a PR whose review+test+verify all passed but whose
- * readyForMerge was left false (e.g. a verdict that landed via a write path that
- * didn't recompute, or a gate that was transiently non-final) converges ONLY on
- * server restart (PAN-1758: "readyForMerge only flips via the startup repair
- * sweep"). This patrol re-derives it on the 60s deacon tick instead.
- *
- * Blocker strands are deliberately excluded — those are owned by
- * reconcileStaleMergeBlockers, and excluding them also avoids fighting the
- * setReviewStatus deriver's hasBlockers override (which would flip readyForMerge
- * straight back to false). Loop-safe: it writes ONLY readyForMerge (no
- * review/test status transition, so no review/test re-dispatch events fire), and
- * is idempotent — once flipped true, the readyForMerge!==false guard excludes the
- * issue, so steady state is zero writes. Flipping readyForMerge=true only makes
- * the issue merge-ELIGIBLE; the merge train / MERGE button remains the trigger.
+ * Blocker strands remain owned by reconcileStaleMergeBlockers. This patrol is
+ * idempotent because a restored record no longer matches readyForMerge=false.
+ * Membership now prevents it from restoring issues without an open PR.
  */
 export async function reconcileStuckReadyForMerge(
   gatherEligibility: typeof gatherMergeEligibility = gatherMergeEligibility,
