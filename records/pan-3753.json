@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:11:47.257Z",
+  "updated": "2026-08-16T19:12:30.857Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "consumers-skip-retired-records": {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 1054947,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T19:12:30.857Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -182,6 +190,7 @@
     "terminal-uat-generations": "completed",
     "terminal-uat-generations.ac1": "completed",
     "terminal-uat-generations.ac2": "completed",
-    "terminal-uat-generations.ac3": "completed"
+    "terminal-uat-generations.ac3": "completed",
+    "consumers-skip-retired-records": "running"
   }
 }
