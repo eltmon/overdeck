@@ -2,7 +2,7 @@
   "issueId": "PAN-3420",
   "schemaVersion": 2,
   "created": "2026-08-01T15:00:57.590Z",
-  "updated": "2026-08-16T14:10:49.892Z",
+  "updated": "2026-08-16T14:24:28.079Z",
   "pipeline": {
     "issueId": "PAN-3420",
     "reviewStatus": "pending",
@@ -31,6 +31,11 @@
       "reason": "resume",
       "agentModel": "k3[1m]",
       "timestamp": "2026-08-10T01:18:06.648Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-08-16T14:24:28.079Z"
     }
   ],
   "recoveryTrips": [
