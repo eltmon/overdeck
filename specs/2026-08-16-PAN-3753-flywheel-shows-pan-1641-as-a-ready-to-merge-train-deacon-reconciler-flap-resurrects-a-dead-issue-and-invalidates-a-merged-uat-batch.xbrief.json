@@ -1,0 +1,624 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T18:19:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3753: Flywheel shows PAN-1641 as a ready-to-merge train — deacon/reconciler flap resurrects a dead issue and invalidates a merged UAT batch",
+    "updated": "2026-08-16T18:26:42.142Z"
+  },
+  "plan": {
+    "id": "pan-3753",
+    "title": "Flywheel shows PAN-1641 as a ready-to-merge train — deacon/reconciler flap resurrects a dead issue and invalidates a merged UAT batch",
+    "status": "proposed",
+    "uid": "29544abe-0479-4e5a-806c-541924926704",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T18:19:17Z",
+    "updated": "2026-08-16T18:26:42.142Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3753",
+        "label": "PAN-3753",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "merge-train",
+      "uat",
+      "review-status",
+      "pipeline-membership",
+      "single-source-of-truth"
+    ],
+    "narratives": {
+      "Problem": "Four writers fight over PAN-1641's review-status record in a loop: refreshMergeStateFromGitHub re-adds merge blockers for a closed PR (never checks PR-open state), the stale-blocker patrol clears them because the branch is mergeable, the setReviewStatus deriver flips readyForMerge=true (gates passed long ago), and the closed-PR patrol flips it back. Each cycle paints PAN-1641 as a ready merge train (the operator clicked Merge and the action no-opped — no open PR), re-invalidates a UAT generation, re-stamps an overdeck/review commit status, and re-emits a never-converging heal event. Worse, the deterministic-per-day UAT generation name (uat/pan-sable-0816) was reused by the flap's re-assembly, replacing the DB row of a batch that had already merged to main as f33a226f0a — so a merged batch is repeatedly 'invalidated'.",
+      "Proposal": "One read door for merge-eligibility: every readyForMerge deriver (stale-blocker patrol, stuck-ready patrol, boot sweep) and the merge-train projection consult the canonical pipeline-membership resolver; only bucket in_flight (open issue + open PR) is merge-eligible. Records whose PR closed unmerged get a terminal retiredAt marker that every patrol, webhook refresh, candidate query, commit-status stamper, and heal loop skips; retirement is reversible only by work restart or a fresh PR. UAT generations become truly terminal: merged rows are stamped promoted by an ancestor check on the reconcile tick, and same-day re-assembly after a promote mints a suffixed name instead of replacing the row. The heal loop heals once per canonical updatedAt, then warns instead of looping. merge-next re-validates membership server-side and returns 409 for non-eligible issues.",
+      "NonGoals": "- No flywheel UI row change — dead issues disappear from the projection entirely, so no dead Merge action renders; disposition stays visible via the existing pipelineMembership DTO on issue views.\n- No deletion of retired review-status records or UAT generation rows — history is kept.\n- No rework of the conflict-gate probe or conflict-resolver dispatch for genuinely in-flight PRs.\n- No change to the deterministic base UAT name for the first assembly of a day.\n- No cleanup/backfill of GitHub commit statuses already stamped on PAN-1641's branch.\n- No fix for fast-forward-landed branch classification (documented known blind spot in pipeline-membership.ts)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retire via a new additive retiredAt field rather than a new mergeStatus enum value.",
+        "rationale": "The mergeStatus enum is switched on across the codebase; a side field with skip-checks is additive and cannot alter existing state-machine behavior."
+      },
+      {
+        "summary": "Gate through the canonical membership resolver, not a local has-open-PR re-derivation.",
+        "rationale": "docs/PIPELINE-MEMBERSHIP.md:59 forbids reconstructing membership outside the resolver and scripts/lint-pipeline-membership.sh enforces delegation; the issue itself calls the projection's bypass a single-read-door violation."
+      },
+      {
+        "summary": "Fix merged-batch invalidation at the naming/terminal layer rather than a one-off cleanup of uat/pan-sable-0816.",
+        "rationale": "The deterministic-per-day name reuse is the identity-destroying root cause (verified in the live DB); a one-off cleanup recurs on the next same-day promote+reassemble."
+      },
+      {
+        "summary": "No flywheel UI change; rely on projection exclusion plus server-side merge-next validation.",
+        "rationale": "With the projection gated there is no row to render, satisfying FR-5's 'not rendered' branch; adding a disabled-row UI for a state that can no longer reach the frontend is speculative work."
+      }
+    ],
+    "items": [
+      {
+        "id": "membership-gate-readyformerge",
+        "title": "Gate every readyForMerge deriver through the pipeline-membership resolver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "projection-gate-merge-eligibility",
+            "review-status-retirement"
+          ],
+          "files_scope": [
+            "src/lib/cloister/merge-eligibility.ts",
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/review-status.ts",
+            "tests/unit/lib/cloister/merge-eligibility-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-eligibility-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gate tests pass: planned_backlog issue keeps its blocker and never regains readyForMerge; in_flight issue with stale blocker still clears",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/merge-eligibility.ts exporting a per-project membership helper: gather lens signals once via gatherProjectLensSignals (src/lib/pipeline-membership-gather.ts), classify each issue with resolvePipelineMembership (src/lib/pipeline-membership.ts:102), and expose isMergeEligible(membership) = (bucket === 'in_flight'). Callers group candidates by project and memoize ONE gather per patrol pass per project, gathering only when at least one candidate exists. Apply the gate in three places: reconcileStaleMergeBlockers (src/lib/cloister/deacon-merge.ts:434-473 — skip + log 'skipping <id> — pipeline membership is <bucket>, not merge-eligible' before resolveConflictGate), reconcileStuckReadyForMerge (deacon-merge.ts:496-510 — same skip before setting readyForMerge:true), and the fixStuckReadyForMerge boot sweep (src/lib/review-status.ts:886-911 — same skip). Keep all existing cooldowns. Do NOT re-derive PR-open state locally; the resolver is the only read door. Tests: add tests/unit/lib/cloister/merge-eligibility-gate.test.ts covering all three gated sites (planned_backlog + mergeable branch → blocker kept, readyForMerge stays false; in_flight + stale blocker → still clears — PAN-2143 regression guard; planned_backlog + passed gates + no blockers → stuck-ready patrol and boot sweep do not set readyForMerge:true). Use vi.useFakeTimers() for cooldown logic per repo rule."
+        },
+        "items": [
+          {
+            "id": "membership-gate-readyformerge.ac1",
+            "title": "Given an issue whose membership bucket is planned_backlog with a mergeable branch and a merge_conflict blocker, when reconcileStaleMergeBlockers runs, then it skips the issue, preserves the blocker, and readyForMerge remains false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-gate-readyformerge.ac2",
+            "title": "Given an in_flight issue with a stale merge blocker, when reconcileStaleMergeBlockers runs, then it still clears the blocker and readyForMerge recomputes true (PAN-2143 regression guard)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-gate-readyformerge.ac3",
+            "title": "Given a planned_backlog issue with passed gates and no blockers, when reconcileStuckReadyForMerge or the fixStuckReadyForMerge boot sweep runs, then neither sets readyForMerge:true for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-gate-readyformerge.ac4",
+            "title": "When a patrol pass has no blocker-carrying candidates for a project, then gatherProjectLensSignals is not called for that project (verify via spy in the gate test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "projection-gate-merge-eligibility",
+        "title": "Exclude non-merge-eligible issues from the merge-train projection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel-merge-order.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/routes/merge-train.ts",
+            "tests/unit/lib/flywheel-merge-order.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel-merge-order.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "candidate test passes: readyForMerge=true record with no open PR is absent from listEligibleCandidatesByProject results",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Make listEligibleCandidatesByProject (src/lib/flywheel-merge-order.ts:248-273) async and exclude candidates whose membership (via the merge-eligibility.ts helper from membership-gate-readyformerge, one gather per call) is not bucket in_flight. Update the two call sites, both already async: getReadySetForProject (src/dashboard/server/services/uat-train.ts:240-262) and defaultOrderedIssueIdsForProject (src/dashboard/server/routes/merge-train.ts:133-140). Check for other callers of listEligibleCandidatesByProject with git grep and update them all. Extend tests/unit/lib/flywheel-merge-order.test.ts: a readyForMerge=true record with no open PR (membership planned_backlog) produces zero candidates; an in_flight record still appears."
+        },
+        "items": [
+          {
+            "id": "projection-gate-merge-eligibility.ac1",
+            "title": "Given a review-status record with readyForMerge=true whose issue has no open PR, when listEligibleCandidatesByProject runs, then the returned candidate list excludes that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projection-gate-merge-eligibility.ac2",
+            "title": "Given an in_flight issue with readyForMerge=true, when listEligibleCandidatesByProject runs, then the returned candidate list still contains it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projection-gate-merge-eligibility.ac3",
+            "title": "git grep for listEligibleCandidatesByProject shows every call site awaits the async signature and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-status-retirement",
+        "title": "Add the retiredAt terminal marker with set/unset triggers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "consumers-skip-retired-records"
+          ],
+          "parallelSafeReason": "Blocked by membership-gate-readyformerge, so its deacon-merge.ts/review-status.ts overlap with that item is serialized by the DAG; the marker must exist before consumers-skip-retired-records starts, so no parallel writer ever touches the same hunks.",
+          "files_scope": [
+            "src/lib/review-status-types.ts",
+            "src/lib/database/review-status-db.ts",
+            "src/lib/review-status.ts",
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/review-status-retirement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/review-status-retirement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "retirement tests pass: closed-unmerged retires, lazy patrol retirement writes retiredAt, fresh-PR write un-retires, retired records are gate-ineligible",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add retiredAt?: string (ISO timestamp) to ReviewStatus (src/lib/review-status-types.ts:20) and a nullable retired_at column on the review_status table following the existing column-add pattern in src/lib/database/review-status-db.ts; ensure the field survives the journal+DB merge path in loadReadyForMergeFlags (src/lib/review-status.ts:96-135 — include it in the journal durable-fields merge, see hazard H3 in continue.json). SET retiredAt (keeping all other fields) in three places: (1) reconcileClosedPrReadyForMerge (src/lib/cloister/deacon-merge.ts:352-409) when the forge reports closed-unmerged — replace the mergeStatus:'failed' write for that branch only; merged-PR handling stays; (2) lazily inside the gated patrols from membership-gate-readyformerge — when membership says not merge-eligible, write retiredAt instead of merely skipping; (3) the PR-closed webhook path in src/lib/webhook-handlers.ts for action 'closed' with merged === false (today only merged === true is handled at line 487). CLEAR retiredAt in exactly two places: resetPipelineVerdictsForWorkStartSync (work restart) and any setReviewStatus write carrying a prNumber/prUrl DIFFERENT from the record's current value (a fresh PR opened — compare before clearing so a stale webhook echo of the same closed PR cannot un-retire, hazard H2). mergeGateEligibility (src/lib/review-status.ts:56-69) returns { eligible: false, reason: 'retired' } when retiredAt is set. Tests: tests/unit/lib/review-status-retirement.test.ts covering all three set triggers, both clear triggers, the same-PR echo non-clear case, and gate ineligibility."
+        },
+        "items": [
+          {
+            "id": "review-status-retirement.ac1",
+            "title": "Given a readyForMerge=true record whose PR the forge reports closed-unmerged, when reconcileClosedPrReadyForMerge runs, then it writes retiredAt and readyForMerge:false and leaves mergeStatus unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-retirement.ac2",
+            "title": "Given a blocker-carrying record whose membership is not in_flight, when the gated stale-blocker patrol runs, then it writes retiredAt on the record instead of only skipping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-retirement.ac3",
+            "title": "Given a retired record, when setReviewStatus receives a write carrying a different prNumber than the record holds, then the write clears retiredAt; when the write carries the same prNumber, retiredAt persists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-retirement.ac4",
+            "title": "Given a retired record, when mergeGateEligibility evaluates it, then it returns eligible:false with reason 'retired', and loadReadyForMergeFlags still surfaces retiredAt after the journal+DB merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "consumers-skip-retired-records",
+        "title": "Make every review-status consumer skip retired records",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/database/review-status-db.ts",
+            "src/lib/webhook-handlers.ts",
+            "src/lib/review-status.ts",
+            "tests/unit/lib/cloister/retired-records-skip.test.ts",
+            "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/retired-records-skip.test.ts tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skip tests pass: retired records produce zero deacon actions, zero blocker-refresh writes, zero commit-status stamps",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Skip records with retiredAt set in every consumer: the deacon patrols in src/lib/cloister/deacon-merge.ts (reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing — add the guard next to each existing mergeStatus==='merged' skip); getMergeBlockerReconcileCandidatesSync (src/lib/overdeck/review-status-sync.ts:546-570 — add AND retired_at IS NULL) and the JSON-path twin query at src/lib/database/review-status-db.ts:252-253 if that variant reads blocker_reasons text; refreshMergeStateFromGitHub (src/lib/webhook-handlers.ts:298-299 — return early when the loaded status is retired); and the overdeck/review commit-status stamping at src/lib/review-status.ts:324-343 (do not stamp when retired). The heal loop's retired-skip is owned by the converging-heal-loop item, not this one. Tests: add tests/unit/lib/cloister/retired-records-skip.test.ts for the deacon patrols and the webhook refresh early-return (fake timers for cooldowns), and extend tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts (retired row excluded from the candidates query — this covers the merge-blocker-reconcile-service's input side)."
+        },
+        "items": [
+          {
+            "id": "consumers-skip-retired-records.ac1",
+            "title": "Given a retired record carrying a merge_conflict blocker, when each deacon patrol runs, then it produces zero actions and zero writes for that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consumers-skip-retired-records.ac2",
+            "title": "Given a retired record with blocker_reasons containing not_mergeable, when getMergeBlockerReconcileCandidatesSync runs, then the issue is absent from the candidates and refreshMergeStateFromGitHub performs no gh call for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consumers-skip-retired-records.ac3",
+            "title": "Given a retired record, when a readyForMerge transition would report overdeck/review to GitHub (review-status.ts:324-343), then no commit status is stamped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-uat-generations",
+        "title": "Make promoted UAT generations terminal and same-day names unique",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-candidate-name.ts",
+            "src/lib/cloister/uat-generation-deps.ts",
+            "src/lib/cloister/uat-reconciler.ts",
+            "tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "parallelSafeReason": "Independent uat-* subsystem with zero files_scope overlap against every other item, so it runs safely in its own slot in wave 0.",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-reconciler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconciler tests pass: merged generation stamped promoted and never invalidated; post-promote assembly mints a suffixed name and preserves the promoted row",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Three changes. (1) Name uniqueness: extend the collision input used when minting a generation name (today origin branch names, src/lib/cloister/uat-generation-deps.ts:302-312) so a name is also taken when a store row with that name exists in ANY status or the branch tip is contained in origin/main (git merge-base --is-ancestor); mint suffixed variants uat/<label>-<codename>-<MMDD>-2, -3, … until free, keeping the deterministic base name from makeUatCandidateName (src/lib/cloister/uat-candidate-name.ts:38-45) for the first assembly of the day. Verify safeBranchName/safeGenerationWorktreePath and the uat-stack Traefik host derivation accept the suffixed name (hazard H4). (2) Backfill: in reconcileUatGenerations (src/lib/cloister/uat-reconciler.ts:166) before the invalidation step, stamp promoted on any ready/superseded row whose branch tip is an ancestor of origin/main (use the existing git deps — getBaseAnchor/getMainHeadSha pattern — not a direct shell-out, hazard H5 for polyrepo) and log '[uat-reconciler] stamping <name> promoted — branch is contained in main'. (3) Contract: isStale must never see a terminal row — keep the listChain statuses ['ready','superseded'] at uat-reconciler.ts:199 and add a comment that promoted is terminal by contract. Tests: extend tests/unit/lib/cloister/uat-reconciler.test.ts — a ready generation whose branch is contained in main is stamped promoted and never invalidated; an assembly after a promote mints a suffixed name and the promoted row survives intact."
+        },
+        "items": [
+          {
+            "id": "terminal-uat-generations.ac1",
+            "title": "Given a ready UAT generation whose branch tip is an ancestor of origin/main, when reconcileUatGenerations runs, then it stamps the row promoted, logs the stamping line, and never invalidates that row in later ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-uat-generations.ac2",
+            "title": "Given a promoted generation row named uat/pan-sable-0816, when a new assembly runs the same day, then it mints a suffixed name (uat/pan-sable-0816-2) and the promoted row's name, status, and members remain unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-uat-generations.ac3",
+            "title": "Given the suffixed name, when safeBranchName and the uat-stack host derivation process it, then both accept it and produce the matching worktree path and Traefik host",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "converging-heal-loop",
+        "title": "Converge the review-status heal loop after one heal per canonical updatedAt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/review-status-reconcile-service.ts",
+            "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "heal-loop tests pass: divergence heals once, unchanged canonical warns NOT CONVERGING without re-emit, advanced canonical heals again",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Two changes in reconcileOnce (src/dashboard/server/services/review-status-reconcile-service.ts:28-69). (1) Convergence: track the last healed canonical updatedAt per issue in a module-level Map<string, string>. When a divergence recurs for the SAME canonical.updatedAt already healed, log '[review-status-reconcile] NOT CONVERGING for <id>: canonical=<updatedAt> event=<lastUpdatedAt>' via console.warn once and suppress further re-emits until canonical.updatedAt advances; record the new updatedAt whenever a heal re-emits. (2) Retired-skip (moved here from consumers-skip-retired-records to keep this file single-owner): skip records with retiredAt set in the canonical read at lines 35-39, so retired issues never re-emit review.status_changed. Extend tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts: first divergence re-emits, second pass with unchanged canonical warns and does not re-emit, advanced canonical re-emits again, retired record is skipped entirely."
+        },
+        "items": [
+          {
+            "id": "converging-heal-loop.ac1",
+            "title": "Given a canonical status that diverges from the latest event, when reconcileOnce runs twice with an unchanged canonical.updatedAt, then it re-emits exactly once and the second pass logs the NOT CONVERGING warning without re-emitting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "converging-heal-loop.ac2",
+            "title": "Given a previously healed issue whose canonical.updatedAt advances, when reconcileOnce runs, then it re-emits the new canonical status and updates the healed-updatedAt record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "converging-heal-loop.ac3",
+            "title": "Given a retired review-status record, when reconcileOnce runs, then the issue produces no re-emit and no NOT CONVERGING warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-next-membership-validation",
+        "title": "Validate membership in POST /api/merge-train/merge-next before merging",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/merge-train.ts",
+            "src/dashboard/server/routes/__tests__/merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/merge-train.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route test passes: non-merge-eligible head issue yields 409 with the disposition reason and no merge attempted",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In postMergeTrainMergeNextPayload (src/dashboard/server/routes/merge-train.ts:148-176), after computing the ordered ids and before shipMergeBatch, run the head issue(s) through the merge-eligibility.ts gate (one gather for the project). If the head issue is not merge-eligible, return { status: 409, body: { error: '<id> is not merge-eligible: <membership reason>' } } without attempting any merge; eligible ids proceed unchanged. Extend src/dashboard/server/routes/__tests__/merge-train.test.ts: a queue whose head has no open PR returns 409 with the disposition reason and the merge dep is never called; an eligible head merges as before."
+        },
+        "items": [
+          {
+            "id": "merge-next-membership-validation.ac1",
+            "title": "Given a project whose merge-queue head issue has no open PR, when POST /api/merge-train/merge-next runs, then it returns 409 naming the issue and the membership disposition reason and performs no merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-next-membership-validation.ac2",
+            "title": "Given a project whose merge-queue head issue is in_flight, when POST /api/merge-train/merge-next runs, then it merges exactly as before (regression guard)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-retirement-terminal-generations",
+        "title": "Document review-status retirement, terminal generations, and the actionability rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T18:19:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3753",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/PIPELINE-MEMBERSHIP.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n retiredAt docs/MERGE-WORKFLOW.md",
+            "grep -n merge-eligibility docs/PIPELINE-MEMBERSHIP.md",
+            "grep -n merge-eligible docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "each grep finds the new section: retirement transition in MERGE-WORKFLOW.md, new resolver consumers in PIPELINE-MEMBERSHIP.md, actionability rule in FLYWHEEL.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update three docs in the same PR. docs/MERGE-WORKFLOW.md: add the review-status retirement transition (the three set triggers, the two un-retire paths, history kept) and terminal UAT generations (promoted-by-backfill via ancestor check, same-day name suffixing). docs/PIPELINE-MEMBERSHIP.md: add the new resolvePipelineMembership consumers to the consumer list — the deacon readyForMerge patrols, listEligibleCandidatesByProject, and the merge-next endpoint. docs/FLYWHEEL.md: state the merge-train actionability rule — a train renders only for merge-eligible membership, and merge-next revalidates server-side (409 with disposition reason)."
+        },
+        "items": [
+          {
+            "id": "docs-retirement-terminal-generations.ac1",
+            "title": "grep -n 'retiredAt' docs/MERGE-WORKFLOW.md returns a section that describes the retirement set triggers, the two un-retire paths, the terminal-generation backfill, and same-day name suffixing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-retirement-terminal-generations.ac2",
+            "title": "grep -n 'merge-eligibility' docs/PIPELINE-MEMBERSHIP.md returns matches that name the deacon readyForMerge patrols, the merge-train projection, and the merge-next endpoint as resolver consumers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-retirement-terminal-generations.ac3",
+            "title": "grep -n 'merge-eligible' docs/FLYWHEEL.md returns a rule stating merge-train rows render only for merge-eligible issues and merge-next returns 409 with the disposition reason otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "membership-gate-readyformerge",
+        "to": "projection-gate-merge-eligibility",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-gate-readyformerge",
+        "to": "review-status-retirement",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-gate-readyformerge",
+        "to": "consumers-skip-retired-records",
+        "type": "blocks"
+      },
+      {
+        "from": "review-status-retirement",
+        "to": "consumers-skip-retired-records",
+        "type": "blocks"
+      },
+      {
+        "from": "review-status-retirement",
+        "to": "converging-heal-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "projection-gate-merge-eligibility",
+        "to": "merge-next-membership-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-gate-readyformerge",
+        "to": "docs-retirement-terminal-generations",
+        "type": "informs"
+      },
+      {
+        "from": "terminal-uat-generations",
+        "to": "docs-retirement-terminal-generations",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3753-flywheel-shows-pan-1641-as-a-ready-to-merge-train-deacon-reconciler-flap-resurrects-a-dead-issue-and-invalidates-a-merged-uat-batch.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
