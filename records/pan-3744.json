@@ -102,7 +102,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T11:05:37.110Z",
+  "updated": "2026-08-16T11:29:57.653Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
@@ -113,13 +113,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T11:05:37.063Z",
+    "updatedAt": "2026-08-16T11:29:57.556Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
     "testNotes": "npm run typecheck: exit 0 (tsc --noEmit + hooks/evals/dashboard/frontend/acp sub-checks all clean, dashboard-types and frontend-types guards passed with zero new known errors). npm run lint: exit 0 (eslint + all repo guard scripts including effect-diagnostics, circular-deps, ratchet-audit, quarantine-audit passed with no new findings). npm test: exit 0 — 1469 test files / 13892 tests passed (51 pre-existing quarantined skips, unrelated to this change), plus the frontend leg (4 files / 64 tests) passed. Also ran the two feature-specific vitest files named in the xBRIEF verify_commands directly: src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts and ConversationPanel.test.tsx — 2 files / 43 tests passed, covering receivedFirstPayload signal timing, conversation-switch reset, awaitingFirstPayload gating of greeting/orphaned/fetch-failed states, and the delayed-stream-payload scenario the issue AC describes.",
     "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "a51ffc2f4db9a0eb2486c9e0a315e332069db624",
-    "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
+    "lastVerifiedCommit": "a51ffc2f4db9a0eb2486c9e0a315e332069db624",
     "reviewSpawnedAt": "2026-08-16T11:01:39.946Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -159,18 +159,18 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 51816216,
-            "output": 76215,
-            "cacheRead": 50715648,
+            "input": 52086302,
+            "output": 77320,
+            "cacheRead": 50978816,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 136,
-            "output": 27487,
-            "cacheRead": 13474506,
-            "cacheWrite": 260396
+            "input": 280,
+            "output": 68018,
+            "cacheRead": 27284104,
+            "cacheWrite": 497147
           }
         }
       },
@@ -182,21 +182,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 51816216,
-          "output": 76215,
-          "cacheRead": 50715648,
+          "input": 52086302,
+          "output": 77320,
+          "cacheRead": 50978816,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 136,
-          "output": 27487,
-          "cacheRead": 13474506,
-          "cacheWrite": 260396
+          "input": 280,
+          "output": 68018,
+          "cacheRead": 27284104,
+          "cacheWrite": 497147
         }
       },
       "costAtCloseOut": {
-        "usd": 36.768154,
-        "pricingAsOf": "2026-08-16T11:05:37.081Z"
+        "usd": 40.726877,
+        "pricingAsOf": "2026-08-16T11:29:57.621Z"
       }
     },
     "merges": [
