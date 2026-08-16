@@ -66,7 +66,7 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:44:06.869Z",
+  "updated": "2026-08-16T18:44:09.043Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "blocked",
@@ -75,9 +75,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T18:44:05.936Z",
+    "updatedAt": "2026-08-16T18:44:07.613Z",
     "reviewNotes": "PSI-calm timing, config validation, swap provenance, and governor documentation require correction",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
+    "reviewedAtCommit": "f49a667a9ef2f1f95ea4a67397a4ae229c569f9d",
     "reviewSpawnedAt": "2026-08-16T18:36:01.752Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -146,7 +147,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.692254,
-        "pricingAsOf": "2026-08-16T18:44:05.968Z"
+        "pricingAsOf": "2026-08-16T18:44:09.018Z"
       }
     },
     "merges": [
