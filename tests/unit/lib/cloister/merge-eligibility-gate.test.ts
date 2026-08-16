@@ -76,7 +76,7 @@ describe('readyForMerge pipeline-membership gates', () => {
 
     expect(await reconcileStaleMergeBlockers(eligibility('planned_backlog'), () => true, () => '/tmp/workspace')).toEqual([]);
     expect(mocks.resolveConflictGate).not.toHaveBeenCalled();
-    expect(loadReviewStatuses()['PAN-3753']).toMatchObject({ readyForMerge: false });
+    expect(loadReviewStatuses()['PAN-3753']).toMatchObject({ readyForMerge: false, retiredAt: '2026-08-16T12:00:00.000Z' });
     expect(loadReviewStatuses()['PAN-3753'].blockerReasons).toHaveLength(1);
   });
 

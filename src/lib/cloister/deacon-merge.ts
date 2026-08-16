@@ -388,7 +388,7 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
         } else {
           setReviewStatusSync(issueId, {
             readyForMerge: false,
-            mergeStatus: 'failed',
+            retiredAt: new Date(now).toISOString(),
             mergeNotes: `PR #${prNumber} was closed without merging — reopen the PR or reset review state to re-queue this issue`,
           });
           const msg = `Reset readyForMerge for ${issueId} — PR #${prNumber} is ${prState.state} (not OPEN)`;
@@ -455,13 +455,13 @@ export async function reconcileStaleMergeBlockers(
     const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
 
     for (const [issueId] of candidates) {
-
       const cooledUntil = staleMergeBlockerCooldowns.get(issueId);
       if (cooledUntil && now < cooledUntil) continue;
       staleMergeBlockerCooldowns.set(issueId, now + STALE_MERGE_BLOCKER_COOLDOWN_MS);
 
       const membership = memberships.get(issueId.toUpperCase());
       if (!membership || !isMergeEligible(membership)) {
+        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date(now).toISOString() });
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
         continue;
       }
@@ -490,9 +490,8 @@ export async function reconcileStaleMergeBlockers(
  * Reconciler (PAN-2198): periodic twin of the boot-only fixStuckReadyForMerge,
  * for the NO-BLOCKER strand of "stuck after review".
  *
- * Blocker strands remain owned by reconcileStaleMergeBlockers. This patrol is
- * idempotent because a restored record no longer matches readyForMerge=false.
- * Membership now prevents it from restoring issues without an open PR.
+ * Blocker strands remain owned by reconcileStaleMergeBlockers. Membership
+ * prevents restoration without an open PR; successful restoration is idempotent.
  */
 export async function reconcileStuckReadyForMerge(
   gatherEligibility: typeof gatherMergeEligibility = gatherMergeEligibility,
@@ -507,6 +506,7 @@ export async function reconcileStuckReadyForMerge(
     for (const [issueId] of candidates) {
       const membership = memberships.get(issueId.toUpperCase());
       if (!membership || !isMergeEligible(membership)) {
+        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
         continue;
       }

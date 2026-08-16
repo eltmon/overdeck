@@ -54,9 +54,10 @@ export interface MergeGateEligibility {
  * verification not failed, not already merged.
  */
 export function mergeGateEligibility(
-  status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
+  status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus' | 'retiredAt'> | null,
 ): MergeGateEligibility {
   if (!status) return { eligible: false, reason: 'no review record' };
+  if (status.retiredAt) return { eligible: false, reason: 'retired' };
   if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') {
     return { eligible: false, reason: `review is ${status.reviewStatus}` };
   }
@@ -124,7 +125,7 @@ export function loadReadyForMergeFlags(issueIds: string[]): Map<string, boolean>
         merged.issueId = issueId;
         merged.updatedAt = journal.updatedAt;
         const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
-        merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
+        merged.readyForMerge = merged.retiredAt || hasBlockers ? false : reviewGatesPassedSync(merged);
         status = normalizeReviewStatusSync(merged);
       }
     }
@@ -241,7 +242,11 @@ export function setReviewStatusSync(
     delete update.testNotes;
   }
 
+  const freshPrIdentity =
+    (update.prNumber !== undefined && update.prNumber !== status.prNumber)
+    || (update.prUrl !== undefined && update.prUrl !== status.prUrl);
   const merged = settleMergedVerification({ ...status, ...update });
+  if (freshPrIdentity) merged.retiredAt = undefined;
 
   // Terminal verdicts consume the request that spawned this review. Preserve a newer request
   // because it represents an explicit re-review requested while the current review was running.
@@ -289,22 +294,19 @@ export function setReviewStatusSync(
   // Explicit caller intent still wins (the merge flow sets readyForMerge=false when a
   // merge starts; mergeStatus then leaves pending/queued so the derive agrees).
   // PAN-905/PAN-3365: merge blockers and failed required UAT override explicit readiness.
-  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0 || merged.uatStatus === 'failed';
+  const hasBlockers = Boolean(merged.retiredAt) || (merged.blockerReasons?.length ?? 0) > 0 || merged.uatStatus === 'failed';
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
         : reviewGatesPassedSync(merged));
 
-  // Create two versions of the history (PAN-3253):
-  // 1. Raw history (unbounded, untrun notes) for database write
-  // 2. Bounded history (last 20, truncated notes) for the returned event payload
+  // Keep raw history for storage and a bounded copy for the event payload (PAN-3253).
   const boundedHistory = rawHistory.slice(-REVIEW_STATUS_HISTORY_LIMIT).map((entry) => ({
     ...entry,
     notes: entry.notes ? truncateReviewStatusNote(entry.notes) : undefined,
   }));
 
-  // Write raw history to the database (for archival), but return bounded history in the status
   const dbStatus = normalizeReviewStatusSync({
     ...merged,
     issueId,
@@ -773,6 +775,7 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
     lastVerifiedCommit: undefined,
     reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
     conflictResolutionDispatchedAt: undefined, blockerReasons: undefined,
+    retiredAt: undefined,
   });
 }
 
@@ -905,6 +908,7 @@ export async function fixStuckReadyForMerge(
   for (const s of stuck) {
     const membership = memberships.get(s.issueId.toUpperCase());
     if (!membership || !mergeEligibility.isMergeEligible(membership)) {
+      if (membership) setReviewStatusSync(s.issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
       console.log(`[review-status] skipping ${s.issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
       continue;
     }

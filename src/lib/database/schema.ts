@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 64;
+export const SCHEMA_VERSION = 65;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -234,6 +234,7 @@ export function initSchema(db: SqliteDatabase): void {
       release_notes         TEXT,
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
+      retired_at            TEXT,
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
@@ -1756,6 +1757,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   if (currentVersion < 64) {
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_status TEXT');
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_notes TEXT');
+  }
+
+  // v64 -> v65: terminal marker for review records whose PR is no longer actionable.
+  if (currentVersion < 65) {
+    tryIdempotentDdl(db, 65, 'ALTER TABLE review_status ADD COLUMN retired_at TEXT');
   }
 
   // After all migrations, set the version

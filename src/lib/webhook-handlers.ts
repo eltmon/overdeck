@@ -510,6 +510,11 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   const update: ReviewStatusUpdate = {};
   let blockers = [...(status.blockerReasons ?? [])];
 
+  if (payload.action === 'closed' && pr.merged === false) {
+    update.readyForMerge = false;
+    update.retiredAt = new Date().toISOString();
+  }
+
   // Populate missing PR identity and keep head SHA in sync on synchronize
   if (!status.prUrl) update.prUrl = pr.html_url ?? `https://github.com/${repo}/pull/${pr.number}`;
   if (!status.prNumber) update.prNumber = pr.number;

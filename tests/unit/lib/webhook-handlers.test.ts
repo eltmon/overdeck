@@ -377,6 +377,24 @@ describe('handleCheckRun', () => {
 });
 
 describe('handlePullRequest', () => {
+  it('retires a review record when its PR closes without merging', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [], prNumber: 1 });
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'closed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-123' },
+        merged: false,
+      },
+    })));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', expect.objectContaining({
+      readyForMerge: false,
+      retiredAt: expect.any(String),
+    }));
+  });
+
   it.each(['opened', 'closed', 'reopened'])('enqueues membership refresh for %s PRs', async (action) => {
     await Effect.runPromise(handlePullRequest(makePayload({
       action,
