@@ -1,0 +1,615 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T17:53:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3752: Conversation transcript parsing runs on the dashboard main thread — slow opens and event-loop stalls survive PAN-3743",
+    "updated": "2026-08-16T18:01:47.525Z"
+  },
+  "plan": {
+    "id": "pan-3752",
+    "title": "Move conversation transcript parsing off the dashboard main thread",
+    "status": "proposed",
+    "uid": "c622122b-65ae-4fe2-b04c-b7b1cc6d009c",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T17:53:33Z",
+    "updated": "2026-08-16T18:01:47.525Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3752",
+        "label": "PAN-3752",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3752.md",
+        "label": "PAN-3752 PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "event-loop",
+      "worker-threads",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "Conversation transcript parsing (pi/codex full-parse snapshots and the Claude initial full parse) runs on the dashboard server's main thread. 15–27 MB session JSONLs block the event loop for seconds: conversation opens sit on the loading skeleton, and the stall gaps the 15 s heartbeat past the 35 s staleness watchdog for every OTHER connected tab, producing 'Reconnecting…' flashes. Post-PAN-3743 evidence (build f33a226f0a) shows the DB-job worker lanes are clean (zero [db-jobs] slow: lines) while event-loop p99 still spikes to 200–307 ms — the stall is main-thread parsing, not DB queueing. Additionally, subscribeConversationMessages bypasses the existing getConversationByName job op with a direct main-thread call (ws-rpc.ts:890).",
+      "Proposal": "Move all transcript parsing into the existing dashboard DB worker system as a new parseTranscriptSnapshot op on a dedicated fourth 'parse' worker lane (D1). The stream shells keep their parse(file) callback seam — only the callback's venue changes, so PAN-1908 wire semantics, the debounce, and the per-subscription latch are untouched (D2). The Claude initial parse uses the same op with parser='claude-initial'; its ParseResult already carries byteOffset and every priorState field, all structured-clone-safe Maps/Sets (D3). Cross-subscription coalescing reuses the existing sharedJobs machinery (D4). getConversationByName routes through its existing job op. The [db-jobs] slow: line gains bytes= for the parse op. The dead streamFullParseSnapshots twin (zero callers) is deleted so no main-thread full-parse shell lingers (D6). No chunked first payload (D5).",
+      "NonGoals": "- No chunked or streamed first-payload delivery — full-snapshot wire semantics are unchanged (FR-2).\n- No frontend changes — ConversationPanel, skeleton, reducers, and the snapshot-adoption path are untouched.\n- No changes to Claude incremental APPEND parsing — small tail reads stay on the main thread; only the initial full parse moves.\n- No parser logic changes — venue only; parser output shapes are byte-identical.\n- No new worker-pool library or process model — reuse node:worker_threads via the existing dashboard-db-worker.\n- No changes to PAN-3743 lane assignments for existing ops (read/long/semantic stay as they are).\n- No removal of the semantic-search lane or its timeout/cancel behavior.\n- No live event-loop-monitor or staleness-reconnect test harness in unit tests — AC-1/AC-2 are verified live by the test role, not in Vitest (the Vitest job door runs inline by design)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Venue: dedicated 'parse' lane in the existing DB worker system (not a separate parse worker, not chunked main-thread parsing)",
+        "rationale": "The issue body offered 'existing DB worker' vs 'dedicated parse worker'. A fourth lane inside the existing worker gives the isolation of a dedicated worker (bulk sweeps and interactive reads never queue behind a seconds-long parse) without a second process model. Parsers verified worker-clean (no server-singleton imports), so the chunked-parse fallback is not expected to trigger."
+      },
+      {
+        "summary": "Edit site corrected: rewire streamResolvedFullParseSnapshots' callers, not streamFullParseSnapshots",
+        "rationale": "The initial PRD draft named streamFullParseSnapshots (ws-rpc.ts:114) as the edit site, but grep proves it has zero callers — the live parse call is streamResolvedFullParseSnapshots at ws-rpc.ts:235. The plan targets the live shell and deletes the dead twin so no main-thread full-parse path remains callable."
+      },
+      {
+        "summary": "Keep the parse(file) callback seam instead of changing stream signatures to a harness discriminator",
+        "rationale": "The shells already call await parse(sessionFile); swapping the callback at the one wrapper call site (streamHarnessFullParseSnapshots) leaves shell bodies, the latch, the debounce, and the existing resolved-stream test untouched — strictly smaller than the draft's signature change, same result."
+      },
+      {
+        "summary": "FR-5 coalescing reuses COALESCED_OPERATIONS/sharedJobs instead of a new module-level per-file latch map",
+        "rationale": "The job door already coalesces concurrent identical (operation, payload) jobs and that machinery is tested. Adding the op to the set plus a lane-precedence check in workerLane() satisfies FR-5 with one line of new logic instead of a parallel coalescing mechanism."
+      },
+      {
+        "summary": "Op dispatch added to BOTH executeInline (dashboard-db-task.ts) and runJob (dashboard-db-worker.ts)",
+        "rationale": "The draft mentioned only runInline; the worker thread has its own duplicated switch and DashboardDbOperation union. Adding the op to only one switch silently breaks the other path — both are named in the work item and locked by the routing test."
+      },
+      {
+        "summary": "No chunked first payload (issue-direction option not taken)",
+        "rationale": "Chunked streaming would change wire semantics (FR-2 forbids) for a latency win NFR-2 does not require — first payload may take the same wall-clock time as today; it only must not block the loop."
+      }
+    ],
+    "items": [
+      {
+        "id": "parse-worker-op-and-lane",
+        "title": "Add parseTranscriptSnapshot op and dedicated 'parse' worker lane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3752",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "snapshot-streams-via-job",
+            "claude-initial-parse-via-job",
+            "parse-job-coalescing",
+            "parse-slow-bytes-and-routing-suite"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "tests/unit/dashboard/db-task-lanes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "pan sync-main",
+            "npx vitest run --configLoader runner tests/unit/dashboard/db-task-lanes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "db-task-lanes.test.ts passes including the new parseTranscriptSnapshot → 'parse' lane assertion",
+            "typecheck completes without errors (proves both DashboardDbOperation unions and every Record<WorkerLane, …> site were updated)"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Sole occupant of wave 0 — every other item is blocked on it, so no parallel slot conflict is possible despite the complex difficulty.",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRE-FLIGHT: run `pan sync-main` first — this branch predates the PAN-3743 merge (f33a226f0a); the PRD's line references cite the post-merge tree. Then, per PRD WI-1: (1) add 'parseTranscriptSnapshot' to the DashboardDbOperation union in BOTH dashboard-db-task.ts and dashboard-db-worker.ts; (2) add 'parse' to WorkerLane (task file line ~51) and to the workers Record (~line 98) — let typecheck find every Record<WorkerLane,…> site; (3) in the exported workerLane() (~line 147) return 'parse' for the new op, checked BEFORE the COALESCED_OPERATIONS→'long' fallthrough; (4) add a parser registry Record mapping 'pi'|'ohmypi'|'codex'|'acp'|'kimi' to parsePiConversationMessages / parseOhmypiConversationMessages / parseCodexConversationMessages / parseAcpConversationMessages / parseKimiConversationMessages (leave the 'claude-initial' entry to item claude-initial-parse-via-job); (5) add the executeInline case in the task file AND the runJob case in the worker file: look up payload.parser, call it with payload.sessionFile, return the ParseResult; unknown parser string throws Error('Unknown transcript parser: …') — never default; (6) extend tests/unit/dashboard/db-task-lanes.test.ts asserting workerLane('parseTranscriptSnapshot') === 'parse'."
+        },
+        "items": [
+          {
+            "id": "parse-worker-op-and-lane.ac1",
+            "title": "The extended db-task-lanes test asserts workerLane('parseTranscriptSnapshot') returns 'parse' and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-worker-op-and-lane.ac2",
+            "title": "runDashboardDbJob('parseTranscriptSnapshot', {sessionFile, parser:'pi'}) on a pi fixture returns a ParseResult deep-equal to a direct parsePiConversationMessages call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-worker-op-and-lane.ac3",
+            "title": "An unknown parser string rejects with an 'Unknown transcript parser' error from both dispatch switches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-worker-op-and-lane.ac4",
+            "title": "npm run typecheck exits 0 with 'parse' added to WorkerLane and both DashboardDbOperation unions updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snapshot-streams-via-job",
+        "title": "Rewire harness snapshot streams to dispatch parsing through the job door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-rpc-resolved-stream.test.ts passes UNMODIFIED (proves the callback seam and wire shape survived)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2 (all line numbers post-sync-main): in streamHarnessFullParseSnapshots (ws-rpc.ts:346) replace each direct parser reference with a job callback — e.g. the ohmypi-jsonl branch becomes streamResolved(() => resolvePiSessionPath(sessionName), (file) => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: harness === 'pi' ? 'pi' : 'ohmypi' })); same shape for codex-rollout-jsonl→'codex', acp-jsonl→'acp', kimi-wire-jsonl→'kimi'. Resolvers stay on the main thread. Delete the dead streamFullParseSnapshots (lines 114–178) and its doc comment (102–113) — zero callers verified by grep; delete ohmypiSnapshotParser (337–344), whose pi/ohmypi distinction moves into the call-site callback. Remove the parser imports (lines 20–24). Do NOT change streamResolvedFullParseSnapshots' body, the emit closure, the parsing/pendingReparse latch, the 300 ms debounce, or any event field. Re-pointing the PAN-1908 doc comment text belongs to item docs-parse-lane; leave a minimal accurate comment here."
+        },
+        "items": [
+          {
+            "id": "snapshot-streams-via-job.ac1",
+            "title": "git grep -n \"parsePiConversationMessages\\|parseOhmypiConversationMessages\\|parseCodexConversationMessages\\|parseAcpConversationMessages\\|parseKimiConversationMessages\" src/dashboard/server/ws-rpc.ts produces no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-streams-via-job.ac2",
+            "title": "src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts passes with zero modifications to the test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-streams-via-job.ac3",
+            "title": "git grep -n \"streamFullParseSnapshots\\|ohmypiSnapshotParser\" src/ tests/ produces no matches (dead code removed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-streams-via-job.ac4",
+            "title": "The diff preserves streamResolvedFullParseSnapshots' emit closure, latch, and debounce byte-for-byte (visible in the diff as untouched lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-initial-parse-via-job",
+        "title": "Route the Claude incremental watcher's initial full parse through the job door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "tests/unit/dashboard/claude-initial-parse-job.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/claude-initial-parse-job.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "claude-initial-parse-job.test.ts passes: fixture equality, byteOffset preserved, structuredClone round-trip preserves Map/Set priorState fields",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: (1) add the 'claude-initial' entry to the parser registry from item parse-worker-op-and-lane, mapping to parseEntireConversation(file, { flushPendingToolUse: false }), in BOTH dispatch switches; (2) replace ws-rpc.ts:953 `const initial = await parseEntireConversation(sessionFile, { flushPendingToolUse: false });` with `const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', { sessionFile, parser: 'claude-initial' });`; (3) leave the priorState construction (lines 971–984) and everything downstream byte-identical — the fields already hang off the returned ParseResult; (4) remove parseEntireConversation from the ws-rpc.ts line-19 import (keep contextUsageFromParseResult, gateSnapshotEmission, watchConversation, and the types); (5) write tests/unit/dashboard/claude-initial-parse-job.test.ts: a claude fixture parsed via the job deep-equals a direct parseEntireConversation call (messages and byteOffset), and structuredClone(jobResult) round-trips with pendingToolUse/unresolvedResults/countedUsageIds/planToolUseIds/orphanToolUseIds/fileEditsByAssistantId still Maps/Sets — this proves worker-envelope safety that the Vitest inline path cannot exercise. Sequential because it shares ws-rpc.ts with snapshot-streams-via-job."
+        },
+        "items": [
+          {
+            "id": "claude-initial-parse-via-job.ac1",
+            "title": "git grep -n \"parseEntireConversation\" src/dashboard/server/ws-rpc.ts produces no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-parse-via-job.ac2",
+            "title": "The structuredClone round-trip test preserves Map/Set types for every priorState field of a real parse result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-parse-via-job.ac3",
+            "title": "The job-routed parse of a claude fixture returns messages deep-equal to a direct parseEntireConversation call and preserves byteOffset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-parse-via-job.ac4",
+            "title": "The diff preserves the priorState block (ws-rpc.ts lines 971–984) untouched — only the initial-parse call site and the import line change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-row-via-job",
+        "title": "Resolve the conversation row through the existing getConversationByName job op",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/dashboard/server/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing ws-rpc server tests pass with the job-routed conversation lookup"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: replace ws-rpc.ts:890 `const conv = getConversationByName(input.conversationName);` with `const conv = yield* Effect.promise(() => runDashboardDbJob<Conversation | null>('getConversationByName', input.conversationName));` (match the file's existing Effect.gen style and the Conversation type import). Remove the direct getConversationByName import (line 18) if no other use remains. The op already exists on both dispatch switches — this is call-site surgery only. Sequential because it shares ws-rpc.ts with snapshot-streams-via-job."
+        },
+        "items": [
+          {
+            "id": "conversation-row-via-job.ac1",
+            "title": "git grep -n \"getConversationByName\" src/dashboard/server/ws-rpc.ts produces no direct import or call (only the runDashboardDbJob usage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-row-via-job.ac2",
+            "title": "subscribeConversationMessages returns the discovering stream for an unknown conversation exactly as before (existing behavior preserved through the job door)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-row-via-job.ac3",
+            "title": "npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-job-coalescing",
+        "title": "Coalesce concurrent same-file parse jobs through sharedJobs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "tests/unit/dashboard/db-task-lanes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/db-task-lanes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane test proves parseTranscriptSnapshot still routes to 'parse' despite COALESCED_OPERATIONS membership",
+            "coalescing test shows two concurrent same-payload calls share one parser execution"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: add 'parseTranscriptSnapshot' to COALESCED_OPERATIONS (dashboard-db-task.ts ~line 90). The workerLane() 'parse' check from item parse-worker-op-and-lane already precedes the coalesced→'long' fallthrough — extend the lane test to lock that precedence explicitly (the op is in the coalesced set AND routes to 'parse'). Add a sharing test: two concurrent runDashboardDbJob('parseTranscriptSnapshot', identicalPayload) calls resolve from one underlying parser execution (spy counts one invocation) and both callers receive equal messages. Note the payload includes the parser discriminator, so coalescing keys per (file, parser) — correct per FR-5's per-file intent."
+        },
+        "items": [
+          {
+            "id": "parse-job-coalescing.ac1",
+            "title": "The lane test asserts workerLane('parseTranscriptSnapshot') returns 'parse' while the op is a member of COALESCED_OPERATIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-job-coalescing.ac2",
+            "title": "The sharing test records exactly one parser invocation for two concurrent identical parse job calls and both callers receive equal results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-slow-bytes-and-routing-suite",
+        "title": "Add bytes= to the parse slow-line and lock the no-main-thread-parse routing in a new test suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "tests/unit/dashboard/db-task-instrumentation.test.ts",
+            "tests/unit/dashboard/transcript-parse-worker.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/transcript-parse-worker.test.ts tests/unit/dashboard/db-task-instrumentation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-parse-worker.test.ts passes: routing lock, per-parser fixture equality, 20 MB generated fixture, wire-shape comparison",
+            "db-task-instrumentation.test.ts passes including the bytes= slow-line assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: (1) formatSlowJobLine gains an optional bytes field rendered as ` bytes=<n>` when present; the worker includes the parsed byte count (ParseResult.byteOffset of the full parse) in its response envelope for parseTranscriptSnapshot, and both slow-line call sites (the parent message handler's waitMs/runMs block and runInline) pass it through; (2) extend tests/unit/dashboard/db-task-instrumentation.test.ts: an artificially slow parse fixture emits a line containing op=parseTranscriptSnapshot and bytes=, and existing ops' lines are unchanged; (3) create tests/unit/dashboard/transcript-parse-worker.test.ts with: a ROUTING LOCK that drives streamHarnessFullParseSnapshots and the Claude subscribe path with the job door spied, asserting the five harness parsers and parseEntireConversation are only ever invoked via runDashboardDbJob('parseTranscriptSnapshot', …); per-parser fixture equality (claude, pi, codex) between the job result and a direct parser call; a ≥20 MB JSONL generated programmatically into a temp dir (never committed) parsed through the job door with message count intact; and a wire-shape comparison where a job-backed stream event deep-equals the pre-change direct-parse event for the same fixture. All debounce/interval tests use vi.useFakeTimers() per the repo rule. NOTE: the Vitest path runs jobs inline on the main thread by design — this suite locks ROUTING, not event-loop timing; live NFR-1 verification is the test role's AC-1/AC-2."
+        },
+        "items": [
+          {
+            "id": "parse-slow-bytes-and-routing-suite.ac1",
+            "title": "A slow fixture parse emits a '[db-jobs] slow:' line that contains 'op=parseTranscriptSnapshot' and 'bytes=', and existing ops' slow lines preserve their current format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-slow-bytes-and-routing-suite.ac2",
+            "title": "The routing-lock test fails when any of the five harness parsers or parseEntireConversation is invoked outside runDashboardDbJob('parseTranscriptSnapshot', …) from the ws-rpc subscribe paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-slow-bytes-and-routing-suite.ac3",
+            "title": "A programmatically generated ≥20 MB fixture in a temp dir produces an intact message count through the job door (no fixture file committed to the repo)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-slow-bytes-and-routing-suite.ac4",
+            "title": "The job-backed snapshot event preserves every field of the pre-change direct-parse event for the same fixture (messages, workLog, streaming, snapshot flag, compactBoundaries, contextUsage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-slow-bytes-and-routing-suite.ac5",
+            "title": "git grep -n \"useFakeTimers\" tests/unit/dashboard/transcript-parse-worker.test.ts shows every debounce/interval-driven test runs under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-parse-lane",
+        "title": "Document the parse lane and worker-venue transcript flow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T17:53:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors (includes docs-adjacent lint gates)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: (1) in docs/DASHBOARD-ARCHITECTURE.md, extend the 'DB job worker lanes' section (added by PAN-3743) with the 'parse' lane — which op uses it (parseTranscriptSnapshot), why transcript parsing is isolated from read/long (CPU-bound seconds-long parses must not block interactive reads or queue behind bulk sweeps), and the subscribeConversationMessages flow (resolve path on main thread → parse in worker → emit unchanged); (2) update the re-pointed PAN-1908 module comment above streamResolvedFullParseSnapshots in ws-rpc.ts to state that parsing runs in the dashboard DB worker via the job door while the watch/debounce/emit shell stays on the main thread. Sequential because the comment edit shares ws-rpc.ts with the earlier items."
+        },
+        "items": [
+          {
+            "id": "docs-parse-lane.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's lanes section contains the 'parse' lane and identifies parseTranscriptSnapshot as its op with the isolation rationale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-parse-lane.ac2",
+            "title": "The module comment above streamResolvedFullParseSnapshots records that parsing executes in the dashboard DB worker and the shell stays on the main thread",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-parse-lane.ac3",
+            "title": "npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parse-worker-op-and-lane",
+        "to": "snapshot-streams-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-worker-op-and-lane",
+        "to": "claude-initial-parse-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-worker-op-and-lane",
+        "to": "parse-job-coalescing",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-worker-op-and-lane",
+        "to": "parse-slow-bytes-and-routing-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-streams-via-job",
+        "to": "claude-initial-parse-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-streams-via-job",
+        "to": "conversation-row-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-streams-via-job",
+        "to": "parse-slow-bytes-and-routing-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-initial-parse-via-job",
+        "to": "parse-slow-bytes-and-routing-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-job-coalescing",
+        "to": "parse-slow-bytes-and-routing-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-job-coalescing",
+        "to": "claude-initial-parse-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-initial-parse-via-job",
+        "to": "conversation-row-via-job",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-streams-via-job",
+        "to": "docs-parse-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-initial-parse-via-job",
+        "to": "docs-parse-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-row-via-job",
+        "to": "docs-parse-lane",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3752-move-conversation-transcript-parsing-off-the-dashboard-main-thread.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
