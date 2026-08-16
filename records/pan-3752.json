@@ -51,18 +51,18 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:35:09.727Z",
+  "updated": "2026-08-16T19:35:27.588Z",
   "pipeline": {
     "issueId": "PAN-3752",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:34:54.886Z",
+    "updatedAt": "2026-08-16T19:35:27.515Z",
     "reviewNotes": "Verification failed at lint",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
@@ -123,10 +123,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 54,
-            "output": 10702,
-            "cacheRead": 4097951,
-            "cacheWrite": 149446
+            "input": 56,
+            "output": 10867,
+            "cacheRead": 4279111,
+            "cacheWrite": 150545
           }
         }
       },
@@ -150,15 +150,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 54,
-          "output": 10702,
-          "cacheRead": 4097951,
-          "cacheWrite": 149446
+          "input": 56,
+          "output": 10867,
+          "cacheRead": 4279111,
+          "cacheWrite": 150545
         }
       },
       "costAtCloseOut": {
-        "usd": 26.326519,
-        "pricingAsOf": "2026-08-16T19:35:09.707Z"
+        "usd": 26.367153000000002,
+        "pricingAsOf": "2026-08-16T19:35:27.558Z"
       }
     },
     "merges": [
