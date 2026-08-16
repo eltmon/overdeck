@@ -16,7 +16,7 @@ import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
@@ -871,7 +871,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   // Parse the complete existing transcript before subscribing to
                   // appends. Keep pending tool_use entries in parser state for the
                   // watcher instead of flushing them into the display-only work log.
-                  const initial = await parseEntireConversation(sessionFile, { flushPendingToolUse: false });
+                  const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', {
+                    sessionFile,
+                    parser: 'claude-initial',
+                  });
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = contextUsageFromParseResult(initial, model);
                   // Per-subscription high-water mark of the largest full transcript

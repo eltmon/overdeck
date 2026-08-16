@@ -29,6 +29,7 @@ import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { parseKimiConversationMessages } from './kimi-conversation-parser.js';
 import { parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
 import { parsePiConversationMessages } from './pi-conversation-parser.js';
+import { parseEntireConversation } from './conversation-service.js';
 import type { ParseResult } from './conversation-service.js';
 
 export type DashboardDbOperation =
@@ -57,7 +58,7 @@ export type DashboardDbOperation =
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -66,6 +67,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   codex: parseCodexConversationMessages,
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
+  'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 
 interface PendingJob {
