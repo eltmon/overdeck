@@ -90,19 +90,19 @@
     "recordedAt": "2026-08-16T10:38:16.564Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T11:13:15.731Z",
+  "updated": "2026-08-16T11:21:50.919Z",
   "pipeline": {
     "issueId": "PAN-3743",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T10:41:47.125Z",
-    "updatedAt": "2026-08-16T11:13:14.362Z",
-    "reviewNotes": "Codex dry runs persist skip verdicts and suppress the later write run",
+    "updatedAt": "2026-08-16T11:21:50.848Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC4 REGRESSION (blocking): src/lib/costs/codex-collector.ts:20 reimplements issueIdFromAgentName as /(?:agent|planning)-((?:[a-z]+-)?\\d+)/i instead of reusing cost.ts:236 /(?:^|-)((?:pan|min|aud|krux|cli)-\\d+)(?:-|$)/i. Measured against the 1381 real dirs in ~/.overdeck/agents, 183 resolve differently: every strike-pan-* and conv-pan-* agent now yields issueId=null (was PAN-<n>). 18 of those dirs hold codex-home sessions today (strike-pan-3740 has 10 jsonl files, strike-pan-3663 has 7, conv-pan-1223-gpt56-mrlfm5fx has 2) so live codex cost events lose issue attribution. FIX: import and reuse the existing issueIdFromAgentName from cost.ts (export it) rather than writing a second regex. AC4 REGRESSION (blocking): codex-collector.ts:25 inferIssueFromPath now REQUIRES a feature-/feature/ or workspaces/feature- prefix and accepts any [a-z]+ prefix, where cost.ts:241 matched (pan|min|aud|krux|cli)[-/]\\d+ anywhere in the cwd. codex-global sessions whose cwd is e.g. ~/Projects/hoff-pan-3743 now fall through to UNKNOWN. FIX: reuse the cost.ts helper. AC3 NOT MET: no test subscribes to the server EventBus and asserts cost.recorded fires for events recorded after a worker sweep. tests/unit/dashboard/cost-reconcile-sweep-job.test.ts only covers workerLane routing and that runDashboardDbJob dispatches the collector; the only cost.recorded assertion in the repo is the pre-existing tests/unit/lib/overdeck/cost.test.ts:370 record() unit test, which predates this bead and never exercises the sweep path. FIX: add a test that drives the post-sweep record loop (fake collector result with >=1 event) through CostWriter with a fake bus layer and asserts the subscription receives cost.recorded. SECONDARY (non-blocking, note for FR-1): cost-reconcile-service.ts now calls recordSkipVerdict per scanned file on the main thread — that is a synchronous better-sqlite3 write per file, exactly the main-thread DB work FR-1 targets. The worker already opens the same DB for lookupSkipVerdict, so the verdict writes belong in collectCodexCostEvents. Also cosmetic: cost.ts:~789 leaves an empty tail inside the per-file loop where the codex branch was removed. AC1 and AC2 are satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3749",
     "reviewedAtCommit": "c62a5d27e68065481021c391e2d6fda1725bb703",
@@ -176,9 +176,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 53998088,
-            "output": 66444,
-            "cacheRead": 53036288,
+            "input": 59590030,
+            "output": 78229,
+            "cacheRead": 58566144,
             "cacheWrite": 0
           }
         },
@@ -199,9 +199,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53998088,
-          "output": 66444,
-          "cacheRead": 53036288,
+          "input": 59590030,
+          "output": 78229,
+          "cacheRead": 58566144,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -212,8 +212,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.321385,
-        "pricingAsOf": "2026-08-16T11:13:15.709Z"
+        "usd": 36.750293,
+        "pricingAsOf": "2026-08-16T11:21:50.903Z"
       }
     },
     "merges": [
