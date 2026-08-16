@@ -24,15 +24,7 @@
       "timestamp": "2026-08-16T19:54:14.988Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-16T19:54:14Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3753\n\n# Review Synthesis — PAN-3753 — 2026-08-16T20:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — project-scoped merge eligibility can fail because of unrelated projects\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3753/.pan/review/agent-pan-3753-review-ac3fa54f/context.json`\n- Branch: `feature/pan-3753`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3753`\n- HEAD reviewed: `ac3fa54fcc5438e7afe8f843e47f0b54c468494b`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR commits: 12\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 2 |\n| performance | ready | `performance.md` | 1 |\n| requirements | ready | `requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Unrelated project failures blank the requested project's merge queue — `src/lib/flywheel-merge-order.ts:253`\n`listEligibleCandidatesByProject(projectRoot)` gathers membership for every globally ready review-status record before filtering by project. A resolver or durable-lens failure in project B therefore rejects project A's lookup, causing the merge-train route to return an empty queue and preventing A's UAT reconciliation. Filter statuses to the requested project before calling `gatherMergeEligibility`. This changed region is inside the PR diff.\n\nThis also creates the performance regression reported by the performance reviewer: reconciliation across P projects can repeat roughly P project gathers for each project, multiplying tracker, PR, Git, and state work toward O(P²) gathers per tick.\n\n### [correctness] Read-only member repositories prevent promoted polyrepo generations from becoming terminal — `src/dashboard/server/services/uat-train.ts:215`\nThe new containment check iterates every repository stored on the generation, but `buildPolyrepoGitDeps` omits repositories with `required === false`. A read-only repository therefore has no probe and becomes `false`, so `contained.every(Boolean)` never passes. Promoted generations can remain live, later become stale, and fail to enter terminal cleanup or same-day successor assembly. Supply containment probes for all recorded repositories or use a dependency builder that retains read-only repositories. This changed region is inside the PR diff.\n\n### [performance] Reconciliation tracking grows for the dashboard process lifetime — `src/dashboard/server/services/review-status-reconcile-service.ts:13`\nThe new module-level `lastHealedUpdatedAt` map retains every issue ever healed, and `warnedNonConverging` retains a composite key for every later non-converging status version. Entries are cleared only when the service stops, not when issues converge, retire, or disappear. Long-running dashboards therefore retain historical issue/version strings without a bound. Keep at most one warning timestamp per active issue and delete tracking after convergence, retirement, or disappearance. This changed region is inside the PR diff.\n\n## Non-blocking Findings\n\n### [correctness] Closed PR can evade retirement when the stored head SHA is stale — `src/lib/webhook-handlers.ts:505`\nThe new retirement update runs only after `loadAndValidateStatus`, while a `closed` event still validates `pr.head.sha`. If the stored SHA missed the final synchronize event, the authoritative close event can return before setting `retiredAt`. Consider validating repository and PR identity without rejecting a close event for a head-SHA mismatch.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Requirements found all 14 in-scope requirements implemented and all six non-goals preserved.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3753/.pan/review/agent-pan-3753-review-ac3fa54f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3753 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/flywheel.ts",
@@ -116,10 +108,10 @@
     "recordedAt": "2026-08-16T19:42:45.970Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T20:05:18.122Z",
+  "updated": "2026-08-16T20:10:38.846Z",
   "pipeline": {
     "issueId": "PAN-3753",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -127,11 +119,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:45:24.631Z",
-    "updatedAt": "2026-08-16T20:05:17.974Z",
+    "updatedAt": "2026-08-16T20:10:38.704Z",
     "reviewNotes": "Project-scoped eligibility can fail on unrelated projects; polyrepo containment and reconcile tracking also need fixes",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
-    "reviewSpawnedAt": "2026-08-16T19:49:10.061Z",
+    "reviewSpawnedAt": "2026-08-16T20:10:38.703Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/flywheel.ts",
@@ -263,7 +255,7 @@
       },
       "costAtCloseOut": {
         "usd": 33.055708,
-        "pricingAsOf": "2026-08-16T20:05:18.073Z"
+        "pricingAsOf": "2026-08-16T20:10:38.765Z"
       }
     },
     "merges": [
