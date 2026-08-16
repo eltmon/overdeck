@@ -77,18 +77,21 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:52:13.457Z",
+  "updated": "2026-08-16T10:53:17.061Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
     "testStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:52:00.746Z",
+    "updatedAt": "2026-08-16T10:53:16.871Z",
     "reviewNotes": "All four reviewers are clean; the prior conversation-switch flash blocker and documentation advisory are resolved.",
+    "testNotes": "typecheck, lint, npm test all exit 0 (13892+64 tests passed, 51 pre-existing quarantined skips); xBRIEF-named feature tests ConversationPanel.test.tsx + useConversationMessagesStream.test.ts 43/43 passed covering receivedFirstPayload timing and awaitingFirstPayload gating",
+    "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
     "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
@@ -139,10 +142,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 130,
-            "output": 26791,
-            "cacheRead": 12705868,
-            "cacheWrite": 256803
+            "input": 134,
+            "output": 26950,
+            "cacheRead": 13217844,
+            "cacheWrite": 259123
           }
         }
       },
@@ -160,15 +163,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 130,
-          "output": 26791,
-          "cacheRead": 12705868,
-          "cacheWrite": 256803
+          "input": 134,
+          "output": 26950,
+          "cacheRead": 13217844,
+          "cacheWrite": 259123
         }
       },
       "costAtCloseOut": {
-        "usd": 29.277748,
-        "pricingAsOf": "2026-08-16T10:52:13.444Z"
+        "usd": 29.387541,
+        "pricingAsOf": "2026-08-16T10:53:16.963Z"
       }
     },
     "merges": [
