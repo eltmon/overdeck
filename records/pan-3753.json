@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T18:41:36.981Z",
+  "updated": "2026-08-16T18:41:53.124Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "projection-gate-merge-eligibility": {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 589813,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:41:53.124Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -80,6 +88,7 @@
     "membership-gate-readyformerge.ac1": "completed",
     "membership-gate-readyformerge.ac2": "completed",
     "membership-gate-readyformerge.ac3": "completed",
-    "membership-gate-readyformerge.ac4": "completed"
+    "membership-gate-readyformerge.ac4": "completed",
+    "projection-gate-merge-eligibility": "running"
   }
 }
