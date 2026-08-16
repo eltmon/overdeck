@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T18:28:21.408Z",
+  "updated": "2026-08-16T18:41:36.981Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "membership-gate-readyformerge": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3753",
         "agentId": "agent-pan-3753",
         "pid": 368463,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:28:21.408Z"
+        "claimedAt": "2026-08-16T18:28:21.408Z",
+        "itemId": "membership-gate-readyformerge",
+        "outcome": "completed",
+        "reason": "Added canonical per-project membership gathers and gated stale-blocker, patrol, and startup readyForMerge restoration; added fake-timer regression tests.",
+        "releasedAt": "2026-08-16T18:41:36.981Z"
+      }
+    ],
+    "statusReasons": {
+      "membership-gate-readyformerge": {
+        "reason": "Added canonical per-project membership gathers and gated stale-blocker, patrol, and startup readyForMerge restoration; added fake-timer regression tests.",
+        "updatedAt": "2026-08-16T18:41:36.981Z"
       }
     }
   },
   "statusOverrides": {
-    "membership-gate-readyformerge": "running"
+    "membership-gate-readyformerge": "completed",
+    "membership-gate-readyformerge.ac1": "completed",
+    "membership-gate-readyformerge.ac2": "completed",
+    "membership-gate-readyformerge.ac3": "completed",
+    "membership-gate-readyformerge.ac4": "completed"
   }
 }
