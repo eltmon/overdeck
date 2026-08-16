@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:07:30.670Z",
+  "updated": "2026-08-16T09:26:52.933Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "skip-verdict-store": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3743",
         "agentId": "agent-pan-3743",
         "pid": 2341838,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:07:30.670Z"
+        "claimedAt": "2026-08-16T09:07:30.670Z",
+        "itemId": "skip-verdict-store",
+        "outcome": "completed",
+        "reason": "Added runtime schema top-up, exact-stat skip verdict persistence, and focused schema/cache/type-boundary tests",
+        "releasedAt": "2026-08-16T09:26:52.932Z"
+      }
+    ],
+    "statusReasons": {
+      "skip-verdict-store": {
+        "reason": "Added runtime schema top-up, exact-stat skip verdict persistence, and focused schema/cache/type-boundary tests",
+        "updatedAt": "2026-08-16T09:26:52.932Z"
       }
     }
   },
   "statusOverrides": {
-    "skip-verdict-store": "running"
+    "skip-verdict-store": "completed",
+    "skip-verdict-store.ac1": "completed",
+    "skip-verdict-store.ac2": "completed",
+    "skip-verdict-store.ac3": "completed",
+    "skip-verdict-store.ac4": "completed"
   }
 }
