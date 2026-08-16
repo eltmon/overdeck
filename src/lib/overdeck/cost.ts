@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
@@ -16,10 +16,11 @@ import {
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
-import { lookupSkipVerdict, recordSkipVerdict } from '../costs/skip-cache.js';
+import { recordSkipVerdict } from '../costs/skip-cache.js';
+import { collectCodexCostEvents } from '../costs/codex-collector.js';
+export { collectCodexCostEvents, type SkipVerdictEntry } from '../costs/codex-collector.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -619,6 +620,30 @@ export const CostWriterLive = Layer.effect(
           warnings: [],
         };
         if (source !== 'ohmypi' && source !== 'codex') return empty;
+        if (source === 'codex') {
+          const collected = yield* Effect.promise(() => collectCodexCostEvents(opts));
+          let imported = 0;
+          let duplicatesSkipped = 0;
+          let earliestEventTs: string | null = null;
+          let latestEventTs: string | null = null;
+          for (const skipped of collected.skipped) {
+            console.warn(`[cost-reconcile] skipped ${skipped.file}: ${skipped.reason}`);
+          }
+          for (const event of collected.events) {
+            if (yield* record(event, { dryRun: opts?.dryRun })) {
+              imported++;
+              const iso = event.ts.toISOString();
+              if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
+              if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
+            } else duplicatesSkipped++;
+          }
+          for (const verdict of collected.verdicts) {
+            recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+          }
+          return { imported, cacheSkipped: collected.stats.cacheSkipped, skipped: collected.skipped,
+            sessionsScanned: collected.stats.scanned, eventsImported: imported, duplicatesSkipped,
+            errors: collected.errors, earliestEventTs, latestEventTs, warnings: [] };
+        }
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
           if (!existsSync(agentsDir)) return [] as string[];
@@ -660,37 +685,13 @@ export const CostWriterLive = Layer.effect(
         };
 
         const roots: ScanRoot[] = agentNames.map((agentName) => ({
-          root: source === 'ohmypi'
-            ? join(agentsDir, agentName, 'sessions')
-            : join(agentsDir, agentName, 'codex-home', 'sessions'),
+          root: join(agentsDir, agentName, 'sessions'),
           agentName,
           issueId: issueIdFromAgentName(agentName),
-          sessionType: source,
+          sessionType: 'ohmypi',
         }));
 
-        if (source === 'codex') {
-          for (const root of opts?.extraRoots ?? []) {
-            roots.push({
-              root,
-              agentName: 'codex-global',
-              issueId: null,
-              sessionType: 'codex',
-              inferIssueFromCwd: true,
-            });
-          }
-        }
-
         for (const extra of opts?.extraRootSpecs ?? []) {
-          if (source === 'codex' && extra.kind === 'codex-global') {
-            roots.push({
-              root: extra.root,
-              agentName: 'codex-global',
-              issueId: null,
-              sessionType: 'codex',
-              inferIssueFromCwd: true,
-            });
-          }
-
           if (source === 'ohmypi' && extra.kind === 'ohmypi-global') {
             const encodedRoots = yield* Effect.sync(() => {
               if (!existsSync(extra.root)) return [] as ScanRoot[];
@@ -787,62 +788,6 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const fileStat = yield* Effect.sync(() => statSync(sessionFile));
-            if (lookupSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size)) {
-              cacheSkipped++;
-              continue;
-            }
-            const parsed = yield* Effect.sync(() => {
-              try {
-                return { ok: true as const, events: parseCodexSessionCostEventsSync(sessionFile) };
-              } catch (cause) {
-                errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                return { ok: false as const, events: [] };
-              }
-            });
-            if (!parsed.ok) continue;
-            const events = parsed.events;
-            if (events.length === 0) {
-              markSkipped(sessionFile, 'no-usage');
-              recordSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size, 'no-usage');
-              continue;
-            }
-            const hasUnknownModel = events.some((event) => event.model === 'unknown');
-            if (hasUnknownModel) markSkipped(sessionFile, 'unknown-model');
-            const codexSession = root.inferIssueFromCwd
-              ? yield* Effect.sync(() => parseCodexSessionSync(sessionFile))
-              : null;
-            const issueId = root.inferIssueFromCwd
-              ? (inferIssueFromPath(codexSession?.cwd) ?? 'UNKNOWN' as IssueIdType)
-              : root.issueId;
-            for (const usage of events) {
-              const ts = new Date(usage.timestamp);
-              const event: CostEvent = {
-                ts,
-                issueId,
-                agentId:     root.agentName,
-                sessionId:   usage.sessionId,
-                sessionType: root.sessionType,
-                provider:    usage.provider,
-                model:       usage.model,
-                input:       usage.input,
-                output:      usage.output,
-                cacheRead:   usage.cacheRead,
-                cacheWrite:  usage.cacheWrite,
-                cost:        usage.cost,
-                requestId:   usage.requestId,
-                sourceFile:  sessionFile,
-              };
-
-              if (yield* record(event, { dryRun: opts?.dryRun })) {
-                imported++;
-                noteImportedTimestamp(ts);
-              } else {
-                duplicatesSkipped++;
-              }
-            }
-            recordSkipVerdict(sessionFile, fileStat.mtimeMs, fileStat.size,
-              hasUnknownModel ? 'unknown-model' : 'imported');
           }
         }
         return {

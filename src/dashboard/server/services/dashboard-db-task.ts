@@ -22,6 +22,7 @@ import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
+import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -42,7 +43,8 @@ export type DashboardDbOperation =
   | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
-  | 'unshareArtifactBySlug';
+  | 'unshareArtifactBySlug'
+  | 'costReconcileSweep';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 type WorkerLane = 'read' | 'long' | 'semantic';
@@ -126,8 +128,9 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
   return `${operation}:${stableStringify(payload)}`;
 }
 
-function workerLane(operation: DashboardDbOperation): WorkerLane {
+export function workerLane(operation: DashboardDbOperation): WorkerLane {
   if (operation === 'searchSessionsSemantic') return 'semantic';
+  if (operation === 'costReconcileSweep') return 'long';
   return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
 }
 
@@ -261,6 +264,8 @@ async function runInline(
       const { unshareArtifactBySlugJob } = await import('./artifact-index-jobs.js');
       return unshareArtifactBySlugJob(payload as string);
     }
+    case 'costReconcileSweep':
+      return collectCodexCostEvents();
   }
 }
 

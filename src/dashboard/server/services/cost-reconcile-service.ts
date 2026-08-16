@@ -1,7 +1,9 @@
 import { Effect } from 'effect';
 import { reclassifyUnknownCostEventsSync } from '../../../lib/costs/attribution.js';
 import { reconcilePiTranscripts } from '../../../lib/costs/reconciler.js';
-import { CostDoorLive, CostWriter } from '../../../lib/overdeck/cost.js';
+import { CostDoorLive, CostWriter, type CostEvent, type SkipVerdictEntry } from '../../../lib/overdeck/cost.js';
+import { recordSkipVerdict } from '../../../lib/costs/skip-cache.js';
+import { runDashboardDbJob } from './dashboard-db-task.js';
 
 const RECONCILE_INTERVAL_MS = 5 * 60_000;
 
@@ -29,14 +31,23 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
       console.log(`[cost-reconciler] ${reason} UNKNOWN backfill: ${backfillResult.updated} updated`);
     }
     try {
-      const codexResult = await Effect.runPromise(
-        CostWriter.use((writer) => writer.reconcile({ source: 'codex' })).pipe(
-          Effect.provide(CostDoorLive),
-        ),
-      );
+      const codexResult = await runDashboardDbJob<{
+        events: CostEvent[];
+        verdicts: SkipVerdictEntry[];
+        stats: { scanned: number; cacheSkipped: number };
+      }>('costReconcileSweep', { source: 'codex' });
+      let imported = 0;
+      for (const event of codexResult.events) {
+        const normalized = { ...event, ts: new Date(event.ts) };
+        if (await Effect.runPromise(CostWriter.use(writer => writer.record(normalized)).pipe(
+          Effect.provide(CostDoorLive)))) imported++;
+      }
+      for (const verdict of codexResult.verdicts) {
+        recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+      }
       console.log(
-        `[cost-reconciler] ${reason} codex sweep: ${codexResult.sessionsScanned} scanned, ` +
-        `${codexResult.cacheSkipped} cache-skipped, ${codexResult.imported} imported`,
+        `[cost-reconciler] ${reason} codex sweep: ${codexResult.stats.scanned} scanned, ` +
+        `${codexResult.stats.cacheSkipped} cache-skipped, ${imported} imported`,
       );
     } catch (err) {
       console.warn('[cost-reconciler] codex sweep failed:', err instanceof Error ? err.message : err);
