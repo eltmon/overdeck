@@ -77,7 +77,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:39:26.587Z",
+  "updated": "2026-08-16T10:51:58.681Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
@@ -87,12 +87,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:39:26.559Z",
+    "updatedAt": "2026-08-16T10:51:58.580Z",
     "reviewNotes": "All four reviewers are clean; the prior conversation-switch flash blocker and documentation advisory are resolved.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
-    "lastVerifiedCommit": "9eb3ab971bce980b9d673c174058f5efca43edc6",
+    "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
     "reviewSpawnedAt": "2026-08-16T10:35:19.158Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -132,10 +131,18 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 39723432,
-            "output": 57657,
-            "cacheRead": 38812160,
+            "input": 39907546,
+            "output": 58518,
+            "cacheRead": 38992640,
             "cacheWrite": 0
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 126,
+            "output": 24777,
+            "cacheRead": 12197618,
+            "cacheWrite": 255255
           }
         }
       },
@@ -147,15 +154,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 39723432,
-          "output": 57657,
-          "cacheRead": 38812160,
+          "input": 39907546,
+          "output": 58518,
+          "cacheRead": 38992640,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 126,
+          "output": 24777,
+          "cacheRead": 12197618,
+          "cacheWrite": 255255
         }
       },
       "costAtCloseOut": {
-        "usd": 25.69215,
-        "pricingAsOf": "2026-08-16T10:39:26.565Z"
+        "usd": 29.15208,
+        "pricingAsOf": "2026-08-16T10:51:58.632Z"
       }
     },
     "merges": [
