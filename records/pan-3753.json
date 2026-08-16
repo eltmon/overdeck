@@ -2,7 +2,7 @@
   "issueId": "PAN-3753",
   "schemaVersion": 2,
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T17:58:15.519Z",
+  "updated": "2026-08-16T17:58:23.115Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3753: Flywheel shows PAN-1641 as a ready-to-merge train — deacon/reconciler flap resurrects a dead issue and invalidates a merged UAT batch",
       "timestamp": "2026-08-16T17:58:15.519Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
