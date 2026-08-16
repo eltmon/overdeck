@@ -111,6 +111,7 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'embedSessions',
   'searchSessionsSemantic',
   'listSubstrateBugWeights',
+  'parseTranscriptSnapshot',
 ]);
 
 const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null };
@@ -346,15 +347,25 @@ export function runDashboardDbJob<T>(
   payload?: unknown,
   onProgress?: (progress: unknown) => void | Promise<void>,
 ): Promise<T> {
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
-    return runInline(operation, payload, onProgress) as Promise<T>;
-  }
-
   const key = coalescingKey(operation, payload);
   const existing = key ? sharedJobs.get(key) : undefined;
   if (existing) {
     if (onProgress) existing.progressListeners.add(onProgress);
     return existing.promise as Promise<T>;
+  }
+
+  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
+    const progressListeners = new Set<ProgressHandler>();
+    if (onProgress) progressListeners.add(onProgress);
+    const promise = runInline(operation, payload, onProgress) as Promise<T>;
+    if (key) {
+      sharedJobs.set(key, { lane: workerLane(operation), promise, progressListeners });
+      promise.then(
+        () => sharedJobs.delete(key),
+        () => sharedJobs.delete(key),
+      );
+    }
+    return promise;
   }
 
   if (pending.size >= MAX_PENDING_JOBS) {

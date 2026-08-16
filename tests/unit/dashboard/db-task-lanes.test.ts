@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../src/dashboard/server/services/pi-conversation-parser.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/dashboard/server/services/pi-conversation-parser.js')>();
+  return {
+    ...actual,
+    parsePiConversationMessages: vi.fn(actual.parsePiConversationMessages),
+  };
+});
 
 import {
   type DashboardDbOperation,
@@ -54,5 +62,18 @@ describe('dashboard database worker lanes', () => {
       sessionFile: piFixture.pathname,
       parser: 'unknown',
     })).rejects.toThrow('Unknown transcript parser: unknown');
+  });
+
+  it('coalesces concurrent parses with identical payloads', async () => {
+    vi.mocked(parsePiConversationMessages).mockClear();
+    const payload = { sessionFile: piFixture.pathname, parser: 'pi' };
+
+    const [first, second] = await Promise.all([
+      runDashboardDbJob('parseTranscriptSnapshot', payload),
+      runDashboardDbJob('parseTranscriptSnapshot', payload),
+    ]);
+
+    expect(parsePiConversationMessages).toHaveBeenCalledOnce();
+    expect(first).toEqual(second);
   });
 });
