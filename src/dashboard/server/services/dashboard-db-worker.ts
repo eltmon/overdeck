@@ -135,13 +135,16 @@ let activeJobs = 0;
 const MAX_CONCURRENT_JOBS_PER_LANE = 1;
 
 async function execute(message: DashboardDbRequest): Promise<void> {
+  const startedAt = Date.now();
   try {
     const result = await runJob(message.id, message.operation, message.payload);
-    parentPort?.postMessage({ id: message.id, ok: true, result });
+    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now() });
   } catch (err) {
     parentPort?.postMessage({
       id: message.id,
       ok: false,
+      startedAt,
+      finishedAt: Date.now(),
       error: {
         name: err instanceof Error ? err.name : 'Error',
         message: err instanceof Error ? err.message : String(err),
