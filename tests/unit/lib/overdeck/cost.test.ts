@@ -392,7 +392,8 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
   it.each(['agentId', 'issueId'] as const)(
     'record() does not announce an event with a null %s',
     async (missingAttribution) => {
-      const { dbLayer, busLayer, archiveLayer, emittedEvents } = makeWiredFakeDb();
+      const { dbLayer, busLayer, archiveLayer, appendedEvents, insertedValues, emittedEvents } =
+        makeWiredFakeDb();
       const layer = CostWriterLive.pipe(
         Layer.provide(dbLayer),
         Layer.provide(busLayer),
@@ -404,6 +405,8 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
         CostWriter.use((w) => w.record(event)).pipe(Effect.provide(layer)),
       );
 
+      expect(appendedEvents).toHaveLength(1);
+      expect(insertedValues).toHaveLength(1);
       expect(emittedEvents).toHaveLength(0);
     },
   );
