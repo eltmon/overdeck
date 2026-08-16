@@ -1,3 +1,8 @@
+/**
+ * Periodic cost reconciliation delegates transcript walking and parsing to the
+ * long DB worker lane. The main thread records returned events through the cost
+ * write door and persists exact path/mtime/size skip verdicts for later sweeps.
+ */
 import { Effect } from 'effect';
 import { reclassifyUnknownCostEventsSync } from '../../../lib/costs/attribution.js';
 import {
