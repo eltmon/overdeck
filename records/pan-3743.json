@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:37:21.665Z",
+  "updated": "2026-08-16T09:45:32.343Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "codex-sweep-worker": {
-        "writerId": "agent-pan-3743",
-        "agentId": "agent-pan-3743",
-        "pid": 2924108,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:37:21.664Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Cached unchanged Pi and Claude transcript verdicts by file stat, avoided opening cached Pi files, preserved retries for unreadable files, and reported cache-skip counts",
         "releasedAt": "2026-08-16T09:37:09.990Z"
+      },
+      {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 2924108,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:37:21.664Z",
+        "itemId": "codex-sweep-worker",
+        "outcome": "completed",
+        "reason": "Extracted pure codex walk/parse collector, routed costReconcileSweep to the long worker in both dispatch switches, and kept CostWriter.record plus verdict persistence on the main thread",
+        "releasedAt": "2026-08-16T09:45:32.342Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "pi-skip-cache": {
         "reason": "Cached unchanged Pi and Claude transcript verdicts by file stat, avoided opening cached Pi files, preserved retries for unreadable files, and reported cache-skip counts",
         "updatedAt": "2026-08-16T09:37:09.990Z"
+      },
+      "codex-sweep-worker": {
+        "reason": "Extracted pure codex walk/parse collector, routed costReconcileSweep to the long worker in both dispatch switches, and kept CostWriter.record plus verdict persistence on the main thread",
+        "updatedAt": "2026-08-16T09:45:32.342Z"
       }
     }
   },
@@ -128,6 +135,10 @@
     "pi-skip-cache.ac1": "completed",
     "pi-skip-cache.ac2": "completed",
     "pi-skip-cache.ac3": "completed",
-    "codex-sweep-worker": "running"
+    "codex-sweep-worker": "completed",
+    "codex-sweep-worker.ac1": "completed",
+    "codex-sweep-worker.ac2": "completed",
+    "codex-sweep-worker.ac3": "completed",
+    "codex-sweep-worker.ac4": "completed"
   }
 }
