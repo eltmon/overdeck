@@ -36,20 +36,22 @@
     "recordedAt": "2026-08-16T09:40:36.934Z"
   },
   "created": "2026-08-16T08:45:13.959Z",
-  "updated": "2026-08-16T10:16:06.267Z",
+  "updated": "2026-08-16T10:20:48.258Z",
   "pipeline": {
     "issueId": "PAN-3745",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:43:54.545Z",
-    "updatedAt": "2026-08-16T10:16:03.911Z",
+    "updatedAt": "2026-08-16T10:20:47.918Z",
+    "reviewNotes": "All four reviewers passed; all in-PR requirements are implemented with no blocking findings.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3747",
+    "reviewedAtCommit": "b8b3fb7855b8a470ab5187843853440eb990b93d",
     "lastVerifiedCommit": "b8b3fb7855b8a470ab5187843853440eb990b93d",
-    "reviewRequestedAt": "2026-08-16T09:43:54.545Z",
     "reviewSpawnedAt": "2026-08-16T10:16:03.909Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -78,9 +80,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 25693674,
-            "output": 16101,
-            "cacheRead": 25369344,
+            "input": 27971537,
+            "output": 23584,
+            "cacheRead": 27413504,
             "cacheWrite": 0
           }
         }
@@ -93,15 +95,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25693674,
-          "output": 16101,
-          "cacheRead": 25369344,
+          "input": 27971537,
+          "output": 23584,
+          "cacheRead": 27413504,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.789352000000001,
-        "pricingAsOf": "2026-08-16T10:16:04.321Z"
+        "usd": 17.204437,
+        "pricingAsOf": "2026-08-16T10:20:48.119Z"
       }
     },
     "merges": [
