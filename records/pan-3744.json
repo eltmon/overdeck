@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:30:53.224Z",
+  "updated": "2026-08-16T09:30:56.553Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -25,7 +25,35 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T08:57:14.075Z"
+    "updatedAt": "2026-08-16T09:30:56.551Z",
+    "reviewRequestedAt": "2026-08-16T09:30:56.551Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/ISSUE-VIEW.md",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+        "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+        "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/ISSUE-VIEW.md",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+        "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+        "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+        "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+      ],
+      "recordedAt": "2026-08-16T09:30:53.223Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3746"
   },
   "closeOut": {
     "usage": {
