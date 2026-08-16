@@ -7,7 +7,7 @@
  * No frontend changes needed — activity.entry already renders in ActivityPanel.
  */
 
-import { MemoryPressureBand, MemoryVerdict, assessMemoryPressure, readGovernorReserves, readGovernorWatchReserveBytes } from './memory-governor.js';
+import { MemoryPressureBand, MemoryVerdict, assessMemoryPressure, readGovernorPsiCalmConfig, readGovernorReserves, readGovernorWatchReserveBytes } from './memory-governor.js';
 import { RuntimeCensus, getRuntimeCensus } from '../runtime-census.js';
 import { emitActivityEntrySync, EmitActivityOptions } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
@@ -41,6 +41,39 @@ function formatGib(bytes: number): string {
   return `${gib.toFixed(1)} GiB`;
 }
 
+function formatTrigger(verdict: MemoryVerdict): string {
+  const trigger = verdict.trigger;
+  if (!trigger) {
+    return verdict.band === 'hard'
+      ? 'Memory critical: the governor entered shedding before trigger details were available.'
+      : 'Overdeck stopped admitting work before trigger details were available.';
+  }
+
+  const since = new Date(trigger.at).toISOString().slice(11, 16);
+  if (trigger.kind === 'soft-dip') {
+    return `Overdeck stopped admitting work at ${since} UTC when available memory dipped to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} soft reserve.`;
+  }
+  if (trigger.kind === 'hard') {
+    return `Overdeck entered critical memory shedding at ${since} UTC when available memory fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} hard reserve.`;
+  }
+  if (trigger.kind === 'swap-psi') {
+    return `Overdeck entered critical memory shedding at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, while memory pressure stalls were active.`;
+  }
+  return `Overdeck stopped admitting work at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, and memory pressure stall data was unavailable.`;
+}
+
+function formatCalmWindow(windowMs: number): string {
+  const minutes = windowMs / 60_000;
+  return Number.isInteger(minutes) ? `${minutes} minutes` : `${windowMs} ms`;
+}
+
+function formatSheddingExit(verdict: MemoryVerdict, hardBytes: number, recoveryBytes: number): string {
+  if (verdict.trigger?.kind === 'swap-psi') {
+    return `Shedding ends when live memory stalls clear or swap runway recovers. Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
+  }
+  return `Shedding ends when available memory reaches the ${formatGib(hardBytes)} hard reserve. Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
+}
+
 /**
  * Format a multi-line memory details string for activity entry.
  */
@@ -65,6 +98,7 @@ export interface MemoryPressurePatrolDeps {
   readSoftReserveBytes: () => number;
   readHardReserveBytes: () => number;
   readRecoveryReserveBytes: () => number;
+  readPsiCalmConfig: () => { readmitAvg10: number; windowMs: number };
   census: () => Promise<RuntimeCensus>;
   readNewKernelJournal: () => Promise<string>;
   emit: (entry: EmitActivityOptions) => void;
@@ -127,6 +161,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     readSoftReserveBytes: deps.readSoftReserveBytes || (() => readGovernorReserves().softBytes),
     readHardReserveBytes: deps.readHardReserveBytes || (() => readGovernorReserves().hardBytes),
     readRecoveryReserveBytes: deps.readRecoveryReserveBytes || (() => readGovernorReserves().recoveryBytes),
+    readPsiCalmConfig: deps.readPsiCalmConfig || (() => readGovernorPsiCalmConfig()),
     census: deps.census || (() => getRuntimeCensus()),
     readNewKernelJournal: deps.readNewKernelJournal || readNewKernelJournal,
     emit: deps.emit || emitActivityEntrySync,
@@ -137,6 +172,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   const softBytes = d.readSoftReserveBytes();
   const hardBytes = d.readHardReserveBytes();
   const recoveryBytes = d.readRecoveryReserveBytes();
+  const psiCalmConfig = d.readPsiCalmConfig();
   const actions: string[] = [];
 
   // WI-4: Check for new OOM kills in the journal (runs even if level unchanged)
@@ -257,8 +293,8 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     logDeaconEventSync(`[deacon] ${action}`);
   } else if (level === 'holding') {
     const message =
-      `Memory pressure: Overdeck has stopped admitting work — ${formatGib(verdict.availableBytes)} available is under the ${formatGib(softBytes)} soft reserve. ` +
-      `Queued agent resumes and review/test dispatches will wait until available memory climbs back above the ${formatGib(recoveryBytes)} recovery reserve. ` +
+      `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
+      `Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve, or at the ${formatGib(softBytes)} soft reserve once memory pressure stalls (PSI full avg10) stay below ${psiCalmConfig.readmitAvg10} for ${formatCalmWindow(psiCalmConfig.windowMs)}. ` +
       `Nothing has been stopped or killed.`;
 
     d.emit({
@@ -275,8 +311,8 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     logDeaconEventSync(`[deacon] ${action}`);
   } else if (level === 'shedding') {
     const message =
-      `Memory critical — ${formatGib(verdict.availableBytes)} available is under the ${formatGib(hardBytes)} hard reserve. ` +
-      `Overdeck admits nothing and the kernel may start killing processes. ` +
+      `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
+      `Overdeck admits nothing while shedding is active. ${formatSheddingExit(verdict, hardBytes, recoveryBytes)} ` +
       `Free memory on this host now; automatic shedding is not wired, so Overdeck will not reclaim anything on its own.`;
 
     d.emit({
@@ -293,7 +329,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     logDeaconEventSync(`[deacon] ${action}`);
   } else if (level === 'ok') {
     const message =
-      `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, above the ${formatGib(watchBytes)} watch reserve. ` +
+      `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, at or above the ${formatGib(watchBytes)} watch reserve. ` +
       `Overdeck is admitting work again.`;
 
     d.emit({
