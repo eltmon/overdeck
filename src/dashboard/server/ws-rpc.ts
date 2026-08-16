@@ -15,7 +15,7 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
-import { getConversationByName } from '../../lib/overdeck/conversations.js';
+import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
@@ -808,7 +808,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.subscribeConversationMessages]: (input) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const conv = getConversationByName(input.conversationName);
+            const conv = yield* Effect.promise(() =>
+              runDashboardDbJob<LegacyConversation | null>('getConversationByName', input.conversationName),
+            );
 
             // PAN-1908: synthetic agent sessions (work/planning/specialist panels)
             // have no conversations-table row. Stream pi/codex work agents by
