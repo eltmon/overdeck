@@ -730,15 +730,9 @@ export async function spawnConversationSession(
     writeBridgeTokenSync(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
-  if (harness === 'ohmypi' && model) {
-    await provisionOhmypiProviderForModel(model);
-  }
-  // PAN-1837 review fix: the tmux-create + session-capture sequence below is
-  // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations
-  // and genuinely awaited — not fire-and-forget — so two conversations sharing
-  // one cwd never snapshot the same "existing sessions" set and race for the
-  // same newest directory. Non-kimi harnesses run this closure directly,
-  // unaffected by the lock.
+  if (harness === 'ohmypi' && model) await provisionOhmypiProviderForModel(model);
+  // PAN-1837: serialize and await Kimi tmux creation + session capture per bucket
+  // so conversations sharing a cwd cannot race; other harnesses run directly.
   const launchTmuxAndCaptureSession = async (): Promise<void> => {
     // Conversations have no AgentState row, so the dashboard can't resolve
     // their wire.jsonl without a conversation-owned captured session id —

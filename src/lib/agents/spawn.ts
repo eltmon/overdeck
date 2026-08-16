@@ -344,7 +344,6 @@ async function spawnRunWithoutConsentClaim(
         console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
       }
     }
-
     try {
       const conversation = {
         name: agentId,
@@ -379,10 +378,7 @@ async function spawnRunWithoutConsentClaim(
   if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
-
-  if (resolvedHarness === 'ohmypi' && selectedModel) {
-    await provisionOhmypiProviderForModel(selectedModel);
-  }
+  if (resolvedHarness === 'ohmypi' && selectedModel) await provisionOhmypiProviderForModel(selectedModel);
   const launcherContent = generateLauncherScriptSync({
     role,
     workingDir: workspace,
