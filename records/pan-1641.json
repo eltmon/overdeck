@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T14:40:55.515Z",
+  "updated": "2026-08-16T14:42:45.244Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -337,16 +337,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "async-omp-provisioning": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 2174512,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T14:33:46.789Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -462,6 +454,17 @@
         "itemId": "e2e-pi-local-gemma",
         "outcome": "completed",
         "releasedAt": "2026-08-13T14:59:10.039Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2174512,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T14:33:46.789Z",
+        "itemId": "async-omp-provisioning",
+        "outcome": "completed",
+        "reason": "Made omp registry provisioning async, deep-equal write-skipping, and serialized per path; hoisted it before live OhMyPi launcher generation and added concurrency, corrupt-registry, unchanged-write, and purity tests.",
+        "releasedAt": "2026-08-16T14:42:45.244Z"
       }
     ],
     "statusReasons": {
@@ -477,6 +480,10 @@
       "pi-openai-env": {
         "reason": "stale claim released (agent-pan-1641 dead)",
         "updatedAt": "2026-08-13T14:02:11.089Z"
+      },
+      "async-omp-provisioning": {
+        "reason": "Made omp registry provisioning async, deep-equal write-skipping, and serialized per path; hoisted it before live OhMyPi launcher generation and added concurrency, corrupt-registry, unchanged-write, and purity tests.",
+        "updatedAt": "2026-08-16T14:42:45.244Z"
       }
     }
   },
@@ -523,7 +530,12 @@
     "e2e-pi-local-gemma.ac1": "completed",
     "e2e-pi-local-gemma.ac2": "completed",
     "e2e-pi-local-gemma.ac3": "completed",
-    "async-omp-provisioning": "running"
+    "async-omp-provisioning": "completed",
+    "async-omp-provisioning.ac1": "completed",
+    "async-omp-provisioning.ac2": "completed",
+    "async-omp-provisioning.ac3": "completed",
+    "async-omp-provisioning.ac4": "completed",
+    "async-omp-provisioning.ac5": "completed"
   },
   "recoveryTrips": [
     {
