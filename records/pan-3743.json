@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T10:05:07.033Z",
+  "updated": "2026-08-16T10:08:40.414Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-worker-lanes": {
-        "writerId": "agent-pan-3743",
-        "agentId": "agent-pan-3743",
-        "pid": 3301222,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T10:05:07.033Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -184,6 +176,17 @@
         "outcome": "completed",
         "reason": "Added parameterized tests pinning interactive, bulk, and semantic operations to their intended worker lanes",
         "releasedAt": "2026-08-16T10:04:59.195Z"
+      },
+      {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 3301222,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T10:05:07.033Z",
+        "itemId": "docs-worker-lanes",
+        "outcome": "completed",
+        "reason": "Documented DB worker lanes, slow-job diagnostics, and cost reconciliation worker/cache boundaries; full typecheck passes.",
+        "releasedAt": "2026-08-16T10:08:40.414Z"
       }
     ],
     "statusReasons": {
@@ -214,6 +217,10 @@
       "lane-audit-test": {
         "reason": "Added parameterized tests pinning interactive, bulk, and semantic operations to their intended worker lanes",
         "updatedAt": "2026-08-16T10:04:59.195Z"
+      },
+      "docs-worker-lanes": {
+        "reason": "Documented DB worker lanes, slow-job diagnostics, and cost reconciliation worker/cache boundaries; full typecheck passes.",
+        "updatedAt": "2026-08-16T10:08:40.414Z"
       }
     }
   },
@@ -250,6 +257,9 @@
     "lane-audit-test.ac1": "completed",
     "lane-audit-test.ac2": "completed",
     "lane-audit-test.ac3": "completed",
-    "docs-worker-lanes": "running"
+    "docs-worker-lanes": "completed",
+    "docs-worker-lanes.ac1": "completed",
+    "docs-worker-lanes.ac2": "completed",
+    "docs-worker-lanes.ac3": "completed"
   }
 }
