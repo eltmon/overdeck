@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T09:59:18.089Z",
+  "updated": "2026-08-16T09:59:28.359Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "db-job-instrumentation": {
+        "writerId": "agent-pan-3743",
+        "agentId": "agent-pan-3743",
+        "pid": 3229179,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:59:28.359Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3743",
@@ -202,6 +210,7 @@
     "pi-sweep-worker": "completed",
     "pi-sweep-worker.ac1": "completed",
     "pi-sweep-worker.ac2": "completed",
-    "pi-sweep-worker.ac3": "completed"
+    "pi-sweep-worker.ac3": "completed",
+    "db-job-instrumentation": "running"
   }
 }
