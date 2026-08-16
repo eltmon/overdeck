@@ -77,20 +77,18 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:53:17.061Z",
+  "updated": "2026-08-16T11:00:51.148Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:53:16.871Z",
-    "reviewNotes": "All four reviewers are clean; the prior conversation-switch flash blocker and documentation advisory are resolved.",
-    "testNotes": "typecheck, lint, npm test all exit 0 (13892+64 tests passed, 51 pre-existing quarantined skips); xBRIEF-named feature tests ConversationPanel.test.tsx + useConversationMessagesStream.test.ts 43/43 passed covering receivedFirstPayload timing and awaitingFirstPayload gating",
+    "updatedAt": "2026-08-16T11:00:48.633Z",
     "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
@@ -128,50 +126,50 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1485693,
-            "output": 1640,
-            "cacheRead": 1132288,
+            "input": 3045224,
+            "output": 2602,
+            "cacheRead": 2561536,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 39907546,
-            "output": 58518,
-            "cacheRead": 38992640,
+            "input": 47691347,
+            "output": 67203,
+            "cacheRead": 46698752,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 134,
-            "output": 26950,
-            "cacheRead": 13217844,
-            "cacheWrite": 259123
+            "input": 136,
+            "output": 27487,
+            "cacheRead": 13474506,
+            "cacheWrite": 260396
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1485693,
-          "output": 1640,
-          "cacheRead": 1132288,
+          "input": 3045224,
+          "output": 2602,
+          "cacheRead": 2561536,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 39907546,
-          "output": 58518,
-          "cacheRead": 38992640,
+          "input": 47691347,
+          "output": 67203,
+          "cacheRead": 46698752,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 134,
-          "output": 26950,
-          "cacheRead": 13217844,
-          "cacheWrite": 259123
+          "input": 136,
+          "output": 27487,
+          "cacheRead": 13474506,
+          "cacheWrite": 260396
         }
       },
       "costAtCloseOut": {
-        "usd": 29.387541,
-        "pricingAsOf": "2026-08-16T10:53:16.963Z"
+        "usd": 33.949481,
+        "pricingAsOf": "2026-08-16T11:00:49.720Z"
       }
     },
     "merges": [
