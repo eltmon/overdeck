@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:08:50.616Z",
+  "updated": "2026-08-16T09:11:50.432Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "first-payload-panel-tests": {
-        "writerId": "agent-pan-3744",
-        "agentId": "agent-pan-3744",
-        "pid": 2370451,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:08:50.616Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3744",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Added a four-row neutral-token transcript skeleton with reduced-motion support, shared across fetch, discovery, and first-stream-payload loading. Extracted the component to satisfy the file-size guard.",
         "releasedAt": "2026-08-16T09:08:34.933Z"
+      },
+      {
+        "writerId": "agent-pan-3744",
+        "agentId": "agent-pan-3744",
+        "pid": 2370451,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:08:50.616Z",
+        "itemId": "first-payload-panel-tests",
+        "outcome": "completed",
+        "reason": "Mocked WS transport payload timing and added passing tests for pre-payload loading, empty first payload greeting, and reset-on-switch; all 33 panel tests pass.",
+        "releasedAt": "2026-08-16T09:11:50.432Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "transcript-skeleton-component": {
         "reason": "Added a four-row neutral-token transcript skeleton with reduced-motion support, shared across fetch, discovery, and first-stream-payload loading. Extracted the component to satisfy the file-size guard.",
         "updatedAt": "2026-08-16T09:08:34.933Z"
+      },
+      "first-payload-panel-tests": {
+        "reason": "Mocked WS transport payload timing and added passing tests for pre-payload loading, empty first payload greeting, and reset-on-switch; all 33 panel tests pass.",
+        "updatedAt": "2026-08-16T09:11:50.432Z"
       }
     }
   },
@@ -128,6 +135,10 @@
     "transcript-skeleton-component.ac1": "completed",
     "transcript-skeleton-component.ac2": "completed",
     "transcript-skeleton-component.ac3": "completed",
-    "first-payload-panel-tests": "running"
+    "first-payload-panel-tests": "completed",
+    "first-payload-panel-tests.ac1": "completed",
+    "first-payload-panel-tests.ac2": "completed",
+    "first-payload-panel-tests.ac3": "completed",
+    "first-payload-panel-tests.ac4": "completed"
   }
 }
