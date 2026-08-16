@@ -116,7 +116,7 @@
     "recordedAt": "2026-08-16T19:42:45.970Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T19:54:14.988Z",
+  "updated": "2026-08-16T19:54:17.971Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "blocked",
@@ -127,10 +127,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:45:24.631Z",
-    "updatedAt": "2026-08-16T19:54:14.131Z",
+    "updatedAt": "2026-08-16T19:54:15.828Z",
     "reviewNotes": "Project-scoped eligibility can fail on unrelated projects; polyrepo containment and reconcile tracking also need fixes",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
+    "reviewedAtCommit": "ac3fa54fcc5438e7afe8f843e47f0b54c468494b",
     "reviewSpawnedAt": "2026-08-16T19:49:10.061Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -263,7 +264,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.93759,
-        "pricingAsOf": "2026-08-16T19:54:14.183Z"
+        "pricingAsOf": "2026-08-16T19:54:17.948Z"
       }
     },
     "merges": [
