@@ -10,6 +10,8 @@ import {
 const POLL_INTERVAL_MS = 60_000;
 
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+const lastHealedUpdatedAt = new Map<string, string>();
+const warnedNonConverging = new Set<string>();
 
 interface ReviewStatusEventPayload {
   issueId: string;
@@ -34,7 +36,7 @@ async function reconcileOnce(): Promise<void> {
   // not duplicate an event that the read door just healed.
   for (const issueId of Object.keys(cached)) {
     const canonical = getReviewStatusSync(issueId);
-    if (!canonical) continue;
+    if (!canonical || canonical.retiredAt) continue;
     canonicalByIssue.set(issueId.toUpperCase(), canonical);
   }
 
@@ -56,6 +58,15 @@ async function reconcileOnce(): Promise<void> {
       sameCanonicalReviewStatus(latestPayload.status, canonical)
     ) continue;
 
+    if (lastHealedUpdatedAt.get(issueId) === canonical.updatedAt) {
+      const warningKey = `${issueId}:${canonical.updatedAt}`;
+      if (!warnedNonConverging.has(warningKey)) {
+        console.warn(`[review-status-reconcile] NOT CONVERGING for ${issueId}: canonical=${canonical.updatedAt} event=${lastUpdatedAt}`);
+        warnedNonConverging.add(warningKey);
+      }
+      continue;
+    }
+
     console.log(
       `[review-status-reconcile] re-emitting status for ${issueId} ` +
       '(canonical differs from last event — healing lost status_changed)',
@@ -65,6 +76,7 @@ async function reconcileOnce(): Promise<void> {
       issueId,
       canonical,
     );
+    lastHealedUpdatedAt.set(issueId, canonical.updatedAt);
   }
 }
 
@@ -85,6 +97,8 @@ export function stopReviewStatusReconcileService(): void {
     clearInterval(reconcileTimer);
     reconcileTimer = null;
   }
+  lastHealedUpdatedAt.clear();
+  warnedNonConverging.clear();
 }
 
 export async function __reconcileReviewStatusesOnceForTests(): Promise<void> {

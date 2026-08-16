@@ -108,6 +108,37 @@ describe('review status reconcile service', () => {
     );
   });
 
+  it('heals one unchanged divergence, warns once, then heals after canonical advances', async () => {
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent('2026-07-22T20:00:00.000Z')]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    startReviewStatusReconcileService();
+    await vi.advanceTimersByTimeAsync(3 * 60_000);
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      `[review-status-reconcile] NOT CONVERGING for ${canonical.issueId}: ` +
+      `canonical=${canonical.updatedAt} event=2026-07-22T20:00:00.000Z`,
+    );
+
+    const advanced = { ...canonical, updatedAt: '2026-07-22T20:02:00.000Z' };
+    mockGetReviewStatusSync.mockReturnValue(advanced);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips retired canonical records without emitting or warning', async () => {
+    mockGetReviewStatusSync.mockReturnValue({ ...canonical, retiredAt: '2026-08-16T00:00:00Z' });
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent('2026-07-22T20:00:00.000Z')]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    startReviewStatusReconcileService();
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+
+    expect(mockEmitReviewStatusChanged).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('does not emit across several ticks when persisted JSON matches canonical status', async () => {
     const canonicalWithUndefined = { ...canonical, mergeNotes: undefined };
     const persisted = JSON.parse(JSON.stringify({
