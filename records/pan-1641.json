@@ -222,18 +222,19 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T14:36:20.539Z",
+  "updated": "2026-08-16T14:40:45.428Z",
   "pipeline": {
     "issueId": "PAN-1641",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T14:35:37.636Z",
-    "reviewNotes": "Ollama launcher provisioning blocks the dashboard event loop, and Overdeck-spawned E2E evidence remains missing",
+    "updatedAt": "2026-08-16T14:40:45.296Z",
+    "reviewNotes": "Approved under cycle-three convergence; no blocker cited code changed since the prior synthesis",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "CORRECTION + final verdict for 7ecbf09b: all five ACs pass. My prior FAILED note checked the legacy continues/pan-1641.vbrief.json; the canonical record is records/pan-1641.json, which DOES carry decision D8 (recordedAt 2026-08-13T14:25:05.563Z) and H1 flipped to RESOLVED. AC-4 is satisfied, and D8's stated contract matches what I independently verified against the installed prime-agent binary: baseUrl is taken literally (dist/core/model-registry.js:548,559,1218,1244 — never through resolveConfigValue) while apiKey/headers are env-resolved by BARE name (dist/core/resolve-config-value.js:17-19); D8's 'legacy pi normalizes to ohmypi' claim also checks out (src/lib/runtimes/index.ts:104-105, harness-policy.ts:138).\n\nAC-1: getProviderEnvForModel's ollama branch (agents/provider-env.ts:44-47) returns only OPENAI_BASE_URL (config base + '/v1') and OPENAI_API_KEY='ollama'; no ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN, asserted in provider-env-ollama.test.ts.\nAC-2: providers.ts:773-775 strips the 'ollama:' prefix and qualifies to 'ollama/<tag>' BEFORE the idempotency slash check, so both 'ollama:gemma4:12b' and the namespaced 'ollama:library/custom:latest' work; an already-qualified 'ollama/...' still short-circuits unchanged, and non-ollama routing is byte-identical to pre-bead behaviour. ohmypi-models.ts:48 strips the same prefix for the registry id, so the registry entry and the --model id now agree.\nAC-3: OPENAI_BASE_URL added to PROVIDER_ENV_KEYS (agents/provider-env.ts:116), child-env.ts:31 and launcher-generator.ts:449; exports test asserts the unset-then-export pair and buildSpawnEnvForModel strips a stale inherited value.\nAC-5: env shape and non-ollama routing both asserted; ohmypi-models-ollama.test.ts:5-11 now mocks loadConfigSync so it no longer depends on the operator's live config.yaml. Ran ohmypi-models-ollama, provider-env-ollama, launcher-generator and tests/lib/providers: 109 tests pass. Full typecheck/lint remain the verification gate's call.\n\nNon-blocking note for the follow-on beads: H5 (localhost-only SAFE_OLLAMA_HOST_RE validation of a configured base_url) is not enforced on this path — provider-env.ts and ohmypi-models.ts both consume config.providerBaseUrls.ollama directly. If resolveOllamaBaseUrl in config-yaml/merge.ts:251 is not already failing closed on a non-localhost host, that hazard is still open and belongs to whichever bead owns it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1679",
     "reviewSpawnedAt": "2026-08-16T14:35:37.631Z"
@@ -243,15 +244,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9391272,
-            "output": 10953,
-            "cacheRead": 5325824,
+            "input": 9557639,
+            "output": 11200,
+            "cacheRead": 5413888,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 159748509,
-            "output": 132148,
-            "cacheRead": 156788992,
+            "input": 168976029,
+            "output": 149833,
+            "cacheRead": 165398784,
             "cacheWrite": 0
           }
         },
@@ -286,15 +287,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9391272,
-          "output": 10953,
-          "cacheRead": 5325824,
+          "input": 9557639,
+          "output": 11200,
+          "cacheRead": 5413888,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 159748509,
-          "output": 132148,
-          "cacheRead": 156788992,
+          "input": 168976029,
+          "output": 149833,
+          "cacheRead": 165398784,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -323,8 +324,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 111.9005396,
-        "pricingAsOf": "2026-08-16T14:35:40.257Z"
+        "usd": 119.8246256,
+        "pricingAsOf": "2026-08-16T14:40:45.388Z"
       }
     },
     "merges": [
