@@ -1,0 +1,422 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T08:49:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3744: Conversation view shows 'How can I help you' empty-state instead of a loading skeleton while the transcript loads",
+    "updated": "2026-08-16T08:55:57.048Z"
+  },
+  "plan": {
+    "id": "pan-3744",
+    "title": "Conversation view shows 'How can I help you' empty-state instead of a loading skeleton while the transcript loads",
+    "status": "proposed",
+    "uid": "2e575e0f-4835-4e60-a74b-273ecbf99fe0",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T08:49:57Z",
+    "updated": "2026-08-16T08:55:57.048Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3744",
+        "label": "PAN-3744",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3744.md",
+        "label": "PRD draft pan-3744.md",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversation-view",
+      "loading-state",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "On the WebSocket stream path, before the first transcript payload arrives the messages query cache is empty: isLoading is false (the fetch query is disabled), isDiscovering is false, and hasTimelineActivity is false, so isFirstMessage (ConversationPanel.tsx:1308) evaluates true and the panel renders the 'How can I help you?' greeting — an assertion that the conversation is empty — while the truth is 'transcript not delivered yet'. Under server load (PAN-3743) that window stretches to many seconds of wrong information.",
+      "Proposal": "Surface a receivedFirstPayload boolean from useConversationMessagesStream (hook-local useState flipped in the WS subscription callback, reset on conversation.name change — never a query-cache sentinel), thread it into ConversationView as a prop, derive awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0, exclude that state from isFirstMessage / messagesFetchFailed / isOrphaned, and render a message-shaped skeleton (shared by the fetch and stream loading paths) until the first payload arrives.",
+      "NonGoals": "- No changes to the transcript RPC server, the WS protocol, or PAN-3743 queueing work (the load itself is out of scope; this issue only fixes what renders during the wait).\n- No change to useSubagentTranscript or the subagent transcript panel.\n- No redesign of the greeting, orphaned, spawn-failed, or fetch-failed states beyond gating them on awaitingFirstPayload.\n- No skeleton for non-stream (fetch-path) conversations beyond reusing the same skeleton component for the existing isLoading branch — no new fetch-path behavior."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Change the hook's return shape from boolean to { enabled, receivedFirstPayload } and update both consumers (ConversationPanel.tsx:188, SimpleActivityFeed.tsx:49) in the same commit.",
+        "rationale": "A second parallel hook would re-subscribe or duplicate state; a shape change is the smallest honest contract and typecheck pins both call sites. SimpleActivityFeed ignores the new flag."
+      },
+      {
+        "summary": "receivedFirstPayload is hook-local useState reset on conversation.name change, not a query-cache sentinel.",
+        "rationale": "Cache entries survive conversation switches, so a cache sentinel would reintroduce the stale-greeting flash the issue's FR-3 forbids."
+      },
+      {
+        "summary": "The gating item renders the existing conversationConnecting block for the awaiting state; the skeleton visual lands as a follow-up item replacing it for both loading paths.",
+        "rationale": "Keeps the gating item independently mergeable and reviewable; the skeleton item is then a pure visual swap."
+      },
+      {
+        "summary": "Stream-path tests mock ../../lib/wsTransport (fake getTransport().subscribe capturing the event listener) with agent- prefixed conversation names instead of mocking the stream hook.",
+        "rationale": "The hook's own gating (agent- name, stream-capable harness, sessionAlive) is part of the behavior under test; mocking wsTransport exercises the real hook end to end. Existing fixtures use 'test-conv' so they stay on the fetch path untouched."
+      }
+    ],
+    "items": [
+      {
+        "id": "stream-first-payload-signal",
+        "title": "Extend useConversationMessagesStream to expose receivedFirstPayload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T08:49:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3744",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gate-empty-states-on-first-payload",
+            "transcript-skeleton-component",
+            "first-payload-panel-tests"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && bun run vitest run --configLoader runner src/components/chat/__tests__/useConversationMessagesStream.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "useConversationMessagesStream.test.ts passes including the new receivedFirstPayload cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts, change useConversationMessagesStream to return { enabled, receivedFirstPayload } instead of boolean. Add const [receivedFirstPayload, setReceivedFirstPayload] = useState(false); inside the subscription event callback (currently lines 165–168, the queryClient.setQueryData block) call setReceivedFirstPayload(true); reset it to false when conversation.name changes — the subscription useEffect (lines 157–174) already keys on conversation.name, so reset inside that effect before subscribing. Do NOT derive this from the query cache (a cache sentinel survives conversation switches and would reintroduce the stale-greeting flash, FR-3). Update both consumers in the same commit: ConversationPanel.tsx:188 becomes `const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);` and SimpleActivityFeed.tsx:49 becomes `const { enabled: streamEnabled } = useConversationMessagesStream(conversation);` (SimpleActivityFeed ignores the new flag). Extend src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts with hook-level cases: no event → false; one event → true; conversation-name change → false again. The tests need a vi.mock of ../../lib/wsTransport whose fake getTransport().subscribe captures the event listener so the test can invoke it on demand (see PRD decision D5)."
+        },
+        "items": [
+          {
+            "id": "stream-first-payload-signal.ac1",
+            "title": "useConversationMessagesStream returns { enabled, receivedFirstPayload } where receivedFirstPayload is false before any WS event and flips to true when the subscription callback receives the first event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-first-payload-signal.ac2",
+            "title": "receivedFirstPayload resets to false when conversation.name changes (rerender with a different agent- name returns false until that subscription's first event)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-first-payload-signal.ac3",
+            "title": "npm run typecheck exits 0 with both consumers (ConversationPanel.tsx:188, SimpleActivityFeed.tsx:49) destructuring the new { enabled, receivedFirstPayload } return shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-first-payload-signal.ac4",
+            "title": "The new hook tests in useConversationMessagesStream.test.ts pass and every pre-existing test in that file passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-empty-states-on-first-payload",
+        "title": "Gate the greeting, orphaned, and fetch-failed states on awaitingFirstPayload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T08:49:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3744",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && bun run vitest run --configLoader runner src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationPanel.test.tsx passes with no pre-existing test modified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/ConversationPanel.tsx, thread the new flag into ConversationView: add receivedFirstPayload={receivedFirstPayload} beside streamMessagesEnabled at line 1036, and add receivedFirstPayload?: boolean to ConversationViewProps (declared around line 1162; the ConversationView signature is at line 1175). In the state derivation block (lines 1290–1317), add `const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;` directly above isDiscovering (line 1290). Then add `!awaitingFirstPayload` to all three derivations that treat 'no data yet' as settled: isFirstMessage (line 1308), messagesFetchFailed (lines 1314–1316), and isOrphaned (line 1317). In the render branches, extend the loading branch at line 1345 to `isLoading || isDiscovering || awaitingFirstPayload` so the awaiting state renders the existing conversationConnecting block ('Loading…' / 'Discovering conversation…' — a stream-awaiting conversation may render either label; the skeleton item replaces this visual next). The greeting branch at line 1430 must be unreachable while awaitingFirstPayload is true. Do not touch isSpawning, isSpawnFailed, isForking, or the data?.error branch."
+        },
+        "items": [
+          {
+            "id": "gate-empty-states-on-first-payload.ac1",
+            "title": "With streamMessagesEnabled true, sessionAlive true, zero messages, and no WS event delivered, the panel renders the conversationConnecting loading block and never renders 'How can I help you?'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-empty-states-on-first-payload.ac2",
+            "title": "After the first WS event delivers an empty transcript (messages: [], workLog: []) for a live conversation, the panel renders 'How can I help you?'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-empty-states-on-first-payload.ac3",
+            "title": "isOrphaned and messagesFetchFailed both include !awaitingFirstPayload, so the pre-payload window renders neither 'no saved history' nor the fetch-failed retry surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-empty-states-on-first-payload.ac4",
+            "title": "Every pre-existing ConversationPanel test passes unmodified, including the PAN-3544 workLog suite (line 627), the spawn-window, orphaned, and fetch-failed suites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-skeleton-component",
+        "title": "Replace the Loading… text with a message-shaped skeleton shared by both loading paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:49:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "design",
+          "issueLabel": "pan-3744",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && bun run vitest run --configLoader runner src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationPanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the bare text block at ConversationPanel.tsx:1345–1348 (the `isLoading || isDiscovering || awaitingFirstPayload` branch) with a lightweight skeleton: 3–4 message-shaped shimmer blocks that match the panel's message layout (avatar-width gutter plus text-line bars is enough — do not clone the full message DOM). Add the skeleton styles to src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css (the module ConversationPanel imports at line 45; conversationConnecting is at line 3523 of that module) using existing CSS custom properties so both dashboard themes render it correctly — per the pan-style-guide skill: no decorative color, shimmer via a subtle opacity/background-position animation on existing surface/muted tokens. Keep the 'Discovering conversation…' label behavior: when isDiscovering is true the skeleton may carry that caption, but the blocks render for all three loading conditions so the fetch path and stream path look identical. Respect prefers-reduced-motion if the codebase already has that pattern in this module (check before adding; if absent, keep the animation subtle and do not introduce a new global pattern)."
+        },
+        "items": [
+          {
+            "id": "transcript-skeleton-component.ac1",
+            "title": "The isLoading (fetch path), isDiscovering, and awaitingFirstPayload (stream path) conditions all render the same skeleton component with 3–4 message-shaped blocks instead of the bare 'Loading…' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-skeleton-component.ac2",
+            "title": "command-deck.module.css applies only existing CSS custom properties for the skeleton (no hardcoded hex, no decorative color) and the skeleton renders correctly in both dashboard themes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-skeleton-component.ac3",
+            "title": "npm run typecheck exits 0 and the ConversationPanel test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "first-payload-panel-tests",
+        "title": "Add stream-path loading-state tests to ConversationPanel.test.tsx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T08:49:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3744",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && bun run vitest run --configLoader runner src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes with the three new stream-path cases and all pre-existing tests unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx, add a stream-path suite. The file currently never mocks the stream hook and its mockConversation is named 'test-conv' (line 83), which keeps shouldStreamConversationMessages false — leave those fixtures alone. For the new suite: (1) vi.mock ../../lib/wsTransport with a fake getTransport() whose subscribe captures the event listener into a test-accessible variable and returns an unsubscribe no-op; (2) build a mock conversation with an agent- prefixed name (e.g. 'agent-test-stream'), sessionAlive: true, endedAt: null, and a stream-capable harness so shouldStreamConversationMessages returns true (check getHarnessBehavior for the harness the fixture needs — mirror whatever makes the pure-function tests in useConversationMessagesStream.test.ts pass). Cover three cases: (a) no event delivered → the skeleton/loading block renders and 'How can I help you?' never appears; (b) invoke the captured listener with one event producing an empty transcript ({ messages: [], workLog: [] }) → the greeting renders; (c) FR-3 reset: render conversation A with no event, rerender with a different agent- name, assert the loading block renders again and the greeting never flashes during the switch. Run only this file with the frontend vitest runner; the whole suite must pass with no pre-existing test modified."
+        },
+        "items": [
+          {
+            "id": "first-payload-panel-tests.ac1",
+            "title": "Test: stream path with sessionAlive true and no WS event delivered renders the loading block and queryByText('How can I help you?') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-payload-panel-tests.ac2",
+            "title": "Test: after the captured WS listener delivers one event with an empty transcript, getByText('How can I help you?') renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-payload-panel-tests.ac3",
+            "title": "Test: rerendering with a different agent- conversation name before any payload re-renders the loading block and never flashes the greeting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-payload-panel-tests.ac4",
+            "title": "The full ConversationPanel.test.tsx file passes with every pre-existing test unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-loading-states",
+        "title": "Document the conversation panel's loading and empty states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T08:49:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3744",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Two documentation touches, no behavior change. (1) docs/ISSUE-VIEW.md: in the conversation-view section, add a short paragraph enumerating the panel's loading/empty states and what each asserts — awaiting-first-payload skeleton (transcript not yet delivered; says nothing about emptiness), greeting 'How can I help you?' (first payload received, genuinely empty live conversation), 'Starting…' (spawn window), orphaned / no saved history (ended session, data loaded, no activity), fetch-failed with Retry (request failed; history may be intact). (2) ConversationPanel.tsx: update the state-derivation comment block around lines 1290–1317 so the incident comments (PAN-3544 at 1291–1297, spawn-window at 1299–1305) are joined by a PAN-3744 comment stating that the pre-first-payload window is a loading state, not an empty state, and that receivedFirstPayload is hook-local because the query cache survives conversation switches."
+        },
+        "items": [
+          {
+            "id": "docs-loading-states.ac1",
+            "title": "docs/ISSUE-VIEW.md contains a paragraph naming all five panel states (awaiting-payload skeleton, greeting, Starting…, orphaned, fetch-failed) and what each asserts about the conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-loading-states.ac2",
+            "title": "ConversationPanel.tsx contains a PAN-3744 comment in the state-derivation block explaining that the pre-first-payload window is a loading state and why receivedFirstPayload is hook-local rather than cache-derived",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-loading-states.ac3",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stream-first-payload-signal",
+        "to": "gate-empty-states-on-first-payload",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-empty-states-on-first-payload",
+        "to": "transcript-skeleton-component",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-skeleton-component",
+        "to": "first-payload-panel-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "first-payload-panel-tests",
+        "to": "docs-loading-states",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3744-conversation-view-shows-how-can-i-help-you-empty-state-instead-of-a-loading-skeleton-while-the-transcript-loads.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
