@@ -51,7 +51,7 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:24:15.455Z",
+  "updated": "2026-08-16T19:24:19.288Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -61,7 +61,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:20:39.123Z",
+    "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
+    "updatedAt": "2026-08-16T19:24:15.433Z",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3756",
@@ -91,8 +92,7 @@
         "tests/unit/dashboard/transcript-parse-worker.test.ts"
       ],
       "recordedAt": "2026-08-16T19:19:39.144Z"
-    },
-    "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -142,7 +142,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.952812,
-        "pricingAsOf": "2026-08-16T19:20:39.259Z"
+        "pricingAsOf": "2026-08-16T19:24:19.265Z"
       }
     },
     "merges": [
