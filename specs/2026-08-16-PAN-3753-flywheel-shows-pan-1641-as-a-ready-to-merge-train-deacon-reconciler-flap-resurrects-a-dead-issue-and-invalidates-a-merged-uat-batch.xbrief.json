@@ -4,17 +4,17 @@
     "created": "2026-08-16T18:19:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3753: Flywheel shows PAN-1641 as a ready-to-merge train — deacon/reconciler flap resurrects a dead issue and invalidates a merged UAT batch",
-    "updated": "2026-08-16T18:26:42.142Z"
+    "updated": "2026-08-16T18:27:48.026Z"
   },
   "plan": {
     "id": "pan-3753",
     "title": "Flywheel shows PAN-1641 as a ready-to-merge train — deacon/reconciler flap resurrects a dead issue and invalidates a merged UAT batch",
-    "status": "proposed",
+    "status": "running",
     "uid": "29544abe-0479-4e5a-806c-541924926704",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-16T18:19:17Z",
-    "updated": "2026-08-16T18:26:42.142Z",
+    "updated": "2026-08-16T18:27:48.026Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3753",
@@ -620,5 +620,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
