@@ -95,6 +95,7 @@ interface WorkerResponse {
   progressSeq?: number;
   startedAt?: number;
   finishedAt?: number;
+  bytes?: number;
   error?: {
     name?: string;
     message?: string;
@@ -127,9 +128,11 @@ export function formatSlowJobLine(input: {
   waitMs: number;
   runMs: number;
   depth: number;
+  bytes?: number;
 }): string | null {
   if (input.waitMs <= 1_000 && input.runMs <= 1_000) return null;
-  return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}`;
+  const bytes = input.bytes === undefined ? '' : ` bytes=${input.bytes}`;
+  return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}${bytes}`;
 }
 
 function workerScriptUrl(): URL {
@@ -221,6 +224,7 @@ function getWorker(lane: WorkerLane): Worker {
         waitMs: message.startedAt - job.enqueuedAt,
         runMs: message.finishedAt - message.startedAt,
         depth: [...pending.values()].filter(pendingJob => pendingJob.lane === job.lane).length,
+        bytes: message.bytes,
       });
       if (line) console.warn(line);
     }
@@ -333,12 +337,16 @@ async function runInline(
   onProgress?: (progress: unknown) => void | Promise<void>,
 ): Promise<unknown> {
   const startedAt = Date.now();
+  let bytes: number | undefined;
   try {
-    return await executeInline(operation, payload, onProgress);
+    const result = await executeInline(operation, payload, onProgress);
+    if (operation === 'parseTranscriptSnapshot') bytes = (result as ParseResult).byteOffset;
+    return result;
   } finally {
     const line = formatSlowJobLine({
       op: operation, lane: workerLane(operation), waitMs: 0,
       runMs: Date.now() - startedAt, depth: 0,
+      bytes,
     });
     if (line) console.warn(line);
   }

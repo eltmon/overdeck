@@ -176,7 +176,10 @@ async function execute(message: DashboardDbRequest): Promise<void> {
   const startedAt = Date.now();
   try {
     const result = await runJob(message.id, message.operation, message.payload);
-    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now() });
+    const bytes = message.operation === 'parseTranscriptSnapshot'
+      ? (result as ParseResult).byteOffset
+      : undefined;
+    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now(), bytes });
   } catch (err) {
     parentPort?.postMessage({
       id: message.id,
