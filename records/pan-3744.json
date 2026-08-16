@@ -102,22 +102,23 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T11:01:43.684Z",
+  "updated": "2026-08-16T11:05:21.217Z",
   "pipeline": {
     "issueId": "PAN-3744",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T11:01:39.946Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
+    "updatedAt": "2026-08-16T11:05:21.108Z",
+    "reviewNotes": "All four reviewers are clean; the added Playwright regression test passes and introduces no new findings.",
     "uatNotes": "Required UAT blocked: workspace container (overdeck-feature-pan-3744) session bootstrap returns HTTP 403 on /api/dashboard/session and /api/conversations, never stabilizes (confirmed via browser console, network log, and server ws-rpc logs showing server-side is healthy). Restarted only the workspace's own server container, 403s recurred. Ran pan admin seed-uat-fixtures PAN-3744 (succeeded, agents=5 issues=1 confirmed server-side) but that fixture creates no conversation/transcript entity to open. No conversation view was reachable in-browser, so the AC's skeleton-then-content resolution is unproven. Full detail in .pan/test/result.json",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
-    "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
+    "reviewedAtCommit": "a51ffc2f4db9a0eb2486c9e0a315e332069db624",
     "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
     "reviewSpawnedAt": "2026-08-16T11:01:39.946Z",
     "scopeDrift": {
@@ -152,15 +153,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3045224,
-            "output": 2602,
-            "cacheRead": 2561536,
+            "input": 3131933,
+            "output": 2894,
+            "cacheRead": 2622208,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 48086811,
-            "output": 68591,
-            "cacheRead": 47076352,
+            "input": 51816216,
+            "output": 76215,
+            "cacheRead": 50715648,
             "cacheWrite": 0
           }
         },
@@ -175,15 +176,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3045224,
-          "output": 2602,
-          "cacheRead": 2561536,
+          "input": 3131933,
+          "output": 2894,
+          "cacheRead": 2622208,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 48086811,
-          "output": 68591,
-          "cacheRead": 47076352,
+          "input": 51816216,
+          "output": 76215,
+          "cacheRead": 50715648,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -194,8 +195,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 34.269241,
-        "pricingAsOf": "2026-08-16T11:01:39.959Z"
+        "usd": 36.768154,
+        "pricingAsOf": "2026-08-16T11:05:21.192Z"
       }
     },
     "merges": [
