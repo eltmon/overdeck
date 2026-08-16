@@ -28,6 +28,7 @@ import {
   buildUatGenerationStore,
   buildUatGenerationCleanupGit,
   listRemoteUatBranches,
+  listRemoteUatBranchesMulti,
 } from '../../../lib/cloister/uat-generation-deps.js';
 import {
   assemblePolyrepoUatGeneration,
@@ -211,6 +212,13 @@ async function runUatTrainReconcileForProject(
       getBranchHeadSha: async () => '',
       getBaseAnchor: async () => getPolyrepoBaseAnchor(projectPath, await readySet()),
       getFeatureAnchor: (feature) => getPolyrepoFeatureAnchor(feature),
+      isGenerationContainedInMain: async (generation) => {
+        const repoGit = buildPolyrepoGitDeps(await resolveProjectRepos(projectPath));
+        const repos = generation.repos ?? [];
+        return repos.length > 0 && Promise.all(repos.map((repo) =>
+          repoGit.get(repo.repoKey)?.isBranchContainedInMain?.(repo.branch) ?? Promise.resolve(false)))
+          .then((contained) => contained.every(Boolean));
+      },
       store: buildUatGenerationStore(),
       assemble: (features) => assemblePolyrepoFromReadySetForProject(projectPath, features),
       teardownStack: (gen) => teardownUatStack(gen),
@@ -226,6 +234,7 @@ async function runUatTrainReconcileForProject(
     getReadySet: () => getReadySetForProject(projectPath),
     getMainHeadSha: () => gitDeps.fetchMain(),
     getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
+    isGenerationContainedInMain: (generation) => gitDeps.isBranchContainedInMain?.(generation.name) ?? Promise.resolve(false),
     store: buildUatGenerationStore(),
     assemble: (features) => assembleFromReadySetForProject(projectPath, features),
     teardownStack: (gen) => teardownUatStack(gen),
@@ -401,6 +410,7 @@ async function assemblePolyrepoFromReadySetForProject(
       dateIso: new Date().toISOString(),
       features,
       repos,
+      takenBranchNames: await listRemoteUatBranchesMulti(repos),
     },
     {
       repoGit: buildPolyrepoGitDeps(repos),

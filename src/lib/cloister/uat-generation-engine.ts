@@ -16,7 +16,7 @@
  * uat-generation-deps.ts for the real wiring), so every path — happy,
  * conflict-resolved, held-out, failed — is unit-testable with fake deps.
  */
-import { makeUatCandidateName } from './uat-candidate-name.js';
+import { makeUniqueUatCandidateName } from './uat-candidate-name.js';
 import {
   applyUnionLintPlan,
   planUnionLint,
@@ -81,6 +81,8 @@ export interface GenerationGitDeps {
   createWorktree(branchName: string, worktreePath: string): Promise<void>;
   /** Head SHA of a feature branch (origin-first). */
   branchHeadSha(branch: string): Promise<string>;
+  /** Whether a UAT branch tip is already contained in the target branch. */
+  isBranchContainedInMain?(branch: string): Promise<boolean>;
   /**
    * Merge a feature branch into the generation worktree. On conflict the
    * worktree is left MID-CONFLICT (the hook needs that state); the engine
@@ -164,10 +166,10 @@ export async function assembleUatGeneration(
   const log = deps.log ?? (() => {});
 
   const baseSha = await deps.git.fetchMain();
-  const name = makeUatCandidateName({
+  const name = makeUniqueUatCandidateName({
     label: input.label,
     dateIso: input.dateIso,
-  });
+  }, [...deps.store.listNames(), ...(input.takenBranchNames ?? [])]);
   const worktreePath = `${input.projectRoot}/workspaces/${generationFolderName(name)}`;
 
   deps.store.insert({

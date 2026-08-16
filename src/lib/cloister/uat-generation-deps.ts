@@ -36,7 +36,7 @@ const runGit = (args: string[], cwd: string) =>
  * contributions throw and get held out. The character class is unchanged, so
  * shell metacharacters and path traversal are still refused.
  */
-function safeBranchName(
+export function safeBranchName(
   branchName: string,
   prefix: 'feature' | 'uat',
   featurePrefix = 'feature/',
@@ -50,7 +50,7 @@ function safeBranchName(
   return branchName;
 }
 
-function safeGenerationWorktreePath(projectRoot: string, worktreePath: string): string {
+export function safeGenerationWorktreePath(projectRoot: string, worktreePath: string): string {
   const workspacesRoot = resolve(projectRoot, 'workspaces');
   const target = resolve(worktreePath);
   const rel = relative(workspacesRoot, target);
@@ -124,6 +124,16 @@ export function buildUatGenerationGitDeps(
       const safeBranch = safeBranchName(branch, 'feature', featurePrefix);
       const tryRef = async (ref: string) => (await runGit(['rev-parse', ref], projectRoot)).stdout.trim();
       return tryRef(`origin/${safeBranch}`).catch(() => tryRef(safeBranch));
+    },
+
+    isBranchContainedInMain: async (branch) => {
+      const safeBranch = safeBranchName(branch, 'uat');
+      const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], projectRoot)
+        .then(() => `origin/${safeBranch}`)
+        .catch(() => safeBranch);
+      return runGit(['merge-base', '--is-ancestor', ref, originTarget], projectRoot)
+        .then(() => true)
+        .catch(() => false);
     },
 
     mergeBranch: async (featureBranch) => {
