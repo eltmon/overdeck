@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:28:24.214Z",
+  "updated": "2026-08-16T18:29:35.937Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "governor-docs": {
-        "writerId": "agent-pan-3754",
-        "agentId": "agent-pan-3754",
-        "pid": 368746,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:28:24.214Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3754",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Populated psiSomeAvg10 on verdicts and replaced placeholder patrol details with real swap and per-value PSI readings plus explicit unreadable fallbacks.",
         "releasedAt": "2026-08-16T18:27:49.877Z"
+      },
+      {
+        "writerId": "agent-pan-3754",
+        "agentId": "agent-pan-3754",
+        "pid": 368746,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:28:24.214Z",
+        "itemId": "governor-docs",
+        "outcome": "completed",
+        "reason": "Documented PSI-calm early re-admission and re-arm behavior, both config keys, trigger provenance, and a self-consistent hold message example.",
+        "releasedAt": "2026-08-16T18:29:35.937Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "patrol-details-real-values": {
         "reason": "Populated psiSomeAvg10 on verdicts and replaced placeholder patrol details with real swap and per-value PSI readings plus explicit unreadable fallbacks.",
         "updatedAt": "2026-08-16T18:27:49.877Z"
+      },
+      "governor-docs": {
+        "reason": "Documented PSI-calm early re-admission and re-arm behavior, both config keys, trigger provenance, and a self-consistent hold message example.",
+        "updatedAt": "2026-08-16T18:29:35.937Z"
       }
     }
   },
@@ -149,6 +156,9 @@
     "patrol-details-real-values.ac1": "completed",
     "patrol-details-real-values.ac2": "completed",
     "patrol-details-real-values.ac3": "completed",
-    "governor-docs": "running"
+    "governor-docs": "completed",
+    "governor-docs.ac1": "completed",
+    "governor-docs.ac2": "completed",
+    "governor-docs.ac3": "completed"
   }
 }
