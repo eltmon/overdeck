@@ -51,18 +51,18 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:24:26.925Z",
+  "updated": "2026-08-16T19:24:51.568Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:24:25.430Z",
+    "updatedAt": "2026-08-16T19:24:37.293Z",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -106,9 +106,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 39961033,
-            "output": 48367,
-            "cacheRead": 39178752,
+            "input": 40077680,
+            "output": 48498,
+            "cacheRead": 39292928,
             "cacheWrite": 0
           }
         },
@@ -129,9 +129,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 39961033,
-          "output": 48367,
-          "cacheRead": 39178752,
+          "input": 40077680,
+          "output": 48498,
+          "cacheRead": 39292928,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -142,8 +142,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.952812,
-        "pricingAsOf": "2026-08-16T19:24:25.540Z"
+        "usd": 25.026185,
+        "pricingAsOf": "2026-08-16T19:24:37.297Z"
       }
     },
     "merges": [
@@ -151,8 +151,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3752",
