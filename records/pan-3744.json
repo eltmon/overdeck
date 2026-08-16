@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T08:58:52.379Z",
+  "updated": "2026-08-16T09:00:54.275Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "stream-first-payload-signal": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3744",
         "agentId": "agent-pan-3744",
         "pid": 2190265,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T08:58:52.378Z"
+        "claimedAt": "2026-08-16T08:58:52.378Z",
+        "itemId": "stream-first-payload-signal",
+        "outcome": "completed",
+        "reason": "Returned stream enabled and first-payload state, reset it per conversation, updated both consumers, and added passing hook tests.",
+        "releasedAt": "2026-08-16T09:00:54.275Z"
+      }
+    ],
+    "statusReasons": {
+      "stream-first-payload-signal": {
+        "reason": "Returned stream enabled and first-payload state, reset it per conversation, updated both consumers, and added passing hook tests.",
+        "updatedAt": "2026-08-16T09:00:54.275Z"
       }
     }
   },
   "statusOverrides": {
-    "stream-first-payload-signal": "running"
+    "stream-first-payload-signal": "completed",
+    "stream-first-payload-signal.ac1": "completed",
+    "stream-first-payload-signal.ac2": "completed",
+    "stream-first-payload-signal.ac3": "completed",
+    "stream-first-payload-signal.ac4": "completed"
   }
 }
