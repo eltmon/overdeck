@@ -162,18 +162,19 @@
     "recordedAt": "2026-08-16T12:15:15.978Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T13:56:15.302Z",
+  "updated": "2026-08-16T13:56:21.678Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T12:16:15.179Z",
-    "updatedAt": "2026-08-16T12:39:47.900Z",
+    "updatedAt": "2026-08-16T13:55:43.993Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -251,9 +252,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 73450624,
-            "output": 106098,
-            "cacheRead": 71864320,
+            "input": 73903849,
+            "output": 107600,
+            "cacheRead": 72304384,
             "cacheWrite": 0
           }
         },
@@ -274,9 +275,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 73450624,
-          "output": 106098,
-          "cacheRead": 71864320,
+          "input": 73903849,
+          "output": 107600,
+          "cacheRead": 72304384,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -287,8 +288,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 47.047541,
-        "pricingAsOf": "2026-08-16T12:39:50.408Z"
+        "usd": 47.378438,
+        "pricingAsOf": "2026-08-16T13:55:44.118Z"
       }
     },
     "merges": [
@@ -296,8 +297,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "k3[1m]",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3743",
