@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -26,27 +26,42 @@ const tempDirs: string[] = [];
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.doUnmock('../../../src/dashboard/server/services/dashboard-db-task.js');
+  vi.doUnmock('../../../src/dashboard/server/routes/jsonl-resolver.js');
+  vi.resetModules();
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 describe('transcript parse worker routing', () => {
-  it('keeps every full transcript parser behind the parse job door in ws-rpc', () => {
-    const source = readFileSync(new URL('../../../src/dashboard/server/ws-rpc.ts', import.meta.url), 'utf8');
+  it('dispatches every full-snapshot harness stream through the parse job door', async () => {
+    vi.resetModules();
+    const jobSpy = vi.fn<(operation: string, payload: unknown) => Promise<ParseResult>>(
+      async () => parsePiConversationMessages(piFixture.pathname),
+    );
+    vi.doMock('../../../src/dashboard/server/services/dashboard-db-task.js', () => ({
+      runDashboardDbJob: jobSpy,
+    }));
+    vi.doMock('../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
+      resolveAgentHarness: vi.fn(async () => 'claude-code'),
+      resolvePiSessionPath: vi.fn(async () => piFixture.pathname),
+      resolveCodexRolloutPath: vi.fn(async () => piFixture.pathname),
+      resolveAcpTranscriptPath: vi.fn(async () => piFixture.pathname),
+      resolveKimiWirePath: vi.fn(async () => piFixture.pathname),
+      readLauncherPinnedSessionId: vi.fn(async () => null),
+    }));
+    const { streamHarnessFullParseSnapshots: isolatedStreamHarness } = await import(
+      '../../../src/dashboard/server/ws-rpc.js'
+    );
 
-    for (const directParser of [
-      'parsePiConversationMessages',
-      'parseOhmypiConversationMessages',
-      'parseCodexConversationMessages',
-      'parseAcpConversationMessages',
-      'parseKimiConversationMessages',
-      'parseEntireConversation',
-    ]) {
-      expect(source).not.toContain(directParser);
+    for (const harness of ['pi', 'ohmypi', 'codex', 'acp', 'kimi-code']) {
+      const stream = isolatedStreamHarness(`session-${harness}`, harness, null);
+      await Effect.runPromise(stream!.pipe(Stream.take(1), Stream.runCollect));
     }
-    expect(source).toContain("parser: harness === 'pi' ? 'pi' : 'ohmypi'");
-    for (const parser of ['codex', 'acp', 'kimi', 'claude-initial']) {
-      expect(source).toContain(`parser: '${parser}'`);
-    }
+
+    expect(jobSpy.mock.calls.map(([, payload]) => (payload as { parser: string }).parser)).toEqual([
+      'pi', 'ohmypi', 'codex', 'acp', 'kimi',
+    ]);
+    expect(jobSpy.mock.calls.every(([operation]) => operation === 'parseTranscriptSnapshot')).toBe(true);
   });
 
   it.each([

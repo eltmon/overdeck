@@ -95,6 +95,12 @@ export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent
   );
 }
 
+/**
+ * Watch and emit full transcript snapshots for harnesses without incremental parsing.
+ * Path resolution, file watching, debounce state, and event emission stay on the main
+ * thread. Callers supply a parser callback that sends CPU-bound parsing through the
+ * dashboard DB worker's parse lane via the job door.
+ */
 export function streamResolvedFullParseSnapshots(
   resolve: () => Promise<string | null>,
   parse: (file: string) => Promise<ParseResult>,

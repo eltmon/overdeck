@@ -46,7 +46,9 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **DB job worker lanes:**
 - The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
   reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
-  This separation prevents a bulk job from delaying an operator-facing read.
+  The `parse` lane runs `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and
+  can take seconds, so its own lane cannot block interactive reads or wait behind bulk
+  sweeps.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
@@ -58,6 +60,10 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   acknowledges each batch before the worker continues its single-pass scan. This limits
   transfer memory without repeated parsing while preserving EventBus publication and
   durable skip-cache updates.
+- `subscribeConversationMessages` resolves transcript paths on the main thread, sends
+  full parses through `parseTranscriptSnapshot`, and emits the unchanged result after
+  the parse worker responds. File watching, debounce state, and event emission remain
+  on the main thread.
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
