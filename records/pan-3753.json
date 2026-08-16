@@ -82,17 +82,22 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "drizzle/overdeck/0000_overdeck_init.sql",
       "src/cli/commands/flywheel.ts",
       "src/dashboard/server/main.ts",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
       "src/lib/cloister/deacon.ts",
       "src/lib/cloister/uat-generation-engine.ts",
       "src/lib/cloister/uat-polyrepo-engine.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/schema.ts",
       "src/lib/overdeck/infra.ts",
+      "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
       "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
       "tests/unit/lib/cloister/uat-generation-engine.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
+      "tests/unit/lib/webhook-handlers.test.ts",
+      "tests/unit/scripts/create-overdeck-db.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -126,10 +131,12 @@
       "docs/FLYWHEEL.md",
       "docs/MERGE-WORKFLOW.md",
       "docs/PIPELINE-MEMBERSHIP.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
       "src/cli/commands/flywheel.ts",
       "src/dashboard/server/main.ts",
       "src/dashboard/server/routes/__tests__/merge-train.test.ts",
       "src/dashboard/server/routes/merge-train.ts",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
       "src/dashboard/server/services/review-status-reconcile-service.ts",
       "src/dashboard/server/services/uat-train.ts",
       "src/lib/cloister/deacon-merge.ts",
@@ -140,6 +147,7 @@
       "src/lib/cloister/uat-generation-engine.ts",
       "src/lib/cloister/uat-polyrepo-engine.ts",
       "src/lib/cloister/uat-reconciler.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/database/schema.ts",
       "src/lib/flywheel-merge-order.ts",
@@ -147,6 +155,7 @@
       "src/lib/overdeck/review-status-sync.ts",
       "src/lib/review-status-types.ts",
       "src/lib/review-status.ts",
+      "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
       "src/lib/webhook-handlers.ts",
       "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
       "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
@@ -158,12 +167,13 @@
       "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts",
       "tests/unit/lib/review-status-retirement.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
+      "tests/unit/lib/webhook-handlers.test.ts",
+      "tests/unit/scripts/create-overdeck-db.test.ts"
     ],
-    "recordedAt": "2026-08-16T19:42:45.970Z"
+    "recordedAt": "2026-08-16T21:05:13.229Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T21:05:08.450Z",
+  "updated": "2026-08-16T21:05:13.231Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
