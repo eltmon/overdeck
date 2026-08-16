@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T18:24:38.703Z",
+  "updated": "2026-08-16T18:28:12.450Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "parse-job-coalescing": {
-        "writerId": "agent-pan-3752",
-        "agentId": "agent-pan-3752",
-        "pid": 305149,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:24:38.702Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3752",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Routed pi, ohmypi, codex, ACP, and Kimi snapshot parsing through parseTranscriptSnapshot jobs while preserving the resolved-stream callback body and wire semantics; removed the dead direct-parse stream.",
         "releasedAt": "2026-08-16T18:24:28.810Z"
+      },
+      {
+        "writerId": "agent-pan-3752",
+        "agentId": "agent-pan-3752",
+        "pid": 305149,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:24:38.702Z",
+        "itemId": "parse-job-coalescing",
+        "outcome": "completed",
+        "reason": "Added parseTranscriptSnapshot to shared-job coalescing and preserved coalescing in Vitest inline execution; verified concurrent identical payloads invoke the parser once.",
+        "releasedAt": "2026-08-16T18:28:12.450Z"
       }
     ],
     "statusReasons": {
@@ -139,6 +142,10 @@
       "snapshot-streams-via-job": {
         "reason": "Routed pi, ohmypi, codex, ACP, and Kimi snapshot parsing through parseTranscriptSnapshot jobs while preserving the resolved-stream callback body and wire semantics; removed the dead direct-parse stream.",
         "updatedAt": "2026-08-16T18:24:28.810Z"
+      },
+      "parse-job-coalescing": {
+        "reason": "Added parseTranscriptSnapshot to shared-job coalescing and preserved coalescing in Vitest inline execution; verified concurrent identical payloads invoke the parser once.",
+        "updatedAt": "2026-08-16T18:28:12.450Z"
       }
     }
   },
@@ -153,6 +160,8 @@
     "snapshot-streams-via-job.ac2": "completed",
     "snapshot-streams-via-job.ac3": "completed",
     "snapshot-streams-via-job.ac4": "completed",
-    "parse-job-coalescing": "running"
+    "parse-job-coalescing": "completed",
+    "parse-job-coalescing.ac1": "completed",
+    "parse-job-coalescing.ac2": "completed"
   }
 }
