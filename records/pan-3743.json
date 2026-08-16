@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T10:38:12.470Z",
+  "updated": "2026-08-16T10:38:16.566Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -261,5 +261,61 @@
     "docs-worker-lanes.ac1": "completed",
     "docs-worker-lanes.ac2": "completed",
     "docs-worker-lanes.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/cost-backfill.test.ts",
+      "src/cli/commands/cost.ts",
+      "src/lib/costs/codex-collector.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/costs/skip-cache.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/overdeck/infra.ts",
+      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/lib/costs/codex-skip-cache.test.ts",
+      "tests/unit/lib/costs/reconciler-collect.test.ts",
+      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
+      "tests/unit/lib/costs/skip-cache.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
+      "src/cli/commands/__tests__/cost-backfill.test.ts",
+      "src/cli/commands/cost.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/lib/costs/codex-collector.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/costs/skip-cache.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/overdeck/infra.ts",
+      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/lib/costs/codex-skip-cache.test.ts",
+      "tests/unit/lib/costs/reconciler-collect.test.ts",
+      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
+      "tests/unit/lib/costs/skip-cache.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+    ],
+    "recordedAt": "2026-08-16T10:38:16.564Z"
   }
 }
