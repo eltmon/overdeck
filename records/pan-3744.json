@@ -77,17 +77,20 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T10:52:07.197Z",
+  "updated": "2026-08-16T10:52:10.927Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-16T10:52:00.694Z",
+    "updatedAt": "2026-08-16T10:52:00.701Z",
+    "reviewNotes": "All four reviewers are clean; the prior conversation-switch flash blocker and documentation advisory are resolved.",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
     "reviewedAtCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
     "lastVerifiedCommit": "2daff8898aa72a8c3ce87894297c47325b4c739a",
@@ -167,7 +170,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.277748,
-        "pricingAsOf": "2026-08-16T10:52:07.041Z"
+        "pricingAsOf": "2026-08-16T10:52:10.871Z"
       }
     },
     "merges": [
