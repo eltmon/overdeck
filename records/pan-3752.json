@@ -51,10 +51,10 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:35:27.588Z",
+  "updated": "2026-08-16T19:45:00.804Z",
   "pipeline": {
     "issueId": "PAN-3752",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "testing",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -62,8 +62,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:35:27.515Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-08-16T19:45:00.411Z",
     "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -101,15 +100,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2628669,
-            "output": 2760,
-            "cacheRead": 2212096,
+            "input": 3010752,
+            "output": 2950,
+            "cacheRead": 2467328,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 40077680,
-            "output": 48498,
-            "cacheRead": 39292928,
+            "input": 45432072,
+            "output": 53402,
+            "cacheRead": 44554240,
             "cacheWrite": 0
           }
         },
@@ -123,24 +122,24 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 56,
-            "output": 10867,
-            "cacheRead": 4279111,
-            "cacheWrite": 150545
+            "input": 146,
+            "output": 39687,
+            "cacheRead": 14239737,
+            "cacheWrite": 223952
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2628669,
-          "output": 2760,
-          "cacheRead": 2212096,
+          "input": 3010752,
+          "output": 2950,
+          "cacheRead": 2467328,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 40077680,
-          "output": 48498,
-          "cacheRead": 39292928,
+          "input": 45432072,
+          "output": 53402,
+          "cacheRead": 44554240,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -150,15 +149,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 56,
-          "output": 10867,
-          "cacheRead": 4279111,
-          "cacheWrite": 150545
+          "input": 146,
+          "output": 39687,
+          "cacheRead": 14239737,
+          "cacheWrite": 223952
         }
       },
       "costAtCloseOut": {
-        "usd": 26.367153000000002,
-        "pricingAsOf": "2026-08-16T19:35:27.558Z"
+        "usd": 32.074355,
+        "pricingAsOf": "2026-08-16T19:45:00.668Z"
       }
     },
     "merges": [
