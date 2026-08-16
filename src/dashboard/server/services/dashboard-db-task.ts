@@ -24,6 +24,12 @@ import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
+import { parseAcpConversationMessages } from './acp-conversation-parser.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { parseKimiConversationMessages } from './kimi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
+import { parsePiConversationMessages } from './pi-conversation-parser.js';
+import type { ParseResult } from './conversation-service.js';
 
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -45,10 +51,22 @@ export type DashboardDbOperation =
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
+  | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
-export type WorkerLane = 'read' | 'long' | 'semantic';
+export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
+
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi';
+type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
+
+const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
+  pi: parsePiConversationMessages,
+  ohmypi: parseOhmypiConversationMessages,
+  codex: parseCodexConversationMessages,
+  acp: parseAcpConversationMessages,
+  kimi: parseKimiConversationMessages,
+};
 
 interface PendingJob {
   lane: WorkerLane;
@@ -95,7 +113,7 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'listSubstrateBugWeights',
 ]);
 
-const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null };
+const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null };
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 let latestSemanticJobId: string | null = null;
@@ -146,6 +164,7 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 
 export function workerLane(operation: DashboardDbOperation): WorkerLane {
   if (operation === 'searchSessionsSemantic') return 'semantic';
+  if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';
   return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
 }
@@ -269,6 +288,12 @@ async function executeInline(
       return embedSessions({ ...(payload as EmbedSessionsOptions), autoInstall: true, onProgress });
     case 'getConversationByName':
       return getConversationByName(payload as string);
+    case 'parseTranscriptSnapshot': {
+      const input = payload as { sessionFile: string; parser: string };
+      const parser = transcriptParsers[input.parser as TranscriptParserName];
+      if (!parser) throw new Error(`Unknown transcript parser: ${input.parser}`);
+      return parser(input.sessionFile);
+    }
     case 'getSetting':
       return getSetting(payload as string);
     case 'setSetting': {
