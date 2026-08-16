@@ -12,20 +12,58 @@
       "timestamp": "2026-08-16T18:12:13.207Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-16T18:32:10.539Z",
+      "reason": "end",
+      "note": "Anomalies: the schema size gate required a PAN-3754 allowlist audit commit, and one state-write ref race succeeded on retry. Deviation: that audit is a second commit because history rewriting is forbidden. Delivered trigger provenance, calm-PSI early re-admission, accurate patrol messages, real swap/PSI details, tests, and docs. Full tests, typecheck, and lint pass."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "tests/lib/config-yaml.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/lib/cloister/memory-governor.ts",
+      "src/lib/cloister/memory-pressure-patrol.ts",
+      "src/lib/cloister/memory-verdict-cache.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/schema.ts",
+      "tests/unit/lib/cloister/memory-governor.test.ts",
+      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/cloister/memory-governor.ts",
+      "src/lib/cloister/memory-pressure-patrol.ts",
+      "src/lib/cloister/memory-verdict-cache.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/schema.ts",
+      "tests/lib/config-yaml.test.ts",
+      "tests/unit/lib/cloister/memory-governor.test.ts",
+      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+    ],
+    "recordedAt": "2026-08-16T18:32:02.394Z"
+  },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T18:32:06.254Z",
+  "updated": "2026-08-16T18:32:10.540Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T18:32:06.251Z",
+    "updatedAt": "2026-08-16T18:32:10.099Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
     "reviewRequestedAt": "2026-08-16T18:32:06.251Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -58,19 +96,48 @@
         "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
       ],
       "recordedAt": "2026-08-16T18:32:02.394Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3755"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1055055,
+            "output": 1677,
+            "cacheRead": 979712,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 12654779,
+            "output": 26076,
+            "cacheRead": 12427264,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 1055055,
+          "output": 1677,
+          "cacheRead": 979712,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 12654779,
+          "output": 26076,
+          "cacheRead": 12427264,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-16T18:12:03.449Z"
+        "usd": 8.133487,
+        "pricingAsOf": "2026-08-16T18:32:10.142Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3755"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -194,37 +261,5 @@
     "governor-docs.ac1": "completed",
     "governor-docs.ac2": "completed",
     "governor-docs.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt",
-      "tests/lib/config-yaml.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/RESOURCE-GOVERNOR.md",
-      "src/lib/cloister/memory-governor.ts",
-      "src/lib/cloister/memory-pressure-patrol.ts",
-      "src/lib/cloister/memory-verdict-cache.ts",
-      "src/lib/config-yaml/defaults.ts",
-      "src/lib/config-yaml/merge.ts",
-      "src/lib/config-yaml/schema.ts",
-      "tests/unit/lib/cloister/memory-governor.test.ts",
-      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/RESOURCE-GOVERNOR.md",
-      "scripts/file-size-allowlist.txt",
-      "src/lib/cloister/memory-governor.ts",
-      "src/lib/cloister/memory-pressure-patrol.ts",
-      "src/lib/cloister/memory-verdict-cache.ts",
-      "src/lib/config-yaml/defaults.ts",
-      "src/lib/config-yaml/merge.ts",
-      "src/lib/config-yaml/schema.ts",
-      "tests/lib/config-yaml.test.ts",
-      "tests/unit/lib/cloister/memory-governor.test.ts",
-      "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
-    ],
-    "recordedAt": "2026-08-16T18:32:02.394Z"
   }
 }
