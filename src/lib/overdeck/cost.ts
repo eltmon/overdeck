@@ -591,13 +591,8 @@ export const CostWriterLive = Layer.effect(
         if (event.agentId && event.issueId) {
           yield* bus.emit({
             type: 'cost.event_recorded',
-            payload: {
-              agentId: event.agentId,
-              issueId: event.issueId,
-              cost: event.cost,
-              inputTokens: event.input,
-              outputTokens: event.output,
-            },
+            payload: { agentId: event.agentId, issueId: event.issueId, cost: event.cost,
+              inputTokens: event.input, outputTokens: event.output },
           });
         }
         return true;
