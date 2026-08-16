@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T15:10:30.424Z",
+  "updated": "2026-08-16T15:10:59.890Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -231,12 +231,15 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-16T15:10:27.353Z",
-    "reviewNotes": "Approved under cycle-three convergence; no blocker cited code changed since the prior synthesis",
-    "testNotes": "HEAD b0f8a9f9b9 (async-omp-provisioning, PAN-1641 delta WI-1). npm run typecheck: PASS (tsc + hooks/evals/dashboard/frontend/acp sub-checks, no new errors). npm run lint: PASS (eslint + all guard scripts incl. circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics; no new findings). Item verify_commands: `npx vitest run src/lib/__tests__/ohmypi-models-ollama.test.ts tests/lib/ohmypi-models.test.ts src/lib/__tests__/launcher-generator.test.ts` = 92/92 passed; `grep provisionOhmypiProviderForModel src/lib/launcher-generator.ts` = no match (PROVISIONING-HOISTED), confirming provisioning moved out of the sync generator. Full `npm test` (~14000 tests) run twice: run1 failed only src/lib/__tests__/provider-env-ollama.test.ts (1 test, wrong ensureOllamaServeRunning call args) but that file passed 100% both standalone and combined with all 5 other ollama/launcher-generator files; run2 passed that file cleanly but failed 3 unrelated tests (head-anchor-write-sites, compliance/status, merge-sync-merge-set) all with 'Test/Hook timed out in 5000ms' under this box's 20 concurrently running Overdeck agents. No overlap between the two runs' failures, none touch PAN-1641 files, none are in scripts/flaky-quarantine.txt. Treated as CPU-contention flakiness, not a regression. UAT not required: this item's files_scope is entirely backend/CLI (ohmypi-models.ts, launcher-generator.ts, provider-env.ts, agents/*, runtimes/*) with no dashboard/frontend surface, and review/inspect notes confirm no UI involvement.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "ACs 1-5 verified against item range e990363582..75b0a6a112 (impl in b0f8a9f9b9; 75b0a6a112 is the file-size-ratchet correction). AC1: src/lib/ohmypi-models.ts:17 imports fs only from node:fs/promises, no sync fs anywhere in the file; provisionOhmypiProviderForModel returns Promise<void> (:100). AC2: launcher-generator.ts has no ohmypi-models import and no provisioning call; 8 of 9 ohmypi-capable generator call sites await provisioning first (spawn.ts:381/382, ohmypi.ts:355/356, spawn-prep.ts:532 covering both :554 and :605, messaging.ts:399/400, spawn-planning-session.ts:697/701, conversation-runtime.ts:733/758, recovery.ts:476 transitively via buildAgentLaunchConfig). EXCEPTION recorded: the 9th site, src/lib/runtimes/pi.ts:371, passes harness:'ohmypi' with a model and does NOT provision -- but it is the unregistered legacy Pi adapter (PAN-1989). runtimes/index.ts:141 registers only createOhmypiRuntimeSync, and index.ts:104-106 normalizes both 'ohmypi' and 'pi' to the ohmypi adapter; createPiRuntimeSync/PiRuntimeSync are re-exported but constructed nowhere outside src/lib/runtimes/__tests__/. Dead before and after the hoist, so reachable behavior is unchanged -- no live regression, and deleting it would violate the surgical-changes rule. AC3: tests/lib/ohmypi-models.test.ts:73-80 asserts zero writeFile calls on an unchanged entry (mocks node:fs/promises writeFile; no tmp write implies no rename). AC4: :82-91 proves two concurrent calls on one registry path persist both dashscope and ollama (no lost update), and :67-71 proves a corrupt models.json throws the manual-fix error leaving the file byte-identical. Serialization logic at ohmypi-models.ts:109-141 is correct -- map registration is synchronous through the set, previous.catch keeps a rejection from poisoning the chain, and all six live callers await the returned promise. AC5: npm run typecheck clean (dashboard guard 30 known / none new, frontend guard 0, acp tsc --noEmit silent); the three named test files pass, 92 tests, vitest 4.1.6. FR-1/FR-2/FR-3/NFR-1 satisfied on every reachable path. Note for follow-up (non-blocking): FR-3 different-path parallelism has no test, and no AC requires one.",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-16T15:10:59.809Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-08-16T15:10:59.799Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/1679",
     "reviewSpawnedAt": "2026-08-16T14:35:37.631Z"
   },
@@ -287,10 +290,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 112,
-            "output": 25740,
-            "cacheRead": 8687301,
-            "cacheWrite": 206660
+            "input": 114,
+            "output": 26130,
+            "cacheRead": 8893961,
+            "cacheWrite": 207547
           }
         }
       },
@@ -332,15 +335,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 112,
-          "output": 25740,
-          "cacheRead": 8687301,
-          "cacheWrite": 206660
+          "input": 114,
+          "output": 26130,
+          "cacheRead": 8893961,
+          "cacheWrite": 207547
         }
       },
       "costAtCloseOut": {
-        "usd": 132.8835536,
-        "pricingAsOf": "2026-08-16T15:10:30.405Z"
+        "usd": 132.93100660000002,
+        "pricingAsOf": "2026-08-16T15:10:59.854Z"
       }
     },
     "merges": [
