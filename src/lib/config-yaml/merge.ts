@@ -688,10 +688,18 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.resources.governor_psi_full_shed_avg10 === 'number') {
         result.resources.governorPsiFullShedAvg10 = config.resources.governor_psi_full_shed_avg10;
       }
-      if (typeof config.resources.governor_psi_calm_readmit_avg10 === 'number') {
+      if (
+        typeof config.resources.governor_psi_calm_readmit_avg10 === 'number'
+        && Number.isFinite(config.resources.governor_psi_calm_readmit_avg10)
+        && config.resources.governor_psi_calm_readmit_avg10 >= 0
+      ) {
         result.resources.governorPsiCalmReadmitAvg10 = config.resources.governor_psi_calm_readmit_avg10;
       }
-      if (typeof config.resources.governor_psi_calm_window_ms === 'number') {
+      if (
+        typeof config.resources.governor_psi_calm_window_ms === 'number'
+        && Number.isFinite(config.resources.governor_psi_calm_window_ms)
+        && config.resources.governor_psi_calm_window_ms > 0
+      ) {
         result.resources.governorPsiCalmWindowMs = config.resources.governor_psi_calm_window_ms;
       }
       // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.

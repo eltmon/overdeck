@@ -3,6 +3,7 @@ import { memoryFeedLevel, patrolMemoryPressure, __resetMemoryPressurePatrolState
 import type { MemoryVerdict, MemoryPressureBand } from '../../../../src/lib/cloister/memory-governor.js';
 
 const GIB = 1024 ** 3;
+const THRESHOLDS = { warningBytes: 8 * GIB, criticalBytes: 4 * GIB };
 
 describe('memory-pressure-patrol', () => {
   beforeEach(() => {
@@ -38,6 +39,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -70,6 +72,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -98,6 +101,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'soft' as const,
         availableBytes: 7 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -128,6 +132,7 @@ describe('memory-pressure-patrol', () => {
       const verdict: MemoryVerdict = {
         band: 'soft',
         availableBytes: 12.5 * GIB,
+        thresholds: THRESHOLDS,
         trigger: { kind: 'soft-dip', readingBytes: 7 * GIB, thresholdBytes: 8 * GIB, at: triggerAt },
       };
 
@@ -155,6 +160,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'hard' as const,
         availableBytes: 3 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -183,6 +189,7 @@ describe('memory-pressure-patrol', () => {
       const verdict: MemoryVerdict = {
         band: 'hard',
         availableBytes: 12.5 * GIB,
+        thresholds: THRESHOLDS,
         trigger: {
           kind: 'swap-psi',
           readingBytes: 1 * GIB,
@@ -224,6 +231,7 @@ describe('memory-pressure-patrol', () => {
               assess: async () => ({
                 band,
                 availableBytes: availableGib * GIB,
+                thresholds: THRESHOLDS,
                 trigger: { ...trigger, at: Date.UTC(2026, 0, 1, 14, 22) },
               }),
               readWatchReserveBytes: () => 12 * GIB,
@@ -255,6 +263,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -277,6 +286,7 @@ describe('memory-pressure-patrol', () => {
       const recoverVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 15 * GIB,
+        thresholds: THRESHOLDS,
       };
       const recoverDeps = {
         ...deps,
@@ -299,6 +309,7 @@ describe('memory-pressure-patrol', () => {
       const mockVerdict: MemoryVerdict = {
         band: 'ok' as const,
         availableBytes: 10 * GIB,
+        thresholds: THRESHOLDS,
       };
 
       const deps = {
@@ -326,6 +337,7 @@ describe('memory-pressure-patrol', () => {
         assess: async () => ({
           band: 'ok',
           availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
           swapFreeBytes: 0,
           swapTotalBytes: 8 * GIB,
           psiSomeAvg10: 0,
@@ -350,6 +362,7 @@ describe('memory-pressure-patrol', () => {
         assess: async () => ({
           band: 'ok',
           availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
           swapFreeBytes: 2 * GIB,
           swapTotalBytes: 8 * GIB,
           psiSomeAvg10: 0.12,

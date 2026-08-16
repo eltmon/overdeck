@@ -335,6 +335,43 @@ describe('assessMemoryPressure', () => {
     }
   });
 
+  it('does not count calm PSI time accumulated before a new pressure hold', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(20 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('ok');
+      await vi.advanceTimersByTimeAsync(600_000);
+
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(9 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(600_000);
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB));
+      expect((await assessMemoryPressure()).band).toBe('ok');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('records the active swap recovery threshold after admissions are already held', async () => {
+    readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB));
+    expect((await assessMemoryPressure()).trigger?.kind).toBe('soft-dip');
+
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 3 * GIB,
+      psiFullAvg10: 2,
+    }));
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      trigger: {
+        kind: 'swap-psi',
+        readingBytes: 3 * GIB,
+        thresholdBytes: 4 * GIB,
+      },
+    });
+  });
+
   it('admits when swap is full but PSI shows no stalls (swap residency is not pressure)', async () => {
     // Operator-approved correction (PAN-3485 follow-up): full-but-idle swap
     // with PSI 0.00 must NOT hold admissions — pages swapped during a leak era

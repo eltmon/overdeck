@@ -173,9 +173,8 @@ export function nextGovernorModeWithRunway(
 
   const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
   const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
-  const swapLow = previousMode === 'admitting'
-    ? runway.swapFreeBytes < swapSoftBytes
-    : runway.swapFreeBytes < swapRecoveryBytes;
+  const activeSwapThresholdBytes = previousMode === 'admitting' ? swapSoftBytes : swapRecoveryBytes;
+  const swapLow = runway.swapFreeBytes < activeSwapThresholdBytes;
   const psiShed = swapLow
     && runway.psiFullAvg10 != null
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
@@ -184,7 +183,7 @@ export function nextGovernorModeWithRunway(
   if (psiShed) {
     return {
       mode: 'shedding',
-      trigger: { kind: 'swap-psi', readingBytes: runway.swapFreeBytes, thresholdBytes: swapSoftBytes },
+      trigger: { kind: 'swap-psi', readingBytes: runway.swapFreeBytes, thresholdBytes: activeSwapThresholdBytes },
     };
   }
   // Operator-approved correction (PAN-3485 follow-up, 2026-08-02): swap
@@ -198,7 +197,7 @@ export function nextGovernorModeWithRunway(
   if (swapLow && runway.psiFullAvg10 == null) {
     return {
       mode: 'holding',
-      trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: swapSoftBytes },
+      trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: activeSwapThresholdBytes },
     };
   }
   return { mode: memoryMode, trigger: memoryTrigger };
@@ -223,11 +222,8 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const psiCalmConfig = readGovernorPsiCalmConfig();
   const snapshot = await readProcMemory();
   const now = Date.now();
-  if (snapshot.psiFullAvg10 != null && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10) {
-    psiCalmSinceMs ??= now;
-  } else {
-    psiCalmSinceMs = null;
-  }
+  const psiIsCalm = snapshot.psiFullAvg10 != null
+    && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10;
   const previousMode = governorMode;
   const transition = nextGovernorModeWithRunway(
     snapshot.memAvailable,
@@ -241,6 +237,10 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     governorMode,
   );
   governorMode = transition.mode;
+  const triggerKindChanged = transition.trigger != null
+    && transition.trigger.kind !== governorTrigger?.kind;
+  const pressureStateChanged = governorMode !== 'admitting'
+    && (previousMode !== governorMode || triggerKindChanged);
   if (governorMode === 'admitting') {
     governorTrigger = null;
   } else if (
@@ -248,6 +248,15 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     && (previousMode === 'admitting' || transition.trigger.kind !== governorTrigger?.kind)
   ) {
     governorTrigger = { ...transition.trigger, at: now };
+  }
+  if (governorMode === 'admitting') {
+    psiCalmSinceMs = null;
+  } else if (pressureStateChanged) {
+    psiCalmSinceMs = psiIsCalm ? now : null;
+  } else if (psiIsCalm) {
+    psiCalmSinceMs ??= now;
+  } else {
+    psiCalmSinceMs = null;
   }
   if (
     governorMode === 'holding'
@@ -257,7 +266,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   ) {
     governorMode = 'admitting';
     governorTrigger = null;
-    psiCalmSinceMs = now;
+    psiCalmSinceMs = null;
   }
   const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),

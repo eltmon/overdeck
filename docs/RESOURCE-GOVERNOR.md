@@ -134,9 +134,11 @@ The governor composes three host signals into that single mode:
   when `full avg10` reaches `governor_psi_full_shed_avg10`.
 
 Swap uses the same hysteresis latch as RAM. After the governor stops admitting, free swap must reach
-`governor_swap_recovery_free_percent` before the swap signal clears. Re-admission requires both
-`MemAvailable >= RECOVERY` and `SwapFree` at or above that recovery percentage, so a machine with
-healthy RAM but exhausted swap does not admit another workspace stack.
+`governor_swap_recovery_free_percent` before the swap signal clears on the normal recovery path.
+That path requires both `MemAvailable >= RECOVERY` and `SwapFree` at or above the recovery
+percentage. PSI-calm early re-admission is the exception: after a fresh full calm window begins in
+the non-admitting state, the governor can re-admit at SOFT even while swap remains below its recovery
+percentage, because idle swap residency without live stalls is not current pressure.
 
 A machine with `SwapTotal = 0` keeps the RAM-only behavior. If PSI is unavailable, low swap still
 holds admissions, but it cannot trigger shedding by itself; only the RAM HARD threshold can do that.

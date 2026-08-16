@@ -261,6 +261,24 @@ api_keys:
       }).config.resources.governorSwapRecoveryFreePercent).toBe(100);
     });
 
+    it('retains calm-PSI defaults for unsafe numeric values', () => {
+      expect(mergeConfigs({
+        resources: { governor_psi_calm_readmit_avg10: 0 },
+      }).config.resources.governorPsiCalmReadmitAvg10).toBe(0);
+
+      for (const governor_psi_calm_readmit_avg10 of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(mergeConfigs({
+          resources: { governor_psi_calm_readmit_avg10 },
+        }).config.resources.governorPsiCalmReadmitAvg10).toBe(0.05);
+      }
+
+      for (const governor_psi_calm_window_ms of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(mergeConfigs({
+          resources: { governor_psi_calm_window_ms },
+        }).config.resources.governorPsiCalmWindowMs).toBe(600_000);
+      }
+    });
+
     it('normalizes compliance mode with advisory as the default', () => {
       expect(mergeConfigs().config.compliance.mode).toBe('advisory');
       expect(mergeConfigs({ compliance: { mode: 'off' } }).config.compliance.mode).toBe('off');
