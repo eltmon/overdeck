@@ -637,8 +637,10 @@ export const CostWriterLive = Layer.effect(
               if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
             } else duplicatesSkipped++;
           }
-          for (const verdict of collected.verdicts) {
-            recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+          if (!opts?.dryRun) {
+            for (const verdict of collected.verdicts) {
+              recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+            }
           }
           return { imported, cacheSkipped: collected.stats.cacheSkipped, skipped: collected.skipped,
             sessionsScanned: collected.stats.scanned, eventsImported: imported, duplicatesSkipped,

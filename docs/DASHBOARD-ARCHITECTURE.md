@@ -47,15 +47,16 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
   reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
   This separation prevents a bulk job from delaying an operator-facing read.
-- Worker implementations live in `src/dashboard/server/workers/dashboard-db-worker.ts`.
-  Add each new operation to both the task contract and the worker dispatch table so the
-  main thread and worker remain type-safe.
+- Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
+  Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
+  the main thread and worker remain type-safe.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
 - `costReconcileSweep` walks and parses transcript files in the `long` lane. The main
-  thread records the returned cost events and skip verdicts through their canonical
-  write doors, preserving EventBus publication and durable cache updates.
+  thread requests bounded 250-event batches and records each batch through the canonical
+  write doors before requesting the next one. This limits worker transfer memory while
+  preserving EventBus publication and durable skip-cache updates.
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared

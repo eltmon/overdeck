@@ -291,8 +291,8 @@ async function executeInline(
     }
     case 'costReconcileSweep':
       return (payload as { source: 'codex' | 'pi' }).source === 'pi'
-        ? collectPiCostEvents()
-        : collectCodexCostEvents();
+        ? collectPiCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number })
+        : collectCodexCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number });
   }
 }
 

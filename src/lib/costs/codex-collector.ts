@@ -31,6 +31,7 @@ type CostReconcileExtraRoot =
   | { kind: 'ohmypi-legacy-agents'; root: string };
 
 type SkippedCostSession = { file: string; reason: string };
+export type CostCollectCursor = { file: string; eventOffset: number };
 
 function walkJsonl(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -53,6 +54,8 @@ function inferIssueFromPath(path: string | undefined): IssueId | null {
 export async function collectCodexCostEvents(opts: {
   extraRoots?: string[];
   extraRootSpecs?: CostReconcileExtraRoot[];
+  cursor?: CostCollectCursor;
+  maxEvents?: number;
 } = {}) {
   const agentsDir = join(getOverdeckHome(), 'agents');
   const names = existsSync(agentsDir)
@@ -70,13 +73,21 @@ export async function collectCodexCostEvents(opts: {
   const errors: string[] = [];
   let scanned = 0;
   let cacheSkipped = 0;
-  for (const root of roots) for (const file of walkJsonl(root.root)) {
-    scanned++;
+  const candidates = roots.flatMap(root => walkJsonl(root.root).map(file => ({ file, root })))
+    .sort((a, b) => a.file.localeCompare(b.file));
+  const maxEvents = opts.maxEvents ?? Number.POSITIVE_INFINITY;
+  let nextCursor: CostCollectCursor | null = null;
+  let done = true;
+  outer: for (const { file, root } of candidates) {
+    if (opts.cursor && file < opts.cursor.file) continue;
+    const eventOffset = opts.cursor?.file === file ? opts.cursor.eventOffset : 0;
+    if (eventOffset === 0) scanned++;
     const stat = statSync(file);
-    if (lookupSkipVerdict(file, stat.mtimeMs, stat.size)) { cacheSkipped++; continue; }
+    if (eventOffset === 0 && lookupSkipVerdict(file, stat.mtimeMs, stat.size)) { cacheSkipped++; continue; }
     let parsed;
     try { parsed = parseCodexSessionCostEventsSync(file); }
     catch (cause) { errors.push(`${file}: ${cause instanceof Error ? cause.message : String(cause)}`); continue; }
+    if (eventOffset >= parsed.length && eventOffset > 0) continue;
     if (parsed.length === 0) {
       skipped.push({ file, reason: 'no-usage' });
       verdicts.push({ path: file, mtimeMs: stat.mtimeMs, size: stat.size, verdict: 'no-usage' });
@@ -86,11 +97,23 @@ export async function collectCodexCostEvents(opts: {
     if (unknown) skipped.push({ file, reason: 'unknown-model' });
     const session = root.inferIssueFromCwd ? parseCodexSessionSync(file) : null;
     const issueId = root.inferIssueFromCwd ? inferIssueFromPath(session?.cwd) ?? 'UNKNOWN' as IssueId : root.issueId;
-    events.push(...parsed.map(usage => ({ ts: new Date(usage.timestamp), issueId, agentId: root.agentName,
+    const remaining = maxEvents - events.length;
+    const selected = parsed.slice(eventOffset, eventOffset + remaining);
+    events.push(...selected.map(usage => ({ ts: new Date(usage.timestamp), issueId, agentId: root.agentName,
       sessionId: usage.sessionId, sessionType: 'codex', provider: usage.provider, model: usage.model,
       input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cacheWrite: usage.cacheWrite,
       cost: usage.cost, requestId: usage.requestId, sourceFile: file })));
+    if (eventOffset + selected.length < parsed.length) {
+      nextCursor = { file, eventOffset: eventOffset + selected.length };
+      done = false;
+      break outer;
+    }
     verdicts.push({ path: file, mtimeMs: stat.mtimeMs, size: stat.size, verdict: unknown ? 'unknown-model' : 'imported' });
+    if (events.length >= maxEvents) {
+      nextCursor = { file, eventOffset: parsed.length };
+      done = candidates.at(-1)?.file === file;
+      break outer;
+    }
   }
-  return { events, verdicts, stats: { scanned, cacheSkipped }, skipped, errors };
+  return { events, verdicts, stats: { scanned, cacheSkipped }, skipped, errors, nextCursor, done };
 }

@@ -14,6 +14,8 @@ import { recordSkipVerdict } from '../../../lib/costs/skip-cache.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
 
 const RECONCILE_INTERVAL_MS = 5 * 60_000;
+const RECONCILE_BATCH_EVENTS = 250;
+type ReconcileCursor = { file: string; eventOffset: number };
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let inFlight: Promise<void> | null = null;
@@ -21,21 +23,29 @@ let inFlight: Promise<void> | null = null;
 async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const piCollected = await runDashboardDbJob<PiCollectResult>('costReconcileSweep', { source: 'pi' });
     const result = {
       eventsImported: 0,
       duplicatesSkipped: 0,
-      cacheSkipped: piCollected.stats.cacheSkipped,
-      errors: piCollected.errors,
+      cacheSkipped: 0,
+      errors: [] as PiCollectResult['errors'],
     };
-    for (const { event, sourceFile } of piCollected.events) {
-      const recorded = await recordCostEventsThroughOverdeck([event], sourceFile);
-      result.eventsImported += recorded.inserted;
-      result.duplicatesSkipped += recorded.duplicates;
-    }
-    for (const verdict of piCollected.verdicts) {
-      recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
-    }
+    let piCursor: ReconcileCursor | undefined;
+    do {
+      const piCollected = await runDashboardDbJob<PiCollectResult>('costReconcileSweep', {
+        source: 'pi', cursor: piCursor, maxEvents: RECONCILE_BATCH_EVENTS,
+      });
+      result.cacheSkipped += piCollected.stats.cacheSkipped;
+      result.errors.push(...piCollected.errors);
+      for (const { event, sourceFile } of piCollected.events) {
+        const recorded = await recordCostEventsThroughOverdeck([event], sourceFile);
+        result.eventsImported += recorded.inserted;
+        result.duplicatesSkipped += recorded.duplicates;
+      }
+      for (const verdict of piCollected.verdicts) {
+        recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+      }
+      piCursor = piCollected.done === false ? piCollected.nextCursor ?? undefined : undefined;
+    } while (piCursor);
     if (result.eventsImported > 0 || result.cacheSkipped > 0 || result.errors.length > 0) {
       console.log(
         `[cost-reconciler] ${reason} sweep: ${result.eventsImported} imported, ` +
@@ -53,23 +63,36 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
       console.log(`[cost-reconciler] ${reason} UNKNOWN backfill: ${backfillResult.updated} updated`);
     }
     try {
-      const codexResult = await runDashboardDbJob<{
+      type CodexBatch = {
         events: CostEvent[];
         verdicts: SkipVerdictEntry[];
         stats: { scanned: number; cacheSkipped: number };
-      }>('costReconcileSweep', { source: 'codex' });
+        nextCursor: ReconcileCursor | null;
+        done: boolean;
+      };
       let imported = 0;
-      for (const event of codexResult.events) {
-        const normalized = { ...event, ts: new Date(event.ts) };
-        if (await Effect.runPromise(CostWriter.use(writer => writer.record(normalized)).pipe(
-          Effect.provide(CostDoorLive)))) imported++;
-      }
-      for (const verdict of codexResult.verdicts) {
-        recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
-      }
+      let scanned = 0;
+      let cacheSkipped = 0;
+      let codexCursor: ReconcileCursor | undefined;
+      do {
+        const codexResult = await runDashboardDbJob<CodexBatch>('costReconcileSweep', {
+          source: 'codex', cursor: codexCursor, maxEvents: RECONCILE_BATCH_EVENTS,
+        });
+        scanned += codexResult.stats.scanned;
+        cacheSkipped += codexResult.stats.cacheSkipped;
+        for (const event of codexResult.events) {
+          const normalized = { ...event, ts: new Date(event.ts) };
+          if (await Effect.runPromise(CostWriter.use(writer => writer.record(normalized)).pipe(
+            Effect.provide(CostDoorLive)))) imported++;
+        }
+        for (const verdict of codexResult.verdicts) {
+          recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+        }
+        codexCursor = codexResult.done === false ? codexResult.nextCursor ?? undefined : undefined;
+      } while (codexCursor);
       console.log(
-        `[cost-reconciler] ${reason} codex sweep: ${codexResult.stats.scanned} scanned, ` +
-        `${codexResult.stats.cacheSkipped} cache-skipped, ${imported} imported`,
+        `[cost-reconciler] ${reason} codex sweep: ${scanned} scanned, ` +
+        `${cacheSkipped} cache-skipped, ${imported} imported`,
       );
     } catch (err) {
       console.warn('[cost-reconciler] codex sweep failed:', err instanceof Error ? err.message : err);

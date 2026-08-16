@@ -52,6 +52,8 @@ export type PiCollectResult = {
   verdicts: Array<{ path: string; mtimeMs: number; size: number; verdict: 'imported' | 'no-usage' }>;
   stats: { scanned: number; cacheSkipped: number; sessionsWithData: number };
   errors: Array<{ path: string; error: string }>;
+  nextCursor?: { file: string; eventOffset: number } | null;
+  done?: boolean;
 };
 
 interface SessionMapping {
@@ -450,24 +452,19 @@ export function extractPiCostEvents(
  */
 type TranscriptFileStat = { path: string; mtimeMs: number; size: number };
 
-function findPiTranscriptFiles(agentDir: string): { files: TranscriptFileStat[]; cacheSkipped: number } {
+function findPiTranscriptFiles(agentDir: string): TranscriptFileStat[] {
   let files: string[];
   try {
     files = readdirSync(agentDir).filter((f) => f.endsWith('.jsonl'));
   } catch {
-    return { files: [], cacheSkipped: 0 };
+    return [];
   }
   const transcripts: TranscriptFileStat[] = [];
-  let cacheSkipped = 0;
   for (const f of files) {
     if (f === 'activity.jsonl' || f === 'cost-events.jsonl' || f === 'pending-events.jsonl') continue;
     const full = join(agentDir, f);
     try {
       const stat = statSync(full);
-      if (lookupSkipVerdict(full, stat.mtimeMs, stat.size)) {
-        cacheSkipped++;
-        continue;
-      }
       const fd = openSync(full, 'r');
       const buf = Buffer.alloc(128);
       const bytesRead = readSync(fd, buf, 0, 128, 0);
@@ -480,7 +477,7 @@ function findPiTranscriptFiles(agentDir: string): { files: TranscriptFileStat[];
       // skip unreadable
     }
   }
-  return { files: transcripts, cacheSkipped };
+  return transcripts;
 }
 
 /**
@@ -490,7 +487,10 @@ function findPiTranscriptFiles(agentDir: string): { files: TranscriptFileStat[];
  * Independent of the pi extension hook, so it captures cost even when the
  * extension emits null usage or the wrong model label.
  */
-export async function collectPiCostEvents(): Promise<PiCollectResult> {
+export async function collectPiCostEvents(opts: {
+  cursor?: { file: string; eventOffset: number };
+  maxEvents?: number;
+} = {}): Promise<PiCollectResult> {
   const result: PiCollectResult = {
     events: [], verdicts: [], stats: { scanned: 0, cacheSkipped: 0, sessionsWithData: 0 }, errors: [],
   };
@@ -504,6 +504,11 @@ export async function collectPiCostEvents(): Promise<PiCollectResult> {
     return result;
   }
 
+  const candidates: Array<TranscriptFileStat & {
+    agentDirName: string;
+    issueId: string | null;
+    sessionType: string;
+  }> = [];
   for (const agentDirName of agentDirs) {
     const agentPath = join(agentsDir, agentDirName);
 
@@ -523,30 +528,53 @@ export async function collectPiCostEvents(): Promise<PiCollectResult> {
     }
     if (agentDirName.startsWith('planning-')) sessionType = 'planning';
 
-    const transcripts = findPiTranscriptFiles(agentPath);
-    result.stats.cacheSkipped += transcripts.cacheSkipped;
-    result.stats.scanned += transcripts.cacheSkipped;
-    for (const transcript of transcripts.files) {
-      const transcriptPath = transcript.path;
-      const sessionId = basename(transcriptPath, '.jsonl');
-      const resolvedIssueId = issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: agentDirName });
-      result.stats.scanned++;
-      try {
-        const content = readFileSync(transcriptPath, 'utf-8');
-        const events = extractPiCostEvents(content, agentDirName, resolvedIssueId, sessionType, sessionId);
-        if (events.length === 0) {
-          result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'no-usage' });
-          continue;
-        }
-        result.stats.sessionsWithData++;
-        result.events.push(...events.map(event => ({ event, sourceFile: `reconciler:${transcriptPath}` })));
-        result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'imported' });
-      } catch (err) {
-        result.errors.push({
-          path: transcriptPath,
-          error: err instanceof Error ? err.message : String(err),
-        });
+    candidates.push(...findPiTranscriptFiles(agentPath).map(transcript => ({
+      ...transcript, agentDirName, issueId, sessionType,
+    })));
+  }
+
+  candidates.sort((a, b) => a.path.localeCompare(b.path));
+  const maxEvents = opts.maxEvents ?? Number.POSITIVE_INFINITY;
+  result.done = true;
+  for (const transcript of candidates) {
+    if (opts.cursor && transcript.path < opts.cursor.file) continue;
+    const transcriptPath = transcript.path;
+    const eventOffset = opts.cursor?.file === transcriptPath ? opts.cursor.eventOffset : 0;
+    const sessionId = basename(transcriptPath, '.jsonl');
+    const resolvedIssueId = transcript.issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: transcript.agentDirName });
+    if (eventOffset === 0) result.stats.scanned++;
+    if (eventOffset === 0 && lookupSkipVerdict(transcriptPath, transcript.mtimeMs, transcript.size)) {
+      result.stats.cacheSkipped++;
+      continue;
+    }
+    try {
+      const content = readFileSync(transcriptPath, 'utf-8');
+      const events = extractPiCostEvents(content, transcript.agentDirName, resolvedIssueId, transcript.sessionType, sessionId);
+      if (eventOffset >= events.length && eventOffset > 0) continue;
+      if (events.length === 0) {
+        result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'no-usage' });
+        continue;
       }
+      result.stats.sessionsWithData++;
+      const remaining = maxEvents - result.events.length;
+      const selected = events.slice(eventOffset, eventOffset + remaining);
+      result.events.push(...selected.map(event => ({ event, sourceFile: `reconciler:${transcriptPath}` })));
+      if (eventOffset + selected.length < events.length) {
+        result.nextCursor = { file: transcriptPath, eventOffset: eventOffset + selected.length };
+        result.done = false;
+        break;
+      }
+      result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'imported' });
+      if (result.events.length >= maxEvents) {
+        result.nextCursor = { file: transcriptPath, eventOffset: events.length };
+        result.done = candidates.at(-1)?.path === transcriptPath;
+        break;
+      }
+    } catch (err) {
+      result.errors.push({
+        path: transcriptPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

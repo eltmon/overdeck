@@ -47,4 +47,28 @@ describe('collectPiCostEvents', () => {
     expect(result.verdicts).toHaveLength(1);
     expect(result.verdicts[0]?.verdict).toBe('imported');
   });
+
+  it('returns large transcripts in bounded event batches', async () => {
+    const agentDir = join(root, '.overdeck', 'agents', 'agent-pan-3743');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ issueId: 'PAN-3743', role: 'work' }));
+    writeFileSync(join(agentDir, 'session.jsonl'), [
+      '{"type":"session","version":3}',
+      ...['m1', 'm2'].map((id, index) => JSON.stringify({
+        type: 'message', id, timestamp: `2026-08-16T10:00:0${index}Z`,
+        message: { role: 'assistant', provider: 'zai', model: 'glm-5.2', responseId: `r${index}`,
+          usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0 } },
+      })),
+    ].join('\n'));
+
+    const first = await collectPiCostEvents({ maxEvents: 1 });
+    expect(first.events).toHaveLength(1);
+    expect(first.verdicts).toHaveLength(0);
+    expect(first.done).toBe(false);
+
+    const second = await collectPiCostEvents({ maxEvents: 1, cursor: first.nextCursor ?? undefined });
+    expect(second.events).toHaveLength(1);
+    expect(second.verdicts).toHaveLength(1);
+    expect(second.done).toBe(true);
+  });
 });

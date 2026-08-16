@@ -9,7 +9,7 @@ import {
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
 import { CostArchive, EventBus } from '../infra.js';
-import { CostWriter, CostWriterLive } from '../cost.js';
+import { collectCodexCostEvents, CostWriter, CostWriterLive } from '../cost.js';
 
 describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
   let odb: OverdeckTestDb;
@@ -72,6 +72,38 @@ describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
       cache_read: 2000,
     });
     expect(rows[1]!.cost).toBeGreaterThan(0);
+  });
+
+  it('does not persist a skip verdict during dry run before a write run', async () => {
+    seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
+    const layer = makeWriterLayer(odb);
+
+    const preview = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'codex', dryRun: true })).pipe(Effect.provide(layer)),
+    );
+    expect(preview).toMatchObject({ imported: 1, cacheSkipped: 0 });
+    expect(readRows(odb)).toHaveLength(0);
+
+    const write = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
+    );
+    expect(write).toMatchObject({ imported: 1, cacheSkipped: 0 });
+    expect(readRows(odb)).toHaveLength(1);
+  });
+
+  it('returns cold-sweep events in bounded batches', async () => {
+    const rolloutFile = seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
+    appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });
+
+    const first = await collectCodexCostEvents({ maxEvents: 1 });
+    expect(first.events).toHaveLength(1);
+    expect(first.verdicts).toHaveLength(0);
+    expect(first.done).toBe(false);
+
+    const second = await collectCodexCostEvents({ maxEvents: 1, cursor: first.nextCursor ?? undefined });
+    expect(second.events).toHaveLength(1);
+    expect(second.verdicts).toHaveLength(1);
+    expect(second.done).toBe(true);
   });
 });
 
