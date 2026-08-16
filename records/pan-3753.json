@@ -47,9 +47,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-16T20:10:44.282Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-16T20:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-16T20:15:08.534Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-16T20:15:08Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3753\n\n# Review Synthesis — PAN-3753 — 2026-08-16T20:35:00-04:00\n\n## Verdict: CHANGES REQUESTED — startup readiness repair still processes retired records\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3753/.pan/review/agent-pan-3753-review-fc2958ce/context.json`\n- Branch: `feature/pan-3753`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3753`\n- HEAD reviewed: `fc2958ce9d8676a91ed5f6142248e469411c939d`\n- Cycle number: 2\n- Prior cycle SHA: `ac3fa54fcc5438e7afe8f843e47f0b54c468494b`\n- PR commits: 13\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Startup readiness repair does not skip retired records — `src/lib/review-status.ts:892`\n**Scope:** `in_pr_scope` — FR-2, NFR-1, requirement `consumers-skip-retired-records`.\n\nThe rewritten `fixStuckReadyForMerge()` candidate predicate checks readiness and historical gate state but does not exclude `s.retiredAt`. A retired record with historically passing gates is gathered for membership and can be rewritten during startup. The derived readiness remains false because retirement is a blocker, but the consumer still mutates the terminal record's timestamp and emits status activity. Add `!s.retiredAt` to the candidate predicate and add a focused regression test proving that a retired record causes neither a membership gather nor a write.\n\nThe cited function is inside the PR diff. This is review cycle 2, so the cycle-3 convergence restriction does not apply.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Correctness confirmed that the prior project-scoping, polyrepo containment, stale-head close-event, and reconciliation-tracking findings are fixed. Effect diagnostics passed with no new findings, and 113 targeted tests passed.\n- Performance confirmed that project gathers and reconciliation tracking are now bounded.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3753/.pan/review/agent-pan-3753-review-fc2958ce/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3753 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/flywheel.ts",
@@ -133,10 +146,10 @@
     "recordedAt": "2026-08-16T19:42:45.970Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T20:10:44.282Z",
+  "updated": "2026-08-16T20:15:08.534Z",
   "pipeline": {
     "issueId": "PAN-3753",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -144,8 +157,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:45:24.631Z",
-    "updatedAt": "2026-08-16T20:10:38.704Z",
-    "reviewNotes": "Project-scoped eligibility can fail on unrelated projects; polyrepo containment and reconcile tracking also need fixes",
+    "updatedAt": "2026-08-16T20:15:07.930Z",
+    "reviewNotes": "Startup readiness repair still processes retired records instead of skipping them",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3757",
     "reviewSpawnedAt": "2026-08-16T20:10:38.703Z",
@@ -243,9 +256,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 53585146,
-            "output": 74603,
-            "cacheRead": 52690944,
+            "input": 57222632,
+            "output": 82515,
+            "cacheRead": 56228352,
             "cacheWrite": 0
           }
         },
@@ -266,9 +279,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53585146,
-          "output": 74603,
-          "cacheRead": 52690944,
+          "input": 57222632,
+          "output": 82515,
+          "cacheRead": 56228352,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -279,8 +292,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.055708,
-        "pricingAsOf": "2026-08-16T20:10:38.765Z"
+        "usd": 35.562162,
+        "pricingAsOf": "2026-08-16T20:15:07.964Z"
       }
     },
     "merges": [
