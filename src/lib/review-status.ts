@@ -882,17 +882,8 @@ export function clearStuckMergeStatuses(): void {
 }
 
 /**
- * On server startup, fix any issues where review+test both passed and
- * verificationStatus is not 'failed', but readyForMerge is stuck at false.
- *
- * This happens when:
- * 1. A merge attempt was made (merging → verifying)
- * 2. The server restarted while verifying — clearStuckMergeStatuses reset mergeStatus to 'pending'
- * 3. At restart time, verificationStatus was 'pending' (reset by the request-review cycle)
- * 4. The old verificationSatisfied check blocked readyForMerge because of 'pending' status
- *
- * With verificationSatisfied now only blocking on 'failed', these issues should be
- * re-evaluated and readyForMerge restored so they reappear on the Awaiting Merge page.
+ * Restore merge eligibility after a restart only when every gate passes and
+ * canonical pipeline membership confirms that the issue still has an open PR.
  */
 export async function fixStuckReadyForMerge(
   gatherEligibility?: typeof import('./cloister/merge-eligibility.js').gatherMergeEligibility,
@@ -903,9 +894,7 @@ export async function fixStuckReadyForMerge(
     s.reviewStatus === 'passed' &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     verificationSatisfied(s) &&
-    // Only fix 'pending'/'queued' merge states — not 'failed' ones.
-    // 'failed' means the merge actually attempted and broke; those need human review,
-    // not automatic restoration. 'merged' is done. Only pending/queued are stuck-but-valid.
+    // Failed and merged attempts are terminal; only pending/queued rows are repairable.
     (s.mergeStatus === 'pending' || s.mergeStatus === 'queued' || s.mergeStatus === undefined || s.mergeStatus === null) &&
     (s.uatStatus === undefined || s.uatStatus === 'passed')
   );
