@@ -173,17 +173,17 @@
     "recordedAt": "2026-08-16T21:05:13.229Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T21:05:13.231Z",
+  "updated": "2026-08-16T21:05:14.270Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T21:04:26.054Z",
+    "updatedAt": "2026-08-16T21:05:14.268Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Automated gates run in the workspace against reviewed HEAD f262b6b5b4: `npm run typecheck` exit 0; `npm run lint` exit 0 (all guard steps including effect-diagnostics, circular-deps, ratchet-audit passed); the 12 xBRIEF-listed regression files (199 tests: merge-eligibility-gate, flywheel-merge-order, review-status-retirement, retired-records-skip, review-status-reconcile-candidates, uat-reconciler, review-status-reconcile-service, merge-train route, deacon-stuck-readyformerge, uat-generation-engine, verdict-restore, webhook-handlers) all passed; the three required doc greps (retiredAt in docs/MERGE-WORKFLOW.md, merge-eligibility in docs/PIPELINE-MEMBERSHIP.md, merge-eligible in docs/FLYWHEEL.md) all found the expected sections. However the project's own mechanical verification gate recorded a FAILED full `npm test` run against this same HEAD at 2026-08-16T20:35:08Z (.overdeck/verification-latest.json, failedCheck=test, attempt 1/3): tests/unit/helpers/overdeck-test-db.test.ts failed 2/4 ('round-trips an agent through the real overdeck.db', 'isolates state between tests') and tests/lib/cloister/deacon-ci-retry.test.ts failed 16/16. Independent read-only verification traced a concrete root cause tied to this branch's own change: reviewed HEAD's committed src/lib/overdeck/review-status-sync.ts unconditionally queries `WHERE retired_at IS NULL` against overdeck.db, but reviewed HEAD's committed drizzle/overdeck/0000_overdeck_init.sql (the locked migration tests/unit/scripts/create-overdeck-db.test.ts uses to create a fresh overdeck.db) does not define a retired_at column on review_status — a fresh-created overdeck.db will throw 'no such column: retired_at' wherever that query runs, which plausibly explains the overdeck-test-db.test.ts failures. IMPORTANT PROCESS NOTE for the operator: this test dispatch raced a still-alive work agent. tmux session agent-pan-3753 (and its codex app-server process) was confirmed alive and mid-turn during this run, actively responding to the same verification-gate-failed feedback by uncommitted-editing exactly three files (drizzle/overdeck/0000_overdeck_init.sql adding retired_at; tests/unit/scripts/create-overdeck-db.test.ts asserting the column; src/lib/runtimes/__tests__/registry-dispatch.test.ts adding DB-close cleanup) at 16:36-16:37 local time, and running its own `vitest run --changed origin/main` at 16:45 to verify its fix — none of that work was committed at verdict time, so it could not be credited to this verdict, and this FAILED verdict targets committed HEAD f262b6b5b4 only, not the agent's in-flight fix. The record's sessionHistory also shows five duplicate 'resume' entries firing within milliseconds at 20:10:44 and 20:28:39, consistent with a duplicate-agent-spawn flap dispatching work and test concurrently on the same issue — worth the operator's attention as a pipeline scheduling bug, separate from the code defect above. No UAT was required: the xBRIEF's own NonGoals state 'No flywheel UI row change' and every item is kind backend/api/docs verified by unit tests, typecheck, or doc greps; review synthesis (cycle 3, APPROVED) confirms this branch has no frontend surface.",
     "verificationNotes": "Verification FAILED at test (875121ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3753/.overdeck/verification-latest.json",
@@ -192,17 +192,22 @@
     "reviewSpawnedAt": "2026-08-16T20:28:32.830Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        "drizzle/overdeck/0000_overdeck_init.sql",
         "src/cli/commands/flywheel.ts",
         "src/dashboard/server/main.ts",
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
         "src/lib/cloister/deacon.ts",
         "src/lib/cloister/uat-generation-engine.ts",
         "src/lib/cloister/uat-polyrepo-engine.ts",
+        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
         "src/lib/database/schema.ts",
         "src/lib/overdeck/infra.ts",
+        "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
         "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
         "tests/unit/lib/cloister/uat-generation-engine.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
+        "tests/unit/lib/webhook-handlers.test.ts",
+        "tests/unit/scripts/create-overdeck-db.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -236,10 +241,12 @@
         "docs/FLYWHEEL.md",
         "docs/MERGE-WORKFLOW.md",
         "docs/PIPELINE-MEMBERSHIP.md",
+        "drizzle/overdeck/0000_overdeck_init.sql",
         "src/cli/commands/flywheel.ts",
         "src/dashboard/server/main.ts",
         "src/dashboard/server/routes/__tests__/merge-train.test.ts",
         "src/dashboard/server/routes/merge-train.ts",
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
         "src/dashboard/server/services/review-status-reconcile-service.ts",
         "src/dashboard/server/services/uat-train.ts",
         "src/lib/cloister/deacon-merge.ts",
@@ -250,6 +257,7 @@
         "src/lib/cloister/uat-generation-engine.ts",
         "src/lib/cloister/uat-polyrepo-engine.ts",
         "src/lib/cloister/uat-reconciler.ts",
+        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
         "src/lib/database/review-status-db.ts",
         "src/lib/database/schema.ts",
         "src/lib/flywheel-merge-order.ts",
@@ -257,6 +265,7 @@
         "src/lib/overdeck/review-status-sync.ts",
         "src/lib/review-status-types.ts",
         "src/lib/review-status.ts",
+        "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
         "src/lib/webhook-handlers.ts",
         "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
         "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
@@ -268,10 +277,12 @@
         "tests/unit/lib/overdeck/review-status-reconcile-candidates.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts",
         "tests/unit/lib/review-status-retirement.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
+        "tests/unit/lib/webhook-handlers.test.ts",
+        "tests/unit/scripts/create-overdeck-db.test.ts"
       ],
-      "recordedAt": "2026-08-16T19:42:45.970Z"
-    }
+      "recordedAt": "2026-08-16T21:05:13.229Z"
+    },
+    "reviewRequestedAt": "2026-08-16T21:05:14.268Z"
   },
   "closeOut": {
     "usage": {
