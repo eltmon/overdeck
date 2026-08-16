@@ -162,7 +162,7 @@
     "recordedAt": "2026-08-16T12:15:15.978Z"
   },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T12:39:50.420Z",
+  "updated": "2026-08-16T13:56:15.302Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "passed",
@@ -296,8 +296,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "k3[1m]",
   "recoveryTrips": [
     {
       "issue": "PAN-3743",
