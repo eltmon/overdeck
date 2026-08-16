@@ -587,8 +587,19 @@ export const CostWriterLive = Layer.effect(
             .onConflictDoNothing(),
         );
 
-        // 3. Announce — cost.subscribe + /api/costs/stream feed from this.
-        yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
+        // 3. Announce on the canonical contract type — God View live counters feed from this.
+        if (event.agentId && event.issueId) {
+          yield* bus.emit({
+            type: 'cost.event_recorded',
+            payload: {
+              agentId: event.agentId,
+              issueId: event.issueId,
+              cost: event.cost,
+              inputTokens: event.input,
+              outputTokens: event.output,
+            },
+          });
+        }
         return true;
       });
 
