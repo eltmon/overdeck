@@ -43,10 +43,10 @@
       "tests/unit/dashboard/db-task-lanes.test.ts",
       "tests/unit/dashboard/transcript-parse-worker.test.ts"
     ],
-    "recordedAt": "2026-08-16T19:09:21.222Z"
+    "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:19:34.036Z",
+  "updated": "2026-08-16T19:19:39.145Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
