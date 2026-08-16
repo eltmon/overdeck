@@ -277,11 +277,9 @@ export function setReviewStatusSync(
   if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
     rawHistory.push({ type: 'release', status: update.releaseStatus, timestamp: now, ...(update.releaseNotes ? { notes: update.releaseNotes } : {}) });
   }
-  // The history array in merged/updated will be bounded at hydration time during the
-  // upsertReviewStatusSync call, so this raw history may grow temporarily.
-  // The read-back via getReviewStatusFromDbSync will apply the bounds.
+  // Hydration bounds raw history before it reaches event payloads.
 
-  // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
+  // readyForMerge is event-driven and derived from gate state on every
   // write, so it flips the instant review+test+verification pass instead of waiting
   // for a deacon patrol or a startup `fixStuckReadyForMerge` reconcile (those become
   // redundant safety nets). This supersedes the PAN-1048 explicit-only model.
@@ -301,7 +299,6 @@ export function setReviewStatusSync(
         ? update.readyForMerge
         : reviewGatesPassedSync(merged));
 
-  // Keep raw history for storage and a bounded copy for the event payload (PAN-3253).
   const boundedHistory = rawHistory.slice(-REVIEW_STATUS_HISTORY_LIMIT).map((entry) => ({
     ...entry,
     notes: entry.notes ? truncateReviewStatusNote(entry.notes) : undefined,
@@ -312,7 +309,7 @@ export function setReviewStatusSync(
     issueId,
     updatedAt: now,
     readyForMerge,
-    history: rawHistory,  // Write raw (unbounded, untrun) history to the database
+    history: rawHistory,
   });
 
   const updated: ReviewStatus = normalizeReviewStatusSync({

@@ -1753,17 +1753,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
   }
 
-  // v63 -> v64: persist browser UAT independently from automated test gates (PAN-3365).
   if (currentVersion < 64) {
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_status TEXT');
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_notes TEXT');
   }
-
-  // v64 -> v65: terminal marker for review records whose PR is no longer actionable.
-  if (currentVersion < 65) {
-    tryIdempotentDdl(db, 65, 'ALTER TABLE review_status ADD COLUMN retired_at TEXT');
-  }
-
+  if (currentVersion < 65) tryIdempotentDdl(db, 65, 'ALTER TABLE review_status ADD COLUMN retired_at TEXT');
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
