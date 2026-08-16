@@ -47,7 +47,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:31:06.521Z",
+  "updated": "2026-08-16T09:33:41.425Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -58,7 +58,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-08-16T09:31:03.600Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3746",
-    "reviewRequestedAt": "2026-08-16T09:30:56.551Z",
+    "reviewRequestedAt": "2026-08-16T09:33:35.916Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
@@ -84,7 +84,8 @@
         "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
       ],
       "recordedAt": "2026-08-16T09:30:53.223Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z"
   },
   "closeOut": {
     "usage": {
