@@ -1,0 +1,449 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-16T18:05:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3754: Memory governor hysteresis hold wedges admissions on a healthy host; operator messages misattribute the trigger",
+    "updated": "2026-08-16T18:11:05.823Z"
+  },
+  "plan": {
+    "id": "pan-3754",
+    "title": "Memory governor: hysteresis hold wedges admissions on a healthy host; operator messages misattribute the trigger",
+    "status": "proposed",
+    "uid": "b419e3f3-7c97-4442-9685-dd941564bcda",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-16T18:05:37Z",
+    "updated": "2026-08-16T18:11:05.823Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3754",
+        "label": "PAN-3754",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3754.md",
+        "label": "PAN-3754 PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "memory-governor",
+      "resource-governor",
+      "operator-messaging"
+    ],
+    "narratives": {
+      "Problem": "One transient dip below the 9.4 GiB soft reserve moves the memory governor to `holding`, and it re-admits only at the 15.7 GiB recovery reserve. On a 62 GiB desktop host whose available memory oscillates 12–17 GiB, that hold can persist for days while PSI stays 0.00 — the pipeline wedges on a healthy host. Simultaneously the patrol's operator messages template 'X available is under the Y reserve' from the CURRENT reading regardless of which trigger set the mode, producing self-refuting messages ('12.5 GiB available is under the 5.0 GiB hard reserve'), and the details block hardcodes 'Swap free: unavailable | PSI full avg10: unavailable'.",
+      "Proposal": "Record trigger provenance (kind/reading/threshold/timestamp) in the governor's pure transition function and expose it on MemoryVerdict; add a PSI-calm early re-admit (holding + PSI full avg10 below governorPsiCalmReadmitAvg10 continuously for governorPsiCalmWindowMs + MemAvailable >= soft ⇒ admitting, with re-arm to prevent oscillation); rewrite patrol messages to print the stored trigger plus the current reading and concrete exit conditions; print real swap/PSI values in the details block. Full design decisions D1–D6 in the PRD (drafts/pan-3754.md on overdeck-state).",
+      "NonGoals": "- No change to genuine-pressure behavior: <hard sheds, PSI ≥ shed threshold with low swap sheds, PSI-unavailable conservative hold stands (NFR-1).\n- No change to the HTTP spawn-path predicate classifyMemoryPressure (memoryWarnGb/memoryBlockGb) — it is explicitly unrelated to the governor.\n- No automatic shedding implementation (the shedding message still says shedding is not wired).\n- No frontend/dashboard UI changes — activity.entry rendering already handles the messages.\n- No Mintlify docs page (verified none exists for resources.* keys; docs/RESOURCE-GOVERNOR.md only).\n- No change to the OOM canary or census top-consumers sections of the patrol."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reused the canonical PRD on overdeck-state (authored by conversation conv-20260816-9367) instead of rewriting from scratch.",
+        "rationale": "Every file/line reference in it verified against the workspace checkout on 2026-08-16 (governor lines 78–199, patrol lines 47–60 and 243–297, verdict-cache lines 21–28); the issue body names it as the PRD. Refined it with explicit design decisions D1–D6 rather than re-deriving."
+      },
+      {
+        "summary": "Trigger provenance is returned by nextGovernorModeWithRunway as { mode, trigger } rather than re-derived in assessMemoryPressure.",
+        "rationale": "The pure transition function is the only code that knows WHY the mode changed; comparing prev/next mode in the caller cannot distinguish soft-dip from psi-unavailable holds. The function has exactly one production caller and zero direct test callers (verified by grep), so the signature change is safe."
+      },
+      {
+        "summary": "PSI-calm window tracking lives in assessMemoryPressure (stateful wrapper), not the pure functions.",
+        "rationale": "Keeps pure functions time-free and fake-timer testable; matches the existing architecture where module state (governorMode) is owned by the wrapper."
+      },
+      {
+        "summary": "Tests are folded into each vertical xBRIEF item rather than a standalone test task.",
+        "rationale": "The tracer-bullet contract requires each item to carry its own verification; the PRD's WI-5 test list distributes cleanly onto items 1–4."
+      },
+      {
+        "summary": "Docs scope is docs/RESOURCE-GOVERNOR.md only.",
+        "rationale": "Verified 2026-08-16 that no Mintlify configuration/resources*.mdx page exists; the governor keys are documented only in docs/RESOURCE-GOVERNOR.md."
+      }
+    ],
+    "items": [
+      {
+        "id": "trigger-provenance",
+        "title": "Record non-admitting trigger provenance and expose it on MemoryVerdict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:05:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3754",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "patrol-trigger-messages"
+          ],
+          "files_scope": [
+            "src/lib/cloister/memory-governor.ts",
+            "src/lib/cloister/memory-verdict-cache.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-governor.test.ts passes including new trigger-provenance cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In memory-verdict-cache.ts (must stay import-free — it is the cycle-free leaf): add `GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable'`, `GovernorTrigger = { kind, readingBytes, thresholdBytes, at }`, and `trigger?: GovernorTrigger | null` on MemoryVerdict. In memory-governor.ts: add module state `governorTrigger: GovernorTrigger | null` beside `governorMode` (line 78); change `nextGovernorModeWithRunway` (line 129) to return `{ mode, trigger: GovernorTriggerSeed | null }` where GovernorTriggerSeed = { kind, readingBytes, thresholdBytes } — precedence: available < hardBytes ⇒ 'hard' (threshold hardBytes); psiShed ⇒ 'swap-psi' (reading swapFreeBytes, threshold swapSoftBytes); swapLow && psiFullAvg10 == null ⇒ 'psi-unavailable' (threshold swapSoftBytes); pure-memory entry into holding ⇒ 'soft-dip' (reading availableBytes, threshold softBytes). Do NOT change nextGovernorMode's signature (tests call it directly). In assessMemoryPressure: when the previous mode was 'admitting' and the new mode is not, or the trigger kind changed mid-hold, store the trigger with `at: Date.now()`; when the new mode is 'admitting', clear it; put the stored trigger on the verdict. Extend resetGovernorModeForTests (line 81) to also reset governorTrigger. Tests: one case per trigger kind asserting kind/reading/threshold; trigger cleared on re-admit; getCachedMemoryVerdict() round-trips the trigger."
+        },
+        "items": [
+          {
+            "id": "trigger-provenance.ac1",
+            "title": "Given an admitting governor, when MemAvailable falls below softBytes, then the verdict's trigger records kind 'soft-dip' with the dipping reading and the soft threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-provenance.ac2",
+            "title": "When available < hardBytes the trigger kind is 'hard'; when psiShed fires it is 'swap-psi'; when swap is low and PSI is null it is 'psi-unavailable' — each with its trigger-time reading and threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-provenance.ac3",
+            "title": "When the governor returns to admitting, the verdict's trigger is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trigger-provenance.ac4",
+            "title": "getCachedMemoryVerdict() returns the trigger stored by assessMemoryPressure (cache round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "psi-calm-early-readmit",
+        "title": "Add PSI-calm early re-admit with config keys and re-arm",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:05:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-governor.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-governor.test.ts passes including dip-then-calm, noisy-PSI, and re-arm cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire two config keys per PRD D4: YAML `resources.governor_psi_calm_readmit_avg10` → `governorPsiCalmReadmitAvg10` (default 0.05) and `resources.governor_psi_calm_window_ms` → `governorPsiCalmWindowMs` (default 600000), added to schema.ts (next to governor_psi_full_shed_avg10 ~line 431), the resolved resources interface (~line 948), defaults.ts (~line 218), and BOTH merge.ts sites (~line 195 default-merge, ~line 687 YAML-merge). In memory-governor.ts add `readGovernorPsiCalmConfig()` beside readGovernorRunwayThresholds (line 100) and module state `psiCalmSinceMs: number | null`. In assessMemoryPressure: each call, set psiCalmSinceMs = Date.now() when psiFullAvg10 != null && psiFullAvg10 < governorPsiCalmReadmitAvg10, else null. After computing the next mode (and storing trigger per trigger-provenance): if the result is 'holding', psiCalmSinceMs != null, Date.now() - psiCalmSinceMs >= governorPsiCalmWindowMs, and memAvailable >= softBytes, then override to 'admitting', clear the trigger, and reset psiCalmSinceMs = Date.now() (re-arm — a later dip needs a fresh window). Extend resetGovernorModeForTests to reset psiCalmSinceMs. Tests use vi.useFakeTimers() + advanceTimersByTimeAsync (repo rule — never real waits)."
+        },
+        "items": [
+          {
+            "id": "psi-calm-early-readmit.ac1",
+            "title": "With no YAML override the resolved config defaults to governorPsiCalmReadmitAvg10 0.05 and governorPsiCalmWindowMs 600000, and a YAML governor_psi_calm_window_ms override produces that value in the resolved config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-calm-early-readmit.ac2",
+            "title": "Given a holding governor from a soft dip with PSI full avg10 0.00, when fake timers advance past the calm window and MemAvailable >= softBytes but < recoveryBytes, then assessMemoryPressure returns band 'ok' (admitting)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-calm-early-readmit.ac3",
+            "title": "Given the same dip with PSI full avg10 0.3, the governor stays holding until MemAvailable >= recoveryBytes (NFR-1 preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-calm-early-readmit.ac4",
+            "title": "After an early re-admit, when MemAvailable dips below soft a second time the governor returns to holding and re-admits only after a fresh full calm window elapses (no oscillation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-calm-early-readmit.ac5",
+            "title": "PSI unavailable + swap low still produces holding (existing conservative path unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-trigger-messages",
+        "title": "Rewrite patrol hold/shed messages to print stored trigger plus current reading",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-16T18:05:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-pressure-patrol.test.ts passes including the no-self-contradictory-inequality property test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In memory-pressure-patrol.ts rewrite the holding (lines 259–262) and shedding (lines 277–280) message builders to consume verdict.trigger. Every non-admitting message states, in complete sentences: why the mode was entered (trigger kind in plain words, trigger-time reading and threshold, since-timestamp), the current reading, and the concrete exit condition(s) — e.g. 'Overdeck stopped admitting work at 14:22 when available memory dipped to 8.9 GiB, under the 9.4 GiB soft reserve. 12.5 GiB is available now. Admissions resume at the 15.7 GiB recovery reserve, or at 9.4 GiB once memory pressure stalls (PSI) stay at zero for 10 minutes. Nothing has been stopped or killed.' A shedding message whose trigger is 'swap-psi' says so instead of claiming the current reading is under the hard reserve. Watch and ok messages keep their shape but must stay arithmetically consistent. Tests: property-style assertion over a matrix of injected verdicts (every band × trigger kind × current readings above/below each reserve) — every 'X available is under/over Y reserve' clause in every emitted message is numerically true. Inject fixed trigger timestamps for determinism. Existing transition-only emission tests stay green."
+        },
+        "items": [
+          {
+            "id": "patrol-trigger-messages.ac1",
+            "title": "The holding message prints the stored trigger (plain-words kind, trigger-time reading and threshold, since-timestamp), the current reading, and both exit conditions (recovery reserve and PSI-calm early re-admit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-trigger-messages.ac2",
+            "title": "A shedding message triggered by 'swap-psi' names the swap/PSI cause and never claims the current reading is under the hard reserve when it is not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-trigger-messages.ac3",
+            "title": "The property test rejects any emitted message whose availability-versus-reserve clause is numerically false, across the injected-verdict matrix (every band x trigger kind)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-trigger-messages.ac4",
+            "title": "When the level changes the patrol emits exactly one activity entry per change, and when the level repeats it emits nothing (existing patrol tests stay green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-details-real-values",
+        "title": "Print real swap and PSI values in the patrol details block",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T18:05:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "src/lib/cloister/memory-governor.ts",
+            "src/lib/cloister/memory-verdict-cache.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-pressure-patrol.test.ts passes with details-block assertions on injected verdict numbers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `psiSomeAvg10?: number | null` to MemoryVerdict in memory-verdict-cache.ts and populate it in assessMemoryPressure (readProcMemory already returns psiSomeAvg10 — system-health-service.ts line 374). Change buildMemoryDetails (memory-pressure-patrol.ts lines 47–60) to also take the verdict, and replace the hardcoded placeholder at line 58 with real lines: `Swap: <free> free of <total>` and `PSI some avg10: <v> | full avg10: <v>`. When a PSI value is null, print `unavailable (pressure stall data not readable)` for that value only. Update the single caller (patrol, lines 218–224). Tests inject a verdict with known swap/PSI numbers and assert those numbers appear in the details, and a null-PSI verdict asserting the explicit fallback text."
+        },
+        "items": [
+          {
+            "id": "patrol-details-real-values.ac1",
+            "title": "Given an injected verdict with swapFree 0 GiB / swapTotal 8 GiB and PSI some 0.00 / full 0.00, the details block prints those exact values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-details-real-values.ac2",
+            "title": "The details builder never produces the string 'Swap free: unavailable' for any injected verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-details-real-values.ac3",
+            "title": "Given a verdict with psiFullAvg10 null, the details print 'unavailable (pressure stall data not readable)' for that value while real swap numbers still print",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-docs",
+        "title": "Document PSI-calm early re-admit, new config keys, and message format in RESOURCE-GOVERNOR.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-16T18:05:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3754",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RESOURCE-GOVERNOR.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n governor_psi_calm_readmit_avg10 docs/RESOURCE-GOVERNOR.md",
+            "grep -n governor_psi_calm_window_ms docs/RESOURCE-GOVERNOR.md"
+          ],
+          "expected_outputs": [
+            "grep finds both new config keys documented in docs/RESOURCE-GOVERNOR.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/RESOURCE-GOVERNOR.md: (1) the hysteresis section describes the PSI-calm early-readmit edge — a holding governor re-admits at the soft reserve once memory PSI full avg10 stays below governor_psi_calm_readmit_avg10 continuously for governor_psi_calm_window_ms, and the window re-arms after each early re-admit; (2) the config table (~lines 374–376) gains rows for governor_psi_calm_readmit_avg10 (default 0.05) and governor_psi_calm_window_ms (default 600000 = 10 minutes); (3) the operator-message documentation shows an example hold message carrying the stored trigger plus the current reading and both exit conditions. No Mintlify page exists for resources.* keys (verified 2026-08-16) — no other doc file changes."
+        },
+        "items": [
+          {
+            "id": "governor-docs.ac1",
+            "title": "docs/RESOURCE-GOVERNOR.md's hysteresis section contains the PSI-calm early-readmit edge: re-admit at the soft reserve after a full calm window, with the window re-arming after each early re-admit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-docs.ac2",
+            "title": "The config table in docs/RESOURCE-GOVERNOR.md contains rows for governor_psi_calm_readmit_avg10 (default 0.05) and governor_psi_calm_window_ms (default 600000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-docs.ac3",
+            "title": "docs/RESOURCE-GOVERNOR.md shows an example hold message containing the stored trigger, the current reading, and both exit conditions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trigger-provenance",
+        "to": "psi-calm-early-readmit",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-provenance",
+        "to": "patrol-trigger-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "trigger-provenance",
+        "to": "patrol-details-real-values",
+        "type": "blocks"
+      },
+      {
+        "from": "patrol-trigger-messages",
+        "to": "patrol-details-real-values",
+        "type": "blocks"
+      },
+      {
+        "from": "psi-calm-early-readmit",
+        "to": "patrol-details-real-values",
+        "type": "blocks"
+      },
+      {
+        "from": "psi-calm-early-readmit",
+        "to": "governor-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "patrol-details-real-values",
+        "to": "governor-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-16-PAN-3754-memory-governor-hysteresis-hold-wedges-admissions-on-a-healthy-host-operator-messages-misattribute-the-trigger.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
