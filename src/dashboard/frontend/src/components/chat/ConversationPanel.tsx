@@ -1291,6 +1291,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
   const isSpawnFailed = !!conversation.spawnError;
+  // PAN-3744: before this subscription emits, the transcript is loading rather
+  // than empty. Keep this signal hook-local because query-cache entries survive
+  // conversation switches and could flash a stale empty state.
   const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
