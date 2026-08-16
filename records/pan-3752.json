@@ -22,22 +22,9 @@
       "timestamp": "2026-08-16T19:19:46.395Z",
       "reason": "end",
       "note": "Specialist retry: the reported failure was dispatch lock contention, not a test failure. Verified the PAN-3752 record lock is now absent and the prior owner PID has exited. No code change was required; the branch remains clean and pushed. Existing final gates remain green: npm run typecheck, npm run lint, and npm test (13,940 backend tests plus 64 frontend tests passed). Re-dispatch review and test."
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-16T19:45Z] uat-agent → FAILED — seq 1",
-      "timestamp": "2026-08-16T19:45:54.789Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "uat-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-16T19:45:54Z",
-      "markdownBody": "# UAT FAILED for PAN-3752\n\n## Failed acceptance criteria\n\nRequired per NFR-1/AC-1/AC-2 (drafts/pan-3752.md: 'verified live by the test role, not in Vitest'). Stayed scoped to the isolated feature-workspace container (roles/test.md) — host :3011 dashboard never touched. Rebuilt+restarted workspace server+frontend containers on fresh dist (parseTranscriptSnapshot confirmed present). Container starts with 0 conversations by design (no host ~/.claude/~/.overdeck mount); seeded a legitimate 25MB pi-format transcript fixture via the shipped no-DB-row synthetic-agent-session path (ws-rpc.ts PAN-1908 'agent-' regex), no code/DB edits. Blocked before opening any conversation: the workspace frontend's own origin 403s on POST /api/dashboard/session ('Missing origin') while the api- origin succeeds (200), so EventRouter/WsTransport retry-loop and the UI never leaves 'Waiting for backend data'/'Reconnecting...' — reproduced after restarting both containers, so not a stale-process artifact. Pre-existing container connectivity defect, outside this branch's files_scope (no frontend/session/CORS files touched), left unfixed per test-role boundaries. AC-1 (no event-loop-monitor warning on a 25MB open) and AC-2 (no staleness reconnect in a second tab) remain unproven.\n\n## Required action\n\nRead the failed UAT acceptance criteria above, reproduce each failure, then implement and verify the required rework before committing and pushing your fix.\n"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -64,19 +51,21 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:45:54.790Z",
+  "updated": "2026-08-16T19:46:25.736Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:45:00.411Z",
-    "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
+    "updatedAt": "2026-08-16T19:45:54.737Z",
+    "testNotes": "typecheck exits 0; lint exits 0; npm test: 13920 passed/20 failed/51 skipped — all 20 failures in tests/unit/lib/lifecycle/workflows.test.ts (unrelated to this branch's scope), reran isolated: 57/57 passed, 1 skipped (full-suite-only flake, matches prior session's own transient-anomaly note). npm run build bundled fine (dist/dashboard/server.js rebuilt with parseTranscriptSnapshot); non-zero exit was only a post-build lint:dist-externals flag on a pre-existing unrelated stale playwright allowlist entry (PAN-1645).",
+    "uatNotes": "Required per NFR-1/AC-1/AC-2 (drafts/pan-3752.md: 'verified live by the test role, not in Vitest'). Stayed scoped to the isolated feature-workspace container (roles/test.md) — host :3011 dashboard never touched. Rebuilt+restarted workspace server+frontend containers on fresh dist (parseTranscriptSnapshot confirmed present). Container starts with 0 conversations by design (no host ~/.claude/~/.overdeck mount); seeded a legitimate 25MB pi-format transcript fixture via the shipped no-DB-row synthetic-agent-session path (ws-rpc.ts PAN-1908 'agent-' regex), no code/DB edits. Blocked before opening any conversation: the workspace frontend's own origin 403s on POST /api/dashboard/session ('Missing origin') while the api- origin succeeds (200), so EventRouter/WsTransport retry-loop and the UI never leaves 'Waiting for backend data'/'Reconnecting...' — reproduced after restarting both containers, so not a stale-process artifact. Pre-existing container connectivity defect, outside this branch's files_scope (no frontend/session/CORS files touched), left unfixed per test-role boundaries. AC-1 (no event-loop-monitor warning on a 25MB open) and AC-2 (no staleness reconnect in a second tab) remain unproven.",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3756",
@@ -119,9 +108,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 45432072,
-            "output": 53402,
-            "cacheRead": 44554240,
+            "input": 46120344,
+            "output": 53612,
+            "cacheRead": 45240320,
             "cacheWrite": 0
           }
         },
@@ -135,10 +124,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 146,
-            "output": 39687,
-            "cacheRead": 14239737,
-            "cacheWrite": 223952
+            "input": 154,
+            "output": 43776,
+            "cacheRead": 15261091,
+            "cacheWrite": 229065
           }
         }
       },
@@ -150,9 +139,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 45432072,
-          "output": 53402,
-          "cacheRead": 44554240,
+          "input": 46120344,
+          "output": 53612,
+          "cacheRead": 45240320,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -162,15 +151,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 146,
-          "output": 39687,
-          "cacheRead": 14239737,
-          "cacheWrite": 223952
+          "input": 154,
+          "output": 43776,
+          "cacheRead": 15261091,
+          "cacheWrite": 229065
         }
       },
       "costAtCloseOut": {
-        "usd": 32.074355,
-        "pricingAsOf": "2026-08-16T19:45:00.668Z"
+        "usd": 32.692614,
+        "pricingAsOf": "2026-08-16T19:45:54.879Z"
       }
     },
     "merges": [
