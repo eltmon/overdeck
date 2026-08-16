@@ -51,7 +51,7 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:47:38.326Z",
+  "updated": "2026-08-16T19:49:17.686Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
@@ -62,7 +62,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
     "updatedAt": "2026-08-16T19:45:54.767Z",
     "testNotes": "npm run typecheck: exits 0 (contracts build, tsc, hooks/evals/dashboard/frontend/acp type-guard scripts all pass, 0 new errors). npm run lint: exits 0 (skills/slash-commands/prompts/file-size/source-introspection/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass). npm test (vitest full suite + frontend issueActions/fr7 suites): 13920 passed, 20 failed, 51 skipped across 1482 files. All 20 failures are in tests/unit/lib/lifecycle/workflows.test.ts, a close-out lifecycle suite unrelated to this branch's scope (files_scope: src/dashboard/server/services/dashboard-db-task.ts, dashboard-db-worker.ts, ws-rpc.ts, docs/DASHBOARD-ARCHITECTURE.md, tests/unit/dashboard/*). Re-ran that file in isolation: 57 passed, 1 skipped, 0 failed — confirms a full-suite-only flake (matches the same 'transient anomaly, passes on isolated rerun' pattern the work agent's own session history already recorded for this issue), not a regression from this diff. `npm run build` bundling itself succeeded (frontend + server dist rebuilt, dist/dashboard/server.js now contains parseTranscriptSnapshot); the script's overall non-zero exit came only from a post-build `lint:dist-externals` check flagging a stale, pre-existing playwright allowlist entry in scripts/dist-externals-allowlist.txt (added by PAN-1645, unrelated to this branch — this PR touches no tsdown config or dist-externals files).",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
