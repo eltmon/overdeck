@@ -141,6 +141,23 @@ repository's forge adapter to merge its PR or MR, waits for positive forge
 evidence, then runs `postMergeLifecycle()` to clean up labels, Docker networks,
 and agent sessions.
 
+## Review-status retirement and terminal generations
+
+Review status keeps its historical verdicts after the row stops being actionable. The
+`retiredAt` timestamp is set when a closed pull request is observed during refresh, when
+the pull-request webhook reports closure, or when lazy review-status loading discovers
+the closed artifact. Consumers exclude retired rows from patrols, merge projections, and
+status stamping instead of deleting their history.
+
+A fresh pull request clears `retiredAt`. Starting fresh work also clears it, so a new
+review cycle can use the same issue record without inheriting the retired state.
+
+UAT generation history is terminal. Backfill marks a generation promoted only when each
+member branch is contained in `main` by the shared positive ancestor check; it does not
+reopen or rebuild that generation. Generation names use the date and codename, followed
+by `-2`, `-3`, and later suffixes when more than one generation is created on the same
+day.
+
 ## After another feature merges
 
 A merge does not trigger a background scan of sibling branches. An open feature
@@ -329,4 +346,3 @@ The destructive/non-reversible completion steps are owned by close-out, not merg
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
 config, closes the tracker issue, and clears review status.
-
