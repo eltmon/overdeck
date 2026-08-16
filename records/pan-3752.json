@@ -46,21 +46,21 @@
     "recordedAt": "2026-08-16T19:09:21.222Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:18:50.811Z",
+  "updated": "2026-08-16T19:18:54.225Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "dispatch_failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T19:18:19.933Z",
-    "reviewNotes": "Approved: all four reviewers reported no blockers; two advisory risks retained.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-16T19:18:44.981Z",
+    "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3756",
+    "reviewRequestedAt": "2026-08-16T19:09:25.075Z",
     "reviewSpawnedAt": "2026-08-16T19:10:33.002Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -99,9 +99,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 38831947,
-            "output": 45210,
-            "cacheRead": 38083840,
+            "input": 39163578,
+            "output": 46967,
+            "cacheRead": 38397696,
             "cacheWrite": 0
           }
         },
@@ -122,9 +122,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38831947,
-          "output": 45210,
-          "cacheRead": 38083840,
+          "input": 39163578,
+          "output": 46967,
+          "cacheRead": 38397696,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -135,8 +135,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.139776,
-        "pricingAsOf": "2026-08-16T19:18:20.030Z"
+        "usd": 24.438289,
+        "pricingAsOf": "2026-08-16T19:18:54.201Z"
       }
     },
     "merges": [
