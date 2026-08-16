@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
+
+import { CostEventRecordedEvent } from '@overdeck/contracts';
 
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import {
@@ -366,9 +368,48 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
     expect(inserted.model).toBe('claude-sonnet-4-6');
     expect(inserted.cost).toBe(0.05);
 
-    // Event bus must have been notified
-    expect(emittedEvents.some((e) => e.type === 'cost.recorded')).toBe(true);
+    // Event bus must receive exactly one canonical, contract-valid announcement.
+    expect(emittedEvents).toHaveLength(1);
+    expect(emittedEvents[0]).toEqual({
+      type: 'cost.event_recorded',
+      payload: {
+        agentId: event.agentId,
+        issueId: event.issueId,
+        cost: event.cost,
+        inputTokens: event.input,
+        outputTokens: event.output,
+      },
+    });
+    expect(() =>
+      Schema.decodeUnknownSync(CostEventRecordedEvent)({
+        ...emittedEvents[0],
+        sequence: 1,
+        timestamp: event.ts.toISOString(),
+      }),
+    ).not.toThrow();
   });
+
+  it.each(['agentId', 'issueId'] as const)(
+    'record() does not announce an event with a null %s',
+    async (missingAttribution) => {
+      const { dbLayer, busLayer, archiveLayer, appendedEvents, insertedValues, emittedEvents } =
+        makeWiredFakeDb();
+      const layer = CostWriterLive.pipe(
+        Layer.provide(dbLayer),
+        Layer.provide(busLayer),
+        Layer.provide(archiveLayer),
+      );
+      const event = { ...makeSampleEvent(), [missingAttribution]: null };
+
+      await Effect.runPromise(
+        CostWriter.use((w) => w.record(event)).pipe(Effect.provide(layer)),
+      );
+
+      expect(appendedEvents).toHaveLength(1);
+      expect(insertedValues).toHaveLength(1);
+      expect(emittedEvents).toHaveLength(0);
+    },
+  );
 
   it('record() passes all 14 NEED columns to the DB insert', async () => {
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeWiredFakeDb();

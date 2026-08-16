@@ -147,6 +147,12 @@ This is the hot path that records costs as agents work.
      - Per-project WAL file (for cross-developer sharing via git)
    - Saves the new byte offset
 
+After `record()` archives and caches an attributed event, it announces
+`cost.event_recorded` on the domain event bus with the agent ID, issue ID, cost, input
+tokens, and output tokens. The ws-rpc broadcast feeds this event to the God View live
+cost counters. If the agent ID or issue ID is null, `record()` does not announce the
+event; cost rollups still include it in the `unattributed` bucket.
+
 ### Session-to-Agent Mapping (Live Path)
 
 The heartbeat hook has both `session_id` (from PostToolUse payload) and `OVERDECK_AGENT_ID` (from env, set by agent launcher). It should:
