@@ -12,11 +12,72 @@
       "timestamp": "2026-08-16T09:06:55.302Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-16T10:38:22.940Z",
+      "reason": "end",
+      "note": "Deviations: the Codex collector implementation lives in src/lib/costs/codex-collector.ts and is re-exported from cost.ts because the repository file-size gate rejected further growth in cost.ts. The first full suite identified three legacy expectations that still counted unchanged files as writer duplicates; the corrected backfill summary now exposes cacheSkipped. A second full suite cleared all PAN-3743 tests but hit seven unrelated shared-process database/timeout failures; all seven passed when their four files were rerun alone with required git permissions. Delivered persistent skip verdicts for Codex, Pi, and Claude transcript scans; worker-lane cost reconciliation for Codex and Pi; slow-job instrumentation; lane audit coverage; and worker-lane documentation. Verification: full typecheck passed, all lint stages passed after removing a new type-only import cycle, 14 focused worker/cost tests passed, and the isolated seven aggregate failures passed 41/41."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/cost-backfill.test.ts",
+      "src/cli/commands/cost.ts",
+      "src/lib/costs/codex-collector.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/costs/skip-cache.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/overdeck/infra.ts",
+      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/lib/costs/codex-skip-cache.test.ts",
+      "tests/unit/lib/costs/reconciler-collect.test.ts",
+      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
+      "tests/unit/lib/costs/skip-cache.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
+      "src/cli/commands/__tests__/cost-backfill.test.ts",
+      "src/cli/commands/cost.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/lib/costs/codex-collector.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/costs/skip-cache.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/overdeck/infra.ts",
+      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
+      "tests/unit/dashboard/db-task-instrumentation.test.ts",
+      "tests/unit/dashboard/db-task-lanes.test.ts",
+      "tests/unit/lib/costs/codex-skip-cache.test.ts",
+      "tests/unit/lib/costs/reconciler-collect.test.ts",
+      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
+      "tests/unit/lib/costs/skip-cache.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+    ],
+    "recordedAt": "2026-08-16T10:38:16.564Z"
+  },
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T10:38:19.338Z",
+  "updated": "2026-08-16T10:38:23.022Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -26,8 +87,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-16T10:38:19.336Z",
+    "updatedAt": "2026-08-16T10:38:22.934Z",
     "inspectNotes": "AC4 REGRESSION (blocking): src/lib/costs/codex-collector.ts:20 reimplements issueIdFromAgentName as /(?:agent|planning)-((?:[a-z]+-)?\\d+)/i instead of reusing cost.ts:236 /(?:^|-)((?:pan|min|aud|krux|cli)-\\d+)(?:-|$)/i. Measured against the 1381 real dirs in ~/.overdeck/agents, 183 resolve differently: every strike-pan-* and conv-pan-* agent now yields issueId=null (was PAN-<n>). 18 of those dirs hold codex-home sessions today (strike-pan-3740 has 10 jsonl files, strike-pan-3663 has 7, conv-pan-1223-gpt56-mrlfm5fx has 2) so live codex cost events lose issue attribution. FIX: import and reuse the existing issueIdFromAgentName from cost.ts (export it) rather than writing a second regex. AC4 REGRESSION (blocking): codex-collector.ts:25 inferIssueFromPath now REQUIRES a feature-/feature/ or workspaces/feature- prefix and accepts any [a-z]+ prefix, where cost.ts:241 matched (pan|min|aud|krux|cli)[-/]\\d+ anywhere in the cwd. codex-global sessions whose cwd is e.g. ~/Projects/hoff-pan-3743 now fall through to UNKNOWN. FIX: reuse the cost.ts helper. AC3 NOT MET: no test subscribes to the server EventBus and asserts cost.recorded fires for events recorded after a worker sweep. tests/unit/dashboard/cost-reconcile-sweep-job.test.ts only covers workerLane routing and that runDashboardDbJob dispatches the collector; the only cost.recorded assertion in the repo is the pre-existing tests/unit/lib/overdeck/cost.test.ts:370 record() unit test, which predates this bead and never exercises the sweep path. FIX: add a test that drives the post-sweep record loop (fake collector result with >=1 event) through CostWriter with a fake bus layer and asserts the subscription receives cost.recorded. SECONDARY (non-blocking, note for FR-1): cost-reconcile-service.ts now calls recordSkipVerdict per scanned file on the main thread — that is a synchronous better-sqlite3 write per file, exactly the main-thread DB work FR-1 targets. The worker already opens the same DB for lookupSkipVerdict, so the verdict writes belong in collectCodexCostEvents. Also cosmetic: cost.ts:~789 leaves an empty tail inside the per-file loop where the codex branch was removed. AC1 and AC2 are satisfied.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3749",
     "reviewRequestedAt": "2026-08-16T10:38:19.336Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -84,23 +146,22 @@
         "tests/unit/lib/overdeck/cost-reconcile.test.ts"
       ],
       "recordedAt": "2026-08-16T10:38:16.564Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3749"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 721143,
-            "output": 1399,
-            "cacheRead": 487168,
+            "input": 2457272,
+            "output": 2470,
+            "cacheRead": 1708800,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 26582878,
-            "output": 32145,
-            "cacheRead": 26274816,
+            "input": 50882368,
+            "output": 54778,
+            "cacheRead": 50226176,
             "cacheWrite": 0
           }
         },
@@ -115,15 +176,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 721143,
-          "output": 1399,
-          "cacheRead": 487168,
+          "input": 2457272,
+          "output": 2470,
+          "cacheRead": 1708800,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 26582878,
-          "output": 32145,
-          "cacheRead": 26274816,
+          "input": 50882368,
+          "output": 54778,
+          "cacheRead": 50226176,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -134,11 +195,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 15.642989,
-        "pricingAsOf": "2026-08-16T09:48:36.680Z"
+        "usd": 30.038309,
+        "pricingAsOf": "2026-08-16T10:38:22.979Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3749"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -319,61 +382,5 @@
     "docs-worker-lanes.ac1": "completed",
     "docs-worker-lanes.ac2": "completed",
     "docs-worker-lanes.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/__tests__/cost-backfill.test.ts",
-      "src/cli/commands/cost.ts",
-      "src/lib/costs/codex-collector.ts",
-      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
-      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
-      "src/lib/overdeck/__tests__/schema-audit.test.ts",
-      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "docs/TELEMETRY.md",
-      "src/dashboard/server/services/cost-reconcile-service.ts",
-      "src/dashboard/server/services/dashboard-db-task.ts",
-      "src/dashboard/server/services/dashboard-db-worker.ts",
-      "src/lib/costs/reconciler.ts",
-      "src/lib/costs/skip-cache.ts",
-      "src/lib/overdeck/cost.ts",
-      "src/lib/overdeck/infra.ts",
-      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
-      "tests/unit/dashboard/db-task-instrumentation.test.ts",
-      "tests/unit/dashboard/db-task-lanes.test.ts",
-      "tests/unit/lib/costs/codex-skip-cache.test.ts",
-      "tests/unit/lib/costs/reconciler-collect.test.ts",
-      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
-      "tests/unit/lib/costs/skip-cache.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "docs/TELEMETRY.md",
-      "src/cli/commands/__tests__/cost-backfill.test.ts",
-      "src/cli/commands/cost.ts",
-      "src/dashboard/server/services/cost-reconcile-service.ts",
-      "src/dashboard/server/services/dashboard-db-task.ts",
-      "src/dashboard/server/services/dashboard-db-worker.ts",
-      "src/lib/costs/codex-collector.ts",
-      "src/lib/costs/reconciler.ts",
-      "src/lib/costs/skip-cache.ts",
-      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
-      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
-      "src/lib/overdeck/__tests__/schema-audit.test.ts",
-      "src/lib/overdeck/cost.ts",
-      "src/lib/overdeck/infra.ts",
-      "tests/unit/dashboard/cost-reconcile-sweep-job.test.ts",
-      "tests/unit/dashboard/db-task-instrumentation.test.ts",
-      "tests/unit/dashboard/db-task-lanes.test.ts",
-      "tests/unit/lib/costs/codex-skip-cache.test.ts",
-      "tests/unit/lib/costs/reconciler-collect.test.ts",
-      "tests/unit/lib/costs/reconciler-skip-cache.test.ts",
-      "tests/unit/lib/costs/skip-cache.test.ts",
-      "tests/unit/lib/overdeck/cost-reconcile.test.ts"
-    ],
-    "recordedAt": "2026-08-16T10:38:16.564Z"
   }
 }
