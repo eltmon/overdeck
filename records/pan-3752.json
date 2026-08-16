@@ -51,7 +51,7 @@
     "recordedAt": "2026-08-16T19:19:39.144Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:46:25.736Z",
+  "updated": "2026-08-16T19:46:28.649Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
@@ -63,9 +63,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:24:14.890Z",
-    "updatedAt": "2026-08-16T19:45:54.737Z",
-    "testNotes": "typecheck exits 0; lint exits 0; npm test: 13920 passed/20 failed/51 skipped — all 20 failures in tests/unit/lib/lifecycle/workflows.test.ts (unrelated to this branch's scope), reran isolated: 57/57 passed, 1 skipped (full-suite-only flake, matches prior session's own transient-anomaly note). npm run build bundled fine (dist/dashboard/server.js rebuilt with parseTranscriptSnapshot); non-zero exit was only a post-build lint:dist-externals flag on a pre-existing unrelated stale playwright allowlist entry (PAN-1645).",
-    "uatNotes": "Required per NFR-1/AC-1/AC-2 (drafts/pan-3752.md: 'verified live by the test role, not in Vitest'). Stayed scoped to the isolated feature-workspace container (roles/test.md) — host :3011 dashboard never touched. Rebuilt+restarted workspace server+frontend containers on fresh dist (parseTranscriptSnapshot confirmed present). Container starts with 0 conversations by design (no host ~/.claude/~/.overdeck mount); seeded a legitimate 25MB pi-format transcript fixture via the shipped no-DB-row synthetic-agent-session path (ws-rpc.ts PAN-1908 'agent-' regex), no code/DB edits. Blocked before opening any conversation: the workspace frontend's own origin 403s on POST /api/dashboard/session ('Missing origin') while the api- origin succeeds (200), so EventRouter/WsTransport retry-loop and the UI never leaves 'Waiting for backend data'/'Reconnecting...' — reproduced after restarting both containers, so not a stale-process artifact. Pre-existing container connectivity defect, outside this branch's files_scope (no frontend/session/CORS files touched), left unfixed per test-role boundaries. AC-1 (no event-loop-monitor warning on a 25MB open) and AC-2 (no staleness reconnect in a second tab) remain unproven.",
+    "updatedAt": "2026-08-16T19:45:54.767Z",
+    "testNotes": "npm run typecheck: exits 0 (contracts build, tsc, hooks/evals/dashboard/frontend/acp type-guard scripts all pass, 0 new errors). npm run lint: exits 0 (skills/slash-commands/prompts/file-size/source-introspection/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass). npm test (vitest full suite + frontend issueActions/fr7 suites): 13920 passed, 20 failed, 51 skipped across 1482 files. All 20 failures are in tests/unit/lib/lifecycle/workflows.test.ts, a close-out lifecycle suite unrelated to this branch's scope (files_scope: src/dashboard/server/services/dashboard-db-task.ts, dashboard-db-worker.ts, ws-rpc.ts, docs/DASHBOARD-ARCHITECTURE.md, tests/unit/dashboard/*). Re-ran that file in isolation: 57 passed, 1 skipped, 0 failed — confirms a full-suite-only flake (matches the same 'transient anomaly, passes on isolated rerun' pattern the work agent's own session history already recorded for this issue), not a regression from this diff. `npm run build` bundling itself succeeded (frontend + server dist rebuilt, dist/dashboard/server.js now contains parseTranscriptSnapshot); the script's overall non-zero exit came only from a post-build `lint:dist-externals` check flagging a stale, pre-existing playwright allowlist entry in scripts/dist-externals-allowlist.txt (added by PAN-1645, unrelated to this branch — this PR touches no tsdown config or dist-externals files).",
     "verificationNotes": "Verification FAILED at lint (529764ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3752/.overdeck/verification-latest.json",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3756",
@@ -159,7 +158,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.692614,
-        "pricingAsOf": "2026-08-16T19:45:54.879Z"
+        "pricingAsOf": "2026-08-16T19:46:28.634Z"
       }
     },
     "merges": [
