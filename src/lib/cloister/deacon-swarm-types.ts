@@ -9,7 +9,6 @@ import type { resolveAutomaticSwarmPolicy } from '../swarm-policy.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import type { FeatureWorkspace } from './deacon-workspaces.js';
-import type { RequestIssueReviewResult } from './deacon-swarm-finalization.js';
 import type {
   clearSwarmCompletionObservationRecord,
   readSwarmCompletionObservation,
@@ -84,8 +83,6 @@ export interface CoordinateSwarmSlotsDeps {
   readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
   /** Delete a stale durable marker that does not belong to the active item. */
   clearSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
-  getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
-  setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /** Re-evaluated immediately before every slot spawn. */
   shouldDispatch?: (issueId: string) => boolean;
   readSwarmHold?: typeof readSwarmHold;
@@ -103,8 +100,6 @@ export interface CoordinateSwarmSlotsDeps {
   resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
   getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
   clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
-  /** Request issue-level review after the feature branch contains every item. */
-  requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }
 
 export interface SlotAssignment {

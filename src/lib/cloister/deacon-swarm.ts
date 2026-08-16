@@ -60,8 +60,7 @@ import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
-import { defaultRequestIssueReview, finalizeSwarmIssueIfComplete } from './deacon-swarm-finalization.js';
-import { clearReleasedBlockedSwarmSlot, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmFinalizedAt, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
+import { clearReleasedBlockedSwarmSlot, clearSwarmSlotCompletion, clearSwarmSlotOwnership, createMinimalIssueRecord, readSwarmHold, writeSwarmForemanTakeover } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 import { archiveBlockedSwarmSlot, defaultIsSlotBranchPushed, prepareReleasedSwarmSlot, releaseBlockedSlots } from './swarm-blocked-slot.js';
@@ -157,13 +156,10 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   readStatusOverrides: defaultReadStatusOverrides,
   readSlotCompletion: defaultReadSlotCompletion,
   clearSlotCompletion: clearSwarmSlotCompletion,
-  getFinalizedAt: getSwarmFinalizedAt,
-  setFinalizedAt: recordSwarmFinalizedAt,
   recordForemanTakeover: writeSwarmForemanTakeover,
   ensureSwarmForeman,
   sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
   resolveAutomaticSwarmPolicy,
-  requestIssueReview: defaultRequestIssueReview,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -309,10 +305,7 @@ export async function coordinateSwarmSlots(
       if (!dispatchEligible) {
         const hasSlotState = reconciled.merged.length > 0 || reconciled.inFlight.length > 0
           || reconciled.branches.length > 0 || reconciled.agents.length > 0;
-        if (!hasSlotState) {
-          actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, doc, deps));
-          continue;
-        }
+        if (!hasSlotState) continue;
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
       actions.push(...await releaseBlockedSlots(issueId, workspace.workspacePath, doc, reconciled, deps));
@@ -329,12 +322,8 @@ export async function coordinateSwarmSlots(
       actions.push(...requeue.actions);
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps, blockedSlotIndexes));
       actions.push(...await gcMergedSlotsAndAdvance(issueId, workspace.workspacePath, reconciled, deps, async () => {
-        const finalized = await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps);
-        if (!dispatchEligible) return finalized;
-        return [
-          ...finalized,
-          ...await dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps, blockedSlotIndexes, blockedItemIds),
-        ];
+        if (!dispatchEligible) return [];
+        return dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps, blockedSlotIndexes, blockedItemIds);
       }));
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
@@ -669,14 +658,6 @@ export function getFailedMergeBlocks(issueId: string, workspacePath?: string): F
   }
 
   return [...bySlot.values()].sort((a, b) => a.slotIndex - b.slotIndex);
-}
-
-export function getSwarmFinalizedAt(issueId: string, workspacePath?: string): string | undefined {
-  return workspacePath ? readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.finalizedAt : undefined;
-}
-
-export async function recordSwarmFinalizedAt(issueId: string, workspacePath: string, finalizedAt: string): Promise<void> {
-  await writeSwarmFinalizedAt(workspacePath, issueId.toUpperCase(), finalizedAt);
 }
 
 export async function recordFailedMergeBlock(block: FailedMergeBlock, workspacePath?: string): Promise<void> {

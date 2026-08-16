@@ -257,7 +257,7 @@ export class WsTransport {
               reconnectAttempts += 1
               try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
-              resetTransport()
+              resetTransport(transport)
               setTimeout(run, reconnectBackoffDelayMs(reconnectAttempts))
             }
           },
@@ -276,6 +276,10 @@ export class WsTransport {
   dispose(): void {
     this.disposed = true
     this.runtime.runSync(Scope.close(this.clientScope, Exit.void))
+    // The WebSocket lives in the runtime's protocol/socket layer, not the
+    // client scope — without disposing the runtime, every resetTransport()
+    // leaked a live socket that kept receiving the full domain-event fan-out.
+    void this.runtime.dispose()
   }
 }
 
@@ -302,9 +306,14 @@ export function subscribeFlywheelStatus(
   )
 }
 
-export function resetTransport(): void {
-  if (_transport) {
-    _transport.dispose()
-    _transport = null
-  }
+export function resetTransport(failed?: WsTransport): void {
+  if (!_transport) return
+  // When a specific transport is named, only reset if it is still the live
+  // singleton. N subscriptions failing on the same dead socket each call
+  // resetTransport; without this guard the 2nd..Nth calls would dispose the
+  // fresh replacement transport the earlier ones just reconnected to,
+  // cascading into a page-wide reconnect stampede.
+  if (failed && failed !== _transport) return
+  _transport.dispose()
+  _transport = null
 }
