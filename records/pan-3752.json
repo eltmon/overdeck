@@ -17,9 +17,22 @@
       "timestamp": "2026-08-16T19:09:29.933Z",
       "reason": "end",
       "note": "Transient anomaly: an early full-suite run had one unrelated pre-push-hook failure that passed on isolated rerun; the final full suite passed. Replaced a source-text routing test with runtime dispatch coverage after lint correctly rejected source introspection. Delivered a dedicated transcript parse worker lane, job-door routing for all full transcript parses and conversation lookup, parse-job coalescing, byte-aware slow-job telemetry, parity/routing/large-file tests, and architecture documentation. Final npm run typecheck, npm run lint, and npm test gates passed; branch is clean and pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-16T19:18Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-08-16T19:18:44.998Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-16T19:18:44Z",
+      "markdownBody": "# Test failure\n\nDispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3752.lock is held by agent-pan-3752-review pid=1126365 acquiredAt=2026-08-16T19:18:20.065Z. Retry the command after that writer finishes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3752`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -46,7 +59,7 @@
     "recordedAt": "2026-08-16T19:09:21.222Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-16T19:18:21.104Z",
+  "updated": "2026-08-16T19:18:44.999Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "reviewing",
