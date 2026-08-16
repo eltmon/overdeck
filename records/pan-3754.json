@@ -83,7 +83,7 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-16T19:59:45.468Z",
+  "updated": "2026-08-16T19:59:50.043Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "pending",
@@ -129,7 +129,9 @@
         "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
       ],
       "recordedAt": "2026-08-16T18:32:02.394Z"
-    }
+    },
+    "reviewRequestedAt": "2026-08-16T19:59:49.647Z",
+    "panDoneRecoveredAt": "2026-08-16T19:59:49.647Z"
   },
   "closeOut": {
     "usage": {
