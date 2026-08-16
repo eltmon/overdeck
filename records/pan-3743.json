@@ -2,7 +2,7 @@
   "issueId": "PAN-3743",
   "schemaVersion": 2,
   "created": "2026-08-16T08:44:10.680Z",
-  "updated": "2026-08-16T08:44:10.680Z",
+  "updated": "2026-08-16T08:44:12.633Z",
   "pipeline": {
     "issueId": "PAN-3743",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3743: Dashboard REST requests queue >20s during 5-minute burst windows (Awareness 'signal timed out', slow conversation opens)",
       "timestamp": "2026-08-16T08:44:10.680Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
