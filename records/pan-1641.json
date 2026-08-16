@@ -222,7 +222,7 @@
   ],
   "feedback": [],
   "created": "2026-08-13T01:09:10.139Z",
-  "updated": "2026-08-16T14:53:55.781Z",
+  "updated": "2026-08-16T14:59:11.968Z",
   "pipeline": {
     "issueId": "PAN-1641",
     "reviewStatus": "passed",
@@ -351,16 +351,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "bound-ollama-health-timeouts": {
-        "writerId": "agent-pan-1641",
-        "agentId": "agent-pan-1641",
-        "pid": 2435537,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T14:53:55.781Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1641",
@@ -487,6 +479,17 @@
         "outcome": "completed",
         "reason": "Made omp registry provisioning async, deep-equal write-skipping, and serialized per path; hoisted it before live OhMyPi launcher generation and added concurrency, corrupt-registry, unchanged-write, and purity tests.",
         "releasedAt": "2026-08-16T14:42:45.244Z"
+      },
+      {
+        "writerId": "agent-pan-1641",
+        "agentId": "agent-pan-1641",
+        "pid": 2435537,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T14:53:55.781Z",
+        "itemId": "bound-ollama-health-timeouts",
+        "outcome": "completed",
+        "reason": "Bound health response body reads to 5 seconds, skipped duplicate known-unhealthy probes, enforced one 30-second startup deadline, and added fake-timer timeout/retry coverage.",
+        "releasedAt": "2026-08-16T14:59:11.968Z"
       }
     ],
     "statusReasons": {
@@ -506,6 +509,10 @@
       "async-omp-provisioning": {
         "reason": "Made omp registry provisioning async, deep-equal write-skipping, and serialized per path; hoisted it before live OhMyPi launcher generation and added concurrency, corrupt-registry, unchanged-write, and purity tests.",
         "updatedAt": "2026-08-16T14:42:45.244Z"
+      },
+      "bound-ollama-health-timeouts": {
+        "reason": "Bound health response body reads to 5 seconds, skipped duplicate known-unhealthy probes, enforced one 30-second startup deadline, and added fake-timer timeout/retry coverage.",
+        "updatedAt": "2026-08-16T14:59:11.968Z"
       }
     }
   },
@@ -558,7 +565,10 @@
     "async-omp-provisioning.ac3": "completed",
     "async-omp-provisioning.ac4": "completed",
     "async-omp-provisioning.ac5": "completed",
-    "bound-ollama-health-timeouts": "running"
+    "bound-ollama-health-timeouts": "completed",
+    "bound-ollama-health-timeouts.ac1": "completed",
+    "bound-ollama-health-timeouts.ac2": "completed",
+    "bound-ollama-health-timeouts.ac3": "completed"
   },
   "recoveryTrips": [
     {
