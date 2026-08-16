@@ -265,6 +265,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
     swapTotalBytes: snapshot.swapTotal,
     swapFreeBytes: snapshot.swapFree,
+    psiSomeAvg10: snapshot.psiSomeAvg10,
     psiFullAvg10: snapshot.psiFullAvg10,
     trigger: governorTrigger,
   };

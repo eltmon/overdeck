@@ -319,6 +319,55 @@ describe('memory-pressure-patrol', () => {
       expect(details).toContain('MemAvailable');
       expect(details).toContain('Watch reserve');
     });
+
+    it('prints real swap and PSI readings in the details block', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          swapFreeBytes: 0,
+          swapTotalBytes: 8 * GIB,
+          psiSomeAvg10: 0,
+          psiFullAvg10: 0,
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].details).toContain('Swap: 0.0 GiB free of 8.0 GiB');
+      expect(emitted[0].details).toContain('PSI some avg10: 0.00 | full avg10: 0.00');
+      expect(emitted[0].details).not.toContain('Swap free: unavailable');
+    });
+
+    it('labels only unreadable PSI values unavailable while preserving swap readings', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          swapFreeBytes: 2 * GIB,
+          swapTotalBytes: 8 * GIB,
+          psiSomeAvg10: 0.12,
+          psiFullAvg10: null,
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].details).toContain('Swap: 2.0 GiB free of 8.0 GiB');
+      expect(emitted[0].details).toContain(
+        'PSI some avg10: 0.12 | full avg10: unavailable (pressure stall data not readable)',
+      );
+    });
   });
 
   describe('topMemoryConsumers', () => {

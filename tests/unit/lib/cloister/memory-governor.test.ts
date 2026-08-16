@@ -93,6 +93,7 @@ function procMemory(
   overrides: Partial<{
     swapTotal: number;
     swapFree: number;
+    psiSomeAvg10: number | null;
     psiFullAvg10: number | null;
   }> = {},
 ) {
@@ -100,6 +101,7 @@ function procMemory(
     memAvailable,
     swapTotal: 8 * GIB,
     swapFree: 8 * GIB,
+    psiSomeAvg10: 0,
     psiFullAvg10: 0,
     ...overrides,
   };
@@ -406,12 +408,14 @@ describe('assessMemoryPressure', () => {
   it('returns swap and PSI evidence in the verdict', async () => {
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
       swapFree: 2 * GIB,
+      psiSomeAvg10: 0.5,
       psiFullAvg10: 0.25,
     }));
 
     await expect(assessMemoryPressure()).resolves.toMatchObject({
       swapTotalBytes: 8 * GIB,
       swapFreeBytes: 2 * GIB,
+      psiSomeAvg10: 0.5,
       psiFullAvg10: 0.25,
     });
   });

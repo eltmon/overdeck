@@ -33,6 +33,7 @@ export interface MemoryVerdict {
   thresholds: MemoryPressureThresholds;
   swapTotalBytes?: number;
   swapFreeBytes?: number;
+  psiSomeAvg10?: number | null;
   psiFullAvg10?: number | null;
   trigger?: GovernorTrigger | null;
 }

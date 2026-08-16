@@ -41,6 +41,10 @@ function formatGib(bytes: number): string {
   return `${gib.toFixed(1)} GiB`;
 }
 
+function formatPsi(value: number | null | undefined): string {
+  return value == null ? 'unavailable (pressure stall data not readable)' : value.toFixed(2);
+}
+
 function formatTrigger(verdict: MemoryVerdict): string {
   const trigger = verdict.trigger;
   if (!trigger) {
@@ -78,17 +82,20 @@ function formatSheddingExit(verdict: MemoryVerdict, hardBytes: number, recoveryB
  * Format a multi-line memory details string for activity entry.
  */
 function buildMemoryDetails(
-  availableBytes: number,
+  verdict: MemoryVerdict,
   watchBytes: number,
   softBytes: number,
   hardBytes: number,
   recoveryBytes: number,
 ): string {
-  // For now, just the basic reserve info. We'll add swap and PSI data later in WI-3 and WI-4.
+  const swap = verdict.swapFreeBytes == null || verdict.swapTotalBytes == null
+    ? 'Swap: unavailable'
+    : `Swap: ${formatGib(verdict.swapFreeBytes)} free of ${formatGib(verdict.swapTotalBytes)}`;
   return [
-    `MemAvailable: ${formatGib(availableBytes)}`,
+    `MemAvailable: ${formatGib(verdict.availableBytes)}`,
     `Watch reserve: ${formatGib(watchBytes)} | Soft: ${formatGib(softBytes)} | Hard: ${formatGib(hardBytes)} | Recovery: ${formatGib(recoveryBytes)}`,
-    `Swap free: unavailable | PSI full avg10: unavailable`,
+    swap,
+    `PSI some avg10: ${formatPsi(verdict.psiSomeAvg10)} | full avg10: ${formatPsi(verdict.psiFullAvg10)}`,
   ].join('\n');
 }
 
@@ -202,7 +209,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
         source: 'cloister',
         link: '/resources',
         message,
-        details: `OOM kills in Overdeck tree:\n${details}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
+        details: `OOM kills in Overdeck tree:\n${details}\n\n${buildMemoryDetails(verdict, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
         desktop: true,
       });
 
@@ -228,7 +235,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
         source: 'cloister',
         link: '/resources',
         message,
-        details: `OOM kills outside Overdeck:\n${details}\n\n${buildMemoryDetails(verdict.availableBytes, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
+        details: `OOM kills outside Overdeck:\n${details}\n\n${buildMemoryDetails(verdict, watchBytes, softBytes, hardBytes, recoveryBytes)}`,
         desktop: false,
       });
 
@@ -252,7 +259,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
   // Build details with the base reserves and top consumers
   let details = buildMemoryDetails(
-    verdict.availableBytes,
+    verdict,
     watchBytes,
     softBytes,
     hardBytes,
