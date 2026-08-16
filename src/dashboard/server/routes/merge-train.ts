@@ -72,7 +72,7 @@ async function queueEntryForProject(
   if (!enabled) return { ...base, queue: [] };
 
   const projectPath = resolve(config.path);
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return { ...base, queue: [] };
 
   const queue = await Effect.runPromise(
@@ -131,7 +131,7 @@ export interface MergeTrainMergeNextDeps {
 }
 
 async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return [];
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),

@@ -134,7 +134,7 @@ function makeCleanupForProject(projectPath: string): () => Promise<void> {
     // none of them reachable from the wrapper path the monorepo cleanup uses.
     const projectConfig = findProjectByPathSync(projectPath);
     const cleanupGit = projectConfig?.workspace?.type === 'polyrepo'
-      ? buildPolyrepoCleanupGit(resolveProjectRepos(projectPath), projectPath)
+      ? buildPolyrepoCleanupGit(await resolveProjectRepos(projectPath), projectPath)
       : buildUatGenerationCleanupGit(projectPath);
 
     await cleanupUatGenerations(projectPath, {
@@ -170,7 +170,7 @@ async function runUatTrainReconcileForProject(
   }
 
   // Early exit if no candidates and no live generations — skip git operations
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   const liveGenerations = listUatGenerationsSync({
     projectRoot: projectPath,
     statuses: ['assembling', 'ready', 'superseded'],
@@ -240,7 +240,7 @@ async function runUatTrainReconcileForProject(
 async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
   const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return [];
 
   const queue = await Effect.runPromise(
@@ -278,8 +278,8 @@ function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
  * only the per-issue branch names differ, and callers here use the branches
  * from each feature's own contributions rather than these.
  */
-function resolveProjectRepos(projectPath: string, preferredIssueId?: string): ResolvedProjectRepo[] {
-  const issueId = preferredIssueId ?? listEligibleCandidatesByProject(projectPath)?.[0]?.issueId;
+async function resolveProjectRepos(projectPath: string, preferredIssueId?: string): Promise<ResolvedProjectRepo[]> {
+  const issueId = preferredIssueId ?? (await listEligibleCandidatesByProject(projectPath))[0]?.issueId;
   if (issueId) return resolveReposForIssue(issueId);
 
   // No candidate to resolve through — the exact state cleanup runs in after the
@@ -298,7 +298,7 @@ async function getPolyrepoReadySetForProject(projectPath: string): Promise<Ready
   const { computePolyrepoMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } =
     await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return [];
 
   const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
@@ -350,7 +350,7 @@ async function getPolyrepoBaseAnchor(
   const contributingKeys = new Set(
     (readySet ?? []).flatMap((f) => (f.repoContributions ?? []).map((c) => c.repoKey)),
   );
-  const repos = resolveProjectRepos(projectPath).filter((r) => contributingKeys.has(r.repoKey));
+  const repos = (await resolveProjectRepos(projectPath)).filter((r) => contributingKeys.has(r.repoKey));
   if (repos.length === 0) return '';
   const gitByRepo = buildPolyrepoGitDeps(repos);
 
@@ -389,7 +389,7 @@ async function assemblePolyrepoFromReadySetForProject(
   projectPath: string,
   features: readonly ReadyFeature[],
 ): Promise<UatGeneration> {
-  const repos = resolveProjectRepos(projectPath, features[0]?.issueId);
+  const repos = await resolveProjectRepos(projectPath, features[0]?.issueId);
   if (repos.length === 0) {
     throw new Error(`[uat-train] no member repos resolved for the polyrepo project at ${projectPath}`);
   }
@@ -765,7 +765,7 @@ export async function postUatGenerationPromotePayload(
   // and promote pushes to it. Fail closed rather than silently skipping a repo,
   // which would publish a partial batch.
   const writableKeys = polyrepo
-    ? new Set(resolveProjectRepos(root).filter((r) => r.required).map((r) => r.repoKey))
+    ? new Set((await resolveProjectRepos(root)).filter((r) => r.required).map((r) => r.repoKey))
     : new Set<string>();
   const nowReadOnly = polyrepo ? storedRepos.filter((r) => !writableKeys.has(r.repoKey)) : [];
   if (nowReadOnly.length > 0) {

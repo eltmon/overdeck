@@ -287,9 +287,13 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
         return { eligible: true };
       },
     }));
+    vi.doMock('../../../src/lib/cloister/merge-eligibility.js', () => ({
+      gatherMergeEligibility: async (issueIds: string[]) => new Map(issueIds.map((issueId) => [issueId, { bucket: issueId === 'PAN-3' ? 'in_flight' : 'planned_backlog' }])),
+      isMergeEligible: (membership: { bucket: string }) => membership.bucket === 'in_flight',
+    }));
 
     const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
-    const candidates = listEligibleCandidatesByProject('/repo/overdeck');
+    const candidates = await listEligibleCandidatesByProject('/repo/overdeck');
 
     // PAN-3 alone survives: PAN-1 is mid-review, PAN-2 still testing, PAN-4 is
     // deacon-ignored, PAN-5 is not ready, PAN-6 is merged, and MIN-9 belongs to another project.

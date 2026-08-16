@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
+import { gatherMergeEligibility, isMergeEligible } from './cloister/merge-eligibility.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
@@ -245,25 +246,23 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
  * No flywheel run required — sources directly from persistent pipeline state.
  * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
  */
-export function listEligibleCandidatesByProject(projectRoot: string): Array<{ issueId: string; title: string; pr?: number }> {
+export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {
   const project = findProjectByPathSync(projectRoot);
   if (!project) return [];
 
-  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
   const allStatuses = loadReviewStatuses();
+  const readyStatuses = Object.entries(allStatuses).filter(([, rs]) =>
+    rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible);
+  const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
+  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
 
-  for (const [issueId, rs] of Object.entries(allStatuses)) {
+  for (const [issueId, rs] of readyStatuses) {
     // Check if this issue belongs to this project
     const issueProject = resolveProjectFromIssueSync(issueId);
     if (!issueProject || issueProject.projectPath !== project.path) continue;
 
-    // Exclude deacon-ignored issues (AC 8)
-    if (rs.deaconIgnored === true) continue;
-
-    // Check if it's merge-eligible
-    if (rs.readyForMerge !== true) continue;
-    const eligibility = mergeGateEligibility(rs);
-    if (!eligibility.eligible) continue;
+    const membership = memberships.get(issueId.toUpperCase());
+    if (!membership || !isMergeEligible(membership)) continue;
 
     // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
     candidates.push({ issueId, title: issueId, pr: rs.prNumber });

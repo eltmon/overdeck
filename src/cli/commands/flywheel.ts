@@ -427,7 +427,7 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
 }
 
 async function formatMergeQueueForCli(cwd: string, json?: boolean): Promise<string> {
-  const q = await Effect.runPromise(computeMergeQueueFromCandidates(listEligibleCandidatesByProject(cwd), cwd).pipe(Effect.provide(nodeServicesLayer)));
+  const q = await Effect.runPromise(computeMergeQueueFromCandidates(await listEligibleCandidatesByProject(cwd), cwd).pipe(Effect.provide(nodeServicesLayer)));
   return json ? JSON.stringify({ mergeQueue: q }, null, 2) : `Merge queue:\n${q.map(i => `  ${i.pr ? `#${i.pr}` : 'no-pr'} ${i.issueId} ${i.title}`).join('\n') || '  (empty)'}`;
 }
 
@@ -817,7 +817,7 @@ export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = 
 
 async function buildFlywheelStateReport(status: FlywheelStatus, cwd: string): Promise<string> {
   // PAN-1696: Compute the merge queue from the pipeline ready set, not flywheel activePipeline.
-  const candidates = listEligibleCandidatesByProject(cwd);
+  const candidates = await listEligibleCandidatesByProject(cwd);
   const mergeQueue = await Effect.runPromise(computeMergeQueueFromCandidates(candidates, cwd).pipe(Effect.provide(nodeServicesLayer)));
   return formatFlywheelStateReport(status, mergeQueue);
 }
