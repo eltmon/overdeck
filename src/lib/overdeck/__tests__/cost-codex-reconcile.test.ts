@@ -94,16 +94,15 @@ describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
   it('returns cold-sweep events in bounded batches', async () => {
     const rolloutFile = seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
     appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });
+    const batches: Array<{ events: unknown[]; verdicts: unknown[] }> = [];
 
-    const first = await collectCodexCostEvents({ maxEvents: 1 });
-    expect(first.events).toHaveLength(1);
-    expect(first.verdicts).toHaveLength(0);
-    expect(first.done).toBe(false);
-
-    const second = await collectCodexCostEvents({ maxEvents: 1, cursor: first.nextCursor ?? undefined });
-    expect(second.events).toHaveLength(1);
-    expect(second.verdicts).toHaveLength(1);
-    expect(second.done).toBe(true);
+    const result = await collectCodexCostEvents({
+      maxEvents: 1,
+      onBatch: async batch => { batches.push(batch); },
+    });
+    expect(batches.map(batch => batch.events.length)).toEqual([1, 1, 0]);
+    expect(batches.at(-1)?.verdicts).toHaveLength(1);
+    expect(result.events).toHaveLength(0);
   });
 });
 

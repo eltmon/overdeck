@@ -52,6 +52,14 @@ interface DashboardDbRequest {
   payload: unknown;
 }
 
+interface DashboardDbAck {
+  id: string;
+  ack: number;
+}
+
+const progressAcks = new Map<string, () => void>();
+let progressSequence = 0;
+
 function aggregateDiscoveredSessionCostByPayload(payload: unknown) {
   if (typeof payload === 'string') {
     return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'month');
@@ -65,8 +73,12 @@ async function runJob(
   operation: DashboardDbOperation,
   payload: unknown,
 ): Promise<unknown> {
-  const emitProgress = (progress: unknown) => {
-    parentPort?.postMessage({ id, progress });
+  const emitProgress = (progress: unknown): Promise<void> => {
+    const progressSeq = ++progressSequence;
+    return new Promise(resolve => {
+      progressAcks.set(`${id}:${progressSeq}`, resolve);
+      parentPort?.postMessage({ id, progress, progressSeq });
+    });
   };
 
   switch (operation) {
@@ -125,8 +137,8 @@ async function runJob(
     }
     case 'costReconcileSweep':
       return (payload as { source: 'codex' | 'pi' }).source === 'pi'
-        ? collectPiCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number })
-        : collectCodexCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number });
+        ? collectPiCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress })
+        : collectCodexCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress });
   }
 }
 
@@ -169,7 +181,13 @@ function drainQueue(): void {
   }
 }
 
-parentPort?.on('message', (message: DashboardDbRequest) => {
+parentPort?.on('message', (message: DashboardDbRequest | DashboardDbAck) => {
+  if ('ack' in message) {
+    const resolve = progressAcks.get(`${message.id}:${message.ack}`);
+    progressAcks.delete(`${message.id}:${message.ack}`);
+    resolve?.();
+    return;
+  }
   queue.push(message);
   drainQueue();
 });

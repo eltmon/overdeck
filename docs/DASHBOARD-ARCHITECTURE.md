@@ -54,9 +54,10 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
 - `costReconcileSweep` walks and parses transcript files in the `long` lane. The main
-  thread requests bounded 250-event batches and records each batch through the canonical
-  write doors before requesting the next one. This limits worker transfer memory while
-  preserving EventBus publication and durable skip-cache updates.
+  thread records bounded 250-event progress batches through the canonical write doors and
+  acknowledges each batch before the worker continues its single-pass scan. This limits
+  transfer memory without repeated parsing while preserving EventBus publication and
+  durable skip-cache updates.
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared

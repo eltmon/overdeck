@@ -72,6 +72,7 @@ interface WorkerResponse {
   ok?: boolean;
   result?: unknown;
   progress?: unknown;
+  progressSeq?: number;
   startedAt?: number;
   finishedAt?: number;
   error?: {
@@ -182,6 +183,8 @@ function getWorker(lane: WorkerLane): Worker {
         for (const listener of job.progressListeners) {
           await listener(message.progress);
         }
+      }).finally(() => {
+        worker.postMessage({ id: message.id, ack: message.progressSeq });
       });
       return;
     }
@@ -291,8 +294,8 @@ async function executeInline(
     }
     case 'costReconcileSweep':
       return (payload as { source: 'codex' | 'pi' }).source === 'pi'
-        ? collectPiCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number })
-        : collectCodexCostEvents(payload as { cursor?: { file: string; eventOffset: number }; maxEvents?: number });
+        ? collectPiCostEvents({ ...(payload as { maxEvents?: number }), onBatch: async batch => onProgress?.(batch) })
+        : collectCodexCostEvents({ ...(payload as { maxEvents?: number }), onBatch: async batch => onProgress?.(batch) });
   }
 }
 

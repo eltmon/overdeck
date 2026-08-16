@@ -61,14 +61,14 @@ describe('collectPiCostEvents', () => {
       })),
     ].join('\n'));
 
-    const first = await collectPiCostEvents({ maxEvents: 1 });
-    expect(first.events).toHaveLength(1);
-    expect(first.verdicts).toHaveLength(0);
-    expect(first.done).toBe(false);
+    const batches: Array<{ events: unknown[]; verdicts: unknown[] }> = [];
+    const result = await collectPiCostEvents({
+      maxEvents: 1,
+      onBatch: async batch => { batches.push(batch); },
+    });
 
-    const second = await collectPiCostEvents({ maxEvents: 1, cursor: first.nextCursor ?? undefined });
-    expect(second.events).toHaveLength(1);
-    expect(second.verdicts).toHaveLength(1);
-    expect(second.done).toBe(true);
+    expect(batches.map(batch => batch.events.length)).toEqual([1, 1, 0]);
+    expect(batches.at(-1)?.verdicts).toHaveLength(1);
+    expect(result.events).toHaveLength(0);
   });
 });
