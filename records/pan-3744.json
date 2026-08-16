@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:30:49.035Z",
+  "updated": "2026-08-16T09:30:53.224Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -159,5 +159,31 @@
     "docs-loading-states.ac1": "completed",
     "docs-loading-states.ac2": "completed",
     "docs-loading-states.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/TranscriptLoadingSkeleton.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
+    ],
+    "recordedAt": "2026-08-16T09:30:53.223Z"
   }
 }
