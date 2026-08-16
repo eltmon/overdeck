@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-16T18:48:17.794Z",
+  "updated": "2026-08-16T18:59:31.235Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "review-status-retirement": {
-        "writerId": "agent-pan-3753",
-        "agentId": "agent-pan-3753",
-        "pid": 675531,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T18:48:17.793Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3753",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Made merge-train candidate projection async, filtered through canonical in_flight membership, updated every caller, and added projection regression coverage.",
         "releasedAt": "2026-08-16T18:48:05.978Z"
+      },
+      {
+        "writerId": "agent-pan-3753",
+        "agentId": "agent-pan-3753",
+        "pid": 675531,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T18:48:17.793Z",
+        "itemId": "review-status-retirement",
+        "outcome": "completed",
+        "reason": "Added persisted retiredAt schema marker, closed-PR/webhook/lazy retirement triggers, fresh-PR and work-restart clears, merge-gate rejection, and regression tests.",
+        "releasedAt": "2026-08-16T18:59:31.235Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "projection-gate-merge-eligibility": {
         "reason": "Made merge-train candidate projection async, filtered through canonical in_flight membership, updated every caller, and added projection regression coverage.",
         "updatedAt": "2026-08-16T18:48:05.978Z"
+      },
+      "review-status-retirement": {
+        "reason": "Added persisted retiredAt schema marker, closed-PR/webhook/lazy retirement triggers, fresh-PR and work-restart clears, merge-gate rejection, and regression tests.",
+        "updatedAt": "2026-08-16T18:59:31.235Z"
       }
     }
   },
@@ -108,6 +115,10 @@
     "projection-gate-merge-eligibility.ac1": "completed",
     "projection-gate-merge-eligibility.ac2": "completed",
     "projection-gate-merge-eligibility.ac3": "completed",
-    "review-status-retirement": "running"
+    "review-status-retirement": "completed",
+    "review-status-retirement.ac1": "completed",
+    "review-status-retirement.ac2": "completed",
+    "review-status-retirement.ac3": "completed",
+    "review-status-retirement.ac4": "completed"
   }
 }
