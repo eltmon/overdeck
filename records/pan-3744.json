@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-16T09:12:12.320Z",
+  "updated": "2026-08-16T09:14:19.465Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-loading-states": {
-        "writerId": "agent-pan-3744",
-        "agentId": "agent-pan-3744",
-        "pid": 2420180,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-16T09:12:12.320Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3744",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Mocked WS transport payload timing and added passing tests for pre-payload loading, empty first payload greeting, and reset-on-switch; all 33 panel tests pass.",
         "releasedAt": "2026-08-16T09:11:50.432Z"
+      },
+      {
+        "writerId": "agent-pan-3744",
+        "agentId": "agent-pan-3744",
+        "pid": 2420180,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-16T09:12:12.320Z",
+        "itemId": "docs-loading-states",
+        "outcome": "completed",
+        "reason": "Documented the five conversation loading/empty states and added the PAN-3744 hook-local signal rationale. Typecheck and lint pass.",
+        "releasedAt": "2026-08-16T09:14:19.464Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "first-payload-panel-tests": {
         "reason": "Mocked WS transport payload timing and added passing tests for pre-payload loading, empty first payload greeting, and reset-on-switch; all 33 panel tests pass.",
         "updatedAt": "2026-08-16T09:11:50.432Z"
+      },
+      "docs-loading-states": {
+        "reason": "Documented the five conversation loading/empty states and added the PAN-3744 hook-local signal rationale. Typecheck and lint pass.",
+        "updatedAt": "2026-08-16T09:14:19.464Z"
       }
     }
   },
@@ -148,6 +155,9 @@
     "first-payload-panel-tests.ac2": "completed",
     "first-payload-panel-tests.ac3": "completed",
     "first-payload-panel-tests.ac4": "completed",
-    "docs-loading-states": "running"
+    "docs-loading-states": "completed",
+    "docs-loading-states.ac1": "completed",
+    "docs-loading-states.ac2": "completed",
+    "docs-loading-states.ac3": "completed"
   }
 }
