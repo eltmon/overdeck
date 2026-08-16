@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
-import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
@@ -238,19 +237,11 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
  *
  * Takes a typed LauncherConfig and returns a bash script string.
  * Callers are responsible for building providerExports, cavemanExports,
- * and baseCommand strings — the generator does NOT call helper functions
- * internally (keeps coupling low, tests simple).
+ * and baseCommand strings, and must await omp model-registry provisioning
+ * before generation. The generator does NOT perform I/O internally.
  */
 export function generateLauncherScriptSync(config: LauncherConfig): string {
   const lines: string[] = [];
-
-  // PAN-3531: omp resolves --model against its bundled catalog plus the user
-  // registry at ~/.omp/agent/models.json; providers absent from the catalog
-  // (dashscope) must be provisioned before spawn or omp fails with
-  // "No model selected".
-  if (config.harness === 'ohmypi' && config.model) {
-    provisionOhmypiProviderForModel(config.model);
-  }
 
   // Shebang
   lines.push('#!/bin/bash');

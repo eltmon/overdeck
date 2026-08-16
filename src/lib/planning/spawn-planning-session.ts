@@ -36,6 +36,7 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
 import {
@@ -692,6 +693,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);
+    if (effectiveHarness === 'ohmypi' && planningModel) {
+      await provisionOhmypiProviderForModel(planningModel);
+    }
     await writeFile(
       launcherScript,
       generateLauncherScriptSync({

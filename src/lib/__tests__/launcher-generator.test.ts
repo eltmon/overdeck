@@ -1,9 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
+
+vi.mock('../ohmypi-models.js', () => ({
+  provisionOhmypiProviderForModel: vi.fn(),
+}));
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.overdeck/ui-theme.json) deterministically uses the dark default
@@ -1247,6 +1252,19 @@ describe('generateLauncherWrapper', () => {
 
 describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   // ─── ohmypi harness tests ──────────────────────────────────────────────────
+
+  it('ohmypi: generation is pure and does not provision the user registry', () => {
+    generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      harness: 'ohmypi',
+      model: 'ollama:gemma4:12b',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+    });
+
+    expect(provisionOhmypiProviderForModel).not.toHaveBeenCalled();
+  });
 
   it('ohmypi: emits omp --mode rpc with --extension, no --no-context-files, and stdin from fifo (AC1)', () => {
     const script = generateLauncherScriptSync({

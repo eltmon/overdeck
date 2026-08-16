@@ -53,6 +53,7 @@ import { writePtyToken } from '../pty-token.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -728,6 +729,9 @@ export async function spawnConversationSession(
     channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
     writeBridgeTokenSync(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
+  }
+  if (harness === 'ohmypi' && model) {
+    await provisionOhmypiProviderForModel(model);
   }
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
   // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations

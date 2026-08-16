@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
@@ -395,6 +396,7 @@ export async function messageAgent(
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
+    if (fallbackHarness === 'ohmypi') await provisionOhmypiProviderForModel(resumeModel);
     const fallbackContent = generateLauncherScriptSync({
       role: resumeRole,
       workingDir: agentState.workspace,

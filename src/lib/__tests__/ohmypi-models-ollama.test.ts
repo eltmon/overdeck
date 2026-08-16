@@ -20,9 +20,9 @@ describe('Ollama Pi model registry provisioning', () => {
     });
   });
 
-  it('registers the bare Ollama tag against the OpenAI-compatible endpoint env', () => {
+  it('registers the bare Ollama tag against the OpenAI-compatible endpoint env', async () => {
     const agentDir = mkdtempSync(join(tmpdir(), 'overdeck-ollama-models-'));
-    provisionOhmypiProviderForModel('ollama:gemma4:12b', agentDir);
+    await provisionOhmypiProviderForModel('ollama:gemma4:12b', agentDir);
 
     const registry = JSON.parse(readFileSync(join(agentDir, 'models.json'), 'utf8')) as {
       providers: Record<string, { baseUrl: string; apiKey: string; models: Array<{ id: string }> }>;

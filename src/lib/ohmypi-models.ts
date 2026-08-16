@@ -14,9 +14,10 @@
  * launcher exports the matching values through getProviderEnvSync().
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { loadConfigSync } from './config-yaml.js';
 import { getDashScopeUpstreamBaseUrl } from './openai-compatible-proxy.js';
@@ -86,6 +87,8 @@ function ompProviderDef(providerName: string, modelId: string): OmpProviderDef |
 /** Providers Overdeck provisions into the omp user registry at spawn time. */
 const PROVISIONED_PROVIDERS = new Set(['dashscope', 'ollama']);
 
+const registryUpdates = new Map<string, Promise<void>>();
+
 /**
  * Merge-write the omp user registry for the provider behind `modelId`.
  * No-op for providers the bundled catalog already covers. Accepts both bare
@@ -94,7 +97,7 @@ const PROVISIONED_PROVIDERS = new Set(['dashscope', 'ollama']);
  * with a clear message when an existing models.json is unparseable — user
  * config is never silently overwritten. `agentDir` exists for tests.
  */
-export function provisionOhmypiProviderForModel(modelId: string, agentDir?: string): void {
+export async function provisionOhmypiProviderForModel(modelId: string, agentDir?: string): Promise<void> {
   const prefix = modelId.split('/')[0];
   const providerName = PROVISIONED_PROVIDERS.has(prefix) ? prefix : getProviderForModelSync(modelId).name;
   const def = ompProviderDef(providerName, modelId);
@@ -103,22 +106,37 @@ export function provisionOhmypiProviderForModel(modelId: string, agentDir?: stri
   const dir = agentDir ?? join(homedir(), '.omp', 'agent');
   const registryPath = join(dir, 'models.json');
 
-  let registry: { providers?: Record<string, unknown> } = {};
-  if (existsSync(registryPath)) {
+  const previous = registryUpdates.get(registryPath) ?? Promise.resolve();
+  const update = previous.catch(() => undefined).then(async () => {
+    let registry: { providers?: Record<string, unknown> } = {};
     try {
-      registry = JSON.parse(readFileSync(registryPath, 'utf8')) as typeof registry;
+      const source = await readFile(registryPath, 'utf8');
+      try {
+        registry = JSON.parse(source) as typeof registry;
+      } catch (err) {
+        throw new Error(
+          `Cannot provision the '${providerName}' provider: ${registryPath} is not valid JSON. ` +
+            `Fix or remove it manually — Overdeck will not overwrite it. (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
     } catch (err) {
-      throw new Error(
-        `Cannot provision the '${providerName}' provider: ${registryPath} is not valid JSON. ` +
-          `Fix or remove it manually — Overdeck will not overwrite it. (${err instanceof Error ? err.message : String(err)})`,
-      );
+      if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) throw err;
     }
-  }
 
-  registry.providers = { ...registry.providers, [providerName]: def };
+    if (isDeepStrictEqual(registry.providers?.[providerName], def)) return;
 
-  mkdirSync(dir, { recursive: true });
-  const tmp = `${registryPath}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(registry, null, 2)}\n`);
-  renameSync(tmp, registryPath);
+    registry.providers = { ...registry.providers, [providerName]: def };
+
+    await mkdir(dir, { recursive: true });
+    const tmp = `${registryPath}.${process.pid}.tmp`;
+    await writeFile(tmp, `${JSON.stringify(registry, null, 2)}\n`);
+    await rename(tmp, registryPath);
+  });
+
+  let tracked: Promise<void>;
+  tracked = update.finally(() => {
+    if (registryUpdates.get(registryPath) === tracked) registryUpdates.delete(registryPath);
+  });
+  registryUpdates.set(registryPath, tracked);
+  return tracked;
 }

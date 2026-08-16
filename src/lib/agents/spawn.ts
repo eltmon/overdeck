@@ -13,6 +13,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { refreshWorkStartReviewedAnchor, resetWorkStartPipelineVerdicts } from '../cloister/work-start-verdicts.js';
 import { recordAgentPlaneSpawn } from '../pan-dir/agents.js';
@@ -379,6 +380,9 @@ async function spawnRunWithoutConsentClaim(
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
 
+  if (resolvedHarness === 'ohmypi' && selectedModel) {
+    await provisionOhmypiProviderForModel(selectedModel);
+  }
   const launcherContent = generateLauncherScriptSync({
     role,
     workingDir: workspace,

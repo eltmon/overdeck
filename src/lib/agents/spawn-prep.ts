@@ -13,6 +13,7 @@ import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } fr
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId, ComplexityLevel } from '../settings.js';
 import { requireModelOverrideSync } from '../model-validation.js';
@@ -526,6 +527,10 @@ export async function buildAgentLaunchConfig(opts: {
         launchRole,
       )
     : {};
+
+  if (opts.harness === 'ohmypi' && model) {
+    await provisionOhmypiProviderForModel(model);
+  }
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
     // Resume sessions adopt the role definition via --agent.

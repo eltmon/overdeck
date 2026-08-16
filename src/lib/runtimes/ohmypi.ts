@@ -47,6 +47,7 @@ import { sessionExists, killSession, createSession, listSessionsSync, getManaged
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
+import { provisionOhmypiProviderForModel } from '../ohmypi-models.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
@@ -351,6 +352,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       )
     }
 
+    if (config.model) await provisionOhmypiProviderForModel(config.model)
     const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
