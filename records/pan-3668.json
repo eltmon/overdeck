@@ -447,7 +447,7 @@
     "recordedAt": "2026-08-13T13:46:44.006Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-17T13:39:04.653Z",
+  "updated": "2026-08-17T13:39:06.797Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "reviewing",
@@ -519,8 +519,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3668",
