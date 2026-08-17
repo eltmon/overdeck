@@ -355,6 +355,7 @@ CREATE TABLE `review_status` (
 	`strike_next_attempt_at` integer,
 	`strike_landing_attempts` text,
 	`review_cycle_history` text,
+	`retired_at` integer,
 	`conflicts_since` text
 );
 --> statement-breakpoint

@@ -63,6 +63,8 @@ export interface UatReconcilerDeps {
    * the single branch head SHA. Omit for monorepo.
    */
   getFeatureAnchor?(feature: ReadyFeature): Promise<string>;
+  /** Positive merge evidence for a generation branch; omitted when unavailable. */
+  isGenerationContainedInMain?(generation: UatGeneration): Promise<boolean>;
   store: GenerationStorePort;
   /** Assemble the next generation from the desired set (the engine). */
   assemble(features: readonly ReadyFeature[]): Promise<UatGeneration>;
@@ -195,8 +197,14 @@ export async function reconcileUatGenerations(
     }
     const desiredIds = new Set(readySet.map((f) => f.issueId.toUpperCase()));
 
-    // 1. Invalidate stale live generations (stack teardown included).
+    // Promoted is terminal: stamp positive merge evidence before stale checks,
+    // and never include promoted rows in the live list passed to isStale.
     for (const gen of deps.store.listChain(projectRoot, ['ready', 'superseded'])) {
+      if (await deps.isGenerationContainedInMain?.(gen).catch(() => false)) {
+        log(`[uat-reconciler] stamping ${gen.name} promoted — branch is contained in main`);
+        deps.store.update(gen.name, { status: 'promoted' });
+        continue;
+      }
       const staleReason = isStale(gen, desiredIds, headShas);
       if (!staleReason) continue;
       log(`[uat-reconciler] invalidating ${gen.name}: ${staleReason}`);

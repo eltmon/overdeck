@@ -23,6 +23,13 @@ import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
+import { parseAcpConversationMessages } from './acp-conversation-parser.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { parseKimiConversationMessages } from './kimi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
+import { parsePiConversationMessages } from './pi-conversation-parser.js';
+import { parseEntireConversation } from './conversation-service.js';
+import type { ParseResult } from './conversation-service.js';
 
 type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -44,7 +51,20 @@ type DashboardDbOperation =
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
+  | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
+
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
+
+const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
+  pi: parsePiConversationMessages,
+  ohmypi: parseOhmypiConversationMessages,
+  codex: parseCodexConversationMessages,
+  acp: parseAcpConversationMessages,
+  kimi: parseKimiConversationMessages,
+  'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
+};
 
 interface DashboardDbRequest {
   id: string;
@@ -112,6 +132,12 @@ async function runJob(
       return embedSessions({ ...(payload as EmbedSessionsOptions), autoInstall: true, onProgress: emitProgress });
     case 'getConversationByName':
       return getConversationByName(payload as string);
+    case 'parseTranscriptSnapshot': {
+      const input = payload as { sessionFile: string; parser: string };
+      const parser = transcriptParsers[input.parser as TranscriptParserName];
+      if (!parser) throw new Error(`Unknown transcript parser: ${input.parser}`);
+      return parser(input.sessionFile);
+    }
     case 'getSetting':
       return getSetting(payload as string);
     case 'setSetting': {
@@ -150,7 +176,10 @@ async function execute(message: DashboardDbRequest): Promise<void> {
   const startedAt = Date.now();
   try {
     const result = await runJob(message.id, message.operation, message.payload);
-    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now() });
+    const bytes = message.operation === 'parseTranscriptSnapshot'
+      ? (result as ParseResult).byteOffset
+      : undefined;
+    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now(), bytes });
   } catch (err) {
     parentPort?.postMessage({
       id: message.id,

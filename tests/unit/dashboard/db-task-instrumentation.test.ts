@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/lib/overdeck/cost.js', () => ({
   collectCodexCostEvents: vi.fn(async () => ({ events: [], verdicts: [], stats: { scanned: 0, cacheSkipped: 0 } })),
@@ -9,6 +9,15 @@ import {
   formatSlowJobLine,
   runDashboardDbJob,
 } from '../../../src/dashboard/server/services/dashboard-db-task.js';
+
+const piFixture = new URL(
+  '../../../src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl',
+  import.meta.url,
+);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('dashboard database job instrumentation', () => {
   it('formats queue wait from enqueue and start stamps', () => {
@@ -28,6 +37,12 @@ describe('dashboard database job instrumentation', () => {
     })).toBe('[db-jobs] slow: op=costReconcileSweep lane=long waitMs=20 runMs=1001 depth=0');
   });
 
+  it('includes parsed bytes only for transcript parse slow lines', () => {
+    expect(formatSlowJobLine({
+      op: 'parseTranscriptSnapshot', lane: 'parse', waitMs: 0, runMs: 1_001, depth: 0, bytes: 25_000_000,
+    })).toBe('[db-jobs] slow: op=parseTranscriptSnapshot lane=parse waitMs=0 runMs=1001 depth=0 bytes=25000000');
+  });
+
   it('returns null when wait and run time are at the threshold', () => {
     expect(formatSlowJobLine({
       op: 'getDiscoveredStats', lane: 'read', waitMs: 1_000, runMs: 1_000, depth: 0,
@@ -42,6 +57,21 @@ describe('dashboard database job instrumentation', () => {
 
     expect(warnSpy).toHaveBeenCalledWith(
       '[db-jobs] slow: op=costReconcileSweep lane=long waitMs=0 runMs=1001 depth=0',
+    );
+  });
+
+  it('logs parsed bytes for a slow inline transcript parse', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    let nowCalls = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => ++nowCalls === 1 ? 1_000 : 2_001);
+
+    const result = await runDashboardDbJob<{ byteOffset: number }>('parseTranscriptSnapshot', {
+      sessionFile: piFixture.pathname,
+      parser: 'pi',
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      `[db-jobs] slow: op=parseTranscriptSnapshot lane=parse waitMs=0 runMs=1001 depth=0 bytes=${result.byteOffset}`,
     );
   });
 });

@@ -24,6 +24,13 @@ import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
+import { parseAcpConversationMessages } from './acp-conversation-parser.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { parseKimiConversationMessages } from './kimi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
+import { parsePiConversationMessages } from './pi-conversation-parser.js';
+import { parseEntireConversation } from './conversation-service.js';
+import type { ParseResult } from './conversation-service.js';
 
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -45,10 +52,23 @@ export type DashboardDbOperation =
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
+  | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
-export type WorkerLane = 'read' | 'long' | 'semantic';
+export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
+
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
+
+const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
+  pi: parsePiConversationMessages,
+  ohmypi: parseOhmypiConversationMessages,
+  codex: parseCodexConversationMessages,
+  acp: parseAcpConversationMessages,
+  kimi: parseKimiConversationMessages,
+  'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
+};
 
 interface PendingJob {
   lane: WorkerLane;
@@ -75,6 +95,7 @@ interface WorkerResponse {
   progressSeq?: number;
   startedAt?: number;
   finishedAt?: number;
+  bytes?: number;
   error?: {
     name?: string;
     message?: string;
@@ -93,9 +114,10 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'embedSessions',
   'searchSessionsSemantic',
   'listSubstrateBugWeights',
+  'parseTranscriptSnapshot',
 ]);
 
-const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null };
+const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null };
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 let latestSemanticJobId: string | null = null;
@@ -106,9 +128,11 @@ export function formatSlowJobLine(input: {
   waitMs: number;
   runMs: number;
   depth: number;
+  bytes?: number;
 }): string | null {
   if (input.waitMs <= 1_000 && input.runMs <= 1_000) return null;
-  return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}`;
+  const bytes = input.bytes === undefined ? '' : ` bytes=${input.bytes}`;
+  return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}${bytes}`;
 }
 
 function workerScriptUrl(): URL {
@@ -146,6 +170,7 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 
 export function workerLane(operation: DashboardDbOperation): WorkerLane {
   if (operation === 'searchSessionsSemantic') return 'semantic';
+  if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';
   return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
 }
@@ -199,6 +224,7 @@ function getWorker(lane: WorkerLane): Worker {
         waitMs: message.startedAt - job.enqueuedAt,
         runMs: message.finishedAt - message.startedAt,
         depth: [...pending.values()].filter(pendingJob => pendingJob.lane === job.lane).length,
+        bytes: message.bytes,
       });
       if (line) console.warn(line);
     }
@@ -269,6 +295,12 @@ async function executeInline(
       return embedSessions({ ...(payload as EmbedSessionsOptions), autoInstall: true, onProgress });
     case 'getConversationByName':
       return getConversationByName(payload as string);
+    case 'parseTranscriptSnapshot': {
+      const input = payload as { sessionFile: string; parser: string };
+      const parser = transcriptParsers[input.parser as TranscriptParserName];
+      if (!parser) throw new Error(`Unknown transcript parser: ${input.parser}`);
+      return parser(input.sessionFile);
+    }
     case 'getSetting':
       return getSetting(payload as string);
     case 'setSetting': {
@@ -305,12 +337,16 @@ async function runInline(
   onProgress?: (progress: unknown) => void | Promise<void>,
 ): Promise<unknown> {
   const startedAt = Date.now();
+  let bytes: number | undefined;
   try {
-    return await executeInline(operation, payload, onProgress);
+    const result = await executeInline(operation, payload, onProgress);
+    if (operation === 'parseTranscriptSnapshot') bytes = (result as ParseResult).byteOffset;
+    return result;
   } finally {
     const line = formatSlowJobLine({
       op: operation, lane: workerLane(operation), waitMs: 0,
       runMs: Date.now() - startedAt, depth: 0,
+      bytes,
     });
     if (line) console.warn(line);
   }
@@ -321,15 +357,25 @@ export function runDashboardDbJob<T>(
   payload?: unknown,
   onProgress?: (progress: unknown) => void | Promise<void>,
 ): Promise<T> {
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
-    return runInline(operation, payload, onProgress) as Promise<T>;
-  }
-
   const key = coalescingKey(operation, payload);
   const existing = key ? sharedJobs.get(key) : undefined;
   if (existing) {
     if (onProgress) existing.progressListeners.add(onProgress);
     return existing.promise as Promise<T>;
+  }
+
+  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
+    const progressListeners = new Set<ProgressHandler>();
+    if (onProgress) progressListeners.add(onProgress);
+    const promise = runInline(operation, payload, onProgress) as Promise<T>;
+    if (key) {
+      sharedJobs.set(key, { lane: workerLane(operation), promise, progressListeners });
+      promise.then(
+        () => sharedJobs.delete(key),
+        () => sharedJobs.delete(key),
+      );
+    }
+    return promise;
   }
 
   if (pending.size >= MAX_PENDING_JOBS) {

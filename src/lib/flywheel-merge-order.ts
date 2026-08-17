@@ -245,25 +245,23 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
  * No flywheel run required — sources directly from persistent pipeline state.
  * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
  */
-export function listEligibleCandidatesByProject(projectRoot: string): Array<{ issueId: string; title: string; pr?: number }> {
+export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {
   const project = findProjectByPathSync(projectRoot);
   if (!project) return [];
 
-  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
   const allStatuses = loadReviewStatuses();
-
-  for (const [issueId, rs] of Object.entries(allStatuses)) {
-    // Check if this issue belongs to this project
+  const readyStatuses = Object.entries(allStatuses).filter(([issueId, rs]) => {
     const issueProject = resolveProjectFromIssueSync(issueId);
-    if (!issueProject || issueProject.projectPath !== project.path) continue;
+    return issueProject?.projectPath === project.path &&
+      rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible;
+  });
+  const { gatherMergeEligibility, isMergeEligible } = await import('./cloister/merge-eligibility.js');
+  const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
+  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
 
-    // Exclude deacon-ignored issues (AC 8)
-    if (rs.deaconIgnored === true) continue;
-
-    // Check if it's merge-eligible
-    if (rs.readyForMerge !== true) continue;
-    const eligibility = mergeGateEligibility(rs);
-    if (!eligibility.eligible) continue;
+  for (const [issueId, rs] of readyStatuses) {
+    const membership = memberships.get(issueId.toUpperCase());
+    if (!membership || !isMergeEligible(membership)) continue;
 
     // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
     candidates.push({ issueId, title: issueId, pr: rs.prNumber });

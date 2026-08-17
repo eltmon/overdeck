@@ -744,7 +744,7 @@ setTimeout(() => {
     });
 }, 1000);
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
-fixStuckReadyForMerge();
+await fixStuckReadyForMerge();
 // PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
 fixStuckCommentedReviews();
 // PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
