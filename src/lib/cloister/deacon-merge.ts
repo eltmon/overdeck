@@ -23,7 +23,6 @@ export { reconcileAutoMergeRows } from './deacon-auto-merge-reconcile.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-
 interface MergeReminderState {
   mergeStuckAttempts?: Record<string, number>;
 }
@@ -154,7 +153,7 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 
     for (const [issueId, status] of Object.entries(statuses)) {
       const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
-      if (status.mergeStatus === 'merged' && !postMergeIncomplete) continue;
+      if (status.retiredAt || (status.mergeStatus === 'merged' && !postMergeIncomplete)) continue;
       if (isStuckMergingState(status, Date.now())) continue;
       if (!postMergeIncomplete && staleMergeReconciled.has(issueId)) continue;
 
@@ -288,7 +287,7 @@ export async function reconcileFalseMerged(): Promise<string[]> {
     const statuses = loadReviewStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus !== 'merged') continue;
+      if (status.retiredAt || status.mergeStatus !== 'merged') continue;
       if (!status.prUrl) continue;
       if (falseMergedReset.has(issueId)) continue;
 
@@ -359,7 +358,7 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (!status.readyForMerge) continue;
+      if (status.retiredAt || !status.readyForMerge) continue;
       if (!status.prUrl) continue;
 
       const cooledUntil = closedPrReadyReconcileCooldowns.get(issueId);
@@ -387,7 +386,7 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
         } else {
           setReviewStatusSync(issueId, {
             readyForMerge: false,
-            mergeStatus: 'failed',
+            retiredAt: new Date(now).toISOString(),
             mergeNotes: `PR #${prNumber} was closed without merging — reopen the PR or reset review state to re-queue this issue`,
           });
           const msg = `Reset readyForMerge for ${issueId} — PR #${prNumber} is ${prState.state} (not OPEN)`;
@@ -431,29 +430,43 @@ const STALE_MERGE_BLOCKER_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
  * cooldown bounds the git-probe cost; resolveConflictGate also caches its
  * mergeability probe.
  */
-export async function reconcileStaleMergeBlockers(): Promise<string[]> {
+export async function reconcileStaleMergeBlockers(
+  gatherEligibility: typeof import('./merge-eligibility.js').gatherMergeEligibility = async (ids) =>
+    (await import('./merge-eligibility.js')).gatherMergeEligibility(ids),
+  workspaceExists: typeof existsSync = existsSync,
+  resolveWorkspace: (issueId: string) => string | null = (issueId) => {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    return resolved
+      ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
+      : null;
+  },
+): Promise<string[]> {
   const actions: string[] = [];
   try {
     const { resolveConflictGate, buildRealConflictGateDeps } = await import('./conflict-gate.js');
     const statuses = loadReviewStatuses();
     const now = Date.now();
     const deps = buildRealConflictGateDeps();
-
-    for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus === 'merged') continue;
-      const hasMergeBlocker = (status.blockerReasons ?? []).some(
+    const candidates = Object.entries(statuses).filter(([, status]) =>
+      !status.retiredAt && status.mergeStatus !== 'merged' && (status.blockerReasons ?? []).some(
         (b) => b.type === 'merge_conflict' || b.type === 'not_mergeable',
-      );
-      if (!hasMergeBlocker) continue;
+      ));
+    const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
 
+    for (const [issueId] of candidates) {
       const cooledUntil = staleMergeBlockerCooldowns.get(issueId);
       if (cooledUntil && now < cooledUntil) continue;
       staleMergeBlockerCooldowns.set(issueId, now + STALE_MERGE_BLOCKER_COOLDOWN_MS);
 
-      const resolved = resolveProjectFromIssueSync(issueId);
-      if (!resolved) continue;
-      const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-      if (!existsSync(workspacePath)) continue;
+      const membership = memberships.get(issueId.toUpperCase());
+      if (!membership || membership.bucket !== 'in_flight') {
+        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date(now).toISOString() });
+        console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
+        continue;
+      }
+      const workspacePath = resolveWorkspace(issueId);
+      if (!workspacePath) continue;
+      if (!workspaceExists(workspacePath)) continue;
 
       try {
         const result = await resolveConflictGate(issueId, workspacePath, 'main', deps);
@@ -475,31 +488,28 @@ export async function reconcileStaleMergeBlockers(): Promise<string[]> {
 /**
  * Reconciler (PAN-2198): periodic twin of the boot-only fixStuckReadyForMerge,
  * for the NO-BLOCKER strand of "stuck after review".
- *
- * readyForMerge is re-derived on every setReviewStatusSync write. When the last
- * write left it false and there is NO merge-blocker, nothing re-derives it until
- * the next write — so a PR whose review+test+verify all passed but whose
- * readyForMerge was left false (e.g. a verdict that landed via a write path that
- * didn't recompute, or a gate that was transiently non-final) converges ONLY on
- * server restart (PAN-1758: "readyForMerge only flips via the startup repair
- * sweep"). This patrol re-derives it on the 60s deacon tick instead.
- *
- * Blocker strands are deliberately excluded — those are owned by
- * reconcileStaleMergeBlockers, and excluding them also avoids fighting the
- * setReviewStatus deriver's hasBlockers override (which would flip readyForMerge
- * straight back to false). Loop-safe: it writes ONLY readyForMerge (no
- * review/test status transition, so no review/test re-dispatch events fire), and
- * is idempotent — once flipped true, the readyForMerge!==false guard excludes the
- * issue, so steady state is zero writes. Flipping readyForMerge=true only makes
- * the issue merge-ELIGIBLE; the merge train / MERGE button remains the trigger.
+ * Blocker strands remain owned by reconcileStaleMergeBlockers. Membership
+ * prevents restoration without an open PR; successful restoration is idempotent.
  */
-export function reconcileStuckReadyForMerge(): string[] {
+export async function reconcileStuckReadyForMerge(
+  gatherEligibility: typeof import('./merge-eligibility.js').gatherMergeEligibility = async (ids) =>
+    (await import('./merge-eligibility.js')).gatherMergeEligibility(ids),
+): Promise<string[]> {
   const actions: string[] = [];
   try {
-    for (const [issueId, status] of Object.entries(loadReviewStatuses())) {
-      if (status.readyForMerge !== false) continue;
-      if ((status.blockerReasons?.length ?? 0) > 0) continue; // blocker strand → reconcileStaleMergeBlockers
-      if (!reviewGatesPassedSync(status)) continue;
+    const candidates = Object.entries(loadReviewStatuses()).filter(([, status]) =>
+      !status.retiredAt
+      && status.readyForMerge === false
+      && (status.blockerReasons?.length ?? 0) === 0
+      && reviewGatesPassedSync(status));
+    const memberships = await gatherEligibility(candidates.map(([issueId]) => issueId));
+    for (const [issueId] of candidates) {
+      const membership = memberships.get(issueId.toUpperCase());
+      if (!membership || membership.bucket !== 'in_flight') {
+        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
+        console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
+        continue;
+      }
       setReviewStatusSync(issueId, { readyForMerge: true });
       const msg = `Restored readyForMerge for ${issueId} — review+test+verify passed, no blocker (was stuck false)`;
       actions.push(msg);
@@ -518,7 +528,7 @@ export async function reconcileMergedButReviewing(): Promise<string[]> {
     const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus !== 'merged') continue;
+      if (status.retiredAt || status.mergeStatus !== 'merged') continue;
       const reviewNonTerminal = nonTerminal.has(status.reviewStatus as string | undefined);
       const testNonTerminal = nonTerminal.has(status.testStatus as string | undefined);
       if (!reviewNonTerminal && !testNonTerminal) continue;

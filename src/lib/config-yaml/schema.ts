@@ -429,6 +429,10 @@ export interface ResourcesConfig {
   governor_swap_recovery_free_percent?: number;
   /** PAN-3123: memory PSI full avg10 threshold that permits shedding */
   governor_psi_full_shed_avg10?: number;
+  /** PAN-3754: memory PSI full avg10 below which a held governor can re-admit early */
+  governor_psi_calm_readmit_avg10?: number;
+  /** PAN-3754: continuous calm-PSI duration required for early re-admission */
+  governor_psi_calm_window_ms?: number;
 }
 
 export interface IssuesConfig {
@@ -946,6 +950,8 @@ export interface NormalizedConfig {
     governorSwapSoftFreePercent: number;
     governorSwapRecoveryFreePercent: number;
     governorPsiFullShedAvg10: number;
+    governorPsiCalmReadmitAvg10: number;
+    governorPsiCalmWindowMs: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

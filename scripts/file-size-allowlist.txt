@@ -14,6 +14,7 @@
 1259 src/lib/lifecycle/workflows.ts # PAN-3727
 1049 src/lib/config-yaml/schema.ts # PAN-3410
 1068 src/lib/config-yaml/schema.ts # PAN-3658
+1074 src/lib/config-yaml/schema.ts # PAN-3754
 900 src/lib/launcher-generator.ts # PAN-1837
 1186 src/lib/sync.ts # PAN-3450
 1060 src/lib/agents/spawn.ts # PAN-1837
