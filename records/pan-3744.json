@@ -102,7 +102,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-17T13:56:28.922Z",
+  "updated": "2026-08-17T14:57:30.633Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
@@ -114,7 +114,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-17T13:56:25.813Z",
+    "updatedAt": "2026-08-17T14:57:30.533Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
     "testNotes": "typecheck exit 0, lint exit 0 (all guard scripts clean), npm test exit 0 on a clean re-run (1469 files/13892 tests passed, 51 pre-existing quarantined skips) plus frontend leg (4/64) passed at HEAD a51ffc2f4d; an initial run's 6 failures were confirmed transient host-contention flakiness (isolated re-run 27/27 passed, unrelated to this branch's diff)",
     "uatNotes": "Live-verified against the workspace's own container (feature-pan-3744.overdeck.localhost) via Playwright MCP: skeleton visible + greeting absent while transcript withheld, content rendered + skeleton gone + greeting still absent after release -- proving the AC end-to-end against the shipped build. Routed around a pre-existing, unrelated workspace dev-proxy Origin-forwarding 403 (documented by the prior test cycle) using the same page.route() mocking technique as this issue's own committed spec test.",
@@ -197,7 +197,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.136377,
-        "pricingAsOf": "2026-08-17T13:56:25.940Z"
+        "pricingAsOf": "2026-08-17T14:57:30.554Z"
       }
     },
     "merges": [
