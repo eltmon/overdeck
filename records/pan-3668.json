@@ -220,6 +220,7 @@
       "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
       "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx",
       "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+      "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
       "src/dashboard/server/routes/context.ts",
       "src/dashboard/server/routes/specialists/project-routes.ts",
       "src/dashboard/server/services/conversation-lifecycle.ts",
@@ -243,10 +244,13 @@
       "src/lib/launcher-generator.ts",
       "src/lib/overdeck/conversation-harness.ts",
       "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
       "src/lib/overdeck/conversations.ts",
       "src/lib/planning/spawn-planning-session.ts",
+      "src/lib/prime-agent/__tests__/host-http.test.ts",
       "src/lib/prime-agent/__tests__/jsonl-framing.test.ts",
       "src/lib/prime-agent/__tests__/rpc-client.test.ts",
+      "src/lib/prime-agent/host-http.ts",
       "src/lib/prime-agent/host.ts",
       "src/lib/prime-agent/launch-command.ts",
       "src/lib/prime-agent/provider-map.test.ts",
@@ -257,6 +261,7 @@
       "tests/lib/context-layers/harness.test.ts",
       "tests/unit/cli/doctor-prime-agent.test.ts",
       "tests/unit/dashboard/runtime-session-projection.test.ts",
+      "tests/unit/lib/cloister/verification-worker-supervisor.test.ts",
       "tests/unit/lib/context-layers/prime-agent.test.ts",
       "tests/unit/lib/overdeck/conversation-runtime-prime.test.ts",
       "tsdown.config.ts"
@@ -372,6 +377,7 @@
       "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx",
       "src/dashboard/frontend/src/components/shared/branding/index.tsx",
       "src/dashboard/frontend/src/types.ts",
+      "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
       "src/dashboard/server/routes/command-deck.ts",
       "src/dashboard/server/routes/context.ts",
       "src/dashboard/server/routes/projects.ts",
@@ -406,12 +412,15 @@
       "src/lib/overdeck/conversation-delivery.ts",
       "src/lib/overdeck/conversation-harness.ts",
       "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
       "src/lib/overdeck/conversation-runtime.ts",
       "src/lib/overdeck/conversations.ts",
       "src/lib/overdeck/cost.ts",
       "src/lib/planning/spawn-planning-session.ts",
+      "src/lib/prime-agent/__tests__/host-http.test.ts",
       "src/lib/prime-agent/__tests__/jsonl-framing.test.ts",
       "src/lib/prime-agent/__tests__/rpc-client.test.ts",
+      "src/lib/prime-agent/host-http.ts",
       "src/lib/prime-agent/host.ts",
       "src/lib/prime-agent/jsonl-framing.ts",
       "src/lib/prime-agent/launch-command.ts",
@@ -434,6 +443,7 @@
       "tests/unit/cli/doctor-prime-agent.test.ts",
       "tests/unit/dashboard/runtime-session-projection.test.ts",
       "tests/unit/lib/agents/spawn-prime-agent.test.ts",
+      "tests/unit/lib/cloister/verification-worker-supervisor.test.ts",
       "tests/unit/lib/context-layers/prime-agent.test.ts",
       "tests/unit/lib/conversations/transcript-adapter-prime.test.ts",
       "tests/unit/lib/cost-parsers/prime-agent-parser.test.ts",
@@ -444,22 +454,31 @@
       "tests/unit/lib/prime-agent/session-resume.test.ts",
       "tsdown.config.ts"
     ],
-    "recordedAt": "2026-08-13T13:46:44.006Z"
+    "recordedAt": "2026-08-17T13:39:08.830Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-17T13:39:06.797Z",
+  "updated": "2026-08-17T13:39:08.897Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-17T13:37:07.185Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-08-17T13:39:05.762Z",
+    "reviewNotes": "All four review dimensions passed with complete requirements coverage.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-17T10:32:31.682Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
+    "reviewedAtCommit": "5caa78a81594b0d3597af9a82ef56e461f3f972a",
     "lastVerifiedCommit": "e4a4b77ce54246475e81262511db2b36e5e0906a",
     "reviewSpawnedAt": "2026-08-17T13:37:07.184Z"
   },
@@ -468,15 +487,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 14041945,
-            "output": 12675,
-            "cacheRead": 10428672,
+            "input": 14148646,
+            "output": 12906,
+            "cacheRead": 10523136,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 149171634,
-            "output": 257805,
-            "cacheRead": 144299392,
+            "input": 154975217,
+            "output": 266555,
+            "cacheRead": 149129600,
             "cacheWrite": 0
           }
         },
@@ -491,15 +510,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 14041945,
-          "output": 12675,
-          "cacheRead": 10428672,
+          "input": 14148646,
+          "output": 12906,
+          "cacheRead": 10523136,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 149171634,
-          "output": 257805,
-          "cacheRead": 144299392,
+          "input": 154975217,
+          "output": 266555,
+          "cacheRead": 149129600,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -510,8 +529,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 104.2817433,
-        "pricingAsOf": "2026-08-17T13:37:14.986Z"
+        "usd": 111.8262223,
+        "pricingAsOf": "2026-08-17T13:39:08.878Z"
       }
     },
     "merges": [
@@ -519,8 +538,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3668",
