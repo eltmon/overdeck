@@ -84,7 +84,7 @@
     "recordedAt": "2026-08-16T19:49:22.663Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-17T10:20:22.815Z",
+  "updated": "2026-08-17T10:20:42.104Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
@@ -94,9 +94,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-17T10:20:22.726Z",
+    "updatedAt": "2026-08-17T10:20:41.877Z",
     "testNotes": "npm run typecheck exits 0; npm run lint exits 0 (all sub-gates green); npm test: 13939 passed / 1 failed / 51 skipped across 1482 files — the single failure (tests/unit/lib/workspaces/rebuild.test.ts hook timeout) is outside this branch's files_scope and reproduced as a clean 9/9 pass in isolation, confirming a CPU-contention flake under concurrent host load, not a regression.",
     "uatNotes": "Playwright UAT against the workspace-built dashboard. Seeded FIX-1, placed a 25600 KB pi-format fixture transcript at the seeded work agent's session path, opened it twice (fresh subscribe + full-reload resubscribe) via /issues/FIX-1 Session tab. AC-1: both opens rendered the full message; GET /api/metrics/summary across both 60s windows showed p99 ~22ms (well under the 100ms warn threshold) and zero [event-loop-monitor] warning lines in the tailed server log. AC-2: a second browser tab on the live Command Deck stayed connected (no Reconnecting banner, live heartbeat) through both parse triggers. Fixed an unrelated environment blocker en route: the workspace container's Vite proxy target 'server:3013' resolved ambiguously on the shared docker network (many workspace stacks alias to 'server'), causing intermittent 403 Invalid origin; pinned via /etc/hosts in the frontend container (workspace-scoped, reversible) — worth filing as it likely affects UAT on other workspace stacks on this host.",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -196,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 49.523289,
-        "pricingAsOf": "2026-08-17T10:20:22.784Z"
+        "pricingAsOf": "2026-08-17T10:20:41.901Z"
       }
     },
     "merges": [
@@ -204,8 +204,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "k3[1m]",
   "recoveryTrips": [
     {
       "issue": "PAN-3752",
