@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-17T12:28:13.138Z",
+  "updated": "2026-08-17T13:10:19.504Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "passed",
@@ -195,8 +195,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "k3[1m]",
   "recoveryTrips": [
     {
       "issue": "PAN-3754",
