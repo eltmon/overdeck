@@ -19,6 +19,10 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),
 }));
+vi.mock('../../../../src/lib/cloister/merge-eligibility.js', () => ({
+  gatherMergeEligibility: vi.fn(async (issueIds: string[]) => new Map(issueIds.map((issueId) => [issueId, { bucket: 'in_flight' }]))),
+  isMergeEligible: vi.fn((membership: { bucket: string }) => membership.bucket === 'in_flight'),
+}));
 
 beforeEach(() => {
   odb = setupOverdeckTestDb();
@@ -39,7 +43,7 @@ const seed = (cols: Record<string, string | number>) => {
 };
 
 describe('reconcileStuckReadyForMerge (PAN-2198)', () => {
-  it('flips readyForMerge for the no-blocker stuck strand, and is idempotent', () => {
+  it('flips readyForMerge for the no-blocker stuck strand, and is idempotent', async () => {
     seed({
       issue_id: 'PAN-STUCK',
       review_status: 'passed',
@@ -50,16 +54,16 @@ describe('reconcileStuckReadyForMerge (PAN-2198)', () => {
       ready_for_merge: 0,
     });
 
-    const actions = reconcileStuckReadyForMerge();
+    const actions = await reconcileStuckReadyForMerge();
     expect(actions).toHaveLength(1);
     expect(actions[0]).toContain('PAN-STUCK');
     expect(loadReviewStatuses()['PAN-STUCK'].readyForMerge).toBe(true);
 
     // Second tick: already flipped → no action (steady state = zero writes)
-    expect(reconcileStuckReadyForMerge()).toHaveLength(0);
+    expect(await reconcileStuckReadyForMerge()).toHaveLength(0);
   });
 
-  it('leaves a blocker-strand issue untouched (owned by reconcileStaleMergeBlockers)', () => {
+  it('leaves a blocker-strand issue untouched (owned by reconcileStaleMergeBlockers)', async () => {
     seed({
       issue_id: 'PAN-BLOCKED',
       review_status: 'passed',
@@ -71,11 +75,11 @@ describe('reconcileStuckReadyForMerge (PAN-2198)', () => {
       ready_for_merge: 0,
     });
 
-    expect(reconcileStuckReadyForMerge()).toHaveLength(0);
+    expect(await reconcileStuckReadyForMerge()).toHaveLength(0);
     expect(loadReviewStatuses()['PAN-BLOCKED'].readyForMerge).toBeFalsy();
   });
 
-  it('leaves an issue whose gates have not passed untouched', () => {
+  it('leaves an issue whose gates have not passed untouched', async () => {
     seed({
       issue_id: 'PAN-REVIEWING',
       review_status: 'reviewing',
@@ -86,7 +90,7 @@ describe('reconcileStuckReadyForMerge (PAN-2198)', () => {
       ready_for_merge: 0,
     });
 
-    expect(reconcileStuckReadyForMerge()).toHaveLength(0);
+    expect(await reconcileStuckReadyForMerge()).toHaveLength(0);
     expect(loadReviewStatuses()['PAN-REVIEWING'].readyForMerge).toBeFalsy();
   });
 });

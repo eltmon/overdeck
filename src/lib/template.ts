@@ -34,7 +34,6 @@ export function generateClaudeMdSync(
 
   const defaultOrder = [
     'workspace-info.md',
-    'beads.md',
     'commands-skills.md',
     'warnings.md',
   ];

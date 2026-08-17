@@ -22,6 +22,8 @@ export interface Conversation {
   createdAt: string;
   endedAt: string | null;
   lastAttachedAt: string | null;
+  /** Transcript mtime from the list enrichment. Null until a transcript exists. */
+  lastActivityAt?: string | null;
   sessionAlive: boolean;
   isWorking?: boolean;
   /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */

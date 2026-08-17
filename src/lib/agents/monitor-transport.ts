@@ -143,6 +143,13 @@ export function formatAgentMessageBlock(
   return `[overdeck:agent-message]${meta ? ` ${meta}` : ''}\n${body}\n[overdeck:agent-message] end`;
 }
 
+/**
+ * Monitor territory: every `.md` mail file except `.pending.md`, which belongs
+ * to the codex notify hook. `.delivered.md` post-delivery backups (PAN-3738)
+ * are deliberately included — they were plain `<ts>.md` files before the suffix
+ * existed and the monitor drained them, so keeping them in preserves today's
+ * behavior exactly. The suffix is for humans reading `mail/`, not a filter.
+ */
 function isPlainMailFile(name: string): boolean {
   return name.endsWith('.md') && !name.endsWith('.pending.md');
 }

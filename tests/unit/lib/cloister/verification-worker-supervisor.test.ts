@@ -218,7 +218,9 @@ describe('PAN-3674 follow-up: expired workers', () => {
 
     const outcome = await runSupervisedVerification('PAN-3674', '/tmp/workspace', { isRemote: false }, 'test');
 
-    if (outcome.outcome !== 'passed') throw new Error(`unexpected outcome: ${JSON.stringify(outcome)}`);
+    if (outcome.outcome !== 'passed') {
+      throw new Error(`unexpected outcome: ${JSON.stringify(outcome)}; disk=${JSON.stringify(readVerificationWorkerState('PAN-3674'))}`);
+    }
     expect(outcome.outcome).toBe('passed');
     // The expired worker was killed rather than joined.
     expect(() => process.kill(zombiePid, 0)).toThrow();

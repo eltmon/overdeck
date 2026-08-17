@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ProjectConfig } from '../../projects.js';
 import type { PanIssueRecord } from '../record.js';
-import { updateIssueRecord } from '../record-update.js';
+import { updateIssueRecord, clearRecordPipelineClosedOutSync, clearRecordPipelineClosedOut } from '../record-update.js';
 
 const ISSUE_ID = 'DURABLE-1';
 
@@ -218,5 +218,127 @@ describe('updateIssueRecord durability', () => {
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
+  });
+});
+
+describe('clearRecordPipelineClosedOut drops stale mergeStatus (PAN-3727)', () => {
+  const ISSUE = 'REOPEN-1';
+  let root: string;
+  let remote: string;
+  let project: ProjectConfig;
+  const originalHome = process.env.OVERDECK_HOME;
+
+  function seedClosedOutRecord(): void {
+    const record = {
+      issueId: ISSUE,
+      schemaVersion: 2,
+      statusOverrides: {},
+      pipeline: {
+        issueId: ISSUE,
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        updatedAt: new Date().toISOString(),
+        closedOut: true,
+        closedOutAt: '2026-08-06T00:00:00.000Z',
+        mergeStatus: 'merged',
+      },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'main' },
+    } as unknown as PanIssueRecord;
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'records', 'reopen-1.json'), JSON.stringify(record));
+    git(root, 'add', '.pan/records');
+    git(root, 'commit', '-q', '-m', 'seed closed-out record');
+    git(root, 'push', '-q', 'origin', 'main');
+  }
+
+  function seedMergedOnlyRecord(): void {
+    const record = {
+      issueId: ISSUE,
+      schemaVersion: 2,
+      statusOverrides: {},
+      pipeline: {
+        issueId: ISSUE,
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+        updatedAt: new Date().toISOString(),
+        mergeStatus: 'merged',
+      },
+      closeOut: null,
+    } as unknown as PanIssueRecord;
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'records', 'reopen-1.json'), JSON.stringify(record));
+    git(root, 'add', '.pan/records');
+    git(root, 'commit', '-q', '-m', 'seed merged-only record');
+    git(root, 'push', '-q', 'origin', 'main');
+  }
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'pan-record-reopen-'));
+    remote = mkdtempSync(join(tmpdir(), 'pan-record-reopen-origin-'));
+    process.env.OVERDECK_HOME = join(root, 'overdeck-home');
+    project = { name: 'Reopen', path: root };
+
+    git(root, 'init', '-q');
+    git(root, 'config', 'user.email', 'test@overdeck.local');
+    git(root, 'config', 'user.name', 'Overdeck Test');
+    git(root, 'config', 'commit.gpgsign', 'false');
+    git(remote, 'init', '--bare', '-q');
+    git(root, 'remote', 'add', 'origin', remote);
+    git(root, 'commit', '-q', '--allow-empty', '-m', 'seed root');
+    git(root, 'branch', '-M', 'main');
+    git(root, 'push', '-q', '-u', 'origin', 'main');
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(remote, { recursive: true, force: true });
+  });
+
+  it('clearRecordPipelineClosedOutSync clears closedOut, stamps reopenedAt, and drops mergeStatus', () => {
+    seedClosedOutRecord();
+
+    clearRecordPipelineClosedOutSync(project, ISSUE, '2026-08-14T00:00:00.000Z');
+
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.closedOut).toBeUndefined();
+    expect(persisted.pipeline.closedOutAt).toBeUndefined();
+    expect(persisted.pipeline.reopenedAt).toBe('2026-08-14T00:00:00.000Z');
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+  });
+
+  it('clearRecordPipelineClosedOut (async) clears closedOut and drops mergeStatus', async () => {
+    seedClosedOutRecord();
+
+    const changed = await clearRecordPipelineClosedOut(project, ISSUE, { reopenedAt: '2026-08-14T00:00:00.000Z' });
+
+    expect(changed).toBe(true);
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.closedOut).toBeUndefined();
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+  });
+
+  it('clearRecordPipelineClosedOutSync also clears a merged-only record with no close-out marker (review finding)', () => {
+    seedMergedOnlyRecord();
+
+    clearRecordPipelineClosedOutSync(project, ISSUE, '2026-08-14T00:00:00.000Z');
+
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+    expect(persisted.pipeline.reopenedAt).toBe('2026-08-14T00:00:00.000Z');
+  });
+
+  it('clearRecordPipelineClosedOut (async) also clears a merged-only record with no close-out marker (review finding)', async () => {
+    seedMergedOnlyRecord();
+
+    const changed = await clearRecordPipelineClosedOut(project, ISSUE, { reopenedAt: '2026-08-14T00:00:00.000Z' });
+
+    expect(changed).toBe(true);
+    const persisted = JSON.parse(readFileSync(join(root, '.pan', 'records', 'reopen-1.json'), 'utf8')) as PanIssueRecord;
+    expect(persisted.pipeline.mergeStatus).toBeUndefined();
+    expect(persisted.pipeline.reopenedAt).toBe('2026-08-14T00:00:00.000Z');
   });
 });

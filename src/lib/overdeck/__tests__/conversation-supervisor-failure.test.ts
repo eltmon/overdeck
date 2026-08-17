@@ -28,10 +28,10 @@ describe('extractSupervisorFailure', () => {
     expect(failure).toContain('@lydell/node-pty');
   });
 
-  it('falls back to the pane tail when no line looks like an error', () => {
+  it('returns null when no line looks like an error', () => {
     const failure = extractSupervisorFailure('starting\n\nwaiting for pty\n');
 
-    expect(failure).toBe('starting | waiting for pty');
+    expect(failure).toBeNull();
   });
 
   it('returns null for an empty pane so the timeout message stands alone', () => {

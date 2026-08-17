@@ -99,10 +99,6 @@ export function createWorktree(
     } else {
       yield* gitRun(['worktree', 'add', '-b', branchName, targetPath], repoPath);
     }
-
-    yield* gitRun(['config', 'beads.role', 'contributor'], targetPath).pipe(
-      Effect.catch(() => Effect.void),
-    );
   });
 }
 

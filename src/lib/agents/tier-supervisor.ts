@@ -146,8 +146,8 @@ export function buildSupervisorPrompt(
 ): string {
   const policyLine = {
     all: 'You are subscribed to EVERY commit in this issue.',
-    flagged: 'You are subscribed only to commits for beads flagged requiresInspection=true.',
-    sampled: 'You are subscribed to a deterministic sample of the beads in this issue.',
+    flagged: 'You are subscribed only to commits for items flagged requiresInspection=true.',
+    sampled: 'You are subscribed to a deterministic sample of the items in this issue.',
   }[subscribe];
 
   return [

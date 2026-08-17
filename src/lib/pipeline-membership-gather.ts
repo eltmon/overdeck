@@ -354,6 +354,7 @@ export interface IssueBranchContainment {
   unmergedRefs: string[];
   mergedWorkRefs: string[];
   pointerRefs: string[];
+  mergedWorkHeads?: Array<{ ref: string; head: string }>;
 }
 
 export interface BranchRefSnapshot {
@@ -506,14 +507,14 @@ export async function gatherIssueBranchContainment(
     repository,
     snapshot: await snapshotBranchRefs(repository.path, repository.defaultBranch, refPatterns, run),
   })));
-  const result: IssueBranchContainment = { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] };
+  const result: IssueBranchContainment = { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [], mergedWorkHeads: [] };
 
   for (const { repository, snapshot } of snapshots) {
     const unmergedSet = new Set(snapshot.unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
     const firstParentShas = new Set(snapshot.firstParentShas.split('\n').map((sha) => sha.trim()).filter(Boolean));
     const refLines = snapshot.refs.split('\n').map((line) => line.trim()).filter(Boolean);
     for (const line of refLines) {
-      const { ref } = parseBranchRefLine(line);
+      const { ref, tipSha } = parseBranchRefLine(line);
       const qualifiedRef = `${repository.path}:${ref}`;
       switch (classifyBranchRefLine(line, unmergedSet, firstParentShas)) {
         case 'unmerged':
@@ -521,6 +522,7 @@ export async function gatherIssueBranchContainment(
           break;
         case 'merged-work':
           result.mergedWorkRefs.push(qualifiedRef);
+          if (tipSha) result.mergedWorkHeads!.push({ ref: qualifiedRef, head: tipSha });
           break;
         case 'pointer':
           result.pointerRefs.push(qualifiedRef);

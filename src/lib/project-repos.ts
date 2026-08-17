@@ -205,6 +205,56 @@ export function resolvePrimaryWorkspaceRepoDirSync(
   return resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0].dir;
 }
 
+// ─── Slot workspace worktrees (PAN-3686) ─────────────────────────────────────
+// A polyrepo swarm slot workspace (<workspace>-slot-N) is an aggregate
+// directory whose registered git worktrees are the nested sub-repo checkouts
+// (<slot>/fe, <slot>/api, …), each owned by a DIFFERENT parent repository.
+// Git cannot remove the aggregate root while nested worktrees live inside it
+// ("Directory not empty"), so GC must enumerate and detach the nested
+// worktrees first — and each removal must run in the owning parent repo, not
+// the base workspace.
+
+export interface NestedSlotWorktree {
+  repoKey: string;
+  /** Absolute path of the nested sub-repo worktree inside the slot workspace. */
+  dir: string;
+  /** Absolute path of the owning repository's main checkout (worktree-remove cwd). */
+  parentRepo: string;
+  /** Per-repo feature branch the slot branch merges into (e.g. feature/min-888). */
+  featureBranch: string;
+}
+
+export interface SlotWorkspaceWorktrees {
+  /** True when the project is configured with more than one repo. */
+  isPolyrepo: boolean;
+  /** Nested sub-repo worktrees present on disk inside the slot workspace. */
+  nested: NestedSlotWorktree[];
+}
+
+/**
+ * Resolve the registered nested worktrees of a swarm slot workspace through
+ * the polyrepo workspace abstraction. Monorepo slots resolve to zero nested
+ * worktrees; callers then remove the slot workspace root directly.
+ */
+export function resolveSlotWorkspaceWorktreesSync(
+  issueId: string,
+  slotWorkspace: string
+): SlotWorkspaceWorktrees {
+  const repos = resolveProjectReposForIssueSync(issueId);
+  const isPolyrepo = (repos?.length ?? 0) > 1;
+  if (!repos || !isPolyrepo) return { isPolyrepo, nested: [] };
+  const repoByKey = new Map(repos.map(repo => [repo.repoKey, repo]));
+  const nested = computeWorkspaceRepoRootsSync(repos, issueId, slotWorkspace)
+    .filter(root => root.isPolyrepo)
+    .flatMap(root => {
+      const repo = repoByKey.get(root.repoKey);
+      return repo
+        ? [{ repoKey: root.repoKey, dir: root.dir, parentRepo: repo.repoPath, featureBranch: root.sourceBranch }]
+        : [];
+    });
+  return { isPolyrepo, nested };
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Pure-sync project/repo resolution — additive Effect.sync wrappers.
 

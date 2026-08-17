@@ -41,18 +41,29 @@
      the :root values explicitly (not just relying on :root) so a Ledger
      scope NESTED inside a Broadsheet document — e.g. the Settings ->
      Appearance theme-comparison specimens — resets these variables at that
-     DOM level instead of inheriting Broadsheet's from the ancestor. ─── */
+     DOM level instead of inheriting Broadsheet's from the ancestor.
+     --font-mono-ui (PAN-3706 F-10) is a second mono role, split out from
+     --font-mono: --font-mono stays reserved for CODE (terminal output, log
+     panes) where Geist Mono Variable's larger x-height and ligatures read
+     well at 13px+; --font-mono-ui is for CHROME that happens to be
+     monospaced — labels, IDs, timestamps — where a tighter system
+     UI-monospace stack reads better at small sizes. Font tokens have never
+     had a light/dark distinction in this file (no --font-* is redeclared in
+     .dark), so --font-mono-ui follows the same two-scope shape as its
+     siblings rather than the four-scope color-token contract used below. ─── */
 :root,
 [data-theme="ledger"] {
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-mono-ui: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 [data-theme="broadsheet"] {
   --font-sans: "Geist Variable", system-ui, sans-serif;
   --font-display: "Geist Variable", system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-mono-ui: "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
 /* ─── Display-scale utilities (Broadsheet vocabulary; Ledger-safe fallback
@@ -205,6 +216,23 @@
   --color-white: #ffffff;
   --color-neutral-400: #9ca3af;
   --color-warning: var(--warning);
+
+  /* PAN-3706 F-4, cross-cutting decision A — unscoped fallback for the
+     shadow scale below, which overrides Tailwind's stock shadow-sm/md/lg/xl
+     KEYS (see the "Elevation tokens" region after .dark). That override is
+     only safe at runtime because useDesignLanguage.ts stamps
+     document.documentElement.dataset.theme before anything else renders —
+     a JS side effect, not a CSS guarantee. Defining the identical stock
+     values here, unscoped, means shadow-sm/md/lg/xl still render correctly
+     from CSS alone if data-theme is ever absent (SSR, a detached DOM node,
+     a test harness, a failed hook) instead of silently resolving to
+     `initial`/invalid. Values are Tailwind v3.4.19's literal boxShadow.
+     {sm,md,lg,xl}, read directly from node_modules/tailwindcss/stubs/
+     config.full.js — not from memory. */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 /* ─── Dark mode ─── */
@@ -265,10 +293,545 @@
   --color-warning: var(--warning);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   PAN-3706 — Broadsheet completion: surface, shape, and type tokens
+   ══════════════════════════════════════════════════════════════════════
+   Findings implemented in this region: F-1 (warm neutral ramp + lifted
+   dark background), F-2 (background/card/popover step apart instead of
+   collapsing to one flat color), F-3 (opaque --border/--input instead of
+   near-invisible low-alpha color-mix), F-5 (ambient corner wash + noise
+   suppression), F-6 (body typography + type-scale vocabulary), F-7
+   (--radius), F-8 (--primary-ink + a --body-foreground/--faint-foreground
+   text-tier ramp).
+
+   :root and .dark above are the untouched, unscoped document default —
+   Ledger's own values, read by anything that never sets [data-theme].
+   Everything below is the scoped override layer, placed AFTER .dark on
+   purpose: these attribute selectors are equal specificity to a bare class
+   selector, so source order — not specificity — is what lets them win over
+   .dark's declarations in dark mode. Every color/surface token below
+   carries all four scopes the selector contract requires:
+
+     [data-theme="ledger"]                                    — restates
+     .dark[data-theme="ledger"], .dark [data-theme="ledger"]  — today's :root/.dark
+     [data-theme="broadsheet"]                                — new
+     .dark[data-theme="broadsheet"], .dark [data-theme="broadsheet"] — values
+
+   The combined form (.dark[data-theme=...]) covers "this element IS the
+   themed root" (html carries both together); the descendant form
+   (.dark [data-theme=...]) covers "this element is INSIDE one" — Settings
+   -> Appearance (AppearanceSection.tsx) renders a NESTED [data-theme] scope
+   per specimen card (same mechanism as the display-scale block's comment
+   above), and that specimen must resolve to its own theme regardless of
+   the document's ambient theme and dark/light class.
+
+   A few tokens below (--radius, --body-*, --type-*) don't actually differ
+   between light and dark — the target-value table this region implements
+   gives each theme exactly one value, not a light/dark pair, mirroring how
+   --radius has no .dark override today. They still get all four scopes
+   for uniformity with the color tokens they sit beside: the .dark-combined
+   scopes are behaviorally redundant for them right now (a bare
+   [data-theme="..."] placed after .dark already wins in both modes, since
+   .dark never redeclares these properties), but keeping every block in
+   this region the same shape is one less thing to get wrong later if a
+   future revision does want to split one of them by mode. ────────────── */
+
+/* ─── F-7: corner radius — Broadsheet is squarer than Ledger. --radius-sm
+     and --radius-md (declared once in :root, above, as
+     calc(var(--radius) - 4px) / calc(var(--radius) - 2px)) are NOT
+     redeclared here: a custom property holding a var() reference is
+     substituted lazily at the point of use against whatever --radius is
+     cascaded on that same element, so they follow automatically — verified
+     against tailwind.config.js's borderRadius.sm/md, which reference the
+     same calc() chain. The badge-radius block further down (originally
+     lines 395-412) also follows automatically: --badge-radius: var(--radius-md)
+     now resolves to a proportionally smaller badge corner under Broadsheet
+     without any change there either. ─── */
+[data-theme="ledger"] {
+  --radius: 0.625rem;
+}
+[data-theme="broadsheet"] {
+  --radius: 0.375rem;
+}
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --radius: 0.625rem;
+}
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --radius: 0.375rem;
+}
+
+/* ─── F-1/F-2/F-3/F-8: surface, border, and text-tier tokens ─── */
+
+/* Ledger, light — byte-identical restatement of the :root block above. Not
+   a new value: this scope exists so a Ledger specimen nested inside a
+   Broadsheet document still resolves Ledger's surfaces instead of
+   inheriting the ancestor's. */
+[data-theme="ledger"] {
+  --background: #ffffff;
+  --foreground: #1f2937;
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+  --secondary: color-mix(in srgb, black 4%, transparent);
+  --secondary-foreground: #1f2937;
+  --muted: color-mix(in srgb, black 4%, transparent);
+  --muted-foreground: #6b7280;
+  --border: color-mix(in srgb, black 8%, transparent);
+  --input: color-mix(in srgb, black 10%, transparent);
+
+  /* F-8: Ledger never had a three-way body/muted/faint text ramp or a
+     primary-ink text color — new tokens, derived from Ledger's existing
+     Tailwind gray scale (foreground is gray-800, muted-foreground is
+     gray-500) so a shared component consuming them under Ledger gets a
+     value in the same family instead of an unset/invalid color. */
+  --body-foreground: #4b5563; /* gray-600 — between foreground (gray-800) and muted (gray-500) */
+  --faint-foreground: #9ca3af; /* gray-400 — one step past muted, toward background */
+  --primary-ink: oklch(0.42 0.19 264); /* darkened --primary, ~8.9:1 on Ledger's #ffffff */
+}
+
+/* Broadsheet, light — F-1 warms the neutral hue from cool blue-gray
+   (Tailwind gray) to a warm near-neutral ramp (hue 30-35). F-2 steps
+   background/card/popover apart (today they're all #ffffff — a card has no
+   visible surface without a border). F-3 makes border/input opaque hsl
+   tokens instead of low-alpha color-mix, which is why nothing currently
+   has a visible edge. */
+[data-theme="broadsheet"] {
+  --background: hsl(0 0% 96.5%);
+  --foreground: hsl(35 10% 14%);
+  --card: hsl(30 8% 94.5%);
+  --card-foreground: hsl(35 10% 14%);
+  --popover: hsl(30 8% 94.5%);
+  --popover-foreground: hsl(35 10% 14%);
+  --secondary: hsl(30 8% 94.5%);
+  --secondary-foreground: hsl(35 10% 14%);
+  --muted: hsl(30 8% 94.5%);
+  --muted-foreground: hsl(35 5% 42%);
+  --border: hsl(30 4% 88.5%);
+  --input: hsl(30 4% 88.5%);
+
+  /* F-8: four-tier text ramp (foreground > body-foreground > muted-foreground
+     > faint-foreground, each step lighter, approaching --background) plus a
+     darkened, text-safe variant of --primary. Hue 264 is unchanged from
+     --primary itself (the lime-accent swap is an explicitly deferred
+     decision, not part of this token) — only lightness and chroma drop so
+     it reads as ink, not as an interactive control. oklch(0.42 0.19 264)
+     contrasts ~8.3:1 against this theme's hsl(0 0% 96.5%) background, well
+     past the ~4.5:1 body-text floor. */
+  --body-foreground: hsl(35 8% 28%);
+  --faint-foreground: hsl(35 3% 62%);
+  --primary-ink: oklch(0.42 0.19 264);
+}
+
+/* Ledger, dark — byte-identical restatement of the .dark block above. */
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --background: #080b10;
+  --foreground: #e5e7eb;
+  --card: #0c1018;
+  --card-foreground: #e5e7eb;
+  --popover: #0c1018;
+  --popover-foreground: #e5e7eb;
+  --secondary: color-mix(in srgb, white 6%, transparent);
+  --secondary-foreground: #e5e7eb;
+  --muted: color-mix(in srgb, white 4%, transparent);
+  --muted-foreground: #9ca3af;
+  --border: color-mix(in srgb, white 6%, transparent);
+  --input: color-mix(in srgb, white 8%, transparent);
+
+  /* F-8, dark derivation — new tokens, sourced from Ledger's existing dark
+     gray ramp so they resolve to a value in-family rather than being left
+     undefined. */
+  --body-foreground: #d1d5db; /* gray-300 — between foreground (gray-200) and muted (gray-400) */
+  --faint-foreground: #4b5563; /* gray-600 — one step past muted, toward background */
+  --primary-ink: oklch(0.7 0.19 264); /* lightened --primary, ~6.9:1 on Ledger's #080b10 */
+}
+
+/* Broadsheet, dark — same F-1/F-2/F-3 warm-ramp and surface-stepping as the
+   light scope above, plus F-8's ramp and ink, flipped for a dark
+   background: background 12.5% L lifts Overdeck off its near-black
+   #080b10 (4.5% L), and card (17%)/popover (18%) sit slightly ABOVE
+   background instead of below it, so dark-mode surfaces read as raised
+   rather than inset. */
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --background: hsl(0 0% 12.5%);
+  --foreground: hsl(30 8% 94%);
+  --card: hsl(0 0% 17%);
+  --card-foreground: hsl(30 8% 94%);
+  --popover: hsl(0 0% 18%);
+  --popover-foreground: hsl(30 8% 94%);
+  --secondary: hsl(0 0% 17.3%);
+  --secondary-foreground: hsl(30 8% 94%);
+  --muted: hsl(0 0% 15%);
+  --muted-foreground: hsl(30 2% 66%);
+  --border: hsl(0 0% 22.7%);
+  --input: hsl(0 0% 22.7%);
+
+  /* oklch(0.7 0.19 264) contrasts ~5.8:1 against this theme's
+     hsl(0 0% 12.5%) background — a lightened blue, not the same value as
+     light mode's darkened one, so --primary-ink stays readable across the
+     theme's own dark/light toggle. */
+  --body-foreground: hsl(30 2% 88%);
+  --faint-foreground: hsl(30 1% 48%);
+  --primary-ink: oklch(0.7 0.19 264);
+}
+
+/* ─── F-6: body typography — 13px/1.6 antialiased body copy under
+     Broadsheet. Today's @layer base body rule (below) sets no font-size/
+     line-height/smoothing at all, so the browser default applies:
+     font-size/line-height inherit from html (Tailwind Preflight's
+     html { line-height: 1.5 }, browser default ~16px font-size), and both
+     -webkit-font-smoothing/-moz-osx-font-smoothing default to `auto`. The
+     var() fallback arguments the body rule uses (`inherit`, `auto`)
+     reproduce exactly that, so Ledger's rendering is untouched.
+     [data-theme="ledger"] resets each property to `initial` so a Ledger
+     scope nested inside a Broadsheet document falls back to inherit/auto
+     too, instead of inheriting Broadsheet's values from the outer scope —
+     same mechanism as the display-scale block above. ─── */
+[data-theme="broadsheet"] {
+  --body-font-size: 13px;
+  --body-line-height: 1.6;
+  --body-font-smoothing: antialiased;
+  --body-font-smoothing-moz: grayscale;
+}
+[data-theme="ledger"] {
+  --body-font-size: initial;
+  --body-line-height: initial;
+  --body-font-smoothing: initial;
+  --body-font-smoothing-moz: initial;
+}
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --body-font-size: 13px;
+  --body-line-height: 1.6;
+  --body-font-smoothing: antialiased;
+  --body-font-smoothing-moz: grayscale;
+}
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --body-font-size: initial;
+  --body-line-height: initial;
+  --body-font-smoothing: initial;
+  --body-font-smoothing-moz: initial;
+}
+
+/* ─── F-6: type scale — a VOCABULARY for future component adoption; nothing
+     in the app consumes these yet, and no existing component is retrofitted
+     onto them as part of this change. Named by literal size rather than
+     t-shirt sizes ("sm"/"base") because this scale's values don't line up
+     with Tailwind's own text-sm/text-base scale, and reusing those names
+     would misleadingly imply parity. Ledger has no equivalent scale of its
+     own — components on Ledger keep using Tailwind's built-in text-*
+     utilities untouched; the [data-theme="ledger"] block below only exists
+     to invalidate a nested specimen the same way the other vocabulary
+     blocks in this region do. ─── */
+[data-theme="broadsheet"] {
+  --type-size-11: 0.6875rem;
+  --type-size-13: 0.8125rem;
+  --type-size-14: 0.875rem;
+  --type-size-15: 0.9375rem;
+  --type-size-16: 1rem;
+  --type-size-18: 1.125rem;
+  --type-size-20: 1.25rem;
+  --type-size-24: 1.5rem;
+  --type-leading-tight: 1.3;
+  --type-leading-snug: 1.45;
+  --type-leading-normal: 1.55;
+  --type-leading-relaxed: 1.6;
+  --type-tracking-tight: -0.012em;
+  --type-tracking-normal: 0em;
+  --type-tracking-wide: 0.01em;
+}
+[data-theme="ledger"] {
+  --type-size-11: initial;
+  --type-size-13: initial;
+  --type-size-14: initial;
+  --type-size-15: initial;
+  --type-size-16: initial;
+  --type-size-18: initial;
+  --type-size-20: initial;
+  --type-size-24: initial;
+  --type-leading-tight: initial;
+  --type-leading-snug: initial;
+  --type-leading-normal: initial;
+  --type-leading-relaxed: initial;
+  --type-tracking-tight: initial;
+  --type-tracking-normal: initial;
+  --type-tracking-wide: initial;
+}
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --type-size-11: 0.6875rem;
+  --type-size-13: 0.8125rem;
+  --type-size-14: 0.875rem;
+  --type-size-15: 0.9375rem;
+  --type-size-16: 1rem;
+  --type-size-18: 1.125rem;
+  --type-size-20: 1.25rem;
+  --type-size-24: 1.5rem;
+  --type-leading-tight: 1.3;
+  --type-leading-snug: 1.45;
+  --type-leading-normal: 1.55;
+  --type-leading-relaxed: 1.6;
+  --type-tracking-tight: -0.012em;
+  --type-tracking-normal: 0em;
+  --type-tracking-wide: 0.01em;
+}
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --type-size-11: initial;
+  --type-size-13: initial;
+  --type-size-14: initial;
+  --type-size-15: initial;
+  --type-size-16: initial;
+  --type-size-18: initial;
+  --type-size-20: initial;
+  --type-size-24: initial;
+  --type-leading-tight: initial;
+  --type-leading-snug: initial;
+  --type-leading-normal: initial;
+  --type-leading-relaxed: initial;
+  --type-tracking-tight: initial;
+  --type-tracking-normal: initial;
+  --type-tracking-wide: initial;
+}
+
+/* ─── F-5: ambient corner wash + noise suppression ─── */
+
+/* --wash is a standalone token rather than retargeting --accent (which is
+   Overdeck's subtle hover surface and must not change meaning) or reusing
+   Subspace's hsl(var(--accent) / .55) trick — Overdeck's color tokens are
+   hex/oklch literals, not bare H-S-L triplets, so var() can't supply just
+   the H-S-L components the way that trick needs. Alpha is applied via
+   color-mix(), the same idiom --secondary/--accent already use above.
+   Ledger has no wash concept, so its scopes invalidate the property.
+
+   SATURATION IS THE WHOLE TRICK: the reference wash reads as ambient LIGHT,
+   not as a color. Its source value is a near-neutral (6% saturation in light,
+   0% in dark) lifted only by opacity — at 38-45% saturation the same gradient
+   renders as a visible brown stain across the top-left third of the viewport
+   rather than a glow. Verified against a rendered screenshot, not by reading
+   the token. Hue stays in the warm 28-35 band for consistency with the neutral
+   ramp above, but chroma must stay in single digits. */
+[data-theme="ledger"] {
+  --wash: initial;
+}
+[data-theme="broadsheet"] {
+  --wash: color-mix(in srgb, hsl(30 6% 75%) 55%, transparent);
+}
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --wash: initial;
+}
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --wash: color-mix(in srgb, hsl(30 4% 38%) 50%, transparent);
+}
+
+/* body is a single, non-repeating element — it can never itself sit nested
+   inside a [data-theme] specimen the way a badge or .display-xl span can,
+   so a plain descendant selector is unambiguous here. */
+[data-theme="broadsheet"] body {
+  background:
+    radial-gradient(130% 190% at 0% 0%, var(--wash) 0%, transparent 55%),
+    var(--background);
+}
+
+/* PAN-3706 cross-cutting decision B — reveal the wash through the opaque
+   app shell WITHOUT coupling to that shell's class list. App.tsx renders
+   the whole app inside a single div that is #root's only child
+   (`<div className="h-screen flex flex-row overflow-hidden bg-background">`
+   at App.tsx:840); that div paints over body's background at every pixel,
+   so the gradient above is otherwise inert. The original author's fix
+   matched that child by its `bg-background` class, which silently stops
+   working the moment that class list changes. This targets the SAME child
+   structurally instead — "the lone direct child of #root" — which is true
+   regardless of what classes it carries: index.html's #root starts with
+   exactly one child (#pan-boot) before React mounts, and React's single
+   root render (main.tsx) replaces it with exactly one child (this App
+   div). The coupling that remains is to that one-child invariant itself:
+   if #root ever gained a second child (e.g. a portal target mounted
+   directly under #root instead of document.body, or the render root
+   switched from a single element to a top-level Fragment with siblings),
+   this selector would start clearing the background of ALL of them, not
+   just the shell — worth a grep for `createPortal`/portal `container`
+   props targeting #root before that ever changes. `background-color` (not
+   `background`) mirrors exactly what Tailwind's `.bg-background` utility
+   itself sets, so this cancels only that one property, whatever else the
+   shell's className ends up being. */
+[data-theme="broadsheet"] #root > * {
+  background-color: transparent;
+}
+
+/* Suppress the fractal-noise film (body::after, defined further down at its
+   original position) under Broadsheet in favor of the wash above.
+   `content: none` fully de-generates the pseudo-element rather than merely
+   hiding it. Specificity 0,1,2 (attribute + element + pseudo-element) beats
+   the unscoped `body::after` rule's 0,0,2 regardless of source order, so
+   that rule is not edited at all — Ledger's noise stays byte-for-byte
+   untouched. */
+[data-theme="broadsheet"] body::after {
+  content: none;
+}
+
+/* ─── Elevation tokens (F-4) — Overdeck ships zero shadow custom
+     properties by default, so the ~120 shadow-sm/md/lg/xl call sites
+     resolve to Tailwind's stock scale, tuned for a white page; on a dark
+     surface those values are close to invisible. Named after a seven-token
+     elevation scale (sm/md/lg/xl role-scaled, plus card/floating/overlay
+     role-named), each redefined for dark mode at roughly 3-4x alpha so a
+     shadow still reads against a dark card instead of disappearing into
+     it. tailwind.config.js wires shadow-sm..xl AND shadow-card/floating/
+     overlay through var(--shadow-*, <stock literal>) — see that file's
+     boxShadow entry. The [data-theme="ledger"] blocks below restate
+     Tailwind's literal stock sm/md/lg/xl values (v3.4.19) verbatim, so
+     shadow-sm..xl keep rendering byte-identical to today under Ledger —
+     the same values are also defined unscoped on :root above (cross-cutting
+     decision A) as a CSS-only fallback for when data-theme is absent.
+     Tailwind's stock scale never varied by color-scheme, so Ledger's light
+     and dark blocks intentionally carry the same four values.
+
+     card/floating/overlay have no pre-existing rendered value under either
+     theme (shadow-card has exactly one call site today — SimpleQuestionCard.
+     tsx — and was inert, since Tailwind had no such utility to resolve it
+     to before this change). Both themes get the same card/floating/overlay
+     numbers, and — like sm/md/lg/xl — the dark variant uses the boosted
+     alpha rather than the flat light alpha, so that one live call site
+     doesn't vanish on Ledger's near-black dark background. ─── */
+[data-theme="ledger"] {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="broadsheet"] {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 25px 50px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.18);
+  --shadow-floating: 0 4px 16px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.18);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 25px 50px rgba(0, 0, 0, 0.5), 0 10px 20px rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.18);
+  --shadow-floating: 0 4px 16px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.18);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* ─── F-9: motion vocabulary — tokens only, no rewiring. Landing the
+     easing/duration vocabulary so a follow-on task can adopt it
+     site-by-site; the @keyframes and animation shorthand elsewhere in this
+     file, and in tailwind.config.js, are NOT touched by this change — none
+     of them consume these tokens yet. Motion doesn't vary between light and
+     dark, so both .dark-prefixed scopes below restate their theme's light-
+     scope values verbatim. ─── */
+[data-theme="ledger"] {
+  /* Today's hardcoded keyframes/animation shorthand use the native CSS
+     ease-out / ease-in / ease-in-out keywords directly — context-menu-in/out,
+     the shake/pulse/shimmer/alive-dot family, and tailwind.config.js's
+     fade-in/slide-in-right/slide-out-right/slide-down-banner all use these
+     three keywords, never a bezier curve. Restating them as token values
+     changes nothing if a rule is later migrated to var(). There is no
+     spring/overshoot curve in use today, so --ease-spring falls back to the
+     same ease-out keyword rather than introducing new motion character
+     where none exists yet. */
+  --ease-out: ease-out;
+  --ease-notion: ease-out;
+  --ease-in-out: ease-in-out;
+  --ease-spring: ease-out;
+
+  /* Durations restate values already hardcoded in this file today: 80ms is
+     context-menu-out's exit, 120ms is context-menu-in's enter, 200ms is the
+     shared tier used by .anim-error-shake and tailwind.config.js's
+     slide-in-right/slide-out-right, 300ms is tailwind's fade-in (the
+     slowest one-shot enter). --duration-enter/--duration-exit pick the
+     literal enter/exit pair from tailwind.config.js (slide-in-right 0.2s
+     enter / slide-out-right 0.2s exit) rather than inventing new numbers. */
+  --duration-instant: 80ms;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-enter: 200ms;
+  --duration-exit: 200ms;
+}
+
+[data-theme="broadsheet"] {
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-notion: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+
+  --duration-instant: 50ms;
+  --duration-fast: .1s;
+  --duration-normal: .15s;
+  --duration-slow: .2s;
+  --duration-enter: .2s;
+  --duration-exit: .15s;
+}
+
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --ease-out: ease-out;
+  --ease-notion: ease-out;
+  --ease-in-out: ease-in-out;
+  --ease-spring: ease-out;
+
+  --duration-instant: 80ms;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-enter: 200ms;
+  --duration-exit: 200ms;
+}
+
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-notion: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+
+  --duration-instant: 50ms;
+  --duration-fast: .1s;
+  --duration-normal: .15s;
+  --duration-slow: .2s;
+  --duration-enter: .2s;
+  --duration-exit: .15s;
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: var(--body-font-size, inherit);
+    line-height: var(--body-line-height, inherit);
+    -webkit-font-smoothing: var(--body-font-smoothing, auto);
+    -moz-osx-font-smoothing: var(--body-font-smoothing-moz, auto);
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -421,6 +984,102 @@ body::after {
   }
   .drawer-task-current-ping {
     animation: drawer-task-current-ping 1.6s ease-out infinite;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Broadsheet component patterns (PAN-3706 F-11; design/style-guide/
+   STYLE-GUIDE.md §8, D-6..D-9) — Chips, Soft Card, Large CTA + Keycap,
+   Dot-Metadata Line. None of these existed in this file before.
+
+   Unlike the display-scale utilities and .eyebrow above, the style guide
+   is explicit that these four have NO Ledger-safe fallback by design (§2
+   "Ledger-Safe Fallbacks"): new Broadsheet-only vocabulary, adopted
+   feature-by-feature, kept off Ledger-reachable surfaces by authoring
+   discipline rather than a CSS guard. So there is no [data-theme="ledger"]
+   or [data-theme="broadsheet"] gate on any of these classes — they are
+   written unconditionally. Every value they use (--border, --muted,
+   --foreground, --primary, --radius) is itself one of the semantic tokens
+   scoped above, so a class that is ever mistakenly reached on a
+   Ledger-reachable surface still resolves against Ledger's own token
+   values rather than rendering bare/unstyled — closing the "leaks as
+   invisible" trap without writing a rule the style guide says must not
+   exist. Authoring discipline (never put these classes on a
+   Ledger-reachable surface) remains the actual enforcement mechanism. ─── */
+@layer components {
+  /* Chips (D-6) — bordered, rounded-lg pill-adjacent control for
+     additive/selectable actions. Icon sizing (16px, leading) is markup for
+     the consumer, same as the Buttons section's icon-sizing convention —
+     not part of this class.
+
+     Opacity-modified utilities (bg-muted/50, border-foreground/40,
+     bg-primary/10, bg-foreground/8 below) are written as literal
+     color-mix() instead of `@apply bg-muted/50` etc: `@apply` can only
+     apply a utility class Tailwind has already generated, and slash-opacity
+     variants are only generated on demand for combinations some scanned
+     .tsx file actually uses. None of these four combinations happens to be
+     used elsewhere today, so `@apply` on them fails at build time with
+     "class does not exist". color-mix() is also this file's own
+     established idiom for opacity-mixed colors (see the badge-bg-* /
+     badge-border-* utilities above). */
+  .chip {
+    @apply inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors;
+  }
+  /* Hover is "bg-muted/50 fill only — never a color change" per the
+     recipe; guarded against .chip-selected so a selected+hovered chip
+     doesn't dim from its permanent bg-muted down to bg-muted/50. */
+  .chip:hover:not(.chip-selected) {
+    background-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  }
+  .chip-dashed {
+    @apply border-dashed;
+  }
+  .chip-selected {
+    /* "Replaces the base border — no color": a neutral foreground tint,
+       not a primary/signal color, per the guide's color-restraint rule. */
+    @apply bg-muted;
+    border-color: color-mix(in srgb, var(--foreground) 40%, transparent);
+  }
+
+  /* Soft Card (D-7) — muted-fill card for suggestion/idea/preview content,
+     distinct from the bordered Cards recipe. The hairline border is
+     opt-in per the recipe via .soft-card-bordered. Title (text-sm
+     font-medium) and the optional eyebrow are consumer markup (see
+     .eyebrow above), not part of this class. */
+  .soft-card {
+    @apply rounded-xl p-5;
+    background-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  }
+  .soft-card-bordered {
+    @apply border;
+    border-color: color-mix(in srgb, var(--border) 50%, transparent);
+  }
+
+  /* Large CTA + Keycap (D-8) — a distinct one-prominent-action-per-view
+     button tier, deliberately not a bigger variant of the Buttons size
+     scale. .keycap also stands alone (e.g. inline in help text), not only
+     inside .large-cta. */
+  .large-cta {
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-base font-medium text-primary transition-colors;
+    background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  }
+  .large-cta:hover,
+  .large-cta:focus-visible {
+    @apply bg-primary text-primary-foreground;
+  }
+  .keycap {
+    @apply rounded-md px-1.5 font-mono text-xs;
+    background-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  /* Dot-Metadata Line (D-9) — one ambient-state summary item: a small
+     status dot plus a label. Consumers repeat this span per item and join
+     them with " · ". The dot itself (h-1.5 w-1.5 rounded-full
+     bg-{signal-color}) is literal Tailwind per the recipe — signal colors
+     are already Tailwind utilities, so no dedicated dot class is
+     introduced here; this class carries only the shared line styling. */
+  .dot-metadata {
+    @apply inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground;
   }
 }
 

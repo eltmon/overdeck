@@ -113,6 +113,26 @@ describe('linear-mcp-auth-hook', () => {
     expect(existsSync(markerPath())).toBe(true)
   })
 
+  it('extracts the hosted-server authorization URL (mcp.linear.app/authorize)', async () => {
+    // The hosted Linear MCP server instructs with this exact shape — the
+    // linear.app/oauth/authorize-only regex missed it and emitted required
+    // with a null URL, leaving the banner stuck on "waiting" (2026-08-15).
+    const authUrl = 'https://mcp.linear.app/authorize?response_type=code&client_id=test&state=abc&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback'
+
+    const result = await runHook(
+      tempDir,
+      input('mcp__linear__authenticate', `Ask the user to open this URL in their browser to authorize the linear MCP server:\n\n${authUrl}\n\nOnce they complete the flow, the server's tools will become available automatically.`),
+      environment(),
+    )
+
+    expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' })
+    expect(eventBodies(eventLog)).toEqual([{
+      kind: 'linear_mcp_auth_required',
+      authUrl,
+    }])
+    expect(existsSync(markerPath())).toBe(true)
+  })
+
   it('emits required with a null URL for a real PostToolUseFailure auth error', async () => {
     // The documented failure-event shape: top-level `error` + `is_interrupt`,
     // no tool_response. PostToolUse does not fire for failed MCP calls at all.

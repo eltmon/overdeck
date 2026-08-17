@@ -29,6 +29,7 @@ const mockExecFile = vi.fn();
 const mockPostMergeLifecycle = vi.fn();
 const mockAppendDomainEventAsync = vi.fn(async () => true);
 const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
+const mockEnqueueProjectResourceRefresh = vi.fn();
 let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -66,7 +67,7 @@ vi.mock('../../../src/lib/cloister/merge-agent.js', () => ({
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  resolveProjectFromIssueSync: () => ({ projectPath: '/tmp/test-project' }),
+  resolveProjectFromIssueSync: () => ({ projectKey: 'test-project', projectPath: '/tmp/test-project' }),
   listProjectsSync: () => [{
     key: 'test-project',
     config: {
@@ -76,6 +77,11 @@ vi.mock('../../../src/lib/projects.js', () => ({
       workspace: { default_branch: 'main' },
     },
   }],
+}));
+
+vi.mock('../../../src/dashboard/server/services/project-resource-refresh-queue.js', () => ({
+  enqueueProjectResourceRefresh: (...args: Parameters<typeof mockEnqueueProjectResourceRefresh>) =>
+    mockEnqueueProjectResourceRefresh(...args),
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
@@ -371,6 +377,58 @@ describe('handleCheckRun', () => {
 });
 
 describe('handlePullRequest', () => {
+  it('retires a review record when its PR closes without merging', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [], prNumber: 1 });
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'closed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-123' },
+        merged: false,
+      },
+    })));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', expect.objectContaining({
+      readyForMerge: false,
+      retiredAt: expect.any(String),
+    }));
+  });
+
+  it('retires a closed PR when the stored head SHA is stale', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [], prNumber: 1, prHeadSha: 'older-sha' });
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'closed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-123', sha: 'final-sha' },
+        merged: false,
+      },
+    })));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', expect.objectContaining({
+      readyForMerge: false,
+      retiredAt: expect.any(String),
+    }));
+  });
+
+  it.each(['opened', 'closed', 'reopened'])('enqueues membership refresh for %s PRs', async (action) => {
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action,
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-123' },
+        merged: false,
+      },
+    })));
+
+    expect(mockEnqueueProjectResourceRefresh).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ path: '/tmp/test-project' }),
+      `pull_request:${action}`,
+    );
+  });
+
   it('dispatches postMergeLifecycle with review passed marking for merged strike PRs', async () => {
     mockPostMergeLifecycle.mockResolvedValue(undefined);
 
@@ -1084,6 +1142,16 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
     mockIsGitHubAppConfigured.mockReturnValue(true);
     mockGetPullRequestState.mockReturnValue(makeAppPrState());
     ghPrViewStdout = '';
+  });
+
+  it('does not query GitHub for a retired record', async () => {
+    mockGetReviewStatus.mockReturnValue({ retiredAt: '2026-08-16T00:00:00Z', blockerReasons: [] });
+
+    await refreshMergeStateFromGitHub('PAN-3753', 'test-owner/test-repo', 42);
+
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 
   it('uses the App REST path (not gh) when the App is configured', async () => {

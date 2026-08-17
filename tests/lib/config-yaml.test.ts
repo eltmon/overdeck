@@ -231,6 +231,8 @@ api_keys:
         governorSwapSoftFreePercent: 25,
         governorSwapRecoveryFreePercent: 50,
         governorPsiFullShedAvg10: 1,
+        governorPsiCalmReadmitAvg10: 0.05,
+        governorPsiCalmWindowMs: 600_000,
       });
     });
 
@@ -240,11 +242,15 @@ api_keys:
           governor_swap_soft_free_percent: 30,
           governor_swap_recovery_free_percent: 60,
           governor_psi_full_shed_avg10: 2.5,
+          governor_psi_calm_readmit_avg10: 0.02,
+          governor_psi_calm_window_ms: 300_000,
         },
       }).config.resources).toMatchObject({
         governorSwapSoftFreePercent: 30,
         governorSwapRecoveryFreePercent: 60,
         governorPsiFullShedAvg10: 2.5,
+        governorPsiCalmReadmitAvg10: 0.02,
+        governorPsiCalmWindowMs: 300_000,
       });
 
       expect(mergeConfigs({
@@ -253,6 +259,24 @@ api_keys:
           governor_swap_recovery_free_percent: 20,
         },
       }).config.resources.governorSwapRecoveryFreePercent).toBe(100);
+    });
+
+    it('retains calm-PSI defaults for unsafe numeric values', () => {
+      expect(mergeConfigs({
+        resources: { governor_psi_calm_readmit_avg10: 0 },
+      }).config.resources.governorPsiCalmReadmitAvg10).toBe(0);
+
+      for (const governor_psi_calm_readmit_avg10 of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(mergeConfigs({
+          resources: { governor_psi_calm_readmit_avg10 },
+        }).config.resources.governorPsiCalmReadmitAvg10).toBe(0.05);
+      }
+
+      for (const governor_psi_calm_window_ms of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(mergeConfigs({
+          resources: { governor_psi_calm_window_ms },
+        }).config.resources.governorPsiCalmWindowMs).toBe(600_000);
+      }
     });
 
     it('normalizes compliance mode with advisory as the default', () => {

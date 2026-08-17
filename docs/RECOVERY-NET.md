@@ -13,7 +13,7 @@ The Deacon treats recovery as a durable obligation, not a one-shot event:
 5. Admit autonomous work through `decideAutonomousRedrive()`: cached memory
    verdict first, then the role concurrency reservation.
 6. Re-drive through the existing door: review obligation, planning-to-work,
-   stack rebuild, dead-session respawn, or swarm redispatch.
+   stack rebuild, dead-session respawn, or a foreman-directed swarm gate.
 7. Persist breaker identity `{ issue, recoveryPath, obligationGeneration,
    tripCount }`; emit needs-you once per open trip.
 
@@ -40,11 +40,13 @@ Both checks fail open on git, forge, or authentication errors: they log an
 patrol tick. Completed or cancelled specs are terminal, and active re-planning
 defers post-merge terminalization.
 
-Failed swarm slots are archived under timestamped `slot-N-failed-*` branch and
-worktree names and redispatched on a higher monotonic index. Patrol reconcile and
-GC ignore those names for occupancy and never delete them. They remain available
-for debugging until configured issue close-out removes all issue worktrees and
-branches.
+Failed swarm slots are reported to the resident foreman. The foreman runs
+`pan swarm recover <id> <slot> --action retry|drop|handoff|reclaim`; recovery is
+never selected by the Deacon patrol. Retry archives the attempt under timestamped
+`slot-N-failed-*` branch and worktree names before a later gated dispatch uses a
+higher monotonic index. Reclaim returns the item to the foreman for serial work.
+Patrol GC ignores archived names, so they remain available for debugging until
+configured issue close-out removes the issue worktrees and branches.
 
 Known Codex rate-limit dialogs are answered with Down then Enter to select
 “Keep current model”; bare Enter is forbidden because it confirms the downgrade.

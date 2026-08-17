@@ -43,6 +43,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'release_notes' },
     { table: 'review_status', column: 'uat_status' },
     { table: 'review_status', column: 'uat_notes' },
+    { table: 'review_status', column: 'retired_at' },
     { table: 'review_status', column: 'inspect_owner_session' },
     { table: 'review_status', column: 'strike_ready_head' },
     { table: 'review_status', column: 'strike_ready_at' },
@@ -119,6 +120,7 @@ export interface DbServiceShape {
 export class Db extends Context.Service<Db, DbServiceShape>()('overdeck/Db') {}
 
 let overdeckDbSync: { path: string; db: SqliteDatabase } | null = null;
+let overdeckReadOnlyDbSync: { path: string; db: SqliteDatabase } | null = null;
 
 function runOverdeckMigrationSync(db: SqliteDatabase): void {
   const row = db
@@ -161,6 +163,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_status` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_notes` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `retired_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
@@ -184,6 +187,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.
@@ -395,7 +399,20 @@ function warnSchemaDriftSync(db: SqliteDatabase): void {
   }
 }
 
-export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
+export function getOverdeckDatabaseSync(
+  dbPath = getOverdeckDatabasePath(),
+  options: { readOnly?: boolean } = {},
+): SqliteDatabase {
+  // Fresh/test homes still need the writable path to create the cache. A real
+  // read-only CLI invocation always targets an existing dashboard-owned DB.
+  if (
+    options.readOnly
+    && overdeckDbSync?.path !== dbPath
+    && existsSync(dbPath)
+    && existsSync(OVERDECK_MIGRATION_PATH)
+  ) {
+    return getOverdeckDatabaseReadOnlySync(dbPath);
+  }
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
   }
@@ -421,9 +438,31 @@ export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): Sql
   return db;
 }
 
+function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
+  if (overdeckReadOnlyDbSync?.path === dbPath) return overdeckReadOnlyDbSync.db;
+
+  overdeckReadOnlyDbSync?.db.close();
+  const db = openDatabase(dbPath, { readOnly: true });
+  db.pragma('foreign_keys = ON');
+  const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+  const missing = [
+    ...report.missingTables.map((table) => `table ${table}`),
+    ...report.missingIndexes.map((index) => `index ${index}`),
+    ...report.missingColumns.map(({ table, column }) => `column ${table}.${column}`),
+  ];
+  if (missing.length > 0) {
+    db.close();
+    throw new Error(`overdeck.db schema is incompatible; writable dashboard startup must update: ${missing.join(', ')}`);
+  }
+  overdeckReadOnlyDbSync = { path: dbPath, db };
+  return db;
+}
+
 export function closeOverdeckDatabaseSync(): void {
   overdeckDbSync?.db.close();
   overdeckDbSync = null;
+  overdeckReadOnlyDbSync?.db.close();
+  overdeckReadOnlyDbSync = null;
 }
 
 function rowValues(row: SqliteRow | undefined): SqliteScalar[] {

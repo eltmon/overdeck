@@ -15,11 +15,25 @@ function makeItem(overrides: Partial<XBriefItem['metadata']> = {}): XBriefItem {
   };
 }
 
+/** Deterministic single-repo roots seam — one root at the slot workspace on the issue's feature branch. */
+function monorepoRoots(_issueId: string, workspacePath: string) {
+  return [{
+    repoKey: 'pan-1',
+    dir: workspacePath,
+    sourceBranch: 'feature/pan-1',
+    targetBranch: 'main',
+    isPolyrepo: false,
+  }];
+}
+
 describe('verifyAndMergeSlot', () => {
   it('runs verify commands in the slot workspace then merges the slot branch in the feature workspace', async () => {
     const calls: Array<{ command: string; cwd: string }> = [];
     const run = async (command: string, cwd: string) => {
       calls.push({ command, cwd });
+      // PAN-3691: the slot branch must carry unmerged current-item work or the
+      // merge is refused — model one ahead commit on the slot branch.
+      if (command.startsWith('git rev-list --count')) return { stdout: '1', stderr: '' };
       return { stdout: 'ok', stderr: '' };
     };
 
@@ -27,7 +41,7 @@ describe('verifyAndMergeSlot', () => {
       { issueId: 'PAN-1', featureWorkspace: '/ws/feature-pan-1' },
       2,
       makeItem(),
-      { deps: { run } },
+      { deps: { run, resolveRepoRoots: monorepoRoots } },
     );
 
     expect(result.verified).toBe(true);
@@ -35,6 +49,7 @@ describe('verifyAndMergeSlot', () => {
     expect(result.conflicts).toBe(false);
     expect(calls).toEqual([
       { command: 'npm run typecheck', cwd: '/ws/feature-pan-1-slot-2' },
+      { command: 'git rev-list --count "feature/pan-1".."feature/pan-1-slot-2"', cwd: '/ws/feature-pan-1-slot-2' },
       { command: 'git merge --no-ff "feature/pan-1-slot-2"', cwd: '/ws/feature-pan-1' },
     ]);
   });
@@ -64,6 +79,7 @@ describe('verifyAndMergeSlot', () => {
     const commands: string[] = [];
     const run = async (command: string) => {
       commands.push(command);
+      if (command.startsWith('git rev-list --count')) return { stdout: '1', stderr: '' };
       if (command.startsWith('git merge --no-ff')) {
         throw Object.assign(new Error('conflict'), { stdout: '', stderr: 'CONFLICT (content)' });
       }
@@ -74,7 +90,7 @@ describe('verifyAndMergeSlot', () => {
       { issueId: 'PAN-1', featureWorkspace: '/ws/feature-pan-1' },
       1,
       makeItem(),
-      { deps: { run } },
+      { deps: { run, resolveRepoRoots: monorepoRoots } },
     );
 
     expect(result.verified).toBe(true);
@@ -82,6 +98,30 @@ describe('verifyAndMergeSlot', () => {
     expect(result.conflicts).toBe(true);
     expect(result.failure).toContain('did not merge cleanly');
     expect(commands).toContain('git merge --abort');
+  });
+
+  it('refuses to report merged when the slot branch has no unmerged current-item changes', async () => {
+    const commands: string[] = [];
+    const run = async (command: string) => {
+      commands.push(command);
+      // PAN-3691: a fresh slot whose agent died before committing (or a reused
+      // slot branch whose earlier work already merged) counts zero ahead.
+      if (command.startsWith('git rev-list --count')) return { stdout: '0', stderr: '' };
+      return { stdout: 'ok', stderr: '' };
+    };
+
+    const result = await verifyAndMergeSlot(
+      { issueId: 'PAN-1', featureWorkspace: '/ws/feature-pan-1' },
+      1,
+      makeItem(),
+      { deps: { run, resolveRepoRoots: monorepoRoots } },
+    );
+
+    expect(result.verified).toBe(true);
+    expect(result.merged).toBe(false);
+    expect(result.conflicts).toBe(false);
+    expect(result.failure).toContain('no unmerged current-item changes');
+    expect(commands.some(c => c.startsWith('git merge'))).toBe(false);
   });
 
   it('refuses items missing verify_commands or expected_outputs', async () => {

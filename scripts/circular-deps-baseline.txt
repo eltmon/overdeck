@@ -38,8 +38,6 @@ src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts > 
 src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts
 src/lib/cloister/auto-resume-config.ts > src/lib/projects.ts
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/deacon-swarm-gc.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/deacon-swarm-orphan-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
 src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts
@@ -54,3 +52,4 @@ src/lib/overdeck/conversation-forks.ts
 src/lib/overdeck/issue-transitions.ts > src/lib/overdeck/workspace-hygiene.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts
+src/dashboard/server/routes/jsonl-resolver.ts > src/lib/agents.ts > src/lib/agents/resume.ts > src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/conversations/transcript-adapter.ts

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -12,6 +12,7 @@ import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
+import { fallbackBadgeTone } from './fallbackBadge';
 import styles from './styles/command-deck.module.css';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
@@ -236,13 +237,25 @@ export function ConversationRow({
         </span>
       )}
       {conv.forkFallbackReason && !conv.forkStatus && (
-        <span
-          className={styles.conversationForkFailed}
-          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.overdeck/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
-        >
-          <TriangleAlert size={10} />
-          <span>Fallback: {conv.forkFallbackReason}</span>
-        </span>
+        fallbackBadgeTone(conv) === 'alert' ? (
+          <span
+            className={styles.conversationForkFailed}
+            title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.overdeck/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+          >
+            <TriangleAlert size={10} />
+            <span>Fallback: {conv.forkFallbackReason}</span>
+          </span>
+        ) : (
+          // PAN-3736: the conversation is demonstrably alive, so the degraded
+          // seed is history rather than a live failure — say so quietly.
+          <span
+            className={styles.conversationForkFallbackNote}
+            title={`Seeded via summary fork instead of the intended handoff: ${conv.forkFallbackReason}. This conversation has been running since; look in ~/.overdeck/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+          >
+            <Info size={10} />
+            <span>Seeded via fallback: {conv.forkFallbackReason}</span>
+          </span>
+        )
       )}
       {conv.transcriptMissing && (
         <span

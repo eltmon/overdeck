@@ -82,58 +82,21 @@ For every item:
 
 Never batch multiple tasks into a single commit. A one-item diff is what makes inspection, review, and rollback tractable.
 
-## Foreman wave-driver protocol
+## Foreman gated-command protocol
 
-The serial per-item workflow above remains the default. Use the foreman path only when the xBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
+Use this protocol when the xBRIEF is swarm-eligible. The parent Work agent stays resident and owns judgment; canonical `pan swarm` commands own every state change.
 
-You remain the durable work agent for the issue. The foreman path is not a revived server-side swarm runtime: there is no `SynthesisOutput` state, no slot callback endpoint, no auto-advance poller, and no per-slot PR. The issue still lands as one reviewed branch.
+1. On every start or restart, run `pan swarm status <ISSUE-ID> --json`. Check foreman and slot liveness, holds, intervention counts, branches, and reconciled lifecycles before acting.
+2. For each ready wave, retain `chooseDispatchTier(item)` for cheap in-context slices. For registered slots, judge semantic prerequisites beyond the DAG, then run `pan swarm dispatch <ISSUE-ID> --json`. A gate refusal is evidence to investigate, never a condition to bypass.
+3. Wait quiescently with `pan swarm wait <ISSUE-ID> --timeout 540 --json`. On each wake, spot-read the changed slot transcript. Check polyrepo isolation, file-scope collisions, plan omissions, semantic dependency drift, and stalled work.
+4. Send corrections only with `pan tell <slot-agent> "<message>"`. The foreman talks to its child slots; slots never coordinate peer-to-peer. Use `pan swarm freeze <ISSUE-ID>` before investigating unsafe coordination and `pan swarm resume <ISSUE-ID>` only after the cause is resolved.
+5. For each completed slot, run `pan swarm merge <ISSUE-ID> <slot> --json`, then run the issue-level integration checks before dispatching dependents. When `autoAdvance` is false, obtain the required operator acknowledgment first.
+6. Retry one failure with specific feedback. If it fails again, run `pan swarm recover <ISSUE-ID> <slot> --action reclaim`, confirm no live slot owns the item, and implement it serially. Never implement an item in foreman context while its slot is live. Other recovery choices remain `retry`, `drop`, and `handoff`.
+7. Stop after three corrective interventions for the same slot and failure class unless the operator explicitly overrides the counter. Use `pan swarm status <ISSUE-ID> --json` to verify the durable count.
+8. At a DAG convergence point, compose an in-context digest from the merged parents' expected outputs and verification evidence. Pass that digest to the convergent item; do not create parallel synthesis state.
+9. When all items are integrated and green, run `pan done <ISSUE-ID>`. Stay responsible through review, test, merge, deploy, verify-on-main, and close-out.
 
-### Wave loop
-
-1. Read `.overdeck/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/xbrief/dag.ts`.
-2. Run `analyzeSwarmReadiness(doc)` from `src/lib/xbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
-3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>-slot-*` branches, `agent-<issue>-slot-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
-4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.
-5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-item commit.
-6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>-slot-<n>` and registers as `agent-<issue>-slot-<n>`.
-7. Do not advance a dependent wave until every blocking parent is merged, completed serially, or intentionally cancelled.
-
-### Tiered dispatch (gated: `tiered_execution.enabled`)
-
-With `tiered_execution` disabled — the default — this subsection is inert: use the wave loop above exactly as written. When it resolves enabled for the plan (global config or `plan.metadata.tiered_execution: "on"`, via `resolveTieredExecutionEnabled` in `src/lib/agents/tier-table.ts`), replace wave-loop steps 4–6 with the tiered path below. Reconcile, wave ordering, convergence synthesis, and failure handling are unchanged.
-
-1. Compute the tier-run schedule once with `computeTierRunSchedule(doc, config)` from `src/lib/agents/standing-tiers.ts` and construct a `StandingTierManager` over it. Before starting a run, call `ensureStandingTiersForRun(currentRunIndex)` — a tier's standing session spawns lazily when its first run is ≤1 run away, and is reused across all its tasks.
-2. Before dispatching each ready item, call `shouldHaltDispatch(verdicts, item, doc)` from `src/lib/agents/tier-supervisor.ts` using the supervisor verdicts collected from the inspect-status surface. If it returns true, a blocking supervisor finding is unresolved on a dependency of this item. Do not dispatch the dependent item yet.
-3. When dispatch is halted by a supervisor finding, send the fix to the tier that owns the blocked dependency first. The fix must land as a new one-item commit, then the standing supervisor must ack that fix commit on the inspect-status surface. After the ack, re-check `shouldHaltDispatch`; only resume dependent dispatch when it returns false. This mirrors the serial `INSPECTION BLOCKED` flow.
-4. For each ready item that is not halted, dispatch to its tier's standing agent with `manager.dispatchItemToTier(tierName, item)`. The helper enforces the single-implementer invariant: **only one worker agent implements a item at a time** — standing tiers share your worktree, so a second in-flight item would race the tree. A second dispatch before `completeItem` throws.
-5. When the standing agent reports the item done, you stage and commit — `git add` the item's files and compose the commit yourself. One item = one foreman-authored commit, same invariant as the serial path.
-6. After the commit lands, call `broadcastCommit` from `src/lib/agents/tier-feed.ts` with the sha, the item title, and the full standing-tier set, so every standing tier ingests the diff and stays warm. Then call `manager.completeItem(item.id)` and continue with the next ready item.
-
-### Verify then merge
-
-Registered slots never merge directly into the feature branch. When a slot reports completion:
-
-1. Run `verifyAndMergeSlot(issue, slotIndex, item)` from `src/lib/agents/slot-merge.ts`.
-2. The helper runs the item's `metadata.verify_commands` in the slot worktree and checks that `metadata.expected_outputs` are present as the evidence contract for that item.
-3. Only after green verification may the slot branch merge into the issue feature branch.
-4. If verification fails, do not merge. Feed the failure back to the slot once, then fall back to serial execution in your own context if it fails again.
-5. If the merge conflicts, do not force-apply the slot. Surface the conflict to the foreman loop, resolve it deliberately, and keep the feature branch continuously green.
-
-### Convergence synthesis
-
-At a DAG convergence point, where an item has more than one blocking parent, compose an in-context synthesis digest before dispatching the convergent item.
-
-The digest is built from the merged parent items' `expected_outputs` and the evidence produced by their verification. Inline that digest into the convergent item's prompt. Do not resurrect runtime synthesis state or store a `SynthesisOutput` object; the merged feature branch plus the prompt digest is the handoff.
-
-### Failure handling
-
-For any in-context subagent or registered slot failure:
-
-- Retry once with feedback that names the exact failing command, missing expected output, or merge conflict.
-- If the retry fails, stop distributing that item and do the work serially in the foreman's own context.
-- Record the fallback in the commit body when it matters for review or crash recovery.
-
-Do not loop forever on a failing worker. One redo, then serial fallback.
+Keep the foreman context shallow. Offload bounded research when useful. If context quality degrades, use `pan handoff` with a file-backed state summary and continue in a fresh persistent session.
 
 ## Jidoka Inspection Gates
 

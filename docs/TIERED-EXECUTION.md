@@ -161,7 +161,7 @@ A standing tier session's curated context is derivable from the xBRIEF plan plus
 
 Replay is the compaction strategy. Agents should not rely on hidden terminal state or uncommitted local memory for correctness.
 
-With `compaction_reroute: off` (default), replay respawns the same registered tier slot behavior as before. With `compaction_reroute: on`, crash replay and threshold compaction recompute the remaining tier-run schedule from items not completed in `statusOverrides`, after applying effective difficulties from `tierOverrides`. If the target tier no longer appears in the remaining schedule, Overdeck decommissions it and spawns nothing. If the tier is still needed, replay respawns with that tier's current configured model and harness, so operator tuning and promotions take effect at the cache-miss point.
+With `compaction_reroute: off` (default), replay respawns the same registered tier slot behavior as before. With `compaction_reroute: on`, the foreman owns rerouting: it recomputes the remaining tier-run schedule from items not completed in `statusOverrides`, after applying effective difficulties from `tierOverrides`. If the target tier no longer appears, the foreman decommissions it. If the tier is still needed, the foreman respawns it with the current configured model and harness, so operator tuning and promotions take effect at the cache-miss point.
 
 ## Non-Goals
 

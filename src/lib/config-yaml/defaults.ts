@@ -216,6 +216,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorSwapSoftFreePercent: 25,
     governorSwapRecoveryFreePercent: 50,
     governorPsiFullShedAvg10: 1,
+    governorPsiCalmReadmitAvg10: 0.05,
+    governorPsiCalmWindowMs: 600_000,
   },
   issues: {
     closedWindowDays: 14,

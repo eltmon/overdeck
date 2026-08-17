@@ -501,6 +501,10 @@ export const ReadModelServiceLive = Layer.effect(
         enrichProgressBySessionId: state.enrichProgressBySessionId,
         embedProgressBySessionId: state.embedProgressBySessionId,
         ciByProjectKey: state.ciByProjectKey,
+        // PAN-3729: the restart-approval banner reads the gate from the
+        // snapshot on connect and from restart_gate.changed events after that
+        // — the frontend never polls the gate endpoints.
+        restartGate: state.restartGate ?? undefined,
         timestamp: new Date().toISOString(),
       };
     }

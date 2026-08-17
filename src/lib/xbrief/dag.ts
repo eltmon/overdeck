@@ -240,8 +240,10 @@ export function getDispatchableItems(
   return actionable.filter(item => {
     const itemBlockers = blockers.get(item.id) ?? [];
     return itemBlockers.every(blockerId => {
-      if (mergedItemIds.has(blockerId)) return true;
       const blocker = itemById.get(blockerId);
+      // Branch ancestry cannot resolve a running task. Polyrepo wrapper
+      // branches may appear merged while member-repository work is still live.
+      if (mergedItemIds.has(blockerId) && blocker?.status === 'completed') return true;
       return blocker?.status === 'completed' || blocker?.status === 'cancelled';
     });
   });
@@ -533,7 +535,7 @@ export function renderActiveSlicePrompt(slice: Omit<ActiveSlice, 'prompt'>): str
   return lines.join('\n');
 }
 
-export type TaskOperationType = 'claim' | 'done' | 'block' | 'unblock' | 'cancel';
+export type TaskOperationType = 'claim' | 'done' | 'block' | 'unblock' | 'cancel' | 'reopen';
 
 export interface TaskOperation {
   type: TaskOperationType;
@@ -549,7 +551,7 @@ export interface TaskOperationResult {
   item: XBriefItem;
 }
 
-const TASK_OPERATION_TYPES = new Set<string>(['claim', 'done', 'block', 'unblock', 'cancel']);
+const TASK_OPERATION_TYPES = new Set<string>(['claim', 'done', 'block', 'unblock', 'cancel', 'reopen']);
 const TASK_COMMANDS = new Set<string>(['next', 'show', ...TASK_OPERATION_TYPES]);
 
 export function isTaskOperationType(value: string): value is TaskOperationType {
@@ -566,6 +568,9 @@ function statusForOperation(type: TaskOperationType): XBriefItemStatus {
     case 'done': return 'completed';
     case 'block': return 'blocked';
     case 'unblock': return 'pending';
+    // PAN-3691: reopen is the canonical recovery for a task falsely marked
+    // completed (e.g. a swarm slot merged with no current-item changes).
+    case 'reopen': return 'pending';
     case 'cancel': return 'cancelled';
     default: {
       const exhaustive: never = type;
@@ -598,6 +603,7 @@ export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation
   const now = new Date().toISOString();
   item.status = statusForOperation(operation.type);
   if (operation.type === 'done') item.completed = now;
+  if (operation.type === 'reopen') delete item.completed;
   if (operation.reason) {
     item.metadata = { ...(item.metadata ?? {}), statusReason: operation.reason, statusUpdatedAt: now };
   }
@@ -607,12 +613,18 @@ export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation
       if (ids.has(sub.id)) {
         sub.status = item.status;
         if (operation.type === 'done') sub.completed = now;
+        if (operation.type === 'reopen') delete sub.completed;
       }
     }
   } else if (operation.type === 'done') {
     for (const sub of subItemsOf(item)) {
       sub.status = 'completed';
       sub.completed = now;
+    }
+  } else if (operation.type === 'reopen') {
+    for (const sub of subItemsOf(item)) {
+      sub.status = 'pending';
+      delete sub.completed;
     }
   }
   next.plan.sequence = currentSequence + 1;

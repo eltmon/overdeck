@@ -21,6 +21,15 @@ import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
+import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
+import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
+import { parseAcpConversationMessages } from './acp-conversation-parser.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { parseKimiConversationMessages } from './kimi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
+import { parsePiConversationMessages } from './pi-conversation-parser.js';
+import { parseEntireConversation } from './conversation-service.js';
+import type { ParseResult } from './conversation-service.js';
 
 type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -41,13 +50,35 @@ type DashboardDbOperation =
   | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
-  | 'unshareArtifactBySlug';
+  | 'unshareArtifactBySlug'
+  | 'parseTranscriptSnapshot'
+  | 'costReconcileSweep';
+
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
+
+const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
+  pi: parsePiConversationMessages,
+  ohmypi: parseOhmypiConversationMessages,
+  codex: parseCodexConversationMessages,
+  acp: parseAcpConversationMessages,
+  kimi: parseKimiConversationMessages,
+  'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
+};
 
 interface DashboardDbRequest {
   id: string;
   operation: DashboardDbOperation;
   payload: unknown;
 }
+
+interface DashboardDbAck {
+  id: string;
+  ack: number;
+}
+
+const progressAcks = new Map<string, () => void>();
+let progressSequence = 0;
 
 function aggregateDiscoveredSessionCostByPayload(payload: unknown) {
   if (typeof payload === 'string') {
@@ -62,8 +93,12 @@ async function runJob(
   operation: DashboardDbOperation,
   payload: unknown,
 ): Promise<unknown> {
-  const emitProgress = (progress: unknown) => {
-    parentPort?.postMessage({ id, progress });
+  const emitProgress = (progress: unknown): Promise<void> => {
+    const progressSeq = ++progressSequence;
+    return new Promise(resolve => {
+      progressAcks.set(`${id}:${progressSeq}`, resolve);
+      parentPort?.postMessage({ id, progress, progressSeq });
+    });
   };
 
   switch (operation) {
@@ -97,6 +132,12 @@ async function runJob(
       return embedSessions({ ...(payload as EmbedSessionsOptions), autoInstall: true, onProgress: emitProgress });
     case 'getConversationByName':
       return getConversationByName(payload as string);
+    case 'parseTranscriptSnapshot': {
+      const input = payload as { sessionFile: string; parser: string };
+      const parser = transcriptParsers[input.parser as TranscriptParserName];
+      if (!parser) throw new Error(`Unknown transcript parser: ${input.parser}`);
+      return parser(input.sessionFile);
+    }
     case 'getSetting':
       return getSetting(payload as string);
     case 'setSetting': {
@@ -120,6 +161,10 @@ async function runJob(
       const { unshareArtifactBySlugJob } = await import('./artifact-index-jobs.js');
       return unshareArtifactBySlugJob(payload as string);
     }
+    case 'costReconcileSweep':
+      return (payload as { source: 'codex' | 'pi' }).source === 'pi'
+        ? collectPiCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress })
+        : collectCodexCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress });
   }
 }
 
@@ -128,13 +173,19 @@ let activeJobs = 0;
 const MAX_CONCURRENT_JOBS_PER_LANE = 1;
 
 async function execute(message: DashboardDbRequest): Promise<void> {
+  const startedAt = Date.now();
   try {
     const result = await runJob(message.id, message.operation, message.payload);
-    parentPort?.postMessage({ id: message.id, ok: true, result });
+    const bytes = message.operation === 'parseTranscriptSnapshot'
+      ? (result as ParseResult).byteOffset
+      : undefined;
+    parentPort?.postMessage({ id: message.id, ok: true, result, startedAt, finishedAt: Date.now(), bytes });
   } catch (err) {
     parentPort?.postMessage({
       id: message.id,
       ok: false,
+      startedAt,
+      finishedAt: Date.now(),
       error: {
         name: err instanceof Error ? err.name : 'Error',
         message: err instanceof Error ? err.message : String(err),
@@ -159,7 +210,13 @@ function drainQueue(): void {
   }
 }
 
-parentPort?.on('message', (message: DashboardDbRequest) => {
+parentPort?.on('message', (message: DashboardDbRequest | DashboardDbAck) => {
+  if ('ack' in message) {
+    const resolve = progressAcks.get(`${message.id}:${message.ack}`);
+    progressAcks.delete(`${message.id}:${message.ack}`);
+    resolve?.();
+    return;
+  }
   queue.push(message);
   drainQueue();
 });

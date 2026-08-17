@@ -13,6 +13,7 @@ import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
+import { healAction } from './heal.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -104,6 +105,11 @@ export function registerConversationsCommands(program: Command): void {
     .command('move <query> <projectKey>')
     .description('Reassign a conversation to a different project (exact name, then fuzzy title match)')
     .action((query: string, projectKey: string) => moveAction(query, projectKey));
+
+  conversations
+    .command('heal <query>')
+    .description('Clear stale fork/spawn failure state for a live conversation')
+    .action((query: string) => healAction(query));
 
   // ── current ───────────────────────────────────────────────────────────────────
   conversations

@@ -10,9 +10,9 @@ import {
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
+import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSession, killSessionSync, listPaneValuesSync, sendEscapeKeyAsync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
-import { getAgentEffectiveLastActivityMs, isAgentIdleForNudge } from './agent-idle.js';
+import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
@@ -24,6 +24,7 @@ import {
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
+import { readAgentBackgroundTaskWedgeEvidence } from './planning-wedge.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -225,8 +226,8 @@ async function evaluateAgent(
     return;
   }
   if (!sessionExistsSync(agentId)) return;
-  if (agent.role === 'plan' && agent.auto === true) {
-    await evaluateAutoPlanningAgent(agent, config, now, actions);
+  if (agent.role === 'plan') {
+    await evaluatePlanningAgent(agent, config, now, actions);
     return;
   }
   // PAN-2519: catch wedged-but-alive work agents that OWE a rework fix before the
@@ -301,43 +302,277 @@ async function evaluateAgent(
   }
 }
 
-async function evaluateAutoPlanningAgent(
+/**
+ * PAN-3677: remediation decision for a planning session with no pending
+ * AskUserQuestion. Pure — side effects live in evaluatePlanningAgent.
+ *
+ * The wedge this catches: a planning session whose turn never ends because the
+ * provider call hung (observed on k3[1m] planning sessions right after
+ * background Explore children reached a terminal state — all-finished AND
+ * mixed failed/finished). The detector combines three signals: the runtime
+ * mirror still says 'active' (the Stop hook never fired — the turn never
+ * ended), work-product activity (hook events, transcript writes) has been
+ * silent past the stage threshold, AND the session transcript positively
+ * proves background children were in flight this turn with every child
+ * terminal (planning-wedge.ts).
+ *
+ * Guards against interrupting healthy turns:
+ *  - mirror 'idle' means the Stop hook fired — the agent is at its prompt
+ *    (operator's turn in a manual session). Never interrupt.
+ *  - `wedgeProven` requires the transcript itself to prove background children
+ *    were in flight AND every child is terminal (parseBackgroundTaskWedge). A
+ *    silent 'active' turn without that proof is a healthy long
+ *    reasoning/provider turn — never interrupt it.
+ *  - work activity fresher than stage1_minutes means real work is flowing
+ *    (tool calls, transcript writes) — never interrupt, even though the pane
+ *    repaint alone would look identical. The detector never consults tmux
+ *    window_activity: the spinner/task panel repaints every second during a
+ *    hung call and would mask the wedge (see getAgentWorkActivityMs).
+ *
+ * The ladder is bounded by construction: interrupt → kill+resume → troubled.
+ * No stage waits on anything after every child is terminal.
+ */
+export type PlanningWedgeDecision =
+  | { kind: 'none' }
+  | { kind: 'interrupt-nudge'; idleMinutes: number }
+  | { kind: 'kill-resume'; idleMinutes: number }
+  | { kind: 'troubled'; idleMinutes: number };
+
+export function decidePlanningWedgeRemediation(opts: {
+  mirrorState: string | null;
+  pendingQuestions: number;
+  /** Positive transcript proof (parseBackgroundTaskWedge): background children were in flight AND every one is terminal. */
+  wedgeProven: boolean;
+  workActivityMs: number | null;
+  lastStage: number;
+  now: number;
+  config: StuckRemediationConfig;
+}): PlanningWedgeDecision {
+  const { mirrorState, pendingQuestions, wedgeProven, workActivityMs, lastStage, now, config } = opts;
+  // A pending AskUserQuestion is the operator's slot (auto sessions get the
+  // default-choice nudge elsewhere) — never treat it as a wedge.
+  if (pendingQuestions > 0) return { kind: 'none' };
+  // Only a stale-'active' mirror is a mid-turn wedge. 'idle' means the Stop
+  // hook fired (turn ended, agent at its prompt); 'suspended'/'stopped'/
+  // 'waiting-on-human' are owned by other paths; null means the mirror never
+  // came up and we cannot tell wedge from healthy.
+  if (mirrorState !== 'active') return { kind: 'none' };
+  // The positive signature: without transcript proof that background children
+  // were in flight and ALL of them are terminal, a silent 'active' turn is a
+  // healthy long reasoning/provider turn — never interrupt it.
+  if (!wedgeProven) return { kind: 'none' };
+  if (workActivityMs === null || !Number.isFinite(workActivityMs)) return { kind: 'none' };
+  const idleMinutes = Math.floor((now - workActivityMs) / 60_000);
+  if (idleMinutes >= config.stage3_minutes) {
+    if (lastStage >= 3) return { kind: 'none' };
+    return { kind: 'troubled', idleMinutes };
+  }
+  if (idleMinutes >= config.stage2_minutes) {
+    if (lastStage >= 2) return { kind: 'none' };
+    return { kind: 'kill-resume', idleMinutes };
+  }
+  if (idleMinutes >= config.stage1_minutes) {
+    if (lastStage >= 1) return { kind: 'none' };
+    return { kind: 'interrupt-nudge', idleMinutes };
+  }
+  return { kind: 'none' };
+}
+
+/**
+ * Episode-clear rule for the planning wedge path, keyed on WORK activity only
+ * (never pane repaints — the spinner would "clear" a still-wedged episode and
+ * re-fire stage 1 every tick): work flowing after the episode opened means the
+ * recovery worked.
+ */
+export function shouldClearPlanningWedgeEpisode(
+  stuckState: StuckRemediationState | null,
+  workActivityMs: number,
+): boolean {
+  if (!stuckState) return false;
+  const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
+  return Number.isFinite(firstStuckMs) && workActivityMs > firstStuckMs;
+}
+
+/** Side-effecting doors the wedge executor needs — injected for tests. */
+export interface PlanningWedgeEffectDeps {
+  sendEscape: (agentId: string) => Promise<void>;
+  message: (agentId: string, msg: string) => Promise<unknown>;
+  /** Async tmux kill (Effect-based `killSession` from tmux.ts) — never the sync variant from server-reachable code. */
+  killSession: (agentId: string) => Promise<void>;
+  resume: (agentId: string, msg: string) => Promise<{ success: boolean; error?: string }>;
+  markTroubled: (agentId: string) => void;
+  writeState: (agentId: string, state: StuckRemediationState) => void;
+  surfaceNeedsYou: () => Promise<void>;
+  log: (msg: string) => void;
+}
+
+/**
+ * Execute one wedge-ladder decision. Ordering is the contract: stage 1 sends
+ * Escape BEFORE queueing its single nudge (the interrupt returns the prompt;
+ * the nudge — and any queued operator messages — are processed after). Stage 2
+ * kills the session and plain-resumes the SAME saved session id, so the
+ * transcript (and every explorer's findings) survives — unlike the
+ * compact-respawn path that lost conversation-only survey notes in the manual
+ * MIN-889 recovery.
+ */
+export async function executePlanningWedgeDecision(
+  agentId: string,
+  issueId: string,
+  decision: Exclude<PlanningWedgeDecision, { kind: 'none' }>,
+  firstStuck: string,
+  now: number,
+  deps: PlanningWedgeEffectDeps,
+): Promise<void> {
+  if (decision.kind === 'interrupt-nudge') {
+    // Escape cancels the in-flight (hung) provider call. The harness returns to
+    // its prompt and processes queued operator messages; the nudge below then
+    // tells the planner how to continue without re-entering the blocking wait.
+    try {
+      await deps.sendEscape(agentId);
+    } catch (err) {
+      console.error(`[deacon] Failed to interrupt wedged planning session ${agentId}:`, err);
+      return;
+    }
+    const message =
+      `Your previous turn stalled for ${decision.idleMinutes} min with no progress and was interrupted (a hung provider call). ` +
+      `Process any queued operator messages first. Then collect background-task results NON-blocking (TaskOutput with block:false) — ` +
+      `every child that reached a terminal state already has its result or error available; do NOT re-enter a blocking wait. ` +
+      `Continue planning now: write the PRD/xBRIEF artifacts and proceed to your instructed stopping point.`;
+    // The Escape already landed — the interrupt happened whether or not the
+    // nudge arrives. Record stage 1 either way: skipping the state write on a
+    // delivery failure would let every patrol re-Escape an already-unwedged
+    // session forever.
+    let deliveryError: string | null = null;
+    try {
+      await deps.message(agentId, message);
+    } catch (err) {
+      deliveryError = err instanceof Error ? err.message : String(err);
+    }
+    deps.writeState(agentId, stageState(1, now, firstStuck));
+    deps.log(deliveryError
+      ? `${transitionAction(1, issueId, decision.idleMinutes, 'interrupted-wedged-turn')} — nudge delivery failed: ${deliveryError}`
+      : transitionAction(1, issueId, decision.idleMinutes, 'interrupted-wedged-turn'));
+    return;
+  }
+
+  if (decision.kind === 'kill-resume') {
+    try {
+      await deps.killSession(agentId);
+    } catch {
+      /* best effort — the resume below fails cleanly if the session lingers */
+    }
+    const message =
+      `Resuming after an automated stall recovery (${decision.idleMinutes} min with no progress). ` +
+      `Your transcript is intact — continue planning from where you left off. ` +
+      `Collect background-task results NON-blocking (TaskOutput with block:false) and proceed.`;
+    const result = await deps.resume(agentId, message);
+    if (result.success) {
+      deps.writeState(agentId, stageState(2, now, firstStuck));
+      deps.log(transitionAction(2, issueId, decision.idleMinutes, 'kill-resumed-wedged-planning'));
+    } else {
+      deps.markTroubled(agentId);
+      deps.writeState(agentId, stageState(3, now, firstStuck));
+      deps.log(`${transitionAction(3, issueId, decision.idleMinutes, 'kill-resume-failed-troubled')} — ${result.error ?? 'unknown'}`);
+      await deps.surfaceNeedsYou();
+    }
+    return;
+  }
+
+  // troubled
+  deps.markTroubled(agentId);
+  deps.writeState(agentId, stageState(3, now, firstStuck));
+  deps.log(transitionAction(3, issueId, decision.idleMinutes, 'wedged-planning-troubled'));
+  await deps.surfaceNeedsYou();
+}
+
+async function evaluatePlanningAgent(
   agent: AgentState,
   config: StuckRemediationConfig,
   now: number,
   actions: string[],
 ): Promise<void> {
   const agentId = agent.id;
-  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
-
+  const issueId = issueIdForAgent(agent);
   const pendingQuestions = await Effect.runPromise(countPendingAskUserQuestionsForAgent(agentId));
-  if (pendingQuestions === 0) return;
 
-  const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
-  if (lastActivityMs === null || !Number.isFinite(lastActivityMs)) return;
-  const lastActivity = new Date(lastActivityMs).toISOString();
-
-  const stuckState = readStuckRemediationState(agentId);
-  if (stuckState) {
-    const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
-    if (Number.isFinite(firstStuckMs) && lastActivityMs > firstStuckMs) {
-      clearStuckRemediationState(agentId);
-      return;
+  // An unanswered AskUserQuestion parks the session on the operator. Manual
+  // sessions wait by design; --auto sessions get the default-choice nudge.
+  if (pendingQuestions > 0) {
+    if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+    if (agent.auto !== true) return;
+    const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
+    if (lastActivityMs === null || !Number.isFinite(lastActivityMs)) return;
+    const lastActivity = new Date(lastActivityMs).toISOString();
+    const stuckState = readStuckRemediationState(agentId);
+    if (stuckState) {
+      const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
+      if (Number.isFinite(firstStuckMs) && lastActivityMs > firstStuckMs) {
+        clearStuckRemediationState(agentId);
+        return;
+      }
     }
+    const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
+    const lastStage = stuckState?.lastStage ?? 0;
+    if (idleMinutes < config.stage1_minutes || lastStage >= 1) return;
+    const message =
+      `This planning session was launched with \`pan plan ${issueId} --auto\`, so do not wait for operator input. ` +
+      `Proceed with the most defensible default from the issue/PRD/comments, record the choice in \`plan.autoDecisions[]\` with rationale, and continue to \`pan plan finalize\`. ` +
+      `Only halt for a genuine contradiction between authoritative inputs.`;
+    await messageAgent(agentId, message);
+    writeStuckRemediationState(agentId, stageState(1, now, firstStuckAt(lastActivity, stuckState)));
+    logAction(actions, transitionAction(1, issueId, idleMinutes, 'auto-planning-default'));
+    return;
   }
 
-  const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
-  const lastStage = stuckState?.lastStage ?? 0;
-  if (idleMinutes < config.stage1_minutes || lastStage >= 1) return;
+  // PAN-3677: mid-turn wedge. Every signal here is WORK activity (hook mirror +
+  // transcript heartbeat), never tmux window_activity — Claude Code repaints
+  // its spinner/task panel every second during a hung provider call, so the
+  // pane looks alive while no work flows. Keying on the pane would (a) hide
+  // the wedge entirely and (b) instantly "clear" the episode state,
+  // re-firing stage 1 every tick.
+  const workActivityMs = getAgentWorkActivityMs(agentId);
+  if (workActivityMs === null || !Number.isFinite(workActivityMs)) return;
 
-  const issueId = issueIdForAgent(agent);
-  const message =
-    `This planning session was launched with \`pan plan ${issueId} --auto\`, so do not wait for operator input. ` +
-    `Proceed with the most defensible default from the issue/PRD/comments, record the choice in \`plan.autoDecisions[]\` with rationale, and continue to \`pan plan finalize\`. ` +
-    `Only halt for a genuine contradiction between authoritative inputs.`;
-  await messageAgent(agentId, message);
-  writeStuckRemediationState(agentId, stageState(1, now, firstStuckAt(lastActivity, stuckState)));
-  logAction(actions, transitionAction(1, issueId, idleMinutes, 'auto-planning-default'));
+  const stuckState = readStuckRemediationState(agentId);
+  if (shouldClearPlanningWedgeEpisode(stuckState, workActivityMs)) {
+    clearStuckRemediationState(agentId);
+    return;
+  }
+
+  const mirrorState = getAgentRuntimeStateSync(agentId)?.state ?? null;
+  if (mirrorState !== 'active') return;
+  const idleMinutesGate = Math.floor((now - workActivityMs) / 60_000);
+  if (idleMinutesGate < config.stage1_minutes) return;
+
+  // The positive signature (readAgentBackgroundTaskWedgeEvidence): the
+  // transcript of the CURRENT turn must prove background children were in
+  // flight and EVERY child is terminal. Without it, a silent 'active' turn is
+  // a healthy long reasoning/provider turn and is never interrupted.
+  const wedgeProven = agent.workspace
+    ? readAgentBackgroundTaskWedgeEvidence(agentId, agent.workspace)?.wedged === true
+    : false;
+
+  const decision = decidePlanningWedgeRemediation({
+    mirrorState,
+    pendingQuestions,
+    wedgeProven,
+    workActivityMs,
+    lastStage: stuckState?.lastStage ?? 0,
+    now,
+    config,
+  });
+  if (decision.kind === 'none') return;
+
+  await executePlanningWedgeDecision(agentId, issueId, decision, firstStuckAt(new Date(workActivityMs).toISOString(), stuckState), now, {
+    sendEscape: (id) => sendEscapeKeyAsync(id),
+    message: (id, msg) => messageAgent(id, msg),
+    killSession: (id) => Effect.runPromise(killSession(id)),
+    resume: (id, msg) => resumeAgent(id, msg),
+    markTroubled: (id) => markAgentTroubled(id),
+    writeState: (id, state) => writeStuckRemediationState(id, state),
+    surfaceNeedsYou: () => surfaceStuckNeedsYou(agent, issueId, firstStuckAt(new Date(workActivityMs).toISOString(), stuckState), actions),
+    log: (msg) => logAction(actions, msg),
+  });
 }
 
 // The flywheel orchestrator is a singleton with role 'flywheel'. It ticks

@@ -44,6 +44,16 @@ export function makeUatCandidateName(deps: UatNameDeps): string {
   return `uat/${deps.label}-${word}-${day}`;
 }
 
+/** Keep the deterministic first name, then mint -2, -3, … around durable collisions. */
+export function makeUniqueUatCandidateName(deps: UatNameDeps, takenNames: Iterable<string>): string {
+  const base = makeUatCandidateName(deps);
+  const taken = new Set(takenNames);
+  if (!taken.has(base)) return base;
+  let suffix = 2;
+  while (taken.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
 function stableIndex(seed: string, modulo: number): number {
   if (modulo <= 0) return 0;
   let hash = 2166136261;

@@ -32,6 +32,7 @@ import {
 } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
+import { restartGateRequesterId, waitForRestartApproval } from '../../lib/restart-gate-client.js';
 import {
   refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath,
@@ -121,7 +122,7 @@ async function recordReloadStatus(
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
-  const startedAt = Date.now();
+  let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
     healthTimeoutMs = parseHealthTimeout(options.healthTimeout);
@@ -262,6 +263,38 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         return;
       }
     }
+
+    // Everything above is ungated: a build changes nothing the operator can see.
+    // The restart below is voluntary, so it waits for the operator's approval
+    // first (PAN-3729) and may find that an approved restart already happened.
+    const gate = await waitForRestartApproval({
+      requesterId: restartGateRequesterId('reload'),
+      kind: 'reload',
+      reason: 'pan reload — put the freshly built dashboard live',
+    });
+    if (!gate.proceed) {
+      // Same disposition as a restart that left the old dashboard running: the
+      // build is good and stays the recorded active deployment, so whichever
+      // server is running now (or next boots) runs it. Nothing is rolled back,
+      // and no restart status is recorded — the requester that actually
+      // restarted recorded its own.
+      await activation?.commit();
+      if (deployment) {
+        const repointError = await reportCliRepoint(deployment.deployRoot);
+        if (repointError) {
+          await recordReloadStatus(startedAt, false, repointError);
+          process.exitCode = 1;
+          return;
+        }
+        await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+      }
+      console.log(chalk.green('✓ Reload complete — another approved restart already replaced the dashboard, so this one restarted nothing'));
+      console.log(chalk.dim(`  ${gate.detail}; this build is the recorded active deployment.`));
+      return;
+    }
+    // The approval wait is unbounded, so the pre-wait clock would report a
+    // reload that "took" as long as the operator was away from the dashboard.
+    startedAt = Date.now();
 
     let restartResult: DashboardRestartResult;
     try {

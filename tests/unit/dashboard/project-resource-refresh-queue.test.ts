@@ -52,6 +52,14 @@ describe('project resource refresh queue', () => {
     expect(shouldRefreshMembershipForResourceRefresh(nonTerminalContext)).toBe(false);
   });
 
+  it.each(['opened', 'closed', 'reopened'])('re-gathers membership for pull_request:%s', (action) => {
+    const context = {
+      reasonsByProjectPath: new Map([['/alpha', new Set([`pull_request:${action}`])]]),
+    };
+
+    expect(shouldRefreshMembershipForResourceRefresh(context)).toBe(true);
+  });
+
   it('runs at most one follow-up when the active project changes again', async () => {
     const first = deferred();
     const refreshProjects = vi.fn()

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(),
   resolve: vi.fn(),
   getIssues: vi.fn(),
+  getConversationByName: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents/messaging.js', () => ({
@@ -22,6 +23,10 @@ vi.mock('../../../../lib/linear-mcp-auth.js', () => ({
 
 vi.mock('../../services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(() => ({ getIssues: mocks.getIssues })),
+}));
+
+vi.mock('../../../../lib/overdeck/conversations.js', () => ({
+  getConversationByName: mocks.getConversationByName,
 }));
 
 import {
@@ -91,6 +96,7 @@ describe('Linear MCP auth routes', () => {
     mocks.messageAgent.mockReset().mockResolvedValue(undefined);
     mocks.resolve.mockReset().mockResolvedValue(NONE);
     mocks.getIssues.mockReset().mockReturnValue([]);
+    mocks.getConversationByName.mockReset().mockReturnValue(null);
   });
 
   it('GET returns the projection without side effects', async () => {
@@ -102,7 +108,7 @@ describe('Linear MCP auth routes', () => {
       status: 200,
       body: {
         ...ACTIVE,
-        blockedAgents: [{ ...ACTIVE.blockedAgents[0], issueUrl: null }],
+        blockedAgents: [{ ...ACTIVE.blockedAgents[0], issueUrl: null, conversationUrl: null }],
       },
     });
     expect(mocks.messageAgent).not.toHaveBeenCalled();
@@ -123,6 +129,57 @@ describe('Linear MCP auth routes', () => {
       agentId: 'agent-min-852',
       issueUrl: 'https://linear.app/mind-your-now/issue/MIN-852/habits-full-bug-audit',
     });
+  });
+
+  it('GET enriches a blocked conversation with its canonical /conv/<rowid> URL', async () => {
+    mocks.resolve.mockResolvedValue({
+      ...ACTIVE,
+      authUrlAgentId: 'conv-20260815-f8c3',
+      blockedAgents: [{
+        agentId: 'conv-20260815-f8c3',
+        issueId: null,
+        declaredAt: '2026-08-15T12:19:35.000Z',
+        expiresAt: '2026-08-15T16:52:22.000Z',
+        notifiedAt: null,
+      }],
+    });
+    mocks.getConversationByName.mockReturnValue({ id: 173, name: 'conv-20260815-f8c3' });
+
+    const result = await request('GET', '/api/linear-mcp-auth');
+
+    expect(result.status).toBe(200);
+    expect(mocks.getConversationByName).toHaveBeenCalledWith('conv-20260815-f8c3');
+    expect((result.body['blockedAgents'] as Array<Record<string, unknown>>)[0]).toMatchObject({
+      agentId: 'conv-20260815-f8c3',
+      conversationUrl: '/conv/173',
+    });
+  });
+
+  it('GET projects a null conversationUrl for non-conversation agents and unresolved conversations', async () => {
+    mocks.resolve.mockResolvedValue({
+      ...ACTIVE,
+      blockedAgents: [
+        { ...ACTIVE.blockedAgents[0] },
+        {
+          agentId: 'conv-20260815-0000',
+          issueId: null,
+          declaredAt: '2026-08-15T12:19:35.000Z',
+          expiresAt: '2026-08-15T16:52:22.000Z',
+          notifiedAt: null,
+        },
+      ],
+    });
+    mocks.getConversationByName.mockReturnValue(null);
+
+    const result = await request('GET', '/api/linear-mcp-auth');
+
+    expect(result.status).toBe(200);
+    const agents = result.body['blockedAgents'] as Array<Record<string, unknown>>;
+    expect(agents[0]).toMatchObject({ agentId: 'agent-min-852', conversationUrl: null });
+    expect(agents[1]).toMatchObject({ agentId: 'conv-20260815-0000', conversationUrl: null });
+    // The read door is only consulted for conv-* agents.
+    expect(mocks.getConversationByName).toHaveBeenCalledTimes(1);
+    expect(mocks.getConversationByName).toHaveBeenCalledWith('conv-20260815-0000');
   });
 
   it.each([

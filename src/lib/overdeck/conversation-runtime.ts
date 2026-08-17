@@ -25,6 +25,7 @@ import {
   archiveConversation,
   removeFavorite,
   updateSpawnError,
+  clearConversationFailureState,
   hasOtherActiveConversationOnTmuxSession,
   type LegacyConversation as Conversation,
 } from './conversations.js';
@@ -409,12 +410,12 @@ function getPtySupervisorSocketPath(agentId: string): string {
 export function extractSupervisorFailure(paneText: string): string | null {
   const lines = paneText.split('\n').map((line) => line.trim()).filter(Boolean);
   const errors = lines.filter((line) => /error|cannot find|ERR_[A-Z_]+|pty-supervisor:/i.test(line));
-  const chosen = (errors.length > 0 ? errors : lines).slice(-3);
+  const chosen = errors.slice(-3);
   if (chosen.length === 0) return null;
   return chosen.join(' | ').slice(0, 500);
 }
 
-async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
+export async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
   const socketPath = getPtySupervisorSocketPath(agentId);
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -426,10 +427,23 @@ async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPER
     await new Promise(r => setTimeout(r, 250));
   }
   const failure = extractSupervisorFailure(await capturePaneText(agentId, 40));
-  throw new Error(
-    `Timed out waiting for PTY supervisor socket ${socketPath}`
-    + (failure ? ` — supervisor output: ${failure}` : ''),
-  );
+  const detail = failure ? `supervisor output: ${failure}` : 'the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME';
+  throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath} — ${detail}`);
+}
+export async function waitForPtySupervisorOrFallback(
+  agentId: string,
+  timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS,
+  sessionAlive: (name: string) => Promise<boolean> = tmuxSessionExists,
+): Promise<void> {
+  try {
+    await waitForPtySupervisorSocket(agentId, timeoutMs);
+  } catch (error) {
+    if (!await sessionAlive(agentId)) throw error;
+    console.warn(
+      `[conversations] PTY supervisor socket unavailable for ${agentId}; `
+      + `continuing with fallback delivery: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
   try {
@@ -802,7 +816,7 @@ export async function spawnConversationSession(
       throw err;
     }
     if (useSupervisor) {
-      await waitForPtySupervisorSocket(tmuxSession);
+      await waitForPtySupervisorOrFallback(tmuxSession);
     }
     if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
       const codexHomeDir = codexFields.codexHome;
@@ -982,6 +996,21 @@ export async function handleConversationStop(name: string, deps: { resolveSessio
     console.error('[conversations] stop conversation failed:', msg);
     return jsonResponse({ error: 'Internal server error' }, { status: 500 });
   }
+}
+export async function handleConversationClearForkState(
+  name: string,
+  deps: {
+    sessionExists?: (session: string) => Promise<boolean>;
+    clearFailureState?: (conversation: string) => void;
+  } = {},
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  if (!await (deps.sessionExists ?? tmuxSessionExists)(conv.tmuxSession)) {
+    return jsonResponse({ error: 'Cannot clear failure state while the tmux session is not alive' }, { status: 409 });
+  }
+  (deps.clearFailureState ?? clearConversationFailureState)(name);
+  return jsonResponse({ ...(getConversationByName(name) ?? conv), sessionAlive: true });
 }
 export async function handleConversationResume(
   name: string,

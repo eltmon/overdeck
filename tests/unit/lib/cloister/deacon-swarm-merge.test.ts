@@ -5,7 +5,7 @@ import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '
 let recordRemote: string | null = null;
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { getFailedMergeBlock, mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 function doc(item: XBriefItem = itemFor('wi-1')): XBriefDocument {
@@ -96,7 +96,12 @@ describe('deacon-swarm ready-slot merge', () => {
       ]);
 
     expect(fakeDeps.verifyAndMergeSlot).toHaveBeenCalledWith(
-      { issueId: 'PAN-2203', featureWorkspace: workspacePath },
+      {
+        issueId: 'PAN-2203',
+        featureWorkspace: workspacePath,
+        slotBranch: 'feature/pan-2203-slot-1',
+        slotWorkspace: `${workspacePath}-slot-1`,
+      },
       1,
       expect.objectContaining({ id: 'wi-1' }),
     );
@@ -124,6 +129,7 @@ describe('deacon-swarm ready-slot merge', () => {
       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-1) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toMatchObject({ itemId: 'wi-1', slotIndex: 1 });
   });
 });
 

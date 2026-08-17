@@ -8,7 +8,8 @@ import type { CanonicalState } from '../../core/state-mapping.js';
 import { Effect } from 'effect';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { getDashboardApiUrlSync } from '../config.js';
-import { getReviewStatus, type ReviewStatus } from '../review-status.js';
+import { rehydrateHeadAnchor } from '../git-utils.js';
+import { getReviewStatus, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 import type { StrikeLandingStatus } from '../strike-landing.js';
 import {
   getProjectConfigFromWorkspacePath,
@@ -62,6 +63,7 @@ export interface MergedDodRowResult extends DodRowResult {
   mergedAt?: string;
   mergeCommit?: string;
   evidence?: 'branch-containment';
+  containedStrikeHead?: string;
 }
 
 interface MergedForgeArtifact {
@@ -237,6 +239,7 @@ export interface EvaluateDodGateDeps {
     mainVerifyRowStatus?: DodRowResult['status'];
   }) => DodRowResult | Promise<DodRowResult>;
   trackerClosed?: (issueId: string) => Awaitable<boolean>;
+  reconcileContainedStrike?: (ctx: LifecycleContext, merged: MergedDodRowResult) => Awaitable<void>;
   now: () => string;
 }
 
@@ -250,6 +253,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   ship: checkShipRow,
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
+  reconcileContainedStrike,
   now: () => new Date().toISOString(),
 };
 
@@ -514,13 +518,23 @@ export async function checkMergedRow(
     }
   }
 
-  if (merged.status === 'miss') {
+  // A successful ancestry check proves that the branch head reached main, but
+  // only containment can identify that result as a non-PR landing for row 5.
+  const needsContainmentEvidence = merged.status === 'miss' || (
+    verified.success &&
+    ctx.github !== undefined &&
+    pullRequestState?.toUpperCase() !== 'MERGED'
+  );
+  if (needsContainmentEvidence) {
     try {
       const containment = await (deps.readBranchContainment ?? defaultMergedRowDeps.readBranchContainment!)(ctx);
       if (containment.mergedWorkRefs.length > 0 && containment.unmergedRefs.length === 0) {
         merged.status = 'pass';
         merged.evidence = 'branch-containment';
         merged.observed = `${merged.observed}; branch work contained in default branch with no merged PR — non-PR landing (membership L2-work lens): ${containment.mergedWorkRefs.join(', ')}`;
+        const strikeSuffix = `:strike/${ctx.issueId.toLowerCase()}`;
+        merged.containedStrikeHead = containment.mergedWorkHeads
+          ?.find(candidate => candidate.ref.endsWith(strikeSuffix))?.head;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -529,6 +543,43 @@ export async function checkMergedRow(
   }
 
   return merged;
+}
+
+const NEGATIVE_STRIKE_VERDICTS = new Set(['failed', 'blocked', 'dispatch_failed']);
+
+/**
+ * Reconcile an out-of-band strike landing only when its durable ready marker
+ * names the exact strike tip proven contained in main. This is the evidence a
+ * normal merge-door landing consumes before it clears the marker.
+ */
+export async function reconcileContainedStrike(
+  ctx: LifecycleContext,
+  merged: MergedDodRowResult,
+  deps: {
+    getStatus?: (issueId: string) => Awaitable<ReviewStatus | null>;
+    setStatus?: typeof setReviewStatusSync;
+  } = {},
+): Promise<void> {
+  const head = merged.evidence === 'branch-containment' ? merged.containedStrikeHead : undefined;
+  if (!head) return;
+  const current = await (deps.getStatus ?? (issueId => Effect.runPromise(getReviewStatus(issueId))))(ctx.issueId);
+  if (!current || current.strikeReadyHead !== head) return;
+
+  const update: ReviewStatusUpdate = {};
+  if (!NEGATIVE_STRIKE_VERDICTS.has(current.reviewStatus)) update.reviewStatus = 'passed';
+  if (!NEGATIVE_STRIKE_VERDICTS.has(current.testStatus)) update.testStatus = 'passed';
+  if (!NEGATIVE_STRIKE_VERDICTS.has(current.verificationStatus ?? '')) {
+    update.verificationStatus = 'passed';
+    update.verificationNotes = `Contained strike ${head} matched durable strike readiness evidence`;
+    update.lastVerifiedCommit = rehydrateHeadAnchor(head);
+  }
+  update.mergeStatus = 'merged';
+  update.strikeLandingState = 'landed';
+  update.strikeReadyHead = undefined;
+  update.strikeReadyAt = undefined;
+
+  const changed = Object.entries(update).some(([key, value]) => current[key as keyof ReviewStatus] !== value);
+  if (changed) (deps.setStatus ?? setReviewStatusSync)(ctx.issueId, update);
 }
 
 export async function checkPostMergeRow(
@@ -870,6 +921,7 @@ export async function evaluateDodGate(
   const merged = opts.verifyMerged
     ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
     : await deps.merged(ctx);
+  await (deps.reconcileContainedStrike ?? defaultEvaluateDodGateDeps.reconcileContainedStrike!)(ctx, merged);
   // Main-verify computes before deploy because deploy's no-merge-commit
   // branch keys on main-verify's outcome (PAN-3188: row 7 skips when row 6
   // skips — both mean "no durable anchor" for this landing class). The verdict

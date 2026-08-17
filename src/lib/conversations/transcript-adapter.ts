@@ -11,7 +11,9 @@
  *   `entry.message.role` and blocks of type `text|thinking|toolCall|toolResult`.
  * - ACP records have top-level `role`, `content`, and optional normalized
  *   `toolCalls` written by the persistent ACP host.
- * - Future harnesses (Codex, etc.) will have their own shapes.
+ * - Codex rollout records have top-level `type: 'event_msg'|'response_item'`
+ *   with user/assistant messages and tool calls nested in `entry.payload`.
+ * - Future harnesses will have their own shapes.
  *
  * The handoff authoring pipeline doesn't care about any of that. It needs
  * one thing from each harness: a canonical "<conversation>...</conversation>"
@@ -27,6 +29,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
+import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome, sessionFilePath } from '../paths.js';
@@ -418,12 +421,112 @@ const kimiCodeAdapter: ConversationTranscriptAdapter = {
   },
 };
 
+// ─── Codex ───────────────────────────────────────────────────────────────
+
+interface CodexRolloutPayload {
+  type?: string;
+  message?: string;
+  name?: string;
+  arguments?: string;
+  input?: unknown;
+}
+
+interface CodexRolloutEntry {
+  type?: string;
+  payload?: CodexRolloutPayload;
+}
+
+function serializeCodexEntry(entry: CodexRolloutEntry): string | undefined {
+  const payload = entry.payload;
+  if (!payload) return undefined;
+
+  if (entry.type === 'event_msg') {
+    if (
+      (payload.type === 'user_message' || payload.type === 'agent_message')
+      && typeof payload.message === 'string'
+    ) {
+      const message = payload.message.trim();
+      if (!message) return undefined;
+      const role = payload.type === 'user_message' ? 'user' : 'assistant';
+      return `[${role}]\n${message}`;
+    }
+    return undefined;
+  }
+
+  if (
+    entry.type === 'response_item'
+    && (payload.type === 'function_call' || payload.type === 'custom_tool_call')
+    && typeof payload.name === 'string'
+  ) {
+    let args = '';
+    if (typeof payload.arguments === 'string') {
+      args = payload.arguments.slice(0, 500);
+    } else {
+      try {
+        args = JSON.stringify(payload.input)?.slice(0, 500) ?? '';
+      } catch {
+        args = '<unserializable>';
+      }
+    }
+    return `[tool_use: ${payload.name}]\n${args}`;
+  }
+
+  // session_meta, turn_context, token_count, tool outputs, raw response
+  // messages, and encrypted reasoning are intentionally skipped. Codex never
+  // exposes reasoning here, so includeThinking has no effect for this adapter.
+  return undefined;
+}
+
+const codexAdapter: ConversationTranscriptAdapter = {
+  name: 'codex',
+  supportsPlainForkAsSource: false,
+  supportsSourceAuthoredHandoff: true,
+
+  async resolveSessionFile(conv) {
+    return resolveCodexRolloutPath(conv.tmuxSession);
+  },
+
+  async serializeTranscript(sessionFile) {
+    const content = await readFile(sessionFile, 'utf-8');
+    const parts: string[] = [];
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      let entry: CodexRolloutEntry;
+      try {
+        entry = JSON.parse(line) as CodexRolloutEntry;
+      } catch {
+        continue;
+      }
+      if (!entry || typeof entry !== 'object') continue;
+      const serialized = serializeCodexEntry(entry);
+      if (serialized) parts.push(serialized);
+    }
+    return parts.join('\n\n');
+  },
+
+  async compactSummary(sessionFile, options) {
+    const serialized = await codexAdapter.serializeTranscript(sessionFile, {
+      includeThinking: options?.includeThinking ?? true,
+    });
+    if (!serialized.trim()) {
+      return { summary: '', summaryModel: null };
+    }
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model,
+      richMode: options?.richMode ?? false,
+      harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
+    });
+    return { summary, summaryModel: options?.model ?? null };
+  },
+};
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'claude-code': claudeCodeAdapter,
   'ohmypi': piAdapter,
-  'codex': claudeCodeAdapter,
+  'codex': codexAdapter,
   'acp': acpAdapter,
   'kimi-code': kimiCodeAdapter,
   'prime-agent': primeAgentAdapter,

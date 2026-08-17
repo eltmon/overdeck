@@ -141,6 +141,23 @@ repository's forge adapter to merge its PR or MR, waits for positive forge
 evidence, then runs `postMergeLifecycle()` to clean up labels, Docker networks,
 and agent sessions.
 
+## Review-status retirement and terminal generations
+
+Review status keeps its historical verdicts after the row stops being actionable. The
+`retiredAt` timestamp is set when a closed pull request is observed during refresh, when
+the pull-request webhook reports closure, or when lazy review-status loading discovers
+the closed artifact. Consumers exclude retired rows from patrols, merge projections, and
+status stamping instead of deleting their history.
+
+A fresh pull request clears `retiredAt`. Starting fresh work also clears it, so a new
+review cycle can use the same issue record without inheriting the retired state.
+
+UAT generation history is terminal. Backfill marks a generation promoted only when each
+member branch is contained in `main` by the shared positive ancestor check; it does not
+reopen or rebuild that generation. Generation names use the date and codename, followed
+by `-2`, `-3`, and later suffixes when more than one generation is created on the same
+day.
+
 ## After another feature merges
 
 A merge does not trigger a background scan of sibling branches. An open feature
@@ -302,7 +319,12 @@ networks. NEVER remove this cleanup step.
 
 The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
 Close Out stops and removes the workspace Docker stack (including the
-`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
+`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. Close-out
+also runs a `close-out:ack-parked-residue` step that acknowledges the issue's open
+recovery trips and clears operator-gate flags on its stopped agent rows, non-blocking on
+failure; the deacon's `reconcileTerminalIssueResidue` patrol (state-plane cadence, ~hourly)
+is the recurring backstop that cleans residue predating this step or left by a failed run
+(PAN-3727). The deacon's
 reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
 and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
 worker with retry backoff. Tracker-backed devnet closure checks run in batches of four. The worker revalidates canonical merged status before each
@@ -324,4 +346,3 @@ The destructive/non-reversible completion steps are owned by close-out, not merg
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
 config, closes the tracker issue, and clears review status.
-

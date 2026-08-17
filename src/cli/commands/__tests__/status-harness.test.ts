@@ -30,6 +30,11 @@ vi.mock('../../../lib/restart-status.js', () => ({
   readRestartEvents: vi.fn(() => Effect.succeed([])),
   detectConcurrentRestartWriters: vi.fn(() => []),
 }))
+// The restart gate (PAN-3729) lives in the dashboard server; keep this test off
+// the network and off the gate line.
+vi.mock('../../../lib/restart-gate-client.js', () => ({
+  readRestartGate: vi.fn(() => Promise.resolve(null)),
+}))
 
 import { statusCommand } from '../status.js'
 import { listRunningAgentsSync } from '../../../lib/agents.js'

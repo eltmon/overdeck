@@ -19,13 +19,12 @@ If `allowHost` is true, the gate emits `agent-spawn-host-override` and persists 
 - `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` for non-interactive confirmation.
 - `src/cli/commands/start.ts:124` always prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host`, even when `--yes` is present, and requires `--yes` when stdin is not a TTY.
 - `src/cli/commands/start.ts:1009` passes `allowHost` into `spawnAgent()`.
-- `src/cli/index.ts:418` registers `pan swarm <id>`.
-- `src/cli/index.ts:426` adds `--host`; `src/cli/index.ts:427` adds `--yes` for non-interactive confirmation.
-- `src/cli/commands/swarm.ts:89` prompts with the same interactive `--host` confirmation, requires `--yes` when stdin is not a TTY, and `src/cli/commands/swarm.ts:144` sends the server confirmation phrase to `POST /api/swarm`.
+- `pan swarm <id>` starts or attaches to the parent foreman through `ensureSwarmForeman()` and `spawnRun()`; it has no host-bypass flag.
+- `pan swarm dispatch <id>` is the only slot-spawn gate. It checks the durable hold, DAG blockers, file overlap, reserved slot capacity, and duplicate slot resources before `spawnRun()`.
+- The Deacon janitor may restore a missing foreman only after the work-concurrency governor admits it. The janitor never spawns slots.
 - `src/dashboard/server/routes/agents.ts:1818` accepts an explicit dashboard host override request after origin validation and confirmation phrase validation.
 - `src/dashboard/server/routes/agents.ts:2652` and `src/dashboard/server/routes/agents.ts:2712` pass `--host --yes` to the `pan start` child only when the request explicitly set and confirmed `host` or `allowHost`.
 - `src/dashboard/server/services/agent-spawner.ts:172` passes `allowHost` through its direct `spawnAgent()` service path.
-- `src/dashboard/server/routes/swarm.ts:1749` requires the same confirmation phrase before `POST /api/swarm` accepts `host` or `allowHost`, `src/dashboard/server/routes/swarm.ts:1095` persists the confirmed host override in swarm runtime state, and `src/dashboard/server/routes/swarm.ts:1020` passes `allowHost` into each swarm slot spawn only after confirmation.
 
 There is no `pan work` spawn command today; the CLI audit found `pan start <id>` and `pan swarm <id>` as direct work-agent start surfaces.
 
@@ -37,9 +36,9 @@ There is no `pan work` spawn command today; the CLI audit found `pan start <id>`
 - `src/lib/cloister/test-agent-queue.ts:85`, `src/lib/cloister/deacon.ts:1568`, `src/lib/cloister/deacon.ts:1745`, and `src/dashboard/server/routes/workspaces.ts:3602` start test roles through `spawnRun()`.
 - Server-side shipping no longer starts a ship role through `spawnRun()`.
 - `src/lib/cloister/service.ts:350` starts reactive lifecycle roles through `spawnRun()` when a lifecycle state maps to a spawned role.
-- `src/dashboard/server/services/agent-spawner.ts:166`, `src/dashboard/server/routes/workspaces.ts:267`, `src/dashboard/server/routes/swarm.ts:1009`, and `src/lib/cloister/handoff.ts:136` start work agents through `spawnAgent()`.
+- `src/dashboard/server/services/agent-spawner.ts`, workspace routes, swarm foreman and dispatch gates, and `src/lib/cloister/handoff.ts` start work agents through the shared spawn door.
 - `src/dashboard/server/routes/agents.ts:2649` and `src/dashboard/server/routes/agents.ts:2709` shell out to `pan start`, which reaches `spawnAgent()`.
-- `src/cli/commands/swarm.ts:121` calls `POST /api/swarm`, which reaches `spawnAgent()` for each slot.
+- `src/lib/cloister/swarm-foreman.ts` starts the parent foreman, and `dispatchNextWave()` starts slot agents. Both reach the shared work-agent spawn gate.
 
 ## Non-agent tmux sessions
 

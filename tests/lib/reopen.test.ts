@@ -15,7 +15,7 @@ import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from
 // ── Overdeck DB fixture ───────────────────────────────────────────────────────
 
 let odb: OverdeckTestDb;
-let projectStub: { projectPath: string } | null = null;
+let projectStub: { projectPath: string; projectKey?: string } | null = null;
 const mockClearIssueClosedCache = vi.fn();
 
 vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
@@ -46,6 +46,11 @@ vi.mock('../../src/lib/projects.js', async () => {
     ...actual,
     resolveProjectFromIssue: () => projectStub,
     resolveProjectFromIssueSync: () => projectStub,
+    // PAN-3727: clearRecordPipelineClosedOutSync (reopen.ts) is gated on
+    // getProjectSync resolving a project. Only opt in when a test sets
+    // projectStub.projectKey — the pre-existing record-aware tests leave it
+    // unset and must keep exercising the getProjectSync-returns-null path.
+    getProjectSync: () => (projectStub?.projectKey ? { name: 'inferred', path: projectStub.projectPath } : null),
   };
 });
 
@@ -320,6 +325,107 @@ describe('reopenWorkspaceState', () => {
       expect(last.note).toContain('reason: redo merge');
       expect(last.note).toContain('review: passed → pending');
       expect(last.note).toContain('merge: merged → pending');
+
+      rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it('drops a stale record pipeline.mergeStatus="merged" on reopen (PAN-3727)', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      const recordDir = join(projectRoot, '.pan', 'records');
+      mkdirSync(recordDir, { recursive: true });
+      const now = '2026-08-06T00:00:00Z';
+      const recordPath = join(recordDir, 'pan-903.json');
+      writeFileSync(
+        recordPath,
+        JSON.stringify({
+          issueId: 'PAN-903',
+          schemaVersion: 2,
+          created: now,
+          updated: now,
+          decisions: [],
+          hazards: [],
+          resumePoint: null,
+          tasksMapping: {},
+          statusOverrides: {},
+          sessionHistory: [],
+          feedback: [],
+          pipeline: {
+            issueId: 'PAN-903',
+            reviewStatus: 'passed',
+            testStatus: 'passed',
+            readyForMerge: false,
+            updatedAt: now,
+            closedOut: true,
+            closedOutAt: now,
+            mergeStatus: 'merged',
+          },
+          closeOut: null,
+        }),
+        'utf-8',
+      );
+      projectStub = { projectPath: projectRoot, projectKey: 'fixture-project' };
+
+      seedStatus({
+        'PAN-903': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
+      });
+      const wsDir = createWorkspace();
+
+      await Effect.runPromise(reopenWorkspaceState('PAN-903', wsDir));
+
+      const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
+      expect(updated.pipeline.closedOut).toBeUndefined();
+      expect(updated.pipeline.mergeStatus).toBeUndefined();
+      expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
+
+      rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it('drops a stale mergeStatus="merged" on a merged-only record with no closedOut marker (review finding, PAN-3727)', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      const recordDir = join(projectRoot, '.pan', 'records');
+      mkdirSync(recordDir, { recursive: true });
+      const now = '2026-08-06T00:00:00Z';
+      const recordPath = join(recordDir, 'pan-904.json');
+      writeFileSync(
+        recordPath,
+        JSON.stringify({
+          issueId: 'PAN-904',
+          schemaVersion: 2,
+          created: now,
+          updated: now,
+          decisions: [],
+          hazards: [],
+          resumePoint: null,
+          tasksMapping: {},
+          statusOverrides: {},
+          sessionHistory: [],
+          feedback: [],
+          pipeline: {
+            issueId: 'PAN-904',
+            reviewStatus: 'passed',
+            testStatus: 'passed',
+            readyForMerge: false,
+            updatedAt: now,
+            mergeStatus: 'merged',
+          },
+          closeOut: null,
+        }),
+        'utf-8',
+      );
+      projectStub = { projectPath: projectRoot, projectKey: 'fixture-project' };
+
+      seedStatus({
+        'PAN-904': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
+      });
+      const wsDir = createWorkspace();
+
+      await Effect.runPromise(reopenWorkspaceState('PAN-904', wsDir));
+
+      const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
+      expect(updated.pipeline.mergeStatus).toBeUndefined();
+      expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
 
       rmSync(wsDir, { recursive: true, force: true });
       rmSync(projectRoot, { recursive: true, force: true });

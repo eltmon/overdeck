@@ -19,10 +19,18 @@ export function isTerminalSwarmSlotAgent(
   if (!slotIndex) return false;
 
   const baseWorkspace = agent.workspace.replace(/-slot-\d+$/, '');
-  const assignment = readRecord(baseWorkspace, agent.issueId)?.swarm?.slotAssignments
+  const record = readRecord(baseWorkspace, agent.issueId);
+  const assignment = record?.swarm?.slotAssignments
     ?.find(candidate => candidate.slotIndex === slotIndex);
   const itemId = agent.slotItemId ?? assignment?.itemId;
   if (!itemId) return false;
+
+  // Swarm task transitions are persisted through the issue record's write
+  // door. The immutable workspace plan can still say `running` after the
+  // member-repo branch has merged, so recovery must honor the canonical
+  // override before it considers reviving stale slot ownership.
+  const canonicalStatus = record?.statusOverrides?.[itemId];
+  if (canonicalStatus === 'completed' || canonicalStatus === 'cancelled') return true;
 
   const plan = readPlan(baseWorkspace) ?? readPlan(agent.workspace);
   const item = plan?.plan.items.find(candidate => candidate.id === itemId);

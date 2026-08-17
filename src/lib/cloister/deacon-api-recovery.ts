@@ -63,7 +63,7 @@ const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
 const CONTEXT_OVERFLOW_CONTINUE_MSG =
   'Your context was compacted to recover from a context-window overflow. ' +
   'Continue from where you left off using the compacted summary and your ' +
-  'beads / continue.json — do NOT start over.';
+  'xBRIEF items / continue.json — do NOT start over.';
 
 /**
  * Let a recovery attempt finish before judging the result. MUST exceed the

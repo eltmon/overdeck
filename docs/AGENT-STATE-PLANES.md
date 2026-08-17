@@ -19,8 +19,10 @@ Durable portable state is committed through domain writers to the orphan
   runtime claim/completion state, read and written through the task state doors.
 
 The per-issue record under `records/` is also the permanent home for swarm
-durable state: `slotCompletions`, `finalizedAt`, `failedMergeBlock`,
-`slotAssignments`, and `supersededAttempts` all live there rather than in a
+durable state: `swarm.hold`, `swarm.interventions`,
+`swarm.completionObservations`, `swarm.slotCompletions`, `swarm.finalizedAt`,
+`swarm.failedMergeBlocks`, `swarm.slotAssignments`, `swarm.supersededAttempts`,
+and `swarm.reclaimedItems` all live there rather than in a
 sidecar runtime file. The workspace record door resolves the record through the
 canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable

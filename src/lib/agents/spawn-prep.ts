@@ -102,6 +102,8 @@ export interface SpawnOptions {
   slotIndex?: number;
   /** xBRIEF item id assigned to the registered swarm slot. */
   slotItemId?: string;
+  /** Marks the bare parent work agent as the swarm foreman. */
+  foreman?: boolean;
   allowHost?: boolean;
   flywheelRunId?: string;
   startedBy: string;
@@ -148,6 +150,10 @@ export interface SpawnRunOptions {
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */
   slotItemId?: string;
+  /** Marks the bare parent work agent as the swarm foreman. */
+  foreman?: boolean;
+  /** Attempt-specific branch used when a static slot id is safely reused. */
+  slotBranch?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
   maxRegisteredSlots?: number;
 }
@@ -181,7 +187,7 @@ export function applyTierAssignment<T extends Pick<SpawnRunOptions, 'model' | 'h
 export function resolveRegisteredSlotSpawn(
   issueId: string,
   baseWorkspace: string,
-  options: Pick<SpawnRunOptions, 'slotIndex' | 'slotItemId'>,
+  options: Pick<SpawnRunOptions, 'slotIndex' | 'slotItemId' | 'slotBranch'>,
 ): RegisteredSlotSpawn | null {
   const { slotIndex, slotItemId: slotItemIdRaw } = options;
   if (slotIndex === undefined && slotItemIdRaw === undefined) return null;
@@ -199,7 +205,7 @@ export function resolveRegisteredSlotSpawn(
   const issueLower = issueId.toLowerCase();
   return {
     agentId: `agent-${issueLower}-slot-${slotIndex}`,
-    branch: `feature/${issueLower}-slot-${slotIndex}`,
+    branch: options.slotBranch ?? `feature/${issueLower}-slot-${slotIndex}`,
     workspace: `${baseWorkspace}-slot-${slotIndex}`,
     slotIndex,
     slotItemId,

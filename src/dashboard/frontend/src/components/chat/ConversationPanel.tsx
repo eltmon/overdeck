@@ -40,6 +40,7 @@ import { conversationMessagesQueryKey, useConversationMessagesStream } from './u
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
+import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -185,7 +186,7 @@ export function ConversationPanel({
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
-  const streamMessagesEnabled = useConversationMessagesStream(conversation);
+  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);
@@ -1034,6 +1035,7 @@ export function ConversationPanel({
               workingPhase={isWorking ? workingPhase : undefined}
               agentBusy={isWorking}
               streamMessagesEnabled={streamMessagesEnabled}
+              receivedFirstPayload={receivedFirstPayload}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
               onOpenTerminal={showTerminal ? () => handleViewMode('terminal') : undefined}
@@ -1160,6 +1162,8 @@ interface ConversationViewProps {
   agentBusy?: boolean;
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
+  /** True after the current conversation's WS subscription emits its first event. */
+  receivedFirstPayload?: boolean;
   messagesData?: MessagesResponse;
   /** PAN-3113 — switch the panel to terminal mode (pane choice card). */
   onOpenTerminal?: () => void;
@@ -1172,7 +1176,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
@@ -1287,6 +1291,10 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
   const isSpawnFailed = !!conversation.spawnError;
+  // PAN-3744: before this subscription emits, the transcript is loading rather
+  // than empty. Keep this signal hook-local because query-cache entries survive
+  // conversation switches and could flash a stale empty state.
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1305,16 +1313,16 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // content parsed, the row is interrupted, not starting.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
-  const isFirstMessage = !isLoading && !isDiscovering && !hasTimelineActivity && conversation.sessionAlive;
+  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
   // behavior) falsely tells the user their history is gone, e.g. during a
   // server-restart window (2026-07-05 incident). Ended conversations have no
   // refetchInterval, so without a retry surface the error state would persist.
   const messagesFetchFailed =
-    !isLoading && !isDiscovering && !streamMessagesEnabled && data == null &&
+    !isLoading && !isDiscovering && !awaitingFirstPayload && !streamMessagesEnabled && data == null &&
     !isSpawning && !isSpawnFailed && !isForking;
-  const isOrphaned = !isLoading && !isDiscovering && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isOrphaned = !isLoading && !isDiscovering && !awaitingFirstPayload && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1342,10 +1350,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   return (
     <div className={styles.conversationView}>
-      {isLoading || isDiscovering ? (
-        <div className={styles.conversationConnecting}>
-          <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
-        </div>
+      {isLoading || isDiscovering || awaitingFirstPayload ? (
+        <TranscriptLoadingSkeleton discovering={isDiscovering} />
       ) : data?.error ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>

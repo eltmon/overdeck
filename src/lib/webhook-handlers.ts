@@ -240,13 +240,19 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const [owner, repoName] = repo.split('/');
     if (!owner || !repoName) return;
 
+    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
+    const githubAppConfigured = isGitHubAppConfigured();
+    if (!githubAppConfigured && isInGraphQLCooldown()) return;
+
+    const status = await Effect.runPromise(getReviewStatus(issueId));
+    if (!status || status.retiredAt) return;
+
     let mergeable: string;
     let mergeState: string;
     let isDraft: boolean;
     let checksFailed: boolean;
 
-    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
-    if (isGitHubAppConfigured()) {
+    if (githubAppConfigured) {
       // App REST path — installation token, separate rate-limit budget, no GraphQL.
       const prState = await Effect.runPromise(getPullRequestState(owner, repoName, prNumber));
       mergeable = prState.mergeable === null ? 'UNKNOWN' : prState.mergeable ? 'MERGEABLE' : 'CONFLICTING';
@@ -255,7 +261,6 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       checksFailed = prState.checksFailed;
     } else {
       // gh CLI fallback (GraphQL) — only when the App is not configured.
-      if (isInGraphQLCooldown()) return;
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFile);
@@ -294,9 +299,6 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
         && FAILING_CHECK_CONCLUSIONS.has((check.conclusion || check.state || '').toUpperCase()),
       );
     }
-
-    const status = await Effect.runPromise(getReviewStatus(issueId));
-    if (!status) return;
 
     const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
 
@@ -460,6 +462,24 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   const repo = payload.repository!.full_name;
 
+  if (['opened', 'closed', 'reopened'].includes(payload.action ?? '')) {
+    try {
+      const { listProjectsSync, resolveProjectFromIssueSync } = await import('./projects.js');
+      const resolved = resolveProjectFromIssueSync(issueId);
+      const project = resolved
+        ? listProjectsSync().find((entry) => entry.key === resolved.projectKey)?.config
+        : undefined;
+      if (project) {
+        const { enqueueProjectResourceRefresh } = await import(
+          '../dashboard/server/services/project-resource-refresh-queue.js'
+        );
+        enqueueProjectResourceRefresh(project, `pull_request:${payload.action}`);
+      }
+    } catch (err: any) {
+      console.warn(`[webhook] Failed to enqueue membership refresh for ${issueId}: ${err?.message ?? err}`);
+    }
+  }
+
   // PAN-1513: fire postMergeLifecycle when GitHub reports the PR closed+merged.
   // Without this, admin-merges (gh pr merge --admin) and any merge that doesn't
   // route through Overdeck's own merge flow leave work agents, strikes, tmux
@@ -485,12 +505,17 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   // For synchronize/opened/reopened the head SHA may have changed — skip SHA
   // validation so the handler can refresh prHeadSha and recompute blockers.
-  const headMayHaveMoved = ['synchronize', 'opened', 'reopened'].includes(payload.action ?? '');
+  const headMayHaveMoved = ['synchronize', 'opened', 'reopened', 'closed'].includes(payload.action ?? '');
   const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
   if (!status) return;
 
   const update: ReviewStatusUpdate = {};
   let blockers = [...(status.blockerReasons ?? [])];
+
+  if (payload.action === 'closed' && pr.merged === false) {
+    update.readyForMerge = false;
+    update.retiredAt = new Date().toISOString();
+  }
 
   // Populate missing PR identity and keep head SHA in sync on synchronize
   if (!status.prUrl) update.prUrl = pr.html_url ?? `https://github.com/${repo}/pull/${pr.number}`;

@@ -40,6 +40,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/update/check',                        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; explicit fresh release discovery' },
   { surface: 'POST /api/update/install',                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; exact-version npm installation' },
 
+  // ── restart-gate.ts (PAN-3729/PAN-3731) ───────────────────────────────────
+  { surface: 'POST /api/restart-gate/requests',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; upsert + poll + TTL refresh, outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/claim',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; exclusive right to restart, outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/approve',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; operator approval, outside 8 remodel domains' },
+  { surface: 'GET /api/restart-gate',                         kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; read door for the current gate, outside 8 remodel domains' },
+
   // ── admin.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
   { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
@@ -184,6 +190,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/conversations/:name',                          kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive (idempotent alias)' },
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
   { surface: 'POST /api/conversations/:name/unarchive',                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unarchive' },
+  { surface: 'POST /api/conversations/:name/clear-fork-state',           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.clearForkState' },
   { surface: 'POST /api/conversations/restart-all',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.restart fan-out' },
   { surface: 'POST /api/conversations/:name/favorite',                   kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setFavorite' },
   { surface: 'DELETE /api/conversations/:name/favorite',                 kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unsetFavorite' },

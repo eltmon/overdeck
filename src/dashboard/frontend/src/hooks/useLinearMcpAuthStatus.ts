@@ -9,6 +9,10 @@ export interface LinearMcpAuthBlockedAgent {
   /** Canonical tracker URL projected by the server (Linear web URL, GitHub
    * html_url); null when the issue cannot be resolved. */
   issueUrl?: string | null;
+  /** Canonical /conv/<rowid> dashboard URL projected by the server from the
+   * conversations read door; null for non-conversation agents or when the
+   * conversation cannot be resolved. */
+  conversationUrl?: string | null;
 }
 
 export interface LinearMcpAuthStatus {

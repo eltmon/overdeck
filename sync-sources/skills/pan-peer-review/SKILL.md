@@ -62,9 +62,9 @@ never raise it to `xhigh`/`max` for a review.
 
 ### 1. Write the brief to a file — never into the focus
 
-The `pan handoff` focus is hard-capped at 500 characters. A real review brief is
-thousands. Write it to a file in the reviewer's future cwd and let the focus
-point at it.
+The `pan handoff` focus is for steering, not content (hard ceiling 10,000 chars
+since PAN-3737). A real review brief is thousands of characters of structure —
+write it to a file in the reviewer's future cwd and let the focus point at it.
 
 A brief that produces a useful review has these parts:
 

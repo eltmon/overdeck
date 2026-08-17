@@ -26,6 +26,8 @@ const {
   mockReadIssueRecord,
   mockReadCompletedCloseOut,
   mockResolveProjectReposForIssueSync,
+  mockAcknowledgeAllOpenRecoveryTrips,
+  mockClearAgentOperatorGatesForIssueSync,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -49,6 +51,8 @@ const {
   mockReadIssueRecord: vi.fn(),
   mockReadCompletedCloseOut: vi.fn().mockResolvedValue(null),
   mockResolveProjectReposForIssueSync: vi.fn(() => null),
+  mockAcknowledgeAllOpenRecoveryTrips: vi.fn().mockResolvedValue(0),
+  mockClearAgentOperatorGatesForIssueSync: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', async (importOriginal) => {
@@ -137,6 +141,22 @@ vi.mock('../../../../src/lib/project-repos.js', () => ({
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
 }));
+
+vi.mock('../../../../src/lib/cloister/recovery-trip.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/cloister/recovery-trip.js')>();
+  return {
+    ...actual,
+    acknowledgeAllOpenRecoveryTrips: mockAcknowledgeAllOpenRecoveryTrips,
+  };
+});
+
+vi.mock('../../../../src/lib/agents/agent-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/agents/agent-state.js')>();
+  return {
+    ...actual,
+    clearAgentOperatorGatesForIssueSync: mockClearAgentOperatorGatesForIssueSync,
+  };
+});
 
 vi.mock('@linear/sdk', () => ({
   LinearClient: vi.fn().mockImplementation(function () { return {
@@ -1312,6 +1332,75 @@ describe('workflows', () => {
       expect(marker?.details?.[0]).toContain('record unavailable');
       expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(true);
       expect(result.success).toBe(true);
+    });
+
+    it('acknowledges open recovery trips and clears operator-gate residue on close-out (PAN-3727)', async () => {
+      const fixtureRecord = {
+        recoveryTrips: [{ issue: 'PAN-100', recoveryPath: 'orphan-proposed-pickup-gate', obligationGeneration: 'wi-1', tripCount: 5, open: true }],
+      };
+      const fixtureAgent = { id: 'agent-pan-100-work', stoppedByUser: true };
+      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async (issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        const acked = fixtureRecord.recoveryTrips.length;
+        fixtureRecord.recoveryTrips = [];
+        return acked;
+      });
+      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce((issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        delete fixtureAgent.stoppedByUser;
+        return [fixtureAgent.id];
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(true);
+      expect(fixtureRecord.recoveryTrips).toHaveLength(0);
+      expect(fixtureAgent.stoppedByUser).toBeUndefined();
+      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
+      expect(step).toMatchObject({ success: true, skipped: false });
+      expect(step?.details?.[0]).toContain('Acked 1 open trip(s)');
+      expect(step?.details?.[0]).toContain('cleared operator gates on 1 agent row(s)');
+    });
+
+    it('records the residue-ack step as skipped (non-blocking) when the ack door throws, but still clears operator gates (PAN-3727 review finding)', async () => {
+      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async () => {
+        throw new Error('record lock unavailable');
+      });
+      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce((issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        return ['agent-pan-100-work'];
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(true);
+      expect(mockClearAgentOperatorGatesForIssueSync).toHaveBeenCalledWith('PAN-100');
+      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
+      expect(step).toMatchObject({ success: true, skipped: true });
+      expect(step?.details?.join(' ')).toContain('record lock unavailable');
+      expect(step?.details?.join(' ')).toContain('cleared operator gates on 1 agent row(s)');
+    });
+
+    it('records the residue-ack step as skipped (non-blocking) when the gate door throws, but still acknowledges trips (PAN-3727 review finding)', async () => {
+      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async (issueId: string) => {
+        expect(issueId).toBe('PAN-100');
+        return 2;
+      });
+      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce(() => {
+        throw new Error('agents db unavailable');
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(true);
+      expect(mockAcknowledgeAllOpenRecoveryTrips).toHaveBeenCalledWith('PAN-100');
+      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
+      expect(step).toMatchObject({ success: true, skipped: true });
+      expect(step?.details?.join(' ')).toContain('agents db unavailable');
+      expect(step?.details?.join(' ')).toContain('Acked 2 open trip(s)');
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {

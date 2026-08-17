@@ -19,6 +19,7 @@ import type {
   EnrichStatsSnapshot,
   ProjectCiSnapshot,
   ResourceStats,
+  RestartGateSnapshot,
   ReviewStatusSnapshot,
   ScanProgressSnapshot,
   TurnDiffSummary,
@@ -115,6 +116,8 @@ export interface ReadModelState {
   embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
   /** PAN-3537 — per-project default-branch CI record, keyed by project key. */
   ciByProjectKey: Record<string, ProjectCiSnapshot>
+  /** PAN-3729 — voluntary-restart approval gate; null until the gate first reports. */
+  restartGate: RestartGateSnapshot | null
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
 }
@@ -160,6 +163,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   enrichProgressBySessionId: {},
   embedProgressBySessionId: {},
   ciByProjectKey: {},
+  restartGate: null,
   agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
@@ -328,6 +332,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
     ciByProjectKey: snapshot.ciByProjectKey ?? state.ciByProjectKey,
+    restartGate: snapshot.restartGate ?? state.restartGate,
     agentIdBySessionId,
   }
 }
@@ -730,6 +735,22 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         },
       }
     }
+
+    // PAN-3729: the payload is the complete gate projection, so this is a
+    // plain replace — no merge, no ordering guard. The gate has exactly one
+    // writer, and it emits after every state transition.
+    case 'restart_gate.changed':
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        restartGate: {
+          status: event.payload.status,
+          pending: event.payload.pending,
+          // PAN-3731: carries the "requesters went away without restarting"
+          // notice. Dropping it here would silently starve the banner.
+          ...(event.payload.lastOutcome === undefined ? {} : { lastOutcome: event.payload.lastOutcome }),
+        },
+      }
 
     case 'resources.updated':
       return {

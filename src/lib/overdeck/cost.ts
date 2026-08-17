@@ -16,9 +16,11 @@ import {
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
+import { recordSkipVerdict } from '../costs/skip-cache.js';
+import { collectCodexCostEvents } from '../costs/codex-collector.js';
+export { collectCodexCostEvents, type SkipVerdictEntry } from '../costs/codex-collector.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -168,6 +170,7 @@ export type BudgetStatus = typeof BudgetStatus.Type;
 
 export interface CostReconcileSummary {
   imported: number;
+  cacheSkipped: number;
   skipped: SkippedCostSession[];
   sessionsScanned: number;
   eventsImported: number;
@@ -587,8 +590,14 @@ export const CostWriterLive = Layer.effect(
             .onConflictDoNothing(),
         );
 
-        // 3. Announce — cost.subscribe + /api/costs/stream feed from this.
-        yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
+        // 3. Announce on the canonical contract type — God View live counters feed from this.
+        if (event.agentId && event.issueId) {
+          yield* bus.emit({
+            type: 'cost.event_recorded',
+            payload: { agentId: event.agentId, issueId: event.issueId, cost: event.cost,
+              inputTokens: event.input, outputTokens: event.output },
+          });
+        }
         return true;
       });
 
@@ -606,6 +615,7 @@ export const CostWriterLive = Layer.effect(
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
           imported: 0,
+          cacheSkipped: 0,
           skipped: [],
           sessionsScanned: 0,
           eventsImported: 0,
@@ -616,7 +626,32 @@ export const CostWriterLive = Layer.effect(
           warnings: [],
         };
         if (source !== 'ohmypi' && source !== 'codex') return empty;
-
+        if (source === 'codex') {
+          const collected = yield* Effect.promise(() => collectCodexCostEvents(opts));
+          let imported = 0;
+          let duplicatesSkipped = 0;
+          let earliestEventTs: string | null = null;
+          let latestEventTs: string | null = null;
+          for (const skipped of collected.skipped) {
+            console.warn(`[cost-reconcile] skipped ${skipped.file}: ${skipped.reason}`);
+          }
+          for (const event of collected.events) {
+            if (yield* record(event, { dryRun: opts?.dryRun })) {
+              imported++;
+              const iso = event.ts.toISOString();
+              if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
+              if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
+            } else duplicatesSkipped++;
+          }
+          if (!opts?.dryRun) {
+            for (const verdict of collected.verdicts) {
+              recordSkipVerdict(verdict.path, verdict.mtimeMs, verdict.size, verdict.verdict);
+            }
+          }
+          return { imported, cacheSkipped: collected.stats.cacheSkipped, skipped: collected.skipped,
+            sessionsScanned: collected.stats.scanned, eventsImported: imported, duplicatesSkipped,
+            errors: collected.errors, earliestEventTs, latestEventTs, warnings: [] };
+        }
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
           if (!existsSync(agentsDir)) return [] as string[];
@@ -624,8 +659,8 @@ export const CostWriterLive = Layer.effect(
             .filter(e => e.isDirectory())
             .map(e => e.name);
         });
-
         let imported = 0;
+        let cacheSkipped = 0;
         const skipped: SkippedCostSession[] = [];
         let duplicatesSkipped = 0;
         let sessionsScanned = 0;
@@ -643,7 +678,6 @@ export const CostWriterLive = Layer.effect(
             `[cost-reconcile] warning ${warning.file}: ${warning.reason} provider=${warning.provider ?? 'unknown'} model=${warning.model}`,
           );
         };
-
         const noteImportedTimestamp = (ts: Date) => {
           const iso = ts.toISOString();
           if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
@@ -659,37 +693,13 @@ export const CostWriterLive = Layer.effect(
         };
 
         const roots: ScanRoot[] = agentNames.map((agentName) => ({
-          root: source === 'ohmypi'
-            ? join(agentsDir, agentName, 'sessions')
-            : join(agentsDir, agentName, 'codex-home', 'sessions'),
+          root: join(agentsDir, agentName, 'sessions'),
           agentName,
           issueId: issueIdFromAgentName(agentName),
-          sessionType: source,
+          sessionType: 'ohmypi',
         }));
 
-        if (source === 'codex') {
-          for (const root of opts?.extraRoots ?? []) {
-            roots.push({
-              root,
-              agentName: 'codex-global',
-              issueId: null,
-              sessionType: 'codex',
-              inferIssueFromCwd: true,
-            });
-          }
-        }
-
         for (const extra of opts?.extraRootSpecs ?? []) {
-          if (source === 'codex' && extra.kind === 'codex-global') {
-            roots.push({
-              root: extra.root,
-              agentName: 'codex-global',
-              issueId: null,
-              sessionType: 'codex',
-              inferIssueFromCwd: true,
-            });
-          }
-
           if (source === 'ohmypi' && extra.kind === 'ohmypi-global') {
             const encodedRoots = yield* Effect.sync(() => {
               if (!existsSync(extra.root)) return [] as ScanRoot[];
@@ -786,60 +796,10 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const events = yield* Effect.sync(() => {
-              try {
-                return parseCodexSessionCostEventsSync(sessionFile);
-              } catch (cause) {
-                errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                return [];
-              }
-            });
-            if (events.length === 0) {
-              markSkipped(sessionFile, 'no-usage');
-              continue;
-            }
-            if (events.some((event) => event.model === 'unknown')) {
-              markSkipped(sessionFile, 'unknown-model');
-            }
-            const codexSession = root.inferIssueFromCwd
-              ? yield* Effect.sync(() => parseCodexSessionSync(sessionFile))
-              : null;
-            const issueId = root.inferIssueFromCwd
-              ? (inferIssueFromPath(codexSession?.cwd) ?? 'UNKNOWN' as IssueIdType)
-              : root.issueId;
-            for (const usage of events) {
-              const ts = new Date(usage.timestamp);
-              const event: CostEvent = {
-                ts,
-                issueId,
-                agentId:     root.agentName,
-                sessionId:   usage.sessionId,
-                sessionType: root.sessionType,
-                provider:    usage.provider,
-                model:       usage.model,
-                input:       usage.input,
-                output:      usage.output,
-                cacheRead:   usage.cacheRead,
-                cacheWrite:  usage.cacheWrite,
-                cost:        usage.cost,
-                requestId:   usage.requestId,
-                sourceFile:  sessionFile,
-              };
-
-              if (yield* record(event, { dryRun: opts?.dryRun })) {
-                imported++;
-                noteImportedTimestamp(ts);
-              } else {
-                duplicatesSkipped++;
-              }
-            }
           }
         }
-
         return {
-          imported,
-          skipped,
-          sessionsScanned,
+          imported, cacheSkipped, skipped, sessionsScanned,
           eventsImported: imported,
           duplicatesSkipped,
           errors,

@@ -423,6 +423,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'recovery_started_at',
       'inspect_started_at',
       'inspect_bead_id',
+      'retired_at',
     ]);
 
     const accountedFor = new Set([...primaryKey, ...durable, ...compatibilityOnly, ...derived, ...ephemeralDefaults]);

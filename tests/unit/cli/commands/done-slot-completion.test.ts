@@ -40,7 +40,7 @@ vi.mock('../../../../src/lib/cloister/deacon-swarm-record.js', () => ({
   persistAndVerifySwarmSlotCompletion: mocks.persistAndVerifySwarmSlotCompletion,
 }));
 
-import { completeSlotWork } from '../../../../src/cli/commands/done.js';
+import { completeSlotWork, parseSlotAgentId } from '../../../../src/cli/commands/done.js';
 import type { PanIssueSwarmSlotCompletion } from '../../../../src/lib/pan-dir/record.js';
 
 type SlotCtx = Parameters<typeof completeSlotWork>[1];
@@ -59,6 +59,30 @@ function makeSlot(overrides: Partial<SlotCtx> = {}): SlotCtx {
     ...overrides,
   } as SlotCtx;
 }
+
+describe('PAN-3682 slot id normalization', () => {
+  it.each([
+    'MIN-888-SLOT-1',
+    'min-888-slot-1',
+    'agent-MIN-888-SLOT-1',
+    'agent-min-888-slot-1',
+  ])('normalizes %s before issue and project resolution', (input) => {
+    expect(parseSlotAgentId(input)).toEqual({
+      issueId: 'MIN-888',
+      agentId: 'agent-min-888-slot-1',
+      slotIndex: 1,
+    });
+  });
+
+  it.each([
+    'MIN-888',
+    'MIN-888-SLOT-0',
+    'MIN-888-SLOT-x',
+    'MIN-888-SLOT-1-extra',
+  ])('rejects non-slot input %s', (input) => {
+    expect(parseSlotAgentId(input)).toBeNull();
+  });
+});
 
 describe('PAN-2372 WI-3 completeSlotWork durable marker (FR-4, FR-5)', () => {
   beforeEach(() => {

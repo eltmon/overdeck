@@ -31,11 +31,14 @@ pan restart
 # Scoped alternatives
 pan restart --cliproxy
 pan restart --traefik
-pan restart --full       # nuclear — stops & restarts everything
+# --full is nuclear — stops & restarts everything
+pan restart --full
 
 # Explicit force cases
-pan restart --force              # explicit operator bypass of the deploy-window gate
-pan restart --cliproxy --force   # redownload the pinned CLIProxy binary
+# --force is an explicit operator bypass of the deploy-window gate
+pan restart --force
+# --cliproxy --force redownloads the pinned CLIProxy binary
+pan restart --cliproxy --force
 ```
 
 Each stage is health-gated: the command waits for `GET /api/health` from the

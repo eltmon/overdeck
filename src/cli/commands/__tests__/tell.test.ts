@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
-  messageAgent: vi.fn(async () => {}),
+  messageAgent: vi.fn(
+    async (): Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }> =>
+      ({ delivered: true, queuedToMail: false }),
+  ),
 }));
 
 const remoteMocks = vi.hoisted(() => ({
@@ -39,6 +42,7 @@ vi.mock('../../../lib/remote/index.js', () => ({
 describe('tellCommand agent ID resolution (PAN-1749)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
     remoteMocks.loadRemoteAgentState.mockReturnValue(null);
   });
 
@@ -68,5 +72,38 @@ describe('tellCommand agent ID resolution (PAN-1749)', () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('planning-pan-123', 'hello');
     expect(agentMocks.messageAgent).toHaveBeenCalledWith('planning-pan-123', 'hello', 'pan-tell');
+  });
+});
+
+describe('tellCommand outcome reporting (PAN-3736)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    remoteMocks.loadRemoteAgentState.mockReturnValue(null);
+  });
+
+  it('prints the busy-agent reason with the mail file path', async () => {
+    const mailPath = '/home/user/.overdeck/agents/agent-pan-123/mail/2026-08-14T10-00-00-000Z.pending.md';
+    const reason = `agent is alive and mid-turn; message queued to its mail file (${mailPath})`;
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, reason });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'peer ping');
+
+    const printed = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(printed).toContain('agent is alive and mid-turn');
+    expect(printed).toContain(mailPath);
+    logSpy.mockRestore();
+  });
+
+  it('prints no extra line when the delivery door had nothing to explain', async () => {
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'peer ping');
+
+    expect(logSpy).toHaveBeenCalledTimes(2);
+    logSpy.mockRestore();
   });
 });

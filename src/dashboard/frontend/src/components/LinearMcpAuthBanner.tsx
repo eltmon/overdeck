@@ -99,9 +99,18 @@ export function LinearMcpAuthBanner() {
         <ul className="text-warning-foreground text-sm pl-8 flex flex-col gap-0.5">
           {blockedAgents.map((agent) => {
             const issueUrl = agent.issueUrl ?? (agent.issueId ? trackerIssueUrl(agent.issueId) : null);
+            // Conversations link to their canonical /conv/<rowid> view (the
+            // DB row id, projected by the server); agents without a
+            // conversation page stay plain text next to their issue link.
             return (
               <li key={agent.agentId}>
-                <span className="font-semibold">{agent.agentId}</span>
+                {agent.conversationUrl ? (
+                  <a href={agent.conversationUrl} className="font-semibold underline hover:opacity-80">
+                    {agent.agentId}
+                  </a>
+                ) : (
+                  <span className="font-semibold">{agent.agentId}</span>
+                )}
                 {agent.issueId && (
                   <>
                     {' — '}

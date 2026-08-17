@@ -115,6 +115,8 @@ Press `Cmd+K` (macOS) or `Ctrl+K` (Linux/Windows) to open the command palette fr
 
 Type to filter. Press `Enter` to execute, `Escape` to close.
 
+Conversation results default to newest-first order. Use the **Newest first** toggle in the palette footer to switch to relevance-rank order; the choice persists per browser.
+
 The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
 
 ---

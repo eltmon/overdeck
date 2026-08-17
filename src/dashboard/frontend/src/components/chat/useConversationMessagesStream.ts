@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
 import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
@@ -150,9 +150,16 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   return isAgentSession && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): boolean {
+export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): { enabled: boolean; receivedFirstPayload: boolean } {
   const queryClient = useQueryClient();
   const enabled = shouldStreamConversationMessages(conversation);
+  const streamIdentity = `${enabled ? 'enabled' : 'disabled'}:${conversation.name}`;
+  const [firstPayloadIdentity, setFirstPayloadIdentity] = useState<string | null>(null);
+  const receivedFirstPayload = firstPayloadIdentity === streamIdentity;
+
+  useLayoutEffect(() => {
+    setFirstPayloadIdentity(null);
+  }, [streamIdentity]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -163,6 +170,7 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,
       (event) => {
+        setFirstPayloadIdentity(streamIdentity);
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) =>
           applyConversationMessagesEvent(previous, event));
       },
@@ -171,9 +179,9 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
     return () => {
       unsubscribe();
     };
-  }, [conversation.name, enabled, queryClient]);
+  }, [conversation.name, enabled, queryClient, streamIdentity]);
 
-  return enabled;
+  return { enabled, receivedFirstPayload };
 }
 
 export function useSubagentTranscript(

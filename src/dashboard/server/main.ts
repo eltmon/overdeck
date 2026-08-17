@@ -40,6 +40,7 @@ import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
+import { initRestartGate } from './services/restart-gate.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
@@ -743,7 +744,7 @@ setTimeout(() => {
     });
 }, 1000);
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
-fixStuckReadyForMerge();
+await fixStuckReadyForMerge();
 // PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
 fixStuckCommentedReviews();
 // PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
@@ -788,6 +789,14 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
+
+// Restart gate (PAN-3729): if the previous server died to perform an approved
+// restart, this boot IS that restart completing — mark the epoch's requesters
+// satisfied so they stop waiting. Also starts the sweep that expires stale
+// requests so the approval banner clears itself.
+await initRestartGate().catch((err: unknown) => {
+  console.warn(`[overdeck] Restart gate init failed: ${err instanceof Error ? err.message : String(err)}`);
+});
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan done`, nudges dead-end agents,

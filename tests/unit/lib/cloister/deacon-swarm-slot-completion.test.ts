@@ -35,8 +35,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 import {
   writeSwarmSlotCompletion,
   clearSwarmSlotCompletion,
+  clearSupersededSwarmAttempts,
   persistAndVerifySwarmSlotCompletion,
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
+import { clearAllSlotAssignments, recordSlotAssignment } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { applySupersededSlotHighWater } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import { getIssueRecordPathForWorkspace } from '../../../../src/lib/pan-dir/record.js';
 import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
@@ -181,6 +184,139 @@ describe('PAN-2372 WI-3 clearSwarmSlotCompletion (FR-6)', () => {
     await expect(clearSwarmSlotCompletion(workspacePath, 'PAN-2372', 7)).resolves.toBeUndefined();
     // No record file should have been created for an issue that never had one.
     expect(existsSync(getIssueRecordPathForWorkspace(workspacePath, 'PAN-2372'))).toBe(false);
+  });
+});
+
+describe('PAN-3685 merged-slot ownership consumption', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-ownership-clear-'));
+    remote = initGitRecordRoot(workspacePath);
+  });
+
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
+  });
+
+  it('atomically removes the assignment and completion while preserving a running sibling', async () => {
+    const { clearSwarmSlotOwnership } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3685', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [
+          { slotIndex: 1, itemId: 'integrated' },
+          { slotIndex: 2, itemId: 'running' },
+        ],
+        slotCompletions: {
+          '1': { slotIndex: 1, itemId: 'integrated', agentId: 'agent-pan-3685-slot-1', completedAt: '2026-08-13T00:00:00.000Z' },
+          '2': { slotIndex: 2, itemId: 'running', agentId: 'agent-pan-3685-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+        },
+      },
+    }));
+
+    await clearSwarmSlotOwnership(workspacePath, 'PAN-3685', 1, 'integrated');
+
+    const swarm = readRecord(workspacePath, 'PAN-3685').swarm;
+    expect(swarm?.slotAssignments).toEqual([{ slotIndex: 2, itemId: 'running' }]);
+    expect(swarm?.slotCompletions?.['1']).toBeUndefined();
+    expect(swarm?.slotCompletions?.['2']).toBeDefined();
+  });
+});
+
+describe('PAN-3690 slot ownership replacement', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-ownership-replace-'));
+    remote = initGitRecordRoot(workspacePath);
+  });
+
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
+  });
+
+  it('atomically clears the prior completion when assigning a new item to the same slot', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [{ slotIndex: 2, itemId: 'item-a' }],
+        slotCompletions: {
+          '2': { slotIndex: 2, itemId: 'item-a', agentId: 'agent-pan-3690-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+        },
+      },
+    }));
+
+    await recordSlotAssignment(workspacePath, 'PAN-3690', {
+      slotIndex: 2,
+      itemId: 'item-b',
+      agentId: 'agent-pan-3690-slot-2',
+    });
+
+    const swarm = readRecord(workspacePath, 'PAN-3690').swarm;
+    expect(swarm?.slotAssignments).toEqual([
+      expect.objectContaining({ slotIndex: 2, itemId: 'item-b' }),
+    ]);
+    expect(swarm?.slotCompletions).toEqual({});
+  });
+
+  it('atomically clears every assignment and completion during reset', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [{ slotIndex: 2, itemId: 'item-a' }],
+        slotCompletions: {
+          '2': { slotIndex: 2, itemId: 'item-a', agentId: 'agent-pan-3690-slot-2', completedAt: '2026-08-13T00:00:00.000Z' },
+          '3': { slotIndex: 3, itemId: 'item-c', agentId: 'agent-pan-3690-slot-3', completedAt: '2026-08-13T00:01:00.000Z' },
+        },
+      },
+    }));
+
+    await clearAllSlotAssignments(workspacePath, 'PAN-3690');
+
+    expect(readRecord(workspacePath, 'PAN-3690').swarm).toEqual(expect.objectContaining({
+      slotAssignments: [],
+      slotCompletions: {},
+    }));
+  });
+
+  it('PAN-3694: clears the superseded-attempt high-water so a fresh swarm reuses indexes 1..N', async () => {
+    const { updateIssueRecordForWorkspace } = await import('../../../../src/lib/pan-dir/record-update.js');
+    // The MIN-888 post-reset state: superseded slot 3 retained in the record.
+    await updateIssueRecordForWorkspace(workspacePath, 'PAN-3690', record => ({
+      ...record,
+      swarm: {
+        slotAssignments: [],
+        supersededAttempts: [{
+          slotIndex: 3,
+          itemId: 'item-c',
+          agentId: 'agent-pan-3690-slot-3',
+          branch: 'feature/pan-3690-slot-3',
+          archivedBranch: 'feature/pan-3690-slot-3-failed-20260814000000',
+          reason: 'failed swarm slot',
+          supersededAt: '2026-08-14T00:00:00.000Z',
+        }],
+      },
+    }));
+
+    // Pre-fix behavior: the retained attempt reserves indexes 1..3, so only
+    // slot 4 is dispatchable.
+    const before = new Set<number>();
+    expect(applySupersededSlotHighWater(before, { superseded: readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts } as never, 1)).toBe(4);
+    expect([...before].sort()).toEqual([1, 2, 3]);
+
+    await clearSupersededSwarmAttempts(workspacePath, 'PAN-3690');
+
+    expect(readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts).toEqual([]);
+    // Post-reset reuse: no index is reserved and the configured max stands.
+    const after = new Set<number>();
+    expect(applySupersededSlotHighWater(after, { superseded: readRecord(workspacePath, 'PAN-3690').swarm?.supersededAttempts } as never, 1)).toBe(1);
+    expect(after.size).toBe(0);
   });
 });
 
