@@ -457,17 +457,17 @@
     "recordedAt": "2026-08-17T13:39:08.830Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-17T13:39:08.897Z",
+  "updated": "2026-08-17T13:39:15.480Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-17T13:39:05.762Z",
+    "updatedAt": "2026-08-17T13:39:14.598Z",
     "reviewNotes": "All four review dimensions passed with complete requirements coverage.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -530,7 +530,7 @@
       },
       "costAtCloseOut": {
         "usd": 111.8262223,
-        "pricingAsOf": "2026-08-17T13:39:08.878Z"
+        "pricingAsOf": "2026-08-17T13:39:14.604Z"
       }
     },
     "merges": [
