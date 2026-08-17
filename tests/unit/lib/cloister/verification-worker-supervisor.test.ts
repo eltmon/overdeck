@@ -186,3 +186,75 @@ describe('verification worker supervisor', () => {
     }, { timeout: 2_000 });
   });
 });
+
+describe('PAN-3674 follow-up: expired workers', () => {
+  function writeWorkerState(home: string, issueId: string, state: Record<string, unknown>): string {
+    const dir = join(home, 'verification-workers', issueId.toLowerCase());
+    mkdirSync(dir, { recursive: true });
+    const resultPath = join(dir, 'result-seeded.json');
+    writeFileSync(join(dir, 'state.json'), JSON.stringify({
+      runId: 'run-seeded',
+      issueId,
+      workspacePath: '/tmp/workspace',
+      resultPath,
+      phase: 'running',
+      ...state,
+    }));
+    return resultPath;
+  }
+
+  it('never joins a worker past its deadline — kills it and starts fresh', async () => {
+    const home = useFixture(100);
+    // Stand-in for a live-but-expired worker: a detached sleeper with its own
+    // process group, exactly like the real detached worker.
+    const zombie = spawn('sleep', ['60'], { detached: true });
+    zombie.unref();
+    const zombiePid = zombie.pid!;
+    writeWorkerState(home, 'PAN-3674', {
+      pid: zombiePid,
+      startedAt: new Date(Date.now() - 70 * 60_000).toISOString(),
+      admittedAt: new Date(Date.now() - 66 * 60_000).toISOString(), // past the 65min budget
+    });
+
+    const outcome = await runSupervisedVerification('PAN-3674', '/tmp/workspace', { isRemote: false }, 'test');
+
+    if (outcome.outcome !== 'passed') throw new Error(`unexpected outcome: ${JSON.stringify(outcome)}`);
+    expect(outcome.outcome).toBe('passed');
+    // The expired worker was killed rather than joined.
+    expect(() => process.kill(zombiePid, 0)).toThrow();
+    // A fresh worker took over the registration.
+    const current = readVerificationWorkerState('PAN-3674');
+    expect(current).not.toBeNull();
+    expect(current!.pid).not.toBe(zombiePid);
+  });
+
+  it('kills the worker when the execution deadline fires mid-run', async () => {
+    const home = useFixture(5_000); // slow fixture: outlives the deadline trip
+    const pending = runSupervisedVerification('PAN-3675', '/tmp/workspace', { isRemote: false }, 'test');
+
+    // Wait for the worker to register, then age its admission past the budget.
+    const stateFile = join(home, 'verification-workers', 'pan-3675', 'state.json');
+    let pid = -1;
+    for (let i = 0; i < 100; i++) {
+      const s = readVerificationWorkerState('PAN-3675');
+      if (s) { pid = s.pid; break; }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(pid).toBeGreaterThan(0);
+    const seeded = JSON.parse(readFileSync(stateFile, 'utf8'));
+    seeded.admittedAt = new Date(Date.now() - 66 * 60_000).toISOString();
+    writeFileSync(stateFile, JSON.stringify(seeded));
+
+    const outcome = await pending;
+    expect(outcome.outcome).toBe('error');
+    expect(outcome.outcome === 'error' ? outcome.message : '').toContain('exceeded');
+    // The kill ladder (TERM → 1s → KILL) is fire-and-forget behind the verdict —
+    // poll for death instead of racing it.
+    let dead = false;
+    for (let i = 0; i < 120 && !dead; i++) {
+      try { process.kill(pid, 0); } catch { dead = true; }
+      if (!dead) await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(dead).toBe(true);
+  });
+});
