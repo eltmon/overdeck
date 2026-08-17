@@ -457,7 +457,7 @@
     "recordedAt": "2026-08-17T13:39:08.830Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-17T13:40:44.350Z",
+  "updated": "2026-08-17T13:50:37.222Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -539,6 +539,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-12T17:50:40.576Z"
+    },
+    {
+      "issue": "PAN-3668",
+      "recoveryPath": "unsignaled-test-verdict",
+      "obligationGeneration": 1786973954598,
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-17T13:50:37.219Z"
     }
   ],
   "workModel": "gpt-5.6-sol",
