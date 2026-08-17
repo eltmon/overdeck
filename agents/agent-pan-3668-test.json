@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3668-test",
+  "issueId": "PAN-3668",
+  "projectKey": "panopticon-cli",
+  "role": "test",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "claude-sonnet-5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3668",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "bcf10c26-c4b9-404f-85c9-ad64ad2ce152",
+      "startedAt": "2026-08-17T13:39:06.793Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-17T13:39:06.793Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
