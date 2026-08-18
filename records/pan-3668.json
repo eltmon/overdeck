@@ -457,7 +457,7 @@
     "recordedAt": "2026-08-17T13:39:08.830Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-18T18:53:54.723Z",
+  "updated": "2026-08-18T18:54:28.463Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -467,10 +467,15 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-18T18:53:51.679Z",
-    "testNotes": "npm run typecheck: passed (clean, 0 errors, verified twice). npm run lint: passed (20/20 sub-checks). npm test (14116 tests): 1 pre-existing unrelated flake in deacon-swarm-recovery.test.ts (confirmed via git diff vs main showing no PR touch, and standalone rerun passing) -- all else green. prime-agent-no-loss-audit + ohmypi-no-loss-audit: 16/16 passed.",
-    "uatNotes": "Built and booted this workspace's dashboard on isolated port 33668/isolated OVERDECK_HOME; /api/health ok at commit 5caa78a8 (matches HEAD). Via Playwright MCP: enabled harness/model permutations, opened composer's harness picker, live-confirmed Prime Agent with pi logo, correct description, enabled/selectable, and selection sticks with Talk it through still enabled -- independently reproduces xBRIEF dashboard-frontend.ac1. Source cross-checked for ac2/ac3 wiring (ModelPicker, CrewRow, context-layers harness marker).",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-18T18:54:28.439Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-18T18:54:28.439Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "5caa78a81594b0d3597af9a82ef56e461f3f972a",
     "lastVerifiedCommit": "e4a4b77ce54246475e81262511db2b36e5e0906a",
@@ -503,10 +508,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 250,
-            "output": 47069,
-            "cacheRead": 23306247,
-            "cacheWrite": 260928
+            "input": 252,
+            "output": 47616,
+            "cacheRead": 23567175,
+            "cacheWrite": 262744
           }
         }
       },
@@ -530,15 +535,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 250,
-          "output": 47069,
-          "cacheRead": 23306247,
-          "cacheWrite": 260928
+          "input": 252,
+          "output": 47616,
+          "cacheRead": 23567175,
+          "cacheWrite": 262744
         }
       },
       "costAtCloseOut": {
-        "usd": 119.0328053,
-        "pricingAsOf": "2026-08-18T18:53:54.715Z"
+        "usd": 119.0950053,
+        "pricingAsOf": "2026-08-18T18:54:28.451Z"
       }
     },
     "merges": [
