@@ -2,7 +2,7 @@
   "issueId": "PAN-3527",
   "schemaVersion": 2,
   "created": "2026-08-07T10:07:02.010Z",
-  "updated": "2026-08-16T14:24:30.964Z",
+  "updated": "2026-08-18T21:48:53.169Z",
   "pipeline": {
     "issueId": "PAN-3527",
     "reviewStatus": "pending",
@@ -40,6 +40,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-16T14:24:30.964Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-18T21:48:53.169Z"
     }
   ]
 }
