@@ -457,18 +457,20 @@
     "recordedAt": "2026-08-17T13:39:08.830Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-18T18:53:50.545Z",
+  "updated": "2026-08-18T18:53:54.723Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
     "testStatus": "passed",
+    "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-08-18T18:53:50.487Z",
-    "testNotes": "Ran gates from this workspace (feature/pan-3668 @ 5caa78a8). npm run typecheck: PASSED on two clean sequential runs (0 errors); one earlier run failed with 34 HarnessName/RuntimeName mismatch errors while running concurrently with a separate lint job, but was not reproducible in isolation after a fresh `npm run build:contracts` + `npx tsc --noEmit -p tsconfig.json` (0 errors) and a full clean `npm run typecheck` (exit 0) -- judged an environment/concurrency artifact, not a code defect, since packages/contracts/src and dist consistently include 'prime-agent' in Harness/RuntimeName/HarnessName. npm run lint: PASSED (all 20 sub-checks including ratchet, circular, effect-diagnostics, quarantine audits). npm test (full suite, 14116 tests): 1 failed initially (tests/unit/lib/cloister/deacon-swarm-recovery.test.ts, an 'overdeck.db schema is incompatible' error in unrelated deacon-swarm-recovery machinery) -- confirmed pre-existing/unrelated to this PR: `git diff origin/main...HEAD` touches neither the test file nor its source (swarm-failed-slot.ts, overdeck/infra.ts), and the file passes cleanly in isolation (5/5... actually full file passed standalone). Judged full-suite-load flake, consistent with the flake pattern already documented in this PR's own docs/prime-agent-verification.md. tests/unit/lib/prime-agent-no-loss-audit.test.ts and tests/unit/lib/ohmypi-no-loss-audit.test.ts: PASSED (16/16).",
+    "updatedAt": "2026-08-18T18:53:51.679Z",
+    "testNotes": "npm run typecheck: passed (clean, 0 errors, verified twice). npm run lint: passed (20/20 sub-checks). npm test (14116 tests): 1 pre-existing unrelated flake in deacon-swarm-recovery.test.ts (confirmed via git diff vs main showing no PR touch, and standalone rerun passing) -- all else green. prime-agent-no-loss-audit + ohmypi-no-loss-audit: 16/16 passed.",
+    "uatNotes": "Built and booted this workspace's dashboard on isolated port 33668/isolated OVERDECK_HOME; /api/health ok at commit 5caa78a8 (matches HEAD). Via Playwright MCP: enabled harness/model permutations, opened composer's harness picker, live-confirmed Prime Agent with pi logo, correct description, enabled/selectable, and selection sticks with Talk it through still enabled -- independently reproduces xBRIEF dashboard-frontend.ac1. Source cross-checked for ac2/ac3 wiring (ModelPicker, CrewRow, context-layers harness marker).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "5caa78a81594b0d3597af9a82ef56e461f3f972a",
     "lastVerifiedCommit": "e4a4b77ce54246475e81262511db2b36e5e0906a",
@@ -536,7 +538,7 @@
       },
       "costAtCloseOut": {
         "usd": 119.0328053,
-        "pricingAsOf": "2026-08-18T18:53:50.537Z"
+        "pricingAsOf": "2026-08-18T18:53:54.715Z"
       }
     },
     "merges": [
