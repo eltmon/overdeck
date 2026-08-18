@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-08-12T04:30:18.959Z",
-  "updated": "2026-08-18T16:44:57.124Z",
+  "updated": "2026-08-18T16:49:46.394Z",
   "pipeline": {
     "issueId": "PAN-3663",
     "reviewStatus": "pending",
@@ -19,10 +19,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-13T16:16:28.750Z",
-    "updatedAt": "2026-08-18T16:44:54.979Z",
+    "updatedAt": "2026-08-18T16:49:44.921Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3663 after its harness exited before push.",
     "strikeReadyHead": "81124d107430fcfba493cbde250fed07ae7d8432",
-    "strikeReadyAt": "2026-08-18T16:44:54.979Z",
+    "strikeReadyAt": "2026-08-18T16:49:44.920Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -61,7 +61,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.08811,
-        "pricingAsOf": "2026-08-18T16:44:54.991Z"
+        "pricingAsOf": "2026-08-18T16:49:44.932Z"
       }
     },
     "merges": [],
