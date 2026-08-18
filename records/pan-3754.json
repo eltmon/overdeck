@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-18T08:17:33.387Z",
+  "updated": "2026-08-18T09:21:22.720Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "passed",
@@ -99,7 +99,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:59:49.647Z",
-    "updatedAt": "2026-08-18T08:17:26.616Z",
+    "updatedAt": "2026-08-18T09:21:20.531Z",
     "testNotes": "Automated gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3754 on branch feature/pan-3754. npm run typecheck: clean (tsc --noEmit, hooks, evals, dashboard-types guard, frontend-types guard, acp all pass, no new errors). npm run lint: clean (eslint + all repo lint gates including state-write/state-path/pipeline-membership/workspace-doors/file-size/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass with 0 new findings). Full suite `npx vitest run --configLoader runner`: 1476 test files passed, 4 skipped; 13943 tests passed, 51 skipped, 0 failed (577s). Diff vs origin/main (local main ref was stale, verified against fetched origin/main) touches only src/lib/cloister/memory-governor.ts, memory-pressure-patrol.ts, memory-verdict-cache.ts, src/lib/config-yaml/{schema,defaults,merge}.ts, docs/RESOURCE-GOVERNOR.md, scripts/file-size-allowlist.txt, and their tests — matches xBRIEF declared scope plus the two audited scope-drift files (file-size-allowlist.txt, tests/lib/config-yaml.test.ts) already noted in the record. No UI/dashboard files touched; UAT not required per xBRIEF NonGoals ('No frontend/dashboard UI changes — activity.entry rendering already handles the messages') and confirmed by the file-scoped diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
     "reviewedAtCommit": "f6d0093074bf2aeb267bea104fdbd9e2a4982b67",
@@ -187,7 +187,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.15902,
-        "pricingAsOf": "2026-08-18T08:17:26.718Z"
+        "pricingAsOf": "2026-08-18T09:21:20.542Z"
       }
     },
     "merges": [
