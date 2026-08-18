@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
+_Last sequenced: 2026-08-18T21:58:39Z · model: claude-opus-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,16 +8,16 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 1 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
 | 2 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and can never start one — 3.5h outage |
 | 3 | PAN-3740 | XS | critical | ok |  |  | Red main: lint:slash-commands finds composer-manifest drift (handoff cap 500 vs 10000) — every merge blocked until regenerated |
-| 4 | PAN-2746 | XS | critical | ok |  | PAN-2742, PAN-2695 | infra-failure bypass writes reviewStatus='passed' |
 | 4 | PAN-3690 | S | critical | ok |  |  | Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit |
+| 5 | PAN-2746 | XS | critical | ok |  | PAN-2742, PAN-2695 | infra-failure bypass writes reviewStatus='passed' |
 | 6 | PAN-3524 | M | critical | ok |  | PAN-3492 | Server-owned --changed verification loop relaunches through freeze, abort, pause and operator stop |
 | 7 | PAN-3283 | S | critical | ok |  |  | Recovering from review_infrastructure_failure sets review_status passed despite an outstanding CHANGES REQUESTED |
 | 8 | PAN-3250 | S | critical | ok |  | PAN-3062 | Workspace spawn branches from local HEAD, so every new workspace inherits whatever is unpushed on local main |
 | 9 | PAN-2689 | S | critical | ok |  |  | Review verdicts from sandboxed codex review agents are silently lost |
 | 10 | PAN-3734 | M | critical | ok |  | PAN-3679 | Reused completed swarm slot can start a new item from a stale polyrepo branch |
 | 11 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the zombie test-agent cause |
-| 12 | PAN-3281 | S | critical | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch |
 | 12 | PAN-3685 | S | critical | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
+| 13 | PAN-3281 | S | critical | ok |  |  | ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch |
 | 14 | PAN-3682 | S | critical | ok |  |  | Migrated polyrepo swarm-slot pan done writes a legacy workspace record path and crashes |
 | 15 | PAN-3630 | S | critical | ok |  |  | pan tell reported three deliveries the agent never received and marked them read; rejected design shipped |
 | 16 | PAN-3561 | S | critical | ok |  |  | An ownerless state-git lock is unbreakable and bricked a project write door for 2.5 days; no TTL, no recovery CLI |
@@ -55,9 +55,9 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 48 | PAN-3237 | S | high | ok |  |  | A capacity-refused planning to work handoff is classified guardrails and marked terminally stuck |
 | 49 | PAN-3084 | S | high | ok |  | PAN-3566 | A review session spawned but never briefed sits at zero context forever and blocks its own replacement |
 | 50 | PAN-3078 | S | high | ok |  |  | The inspect verdict is never delivered to the work agent, so an agent that waits for it deadlocks forever |
-| 51 | PAN-3040 | M | high | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects |
 | 51 | PAN-3580 | M | high | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
 | 52 | PAN-3677 | S | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
+| 53 | PAN-3040 | M | high | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects |
 | 54 | PAN-2995 | S | high | ok |  | PAN-3047 | pan done --strike false-blocks after the prescribed squash-merge; it should verify PR-merged state, not ancestry |
 | 55 | PAN-3752 | M | high | ok |  | PAN-3743 | Conversation transcript parsing runs on the dashboard main thread — slow opens and event-loop stalls survive the PAN-3743 fix |
 | 56 | PAN-3743 | L | high | ok |  |  | Dashboard REST requests queue >20s in 5-minute burst windows — Awareness reports "signal timed out", conversation opens crawl |
@@ -133,10 +133,10 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 126 | PAN-2567 | S | critical | ok |  |  | reviewed+green PR stuck after review |
 | 127 | PAN-2179 | S | high | ok |  |  | relaunch can leave a zombie agent |
 | 128 | PAN-2169 | S | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 129 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
 | 129 | PAN-3689 | S | high | ok |  |  | Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures |
-| 130 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 131 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
+| 130 | PAN-2775 | S | high | ok |  |  | Agents die in sweeps: boot-correlated false reaps (live flywheel reaped, convoy reaped 5x) + unexplained simultaneous 3-host kill at 04… |
+| 131 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 132 | PAN-2323 | S | high | ok |  |  | Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one |
 | 133 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so Anthropic-pinned subagents die at spawn in proxied sessions |
 | 134 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent: operator scope changes force a doctrine violation |
 | 135 | PAN-3556 | S | high | ok |  |  | Concurrent double-spawn race allocated two session identities 3s apart and overwrote the first launcher pin |
@@ -180,10 +180,10 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 173 | PAN-3297 | S | high | ok |  |  | pan tell calls healthy supervisor-run agents zombies after a dashboard restart while resume calls them healthy |
 | 174 | PAN-3256 | XS | high | ok |  | PAN-3186 | MYN pipeline membership fails forge_unavailable because glab runs in a repo path that is not a git repository |
 | 175 | PAN-3196 | S | high | ok |  |  | Close-out cannot tear down workspaces holding root-owned container residue and dies on EACCES after every DoD row |
-| 176 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is fully broken: Commander passes its options object into the fetchImpl injection slot |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
-| 177 | PAN-3174 | M | high | ok |  | PAN-3032 | Every polyrepo UAT stack 504s: stale myn- Traefik labels, unattached devnet, and a frontend port mismatch |
-| 178 | PAN-3129 | M | high | ok |  |  | Canonical writes under agent-controlled paths have no symlink or TOCTOU containment check |
+| 177 | PAN-3190 | XS | high | ok |  |  | pan merge cancel is fully broken: Commander passes its options object into the fetchImpl injection slot |
+| 178 | PAN-3174 | M | high | ok |  | PAN-3032 | Every polyrepo UAT stack 504s: stale myn- Traefik labels, unattached devnet, and a frontend port mismatch |
+| 179 | PAN-3129 | M | high | ok |  |  | Canonical writes under agent-controlled paths have no symlink or TOCTOU containment check |
 | 180 | PAN-3048 | XS | high | ok |  |  | Pipeline auto-commit lands .pan/drafts PRDs in product feature branches; the duplicated exclusion list has drifted |
 | 181 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
 | 182 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
@@ -274,11 +274,11 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 267 | PAN-3276 | S | high | ok |  |  | Needs-you rows for terminal questions and permission prompts do not navigate anywhere when clicked |
 | 268 | PAN-2351 | M | high | ok |  |  | Overdeck Anywhere P0: scoped access tokens plus WS and SSE heartbeats — blocks all remote exposure |
 | 269 | PAN-3121 | S | high | ok |  | PAN-3117 | The failed-send outbox never reconciles against the transcript, leaving a delivered message with a doomed Retry twin |
-| 270 | PAN-3113 | M | medium | ok |  | PAN-3235 | Surface agent-pane choice prompts as inline decision cards in the conversation view |
 | 270 | PAN-3420 | M | high | ok |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 271 | PAN-3013 | XS | medium | ok |  |  | Dead linear-mcp-auth-hook entries leak into durable settings.json and fail on every matching tool call |
-| 272 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 273 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 271 | PAN-3113 | M | medium | ok |  | PAN-3235 | Surface agent-pane choice prompts as inline decision cards in the conversation view |
+| 272 | PAN-3013 | XS | medium | ok |  |  | Dead linear-mcp-auth-hook entries leak into durable settings.json and fail on every matching tool call |
+| 273 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 274 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
 | 275 | PAN-2188 | M | high | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
 | 276 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) |
 | 277 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
@@ -459,13 +459,13 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 452 | PAN-3016 | M | medium | ok |  |  | URL-address every view so any place you navigate to can be reached again from the URL |
 | 453 | PAN-1740 | XS | medium | ok |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
 | 454 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
-| 455 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 455 | PAN-3703 | XS | medium | ok |  |  | Ctrl-K: sort conversation results newest-first by the canonical recency field |
-| 456 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 457 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 458 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 459 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 460 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals look like a broken button |
+| 456 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 457 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 458 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 459 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 460 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 461 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals look like a broken button |
 | 462 | PAN-2566 | L | medium | ok | ✓ |  | Traycer parity epic: triage list of capabilities Overdeck genuinely lacks |
 | 463 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
 | 464 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
@@ -489,13 +489,13 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 482 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 483 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
 | 484 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 485 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
 | 485 | PAN-3705 | S | medium | ok |  | PAN-3703 | Ctrl-K: add Conversations as a first-class entry in the type list |
-| 486 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
-| 487 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 488 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 489 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 490 | PAN-3735 | S | medium | ok |  |  | pan CLI blames a healthy dashboard when the caller is sandboxed; detect read-only/no-network and say so |
+| 486 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
+| 487 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
+| 488 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 489 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 490 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 491 | PAN-3735 | S | medium | ok |  |  | pan CLI blames a healthy dashboard when the caller is sandboxed; detect read-only/no-network and say so |
 | 492 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers, violating the surface documented event-driven contract |
 | 493 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items are invisible to requirement traceability |
 | 494 | PAN-2354 | S | medium | ok |  | PAN-2351 | Overdeck Anywhere P1c: needs-you push notification bridge, ntfy first and Web Push later |
@@ -598,13 +598,13 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 591 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
 | 592 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
 | 593 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 594 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
 | 594 | PAN-3684 | XS | medium | ok |  |  | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
-| 595 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 596 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 597 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 598 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 599 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
+| 595 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 596 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 597 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 598 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 599 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 600 | PAN-3322 | XS | medium | ok |  | PAN-3308 | The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget |
 | 601 | PAN-2356 | XL | medium | ok |  | PAN-2352 | Overdeck Anywhere P3: outbound-only relay service with GitHub OAuth, push origin and a multi-tenant front door |
 | 602 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 603 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
@@ -715,13 +715,13 @@ _Last sequenced: 2026-08-18T21:56:25Z · model: claude-opus-5 · open: 866_
 | 708 | PAN-3011 | M | low | ok |  |  | Support poolside Laguna S 2.1 locally via Ollama or vLLM and hosted via OpenRouter |
 | 709 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 710 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 711 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 712 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 713 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 714 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 715 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 716 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 712 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 713 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 714 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 715 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 716 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 717 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
 | 718 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
 | 719 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
 | 720 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
@@ -886,13 +886,13 @@ A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and 
 
 Main CI is red on the merge commit because the generated composer-command manifest still declares the old 500-character pan handoff cap while the command description says 10000. A red main empties the merge gate silently and blocks every other issue from landing, so this outranks all non-red-main work regardless of how small the fix is. The change itself is a regeneration of one committed artifact, so the cost of clearing it is near zero and the cost of leaving it is the whole pipeline. In pipeline — rank set once here and pinned from now on; gate stays auto.
 
-### PAN-2746 (rank 4)
-
-Highest integrity risk — infra-failure bypass writes reviewStatus=passed, indistinguishable from real approval; nearly merged a pipeline-critical change unreviewed.
-
 ### PAN-3690 (rank 4)
 
 Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
+
+### PAN-2746 (rank 5)
+
+Highest integrity risk — infra-failure bypass writes reviewStatus=passed, indistinguishable from real approval; nearly merged a pipeline-critical change unreviewed.
 
 ### PAN-3524 (rank 6)
 
@@ -918,13 +918,13 @@ Reused completed swarm slot can start a new item from a stale polyrepo branch. C
 
 Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the zombie test-agent cause. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
 
-### PAN-3281 (rank 12)
-
-ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
-
 ### PAN-3685 (rank 12)
 
 Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
+
+### PAN-3281 (rank 13)
+
+ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
 
 ### PAN-3682 (rank 14)
 
@@ -1074,10 +1074,6 @@ A review session spawned but never briefed sits at zero context forever and bloc
 
 The inspect verdict is never delivered to the work agent, so an agent that waits for it deadlocks forever. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3040 (rank 51)
-
-pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
-
 ### PAN-3580 (rank 51)
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
@@ -1085,6 +1081,10 @@ The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rewo
 ### PAN-3677 (rank 52)
 
 Planning agents wedge after a background Explore task finishes; parent never consumes the result. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
+
+### PAN-3040 (rank 53)
+
+pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
 ### PAN-2995 (rank 54)
 
@@ -1201,7 +1201,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-08-18T21:56:25Z",
+  "generatedAt": "2026-08-18T21:58:39Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 866,
@@ -1246,8 +1246,21 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2746",
+      "issue": "PAN-3690",
       "rank": 4,
+      "size": "S",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit",
+      "rationale": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2746",
+      "rank": 5,
       "size": "XS",
       "importance": "critical",
       "score": 94,
@@ -1258,19 +1271,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       ],
       "why": "infra-failure bypass writes reviewStatus='passed'",
       "rationale": "Highest integrity risk — infra-failure bypass writes reviewStatus=passed, indistinguishable from real approval; nearly merged a pipeline-critical change unreviewed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3690",
-      "rank": 4,
-      "size": "S",
-      "importance": "critical",
-      "score": 94,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit",
-      "rationale": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1359,19 +1359,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3281",
-      "rank": 12,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch",
-      "rationale": "ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3685",
       "rank": 12,
       "size": "S",
@@ -1381,6 +1368,19 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "dependsOn": [],
       "why": "Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed",
       "rationale": "Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3281",
+      "rank": 13,
+      "size": "S",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch",
+      "rationale": "ready_for_merge stays 1 while an issue is stuck on incomplete plan items, so stuck work reaches the UAT batch. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1884,19 +1884,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3040",
-      "rank": 51,
-      "size": "M",
-      "importance": "high",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects",
-      "rationale": "pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3580",
       "rank": 51,
       "size": "M",
@@ -1919,6 +1906,19 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "dependsOn": [],
       "why": "Planning agents wedge after a background Explore task finishes; parent never consumes the result",
       "rationale": "Planning agents wedge after a background Explore task finishes; parent never consumes the result. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3040",
+      "rank": 53,
+      "size": "M",
+      "importance": "high",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects",
+      "rationale": "pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2910,8 +2910,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2775",
+      "issue": "PAN-3689",
       "rank": 129,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2775",
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2924,7 +2936,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2734",
-      "rank": 130,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2937,7 +2949,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2323",
-      "rank": 131,
+      "rank": 132,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2945,18 +2957,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "dependsOn": [],
       "why": "Flywheel respawn after crash/displacement starts a blank session instead of resuming the live one",
       "rationale": "Flywheel respawn after crash starts a blank session instead of resuming the live one.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3689",
-      "rank": 129,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3511,8 +3511,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3190",
+      "issue": "PAN-3668",
       "rank": 176,
+      "size": "L",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3190",
+      "rank": 177,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -3524,7 +3536,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3174",
-      "rank": 177,
+      "rank": 178,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -3538,25 +3550,13 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3129",
-      "rank": 178,
+      "rank": 179,
       "size": "M",
       "importance": "high",
       "score": 80,
       "condition": "ok",
       "dependsOn": [],
       "why": "Canonical writes under agent-controlled paths have no symlink or TOCTOU containment check",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3668",
-      "rank": 176,
-      "size": "L",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4704,8 +4704,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3113",
+      "issue": "PAN-3420",
       "rank": 270,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3113",
+      "rank": 271,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -4719,7 +4731,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3013",
-      "rank": 271,
+      "rank": 272,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -4731,7 +4743,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1666",
-      "rank": 272,
+      "rank": 273,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -4745,7 +4757,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1556",
-      "rank": 273,
+      "rank": 274,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4753,18 +4765,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "dependsOn": [],
       "why": "Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent",
       "rationale": "Session/activity feed coalesces review-spawn spam and supersedes re-reviews per issue — keeps active conversations most-recent.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3420",
-      "rank": 270,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6951,8 +6951,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1673",
+      "issue": "PAN-3703",
       "rank": 455,
+      "size": "XS",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Ctrl-K: sort conversation results newest-first by the canonical recency field",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1673",
+      "rank": 456,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6964,7 +6976,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1669",
-      "rank": 456,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6976,7 +6988,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1668",
-      "rank": 457,
+      "rank": 458,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6988,7 +7000,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1627",
-      "rank": 458,
+      "rank": 459,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -7000,7 +7012,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1624",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -7012,25 +7024,13 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3731",
-      "rank": 460,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 55,
       "condition": "ok",
       "dependsOn": [],
       "why": "Restart-gate banner gives no feedback after approval; dead-requester approvals look like a broken button",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3703",
-      "rank": 455,
-      "size": "XS",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ctrl-K: sort conversation results newest-first by the canonical recency field",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7316,8 +7316,22 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1240",
+      "issue": "PAN-3705",
       "rank": 485,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3703"
+      ],
+      "why": "Ctrl-K: add Conversations as a first-class entry in the type list",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1240",
+      "rank": 486,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7329,7 +7343,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1227",
-      "rank": 486,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7341,7 +7355,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1226",
-      "rank": 487,
+      "rank": 488,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -7353,7 +7367,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1173",
-      "rank": 488,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7365,7 +7379,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1154",
-      "rank": 489,
+      "rank": 490,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7377,27 +7391,13 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3735",
-      "rank": 490,
+      "rank": 491,
       "size": "S",
       "importance": "medium",
       "score": 52,
       "condition": "ok",
       "dependsOn": [],
       "why": "pan CLI blames a healthy dashboard when the caller is sandboxed; detect read-only/no-network and say so",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3705",
-      "rank": 485,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3703"
-      ],
-      "why": "Ctrl-K: add Conversations as a first-class entry in the type list",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8639,8 +8639,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1852",
+      "issue": "PAN-3684",
       "rank": 594,
+      "size": "XS",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1852",
+      "rank": 595,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8652,7 +8664,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1844",
-      "rank": 595,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8664,7 +8676,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1840",
-      "rank": 596,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8676,7 +8688,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1839",
-      "rank": 597,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8688,7 +8700,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-1776",
-      "rank": 598,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8700,7 +8712,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-3322",
-      "rank": 599,
+      "rank": 600,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8711,18 +8723,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "why": "The launcher-generator file-size ceiling sits 126 lines above the file, banking regrowth budget",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3684",
-      "rank": 594,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-2356",
@@ -10053,8 +10053,20 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2085",
+      "issue": "PAN-1641",
       "rank": 711,
+      "size": "M",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Run agents on local GPU models via a managed Ollama sidecar",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
+      "issue": "PAN-2085",
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10066,7 +10078,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2084",
-      "rank": 712,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10078,7 +10090,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2083",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10090,7 +10102,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2082",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10102,7 +10114,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2074",
-      "rank": 715,
+      "rank": 716,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -10114,7 +10126,7 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
     },
     {
       "issue": "PAN-2046",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10123,18 +10135,6 @@ Post-planning auto-spawn is abandoned on a transient Docker failure and attempt 
       "why": "Conversation view does not surface terminal command responses",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1641",
-      "rank": 711,
-      "size": "M",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Run agents on local GPU models via a managed Ollama sidecar",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-2006",
