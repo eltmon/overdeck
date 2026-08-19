@@ -576,6 +576,26 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
     expect(deps.getFeatureAnchor).toBeTypeOf('function');
   });
 
+  it('checks containment for read-only generation repositories', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+    const isBranchContainedInMain = vi.fn().mockResolvedValue(true);
+    mocks.buildPolyrepoGitDeps.mockReturnValue(new Map([
+      ['docs', { isBranchContainedInMain }],
+    ]));
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+    const contained = await capturedDeps().isGenerationContainedInMain!({
+      name: 'uat/min-otter-0727',
+      repos: [{ repoKey: 'docs', branch: 'feature/min-901' }],
+    } as UatGeneration);
+
+    expect(mocks.buildPolyrepoGitDeps).toHaveBeenCalledWith(expect.any(Array), { includeReadOnly: true });
+    expect(isBranchContainedInMain).toHaveBeenCalledWith('feature/min-901');
+    expect(contained).toBe(true);
+  });
+
   it('invokes polyrepo assembly, not the monorepo engine, for a polyrepo project', async () => {
     mocks.findProjectByPathSync.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },

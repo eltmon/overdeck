@@ -36,7 +36,7 @@ const runGit = (args: string[], cwd: string) =>
  * contributions throw and get held out. The character class is unchanged, so
  * shell metacharacters and path traversal are still refused.
  */
-function safeBranchName(
+export function safeBranchName(
   branchName: string,
   prefix: 'feature' | 'uat',
   featurePrefix = 'feature/',
@@ -50,7 +50,7 @@ function safeBranchName(
   return branchName;
 }
 
-function safeGenerationWorktreePath(projectRoot: string, worktreePath: string): string {
+export function safeGenerationWorktreePath(projectRoot: string, worktreePath: string): string {
   const workspacesRoot = resolve(projectRoot, 'workspaces');
   const target = resolve(worktreePath);
   const rel = relative(workspacesRoot, target);
@@ -124,6 +124,16 @@ export function buildUatGenerationGitDeps(
       const safeBranch = safeBranchName(branch, 'feature', featurePrefix);
       const tryRef = async (ref: string) => (await runGit(['rev-parse', ref], projectRoot)).stdout.trim();
       return tryRef(`origin/${safeBranch}`).catch(() => tryRef(safeBranch));
+    },
+
+    isBranchContainedInMain: async (branch) => {
+      const safeBranch = safeBranchName(branch, 'uat');
+      const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], projectRoot)
+        .then(() => `origin/${safeBranch}`)
+        .catch(() => safeBranch);
+      return runGit(['merge-base', '--is-ancestor', ref, originTarget], projectRoot)
+        .then(() => true)
+        .catch(() => false);
     },
 
     mergeBranch: async (featureBranch) => {
@@ -254,14 +264,15 @@ export function featureNamespaceOf(sourceBranch: string): string {
  */
 export function buildPolyrepoGitDeps(
   repos: readonly ResolvedProjectRepo[],
+  /** Containment-only callers include read-only repos recorded on old generations. */
+  options: { includeReadOnly?: boolean } = {},
 ): Map<string, PolyrepoRepoGit> {
   return new Map(
     repos
       // A repo configured `readonly: true` (required === false) is never a
-      // write target. Omitting it here means assembly cannot branch or push to
-      // it even if a caller passes it in — the ready-set filter is the first
-      // line of defense, this is the second.
-      .filter((repo) => repo.required)
+      // write target. Assembly uses the default filter; terminal containment
+      // opts in because historical generations can record read-only repos.
+      .filter((repo) => repo.required || options.includeReadOnly)
       .map((repo) => {
         let worktreePath = '';
         let generationBranch = '';

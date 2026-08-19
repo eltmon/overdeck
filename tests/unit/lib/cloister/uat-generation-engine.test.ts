@@ -167,14 +167,15 @@ describe('assembleUatGeneration — happy path', () => {
     expect(store.rows.get(gen.name)!.status).toBe('ready');
   });
 
-  it('reuses the same deterministic daily branch on rebuild', async () => {
+  it('mints a unique daily branch and preserves the prior row on rebuild', async () => {
     const store = makeFakeStore();
     const git = makeFakeGit();
     const first = await assembleUatGeneration(input(), deps(git, store));
     const second = await assembleUatGeneration(input(), deps(git, store));
-    expect(second.name).toBe(first.name);
-    expect(git.calls.pushed).toEqual([first.name, first.name]);
-    expect(store.rows.get(first.name)!.status).toBe('ready');
+    expect(second.name).toBe(`${first.name}-2`);
+    expect(git.calls.pushed).toEqual([first.name, second.name]);
+    expect(store.rows.get(first.name)!.status).toBe('superseded');
+    expect(store.rows.get(second.name)!.status).toBe('ready');
   });
 });
 

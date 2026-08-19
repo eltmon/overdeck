@@ -35,6 +35,8 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   releaseNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  /** Terminal marker for a closed/stale PR record; cleared only by fresh work or a new PR. */
+  retiredAt?: string;
   autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;

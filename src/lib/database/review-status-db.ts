@@ -66,9 +66,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         last_verified_commit,
         merge_step,
         auto_merge,
-        review_cycle_history
+        review_cycle_history, retired_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -113,7 +113,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         last_verified_commit  = excluded.last_verified_commit,
         merge_step            = excluded.merge_step,
         auto_merge            = excluded.auto_merge,
-        review_cycle_history  = excluded.review_cycle_history
+        review_cycle_history  = excluded.review_cycle_history,
+        retired_at            = excluded.retired_at
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -159,6 +160,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.mergeStep ?? null,
       s.autoMerge === undefined ? null : (s.autoMerge ? 1 : 0),
       s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
+      s.retiredAt ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -248,9 +250,10 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
   const rows = db.prepare(`
     SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
     FROM review_status
-    WHERE ready_for_merge = 1
+    WHERE retired_at IS NULL AND (
+      ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
-      OR blocker_reasons LIKE '%not_mergeable%'
+      OR blocker_reasons LIKE '%not_mergeable%')
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;
@@ -433,6 +436,7 @@ interface DbReviewStatusRow {
   release_notes: string | null;
   updated_at: string;
   ready_for_merge: number;
+  retired_at: string | null;
   auto_requeue_count: number | null;
   merge_retry_count: number | null;
   pr_url: string | null;
@@ -495,6 +499,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     releaseNotes: row.release_notes ?? undefined,
     updatedAt: row.updated_at,
     readyForMerge: row.ready_for_merge === 1,
+    retiredAt: row.retired_at ?? undefined,
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     mergeRetryCount: row.merge_retry_count ?? undefined,
     prUrl: row.pr_url ?? undefined,

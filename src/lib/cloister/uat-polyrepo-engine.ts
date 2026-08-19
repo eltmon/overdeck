@@ -23,7 +23,7 @@
  * conflict-resolved, held-out, push-failed — is unit-testable with fake deps.
  */
 
-import { makeUatCandidateName } from './uat-candidate-name.js';
+import { makeUniqueUatCandidateName } from './uat-candidate-name.js';
 import { generationFolderName } from './uat-generation-engine.js';
 import {
   applyUnionLintPlan,
@@ -66,6 +66,7 @@ export interface PolyrepoAssembleInput {
   features: readonly ReadyFeature[];
   /** Every configured member repo for the project. */
   repos: readonly ResolvedProjectRepo[];
+  takenBranchNames?: readonly string[];
 }
 
 /**
@@ -222,7 +223,10 @@ export async function assemblePolyrepoUatGeneration(
   deps: PolyrepoAssembleDeps,
 ): Promise<UatGeneration> {
   const log = deps.log ?? (() => {});
-  const name = makeUatCandidateName({ label: input.label, dateIso: input.dateIso });
+  const name = makeUniqueUatCandidateName(
+    { label: input.label, dateIso: input.dateIso },
+    [...deps.store.listNames(), ...(input.takenBranchNames ?? [])],
+  );
   const worktreePath = `${input.projectRoot}/workspaces/${generationFolderName(name)}`;
   const repoWorktree = (repoKey: string) => `${worktreePath}/${repoKey}`;
 

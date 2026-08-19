@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 python3 - <<'PY'
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -32,7 +33,9 @@ def run_pan(*args: str) -> str:
         return cached
 
     last: subprocess.CompletedProcess[str] | None = None
-    for attempt in range(5):
+    deadline = time.monotonic() + float(os.environ.get("PAN_SKILL_LINT_RETRY_SECONDS", "120"))
+    attempt = 0
+    while True:
         last = subprocess.run(
             [*LOCAL_PAN, *args],
             cwd=ROOT,
@@ -45,11 +48,13 @@ def run_pan(*args: str) -> str:
             with RUN_PAN_CACHE_LOCK:
                 RUN_PAN_CACHE[key] = last.stdout
             return last.stdout
-        # The CLI help smoke tests run immediately after tsdown rewrites dist/.
-        # Give the filesystem/module loader a short settle window before treating
-        # a command as genuinely broken.
-        if attempt < 4:
-            time.sleep(0.2 * (attempt + 1))
+        # Verification can run another build-heavy specialist against this workspace.
+        # That build cleans and rewrites dist/ while these CLI help probes are active.
+        # Wait through a complete competing build before treating the command as broken.
+        if time.monotonic() >= deadline:
+            break
+        attempt += 1
+        time.sleep(min(2.0, 0.2 * attempt))
 
     assert last is not None
     raise subprocess.CalledProcessError(last.returncode, last.args, output=last.stdout)

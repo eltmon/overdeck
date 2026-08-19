@@ -29,4 +29,19 @@ describe('merge-blocker reconcile candidates', () => {
       expect.objectContaining({ issueId: 'PAN-2712', readyForMerge: false }),
     ]);
   });
+
+  it('excludes retired rows carrying merge blockers', () => {
+    odb.raw().prepare(`
+      INSERT INTO review_status
+        (issue_id, review_status, test_status, blocker_reasons, retired_at, updated_at, ready_for_merge)
+      VALUES (?, 'passed', 'passed', ?, ?, ?, 0)
+    `).run(
+      'PAN-3753',
+      JSON.stringify([{ type: 'not_mergeable', summary: 'closed PR' }]),
+      Date.now(),
+      Date.now(),
+    );
+
+    expect(getMergeBlockerReconcileCandidatesSync()).toEqual([]);
+  });
 });

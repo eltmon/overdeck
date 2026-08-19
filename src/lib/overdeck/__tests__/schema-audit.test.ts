@@ -98,6 +98,14 @@ describe('overdeck schema audit', () => {
   it('warns for each missing artifact at startup without repairing the schema', () => {
     const dbPath = makeDbPath();
     const setup = createInitializedDatabase(dbPath);
+    setup.exec(`
+      CREATE TABLE cost_reconcile_file_state (
+        path TEXT PRIMARY KEY NOT NULL,
+        mtime_ms INTEGER NOT NULL,
+        size INTEGER NOT NULL,
+        verdict TEXT NOT NULL
+      )
+    `);
     removeExpectedArtifacts(setup);
     const schemaVersion = setup.pragma('schema_version', { simple: true });
     setup.close();

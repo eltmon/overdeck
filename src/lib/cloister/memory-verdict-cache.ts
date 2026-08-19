@@ -18,13 +18,24 @@ export interface MemoryPressureThresholds {
   criticalBytes: number;
 }
 
+export type GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable';
+
+export interface GovernorTrigger {
+  kind: GovernorTriggerKind;
+  readingBytes: number;
+  thresholdBytes: number;
+  at: number;
+}
+
 export interface MemoryVerdict {
   band: MemoryPressureBand;
   availableBytes: number;
   thresholds: MemoryPressureThresholds;
   swapTotalBytes?: number;
   swapFreeBytes?: number;
+  psiSomeAvg10?: number | null;
   psiFullAvg10?: number | null;
+  trigger?: GovernorTrigger | null;
 }
 
 let cachedVerdict: MemoryVerdict | null = null;

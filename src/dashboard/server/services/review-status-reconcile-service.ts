@@ -10,6 +10,7 @@ import {
 const POLL_INTERVAL_MS = 60_000;
 
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+const reconcileTracking = new Map<string, { healedUpdatedAt: string; warnedUpdatedAt?: string }>();
 
 interface ReviewStatusEventPayload {
   issueId: string;
@@ -34,8 +35,11 @@ async function reconcileOnce(): Promise<void> {
   // not duplicate an event that the read door just healed.
   for (const issueId of Object.keys(cached)) {
     const canonical = getReviewStatusSync(issueId);
-    if (!canonical) continue;
+    if (!canonical || canonical.retiredAt) continue;
     canonicalByIssue.set(issueId.toUpperCase(), canonical);
+  }
+  for (const issueId of reconcileTracking.keys()) {
+    if (!canonicalByIssue.has(issueId)) reconcileTracking.delete(issueId);
   }
 
   const store = getEventStore();
@@ -49,12 +53,27 @@ async function reconcileOnce(): Promise<void> {
     const latest = latestByIssue.get(issueId);
     const latestPayload = latest ? reviewStatusPayload(latest) : null;
     const lastUpdatedAt = latestPayload?.status.updatedAt ?? '';
-    if (lastUpdatedAt > canonical.updatedAt) continue;
+    if (lastUpdatedAt > canonical.updatedAt) {
+      reconcileTracking.delete(issueId);
+      continue;
+    }
     if (
       lastUpdatedAt === canonical.updatedAt &&
       latestPayload &&
       sameCanonicalReviewStatus(latestPayload.status, canonical)
-    ) continue;
+    ) {
+      reconcileTracking.delete(issueId);
+      continue;
+    }
+
+    const tracking = reconcileTracking.get(issueId);
+    if (tracking?.healedUpdatedAt === canonical.updatedAt) {
+      if (tracking.warnedUpdatedAt !== canonical.updatedAt) {
+        console.warn(`[review-status-reconcile] NOT CONVERGING for ${issueId}: canonical=${canonical.updatedAt} event=${lastUpdatedAt}`);
+        tracking.warnedUpdatedAt = canonical.updatedAt;
+      }
+      continue;
+    }
 
     console.log(
       `[review-status-reconcile] re-emitting status for ${issueId} ` +
@@ -65,6 +84,7 @@ async function reconcileOnce(): Promise<void> {
       issueId,
       canonical,
     );
+    reconcileTracking.set(issueId, { healedUpdatedAt: canonical.updatedAt });
   }
 }
 
@@ -85,6 +105,7 @@ export function stopReviewStatusReconcileService(): void {
     clearInterval(reconcileTimer);
     reconcileTimer = null;
   }
+  reconcileTracking.clear();
 }
 
 export async function __reconcileReviewStatusesOnceForTests(): Promise<void> {

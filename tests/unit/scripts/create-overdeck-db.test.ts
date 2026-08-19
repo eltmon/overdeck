@@ -48,6 +48,8 @@ describe('createOverdeckDatabase', () => {
     try {
       const tables = tableNames(db);
       expect(tables).toHaveLength(OVERDECK_TABLE_COUNT);
+      const reviewStatusColumns = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
+      expect(reviewStatusColumns.map((column) => column.name)).toContain('retired_at');
 
       for (const tableName of tables) {
         const row = db.prepare(`SELECT COUNT(*) AS count FROM "${tableName}"`).get<{ count: number }>();
