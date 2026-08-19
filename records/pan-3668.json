@@ -454,10 +454,10 @@
       "tests/unit/lib/prime-agent/session-resume.test.ts",
       "tsdown.config.ts"
     ],
-    "recordedAt": "2026-08-17T13:39:08.830Z"
+    "recordedAt": "2026-08-19T00:48:16.916Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-19T00:48:12.985Z",
+  "updated": "2026-08-19T00:48:16.921Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
