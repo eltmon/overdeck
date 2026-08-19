@@ -462,18 +462,18 @@
     "recordedAt": "2026-08-19T00:48:16.916Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-19T00:48:46.637Z",
+  "updated": "2026-08-19T00:49:54.453Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-19T00:48:44.085Z",
+    "updatedAt": "2026-08-19T00:49:54.399Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -759,9 +759,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 158404001,
-            "output": 272776,
-            "cacheRead": 152436864,
+            "input": 158861672,
+            "output": 273431,
+            "cacheRead": 152888960,
             "cacheWrite": 0
           }
         },
@@ -790,9 +790,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 158404001,
-          "output": 272776,
-          "cacheRead": 152436864,
+          "input": 158861672,
+          "output": 273431,
+          "cacheRead": 152888960,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -809,8 +809,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 120.1210483,
-        "pricingAsOf": "2026-08-19T00:48:44.142Z"
+        "usd": 120.3946213,
+        "pricingAsOf": "2026-08-19T00:49:54.442Z"
       }
     },
     "merges": [
