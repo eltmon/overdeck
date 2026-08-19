@@ -105,18 +105,20 @@ export interface ShadowConfig {
 /**
  * Permission mode for spawned Claude Code agents.
  *
- * - `auto` (default): pass `--permission-mode auto`. Uses Claude Code's built-in
- *   classifier to approve safe tool calls and block destructive ones (force pushes,
- *   exfiltration, `rm -rf`, etc.). Requires `skipAutoPermissionPrompt: true` in
- *   `~/.claude/settings.json` and a supporting Anthropic plan (Max/Team/Enterprise/API).
- * - `bypass`: pass `--permission-mode bypassPermissions` (the standalone
+ * - `bypass` (default): pass `--permission-mode bypassPermissions` (the standalone
  *   `--dangerously-skip-permissions` flag was removed). Fully autonomous — no approval
- *   prompts and no classifier. For the Codex harness this maps to Full Access
- *   (`approval_policy=never` + `sandbox_mode=danger-full-access`). Use when running
- *   providers that reject the `auto` flag (some Bedrock/Vertex/Foundry setups) or when
- *   you genuinely want zero gating.
+ *   prompts. This is the value to set when you want dashboard-launched conversations
+ *   and agents to never stop on a permission prompt. For the Codex harness it maps to
+ *   Full Access (`approval_policy=never` + `sandbox_mode=danger-full-access`).
+ * - `auto`: pass `--permission-mode default`. `auto` is Overdeck's internal mode name,
+ *   NOT a Claude Code flag value — Claude Code accepts only
+ *   acceptEdits/bypassPermissions/default/plan and rejects anything else. Under this mode
+ *   Claude Code prompts as usual and Overdeck relies on the PermissionRequest/PreToolUse
+ *   auto-approve hooks being installed on the machine to keep agents unblocked. Without
+ *   those hooks, every tool call prompts.
  *
- * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config → 'auto'.
+ * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config
+ * → 'bypass' (DEFAULT_CONFIG.claude.permissionMode).
  *
  * The persisted setting lives in `~/.overdeck/config.yaml` under `claude.permissionMode`
  * (loaded by `config-yaml.ts` and surfaced through `loadConfig().config.claude`). The
