@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildClaudeUserSettingsSync,
   bypassPrefixForAgentFlagSync,
+  ensureClaudePermissionFlagSync,
   getClaudePermissionFlagsSync,
   getClaudePermissionFlagsStringSync,
   readYoloEnv,
@@ -55,6 +56,42 @@ describe('claude-permissions', () => {
       expect(getClaudePermissionFlagsStringSync('auto')).toBe('--permission-mode default');
       expect(getClaudePermissionFlagsStringSync('bypass')).toBe(
         '--permission-mode bypassPermissions',
+      );
+    });
+  });
+
+  describe('ensureClaudePermissionFlag — conversation spawns must never emit the literal `auto`', () => {
+    // Regression guard: the conversation launcher hand-rolled this append with
+    // `mode === 'auto' ? 'auto' : 'bypassPermissions'`, so a machine configured
+    // with claude.permissionMode=auto produced `--permission-mode auto`. Claude
+    // Code strict-validates the flag (acceptEdits/bypassPermissions/default/plan)
+    // and aborts the launch on anything else.
+
+    it('appends --permission-mode default under auto, never the literal "auto"', () => {
+      const cmd = ensureClaudePermissionFlagSync("claude --model 'claude-fable-5'", 'auto');
+      expect(cmd).toBe("claude --model 'claude-fable-5' --permission-mode default");
+      expect(cmd).not.toMatch(/--permission-mode auto\b/);
+    });
+
+    it('appends --permission-mode bypassPermissions under bypass', () => {
+      expect(ensureClaudePermissionFlagSync("claude --model 'claude-fable-5'", 'bypass')).toBe(
+        "claude --model 'claude-fable-5' --permission-mode bypassPermissions",
+      );
+    });
+
+    it('leaves a command that already carries the flag untouched', () => {
+      const cmd = 'claude --permission-mode default --model x';
+      expect(ensureClaudePermissionFlagSync(cmd, 'bypass')).toBe(cmd);
+    });
+
+    it('resolves from PAN_YOLO when no explicit mode is passed', () => {
+      process.env.PAN_YOLO = 'true';
+      expect(ensureClaudePermissionFlagSync('claude --model x')).toBe(
+        'claude --model x --permission-mode bypassPermissions',
+      );
+      process.env.PAN_YOLO = 'false';
+      expect(ensureClaudePermissionFlagSync('claude --model x')).toBe(
+        'claude --model x --permission-mode default',
       );
     });
   });

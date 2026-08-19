@@ -105,6 +105,24 @@ function degradeInvalidTieredExecution(
   result.tieredExecution = { ...DEFAULT_TIERED_EXECUTION_CONFIG, enabled: false };
 }
 
+// An unrecognized `claude.permissionMode` used to be dropped without a word, so
+// a typo (`bypassPermissions`, `yolo`, `auto-review`) silently kept whatever the
+// default was — for permissions that is a security-relevant surprise in either
+// direction. Config load must not throw (see the tiered_execution note above), so
+// we degrade to the current value and say so, once per distinct bad value.
+const warnedInvalidClaudePermissionModes = new Set<string>();
+function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void {
+  const shown = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  if (warnedInvalidClaudePermissionModes.has(String(shown))) return;
+  warnedInvalidClaudePermissionModes.add(String(shown));
+  console.error(
+    `[config] claude.permissionMode "${shown}" is not a valid value — valid values are ` +
+    `'auto' (Claude Code runs with --permission-mode default; needs the auto-approve hooks) ` +
+    `and 'bypass' (--permission-mode bypassPermissions; no prompts). ` +
+    `Ignoring it and using "${effective}".`,
+  );
+}
+
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
@@ -768,8 +786,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
-    if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
-      result.claude.permissionMode = config.claude.permissionMode;
+    if (config.claude?.permissionMode !== undefined) {
+      if (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass') {
+        result.claude.permissionMode = config.claude.permissionMode;
+      } else {
+        warnInvalidClaudePermissionMode(config.claude.permissionMode, result.claude.permissionMode);
+      }
     }
 
     if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {

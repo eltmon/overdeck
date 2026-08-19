@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../claude-permissions.js';
+import { getClaudePermissionFlagsStringSync, ensureClaudePermissionFlagSync } from '../claude-permissions.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
@@ -609,10 +609,9 @@ export async function spawnConversationSession(
       primeAgentFields = primeLaunch.fields;
     } else {
       runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
-      const mode = resolvePermissionModeSync();
-      if (!runtimeCommand.includes('--permission-mode')) {
-        runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
-      }
+      // The mode→flag mapping lives in claude-permissions.ts. In particular,
+      // Claude Code rejects the literal permission-mode value `auto`.
+      runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
     }
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
