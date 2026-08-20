@@ -26,6 +26,20 @@ describe('prompt load-bearing rails', () => {
     it('states the auto-pickable predicate', () => {
       expect(prompt).toMatch(/ready && planned && \(released \|\| auto_pickup_backlog \|\| activeBookMember\)/);
     });
+
+    it('gates recovery verbs on a root-cause hypothesis', () => {
+      expect(prompt).toMatch(/A recovery verb moves one instance/i);
+      expect(prompt).toMatch(/root-cause hypothesis/i);
+    });
+
+    it('treats recurrence as the step-back signal', () => {
+      expect(prompt).toMatch(/Recurrence is the step-back signal/i);
+      expect(prompt).toMatch(/machinery is itself the\s+symptom/i);
+    });
+
+    it('treats troubled agents as diagnosis targets, not resume targets', () => {
+      expect(prompt).toMatch(/diagnosis target, not a resume target/i);
+    });
   });
 
   describe('roles/review.md', () => {
