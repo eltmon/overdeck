@@ -4,17 +4,17 @@
     "created": "2026-08-16T08:49:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3744: Conversation view shows 'How can I help you' empty-state instead of a loading skeleton while the transcript loads",
-    "updated": "2026-08-16T08:57:18.738Z"
+    "updated": "2026-08-21T18:13:11.578Z"
   },
   "plan": {
     "id": "pan-3744",
     "title": "Conversation view shows 'How can I help you' empty-state instead of a loading skeleton while the transcript loads",
-    "status": "running",
+    "status": "completed",
     "uid": "2e575e0f-4835-4e60-a74b-273ecbf99fe0",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-16T08:49:57Z",
-    "updated": "2026-08-16T08:57:18.738Z",
+    "updated": "2026-08-21T18:13:11.578Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3744",
@@ -418,5 +418,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
