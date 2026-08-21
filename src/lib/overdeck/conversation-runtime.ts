@@ -243,7 +243,7 @@ function isPiTuiInputReady(snapshot: string): boolean {
     // and is the actual signal that Pi's TUI is accepting input. The two patterns
     // above matched an older Pi build's chrome and no longer appear at all, which
     // is why this check previously ran to its full timeout on every ohmypi spawn.
-    || /⬢[^\n]*◕/.test(snapshot);
+    || /⬢[^\n]*[◕◉]/.test(snapshot);
 }
 export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;

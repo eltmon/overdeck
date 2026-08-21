@@ -100,6 +100,14 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
     await expect(ready).resolves.toBe(true);
   });
 
+  it('recognizes the omp v17 thinking marker as an interactive prompt', async () => {
+    paneSnapshots.values = [
+      '╭── π  > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮\n╰─  ─╯',
+    ];
+
+    await expect(waitForPiTuiReady('conv-pi', 1000)).resolves.toBe(true);
+  });
+
   it('times out when Pi renders text but never reaches the input prompt', async () => {
     paneSnapshots.values = Array.from({ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
 
