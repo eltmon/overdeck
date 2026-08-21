@@ -100,22 +100,27 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
     await expect(ready).resolves.toBe(true);
   });
 
-  it('recognizes the omp v17 thinking marker as an interactive prompt', async () => {
-    paneSnapshots.values = [
-      '╭── π  > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮\n╰─  ─╯',
-    ];
+  it('accepts the omp v17 footer after a stable startup grace period', async () => {
+    paneSnapshots.values = Array.from(
+      { length: 22 },
+      () => '╭── π  > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮\n╰─  ─╯',
+    );
 
-    await expect(waitForPiTuiReady('conv-pi', 1000)).resolves.toBe(true);
+    const ready = waitForPiTuiReady('conv-pi', 6000);
+    await vi.advanceTimersByTimeAsync(5250);
+
+    await expect(ready).resolves.toBe(true);
   });
 
   it('waits for omp v17 MCP startup to finish before accepting its footer', async () => {
     paneSnapshots.values = [
+      '╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
       'Connecting to MCP servers: sentry, linear…\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
       'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
     ];
 
     const ready = waitForPiTuiReady('conv-pi', 1000);
-    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(500);
 
     await expect(ready).resolves.toBe(true);
   });
