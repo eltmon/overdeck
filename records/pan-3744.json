@@ -102,7 +102,7 @@
     "recordedAt": "2026-08-16T09:30:53.223Z"
   },
   "created": "2026-08-16T08:44:42.917Z",
-  "updated": "2026-08-21T17:14:25.491Z",
+  "updated": "2026-08-21T18:13:26.345Z",
   "pipeline": {
     "issueId": "PAN-3744",
     "reviewStatus": "passed",
@@ -114,7 +114,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T09:33:35.916Z",
-    "updatedAt": "2026-08-21T17:14:23.271Z",
+    "updatedAt": "2026-08-21T18:13:26.318Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed UAT issues",
     "testNotes": "typecheck exit 0, lint exit 0 (all guard scripts clean), npm test exit 0 on a clean re-run (1469 files/13892 tests passed, 51 pre-existing quarantined skips) plus frontend leg (4/64) passed at HEAD a51ffc2f4d; an initial run's 6 failures were confirmed transient host-contention flakiness (isolated re-run 27/27 passed, unrelated to this branch's diff)",
     "uatNotes": "Live-verified against the workspace's own container (feature-pan-3744.overdeck.localhost) via Playwright MCP: skeleton visible + greeting absent while transcript withheld, content rendered + skeleton gone + greeting still absent after release -- proving the AC end-to-end against the shipped build. Routed around a pre-existing, unrelated workspace dev-proxy Origin-forwarding 403 (documented by the prior test cycle) using the same page.route() mocking technique as this issue's own committed spec test.",
@@ -147,7 +147,9 @@
         "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx"
       ],
       "recordedAt": "2026-08-16T09:30:53.223Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-21T18:13:26.318Z"
   },
   "closeOut": {
     "usage": {
@@ -203,7 +205,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3746"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-21T18:13:26.339Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a51ffc2f4db9a0eb2486c9e0a315e332069db624",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3746 MERGED at 2026-08-16T13:55:42Z",
+          "status": "pass",
+          "mergedAt": "2026-08-16T13:55:42Z",
+          "mergeCommit": "098346f558d14215641a829badf9baec122a8898"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on 098346f558d14215641a829badf9baec122a8898: test, lint, build (22), guard; verified on main by later green CI run 5b56bf219f253fc6c2b8229aac2feedbb704d3e7 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 5b56bf21 contains merge 098346f5",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (18 transcript files preserved); No strike branch strike/pan-3744 found; Pruned 24 checkpoint ref(s) for agent-pan-3744, planning-pan-3744, strike-pan-3744; No specialist registry entries for PAN-3744"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
