@@ -236,11 +236,17 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 function isPiTuiInputReady(snapshot: string): boolean {
+  // omp v17 renders its footer before MCP startup completes, but input sent
+  // during that transition is discarded by the final TUI redraw. When MCP
+  // connection is visible, wait for its completion message before delivery.
+  if (/Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot)) {
+    return false;
+  }
   return /^\s*[❯›>]\s/m.test(snapshot)
     || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot)
     // Current omp/Pi footer bar, e.g. "╭── π  > ⬢ Qwen3.6 Plus · ◕ high > ...".
-    // It renders within ~1s of spawn — well before MCP servers finish connecting —
-    // and is the actual signal that Pi's TUI is accepting input. The two patterns
+    // It renders within ~1s of spawn. Once any visible MCP startup has completed,
+    // it signals that Pi's TUI is accepting input. The two patterns
     // above matched an older Pi build's chrome and no longer appear at all, which
     // is why this check previously ran to its full timeout on every ohmypi spawn.
     || /⬢[^\n]*[◕◉]/.test(snapshot);

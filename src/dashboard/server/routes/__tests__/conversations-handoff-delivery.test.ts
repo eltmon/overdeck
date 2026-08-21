@@ -108,6 +108,18 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
     await expect(waitForPiTuiReady('conv-pi', 1000)).resolves.toBe(true);
   });
 
+  it('waits for omp v17 MCP startup to finish before accepting its footer', async () => {
+    paneSnapshots.values = [
+      'Connecting to MCP servers: sentry, linear…\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+      'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+    ];
+
+    const ready = waitForPiTuiReady('conv-pi', 1000);
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(ready).resolves.toBe(true);
+  });
+
   it('times out when Pi renders text but never reaches the input prompt', async () => {
     paneSnapshots.values = Array.from({ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
 
