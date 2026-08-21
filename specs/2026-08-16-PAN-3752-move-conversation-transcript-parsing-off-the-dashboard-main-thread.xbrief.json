@@ -4,17 +4,17 @@
     "created": "2026-08-16T17:53:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3752: Conversation transcript parsing runs on the dashboard main thread — slow opens and event-loop stalls survive PAN-3743",
-    "updated": "2026-08-16T18:04:22.230Z"
+    "updated": "2026-08-21T18:14:21.031Z"
   },
   "plan": {
     "id": "pan-3752",
     "title": "Move conversation transcript parsing off the dashboard main thread",
-    "status": "running",
+    "status": "completed",
     "uid": "c622122b-65ae-4fe2-b04c-b7b1cc6d009c",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-16T17:53:33Z",
-    "updated": "2026-08-16T18:04:22.230Z",
+    "updated": "2026-08-21T18:14:21.031Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3752",
@@ -611,5 +611,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
