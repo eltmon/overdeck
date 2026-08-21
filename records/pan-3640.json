@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3640",
+  "schemaVersion": 2,
+  "created": "2026-08-21T18:14:53.652Z",
+  "updated": "2026-08-21T18:14:53.652Z",
+  "pipeline": {
+    "issueId": "PAN-3640",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-21T18:14:53.652Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
+}
