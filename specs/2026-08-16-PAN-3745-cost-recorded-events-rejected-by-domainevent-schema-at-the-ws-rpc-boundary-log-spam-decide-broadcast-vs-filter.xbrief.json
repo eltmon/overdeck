@@ -4,17 +4,17 @@
     "created": "2026-08-16T08:52:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3745: cost.recorded events rejected by DomainEvent schema at the ws-rpc boundary (log spam; decide broadcast vs filter)",
-    "updated": "2026-08-16T08:59:51.747Z"
+    "updated": "2026-08-21T18:13:45.028Z"
   },
   "plan": {
     "id": "pan-3745",
     "title": "cost.recorded events rejected by DomainEvent schema at the ws-rpc boundary (log spam; decide broadcast vs filter)",
-    "status": "running",
+    "status": "completed",
     "uid": "214d3cce-2a12-462f-a6f4-5e1be21e3c1e",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-16T08:52:23Z",
-    "updated": "2026-08-16T08:59:51.747Z",
+    "updated": "2026-08-21T18:13:45.028Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3745",
@@ -245,5 +245,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
