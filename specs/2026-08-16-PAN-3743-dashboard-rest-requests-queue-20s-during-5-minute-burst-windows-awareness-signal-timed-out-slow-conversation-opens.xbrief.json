@@ -4,17 +4,17 @@
     "created": "2026-08-16T08:56:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3743: Dashboard REST requests queue >20s during 5-minute burst windows (Awareness 'signal timed out', slow conversation opens)",
-    "updated": "2026-08-16T09:06:52.096Z"
+    "updated": "2026-08-21T18:12:25.120Z"
   },
   "plan": {
     "id": "pan-3743",
     "title": "Dashboard REST requests queue >20s during 5-minute burst windows (Awareness 'signal timed out', slow conversation opens)",
-    "status": "running",
+    "status": "completed",
     "uid": "59968067-afef-48b7-9297-7545884c0a60",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-16T08:56:42Z",
-    "updated": "2026-08-16T09:06:52.096Z",
+    "updated": "2026-08-21T18:12:25.120Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3743",
@@ -656,5 +656,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
