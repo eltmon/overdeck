@@ -253,7 +253,7 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
     const mcpFinished = /MCP finished/i.test(snapshot);
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !mcpFinished;
     const hasV17Footer = /⬢[^\n]*[◕◉]/.test(snapshot);
-    if (isPiTuiInputReady(snapshot) || (hasV17Footer && mcpFinished)) {
+    if (isPiTuiInputReady(snapshot)) {
       console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
       return true;
     }

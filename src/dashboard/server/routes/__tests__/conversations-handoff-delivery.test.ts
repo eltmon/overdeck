@@ -119,8 +119,13 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
       'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
     ];
 
-    const ready = waitForPiTuiReady('conv-pi', 1000);
-    await vi.advanceTimersByTimeAsync(500);
+    paneSnapshots.values.push(...Array.from(
+      { length: 20 },
+      () => 'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+    ));
+
+    const ready = waitForPiTuiReady('conv-pi', 6000);
+    await vi.advanceTimersByTimeAsync(5500);
 
     await expect(ready).resolves.toBe(true);
   });
