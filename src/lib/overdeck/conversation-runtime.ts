@@ -236,10 +236,6 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 function isPiTuiInputReady(snapshot: string): boolean {
-  // Input sent while MCP startup is visible is discarded by omp's final redraw.
-  if (/Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot)) {
-    return false;
-  }
   return /^\s*[❯›>]\s/m.test(snapshot)
     || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
 }
@@ -250,23 +246,12 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
     const snapshot = await Effect.runPromise(
       capturePane(tmuxSession, 40).pipe(Effect.catch(() => Effect.succeed(''))),
     );
-    const mcpFinished = /MCP finished/i.test(snapshot);
-    const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !mcpFinished;
-    const hasV17Footer = /⬢[^\n]*[◕◉]/.test(snapshot);
-    if (isPiTuiInputReady(snapshot)) {
+    const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
+    // omp v17 paints its footer before MCP startup and redraws again afterward.
+    stableV17FooterPolls = /⬢[^\n]*[◕◉]/.test(snapshot) && !mcpConnecting ? stableV17FooterPolls + 1 : 0;
+    if (isPiTuiInputReady(snapshot) || stableV17FooterPolls >= 21) {
       console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
       return true;
-    }
-    // omp v17 paints its footer before it starts MCP connections. Give that
-    // footer a stable grace period so the first message survives the redraw.
-    if (hasV17Footer && !mcpConnecting) {
-      stableV17FooterPolls += 1;
-      if (stableV17FooterPolls >= 21) {
-        console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
-        return true;
-      }
-    } else {
-      stableV17FooterPolls = 0;
     }
     await new Promise<void>((r) => setTimeout(r, 250));
   }
