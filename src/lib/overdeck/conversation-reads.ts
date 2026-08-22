@@ -398,6 +398,9 @@ export async function getConversationsPendingInputFeed(
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
+          // PAN-3766 — the answer path depends on the harness: pi ask modals
+          // must be driven by keystrokes, not sent a message.
+          harness: conv.harness ?? 'claude-code',
           ...(pending ? { pendingAskUserQuestion: pending } : {}),
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),

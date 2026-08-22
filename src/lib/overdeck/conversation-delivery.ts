@@ -26,6 +26,7 @@ import {
 import { sendRawKeystroke, sendKeysAsync } from '../tmux.js';
 import { deliverAgentMessage } from '../agents.js';
 import { tmuxSessionExists } from './conversation-runtime.js';
+import { answerPiAskModal, type PiAskModalDeps } from '../pi-ask-modal.js';
 import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-enrichment.js';
 import { getOverdeckHome } from '../paths.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
@@ -321,6 +322,41 @@ export async function deliverConversationViaControlChannel(
     message,
     source: options.source,
   });
+}
+
+/**
+ * PAN-3766 follow-up — answer a pi conversation's `ask` modal. The control
+ * channel cannot do it: a steer queues behind the modal and is never seen.
+ * The answer must drive the modal with keystrokes (see pi-ask-modal.ts).
+ */
+export async function handleConversationPiAskAnswer(
+  rawId: string,
+  body: Record<string, unknown>,
+  deps: PiAskModalDeps = {},
+): Promise<{ body: Record<string, unknown>; status?: number }> {
+  try {
+    const numericId = Number(rawId);
+    const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
+      ? getConversationById(numericId)
+      : getConversationByName(rawId);
+    if (!conv) {
+      return { body: { error: 'Conversation not found' }, status: 404 };
+    }
+    if (!isPiControlChannelHarness(conv.harness ?? 'claude-code')) {
+      return { body: { error: 'Not a Pi conversation' }, status: 400 };
+    }
+    if (conv.status === 'ended') {
+      return { body: { error: 'Session has ended — start a new run to interact' }, status: 422 };
+    }
+    return await answerPiAskModal(conv.tmuxSession, body, {
+      ...deps,
+      sessionExists: deps.sessionExists ?? tmuxSessionExists,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] pi ask answer failed:', msg);
+    return { body: { error: 'Internal server error' }, status: 500 };
+  }
 }
 
 export async function handleConversationThinkingLevel(

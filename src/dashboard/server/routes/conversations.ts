@@ -68,6 +68,7 @@ import {
   handleConversationCompact,
   handleConversationCodexApproval,
   handleConversationControlAck,  handleConversationDeliveryMethod,
+  handleConversationPiAskAnswer,
   handleConversationPlanAction,
   handleConversationThinkingLevel,
   isPiControlChannelHarness,
@@ -655,6 +656,29 @@ const postConversationPaneChoiceRoute = HttpRouter.add(
     });
   }),
 );
+//
+// PAN-3766 — answer an ohmypi conversation's `ask` modal from the dashboard.
+// The message route cannot: pi queues the steer behind the modal and the agent
+// never sees it. This route drives the modal with keystrokes after verifying
+// the live pane still shows the same question (see pi-ask-modal.ts).
+const postConversationPiAskAnswerRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/pi-ask-answer',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      const result = await handleConversationPiAskAnswer(rawId, body);
+      return jsonResponse(result.body, { status: result.status });
+    });
+  }),
+);
 const postConversationDeliveryMethodRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/delivery-method',
@@ -1030,6 +1054,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationMessageRoute,
   postConversationCodexApprovalRoute,
   postConversationPaneChoiceRoute,
+  postConversationPiAskAnswerRoute,
   postConversationDeliveryMethodRoute,
   postConversationControlAckRoute,
   postConversationFavoriteRoute,
