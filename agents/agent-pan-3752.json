@@ -50,6 +50,10 @@
         "lifecycle.log",
         "state.json"
       ]
+    },
+    {
+      "at": "2026-08-22T16:57:40.930Z",
+      "event": "stopped"
     }
   ],
   "archiveRef": null,
