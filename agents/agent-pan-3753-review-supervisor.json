@@ -41,6 +41,18 @@
         "inFlightReviewOrTest": null
       },
       "filesRemoved": []
+    },
+    {
+      "at": "2026-08-22T18:54:52.242Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": []
     }
   ],
   "archiveRef": null,
