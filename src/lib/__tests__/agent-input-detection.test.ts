@@ -192,6 +192,62 @@ ${Array.from({ length: 30 }, (_, i) => `later output ${i}`).join('\n')}
 
     expect(detection).toBeNull()
   })
+
+  // PAN-3766 — ohmypi `ask` modal, keyed on its distinctive footer hint. Shape
+  // mirrors a captured live pane: box-drawn frame, bottom border after footer.
+  it('detects a pi ask modal as a user_question with the question text in the prompt', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Some earlier agent output.
+
+ ⠙ Choosing which battle to stage live ⟦esc⟧
+╭─ Ask ─────────────────────────────────────────────╮
+│ Which battle should I stage so it's ready to trigger? │
+├───────────────────────────────────────────────────┤
+│ ❯ ○ 1 · Camp battle                               │
+│   ○ 2 · Strike (offline duel)                     │
+│   ○ Other (type your own)                         │
+├───────────────────────────────────────────────────┤
+│ Enter select · n note · ↑/↓ move · Esc cancel     │
+╰───────────────────────────────────────────────────╯
+`)
+
+    expect(detection).toMatchObject({ reason: 'user_question' })
+    expect(detection?.prompt).toContain('Which battle should I stage')
+    expect(detection?.prompt).toContain('Ask')
+  })
+
+  it('also detects the unboxed ask layout', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Ask  1 questions
+[battle]  options:5
+Which battle should I stage?
+❯ 1 - Camp battle
+
+Enter select · n note · ↑↓ move · Esc cancel
+`)
+
+    expect(detection).toMatchObject({ reason: 'user_question' })
+    expect(detection?.prompt).toContain('Which battle should I stage?')
+  })
+
+  it('clears the pi ask detection once the modal is answered and output follows', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+│ Enter select · n note · ↑/↓ move · Esc cancel     │
+╰───────────────────────────────────────────────────╯
+The agent continued working after the answer.
+`)
+
+    expect(detection).toBeNull()
+  })
+
+  it('does not fire on prose that merely mentions the footer keys', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Press Enter to select an item from the list, or Esc to cancel the operation entirely.
+Done.
+`)
+
+    expect(detection).toBeNull()
+  })
 })
 
 describe('parseCodexApprovalPrompt', () => {
