@@ -38,6 +38,18 @@
         "lifecycle.log",
         "state.json"
       ]
+    },
+    {
+      "at": "2026-08-22T18:55:02.409Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": []
     }
   ],
   "archiveRef": null,
