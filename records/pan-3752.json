@@ -84,7 +84,7 @@
     "recordedAt": "2026-08-16T19:49:22.663Z"
   },
   "created": "2026-08-16T17:40:14.912Z",
-  "updated": "2026-08-22T15:50:16.222Z",
+  "updated": "2026-08-22T16:52:02.038Z",
   "pipeline": {
     "issueId": "PAN-3752",
     "reviewStatus": "passed",
@@ -96,7 +96,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-22T15:50:09.525Z",
+    "updatedAt": "2026-08-22T16:52:02.019Z",
     "testNotes": "npm run typecheck exits 0; npm run lint exits 0 (all sub-gates green); npm test: 13939 passed / 1 failed / 51 skipped across 1482 files — the single failure (tests/unit/lib/workspaces/rebuild.test.ts hook timeout) is outside this branch's files_scope and reproduced as a clean 9/9 pass in isolation, confirming a CPU-contention flake under concurrent host load, not a regression.",
     "uatNotes": "Playwright UAT against the workspace-built dashboard. Seeded FIX-1, placed a 25600 KB pi-format fixture transcript at the seeded work agent's session path, opened it twice (fresh subscribe + full-reload resubscribe) via /issues/FIX-1 Session tab. AC-1: both opens rendered the full message; GET /api/metrics/summary across both 60s windows showed p99 ~22ms (well under the 100ms warn threshold) and zero [event-loop-monitor] warning lines in the tailed server log. AC-2: a second browser tab on the live Command Deck stayed connected (no Reconnecting banner, live heartbeat) through both parse triggers. Fixed an unrelated environment blocker en route: the workspace container's Vite proxy target 'server:3013' resolved ambiguously on the shared docker network (many workspace stacks alias to 'server'), causing intermittent 403 Invalid origin; pinned via /etc/hosts in the frontend container (workspace-scoped, reversible) — worth filing as it likely affects UAT on other workspace stacks on this host.",
     "inspectNotes": "All 4 ACs verified: workerLane('parseTranscriptSnapshot')='parse' and full db-task-lanes suite passes (13/13); deep-equal dispatch test runs against the real fixture at src/dashboard/server/services/__tests__/pi-conversation-parser.fixture.jsonl; 'Unknown transcript parser' throw present in both dispatch switches (task inline + worker); npm run typecheck exits 0 with 'parse' in WorkerLane and both DashboardDbOperation unions updated. Note for the wiring bead: parser map has pi/ohmypi/codex/acp/kimi but no 'claude' entry, and parseEntireConversation takes an options arg, so FR-1's Claude initial full parse will need the union and payload extended.",
@@ -132,7 +132,9 @@
         "tests/unit/dashboard/transcript-parse-worker.test.ts"
       ],
       "recordedAt": "2026-08-16T19:49:22.663Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-22T16:52:02.019Z"
   },
   "closeOut": {
     "usage": {
@@ -202,7 +204,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3756"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-22T16:52:02.032Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a578b38330092ebc5a8539f7def3c2fbf0b7bc78",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3756 MERGED at 2026-08-17T10:19:00Z",
+          "status": "pass",
+          "mergedAt": "2026-08-17T10:19:00Z",
+          "mergeCommit": "4289c4b41c5195e0bb9612746a9232e5a1d1062e"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on 4289c4b41c5195e0bb9612746a9232e5a1d1062e: test, lint, build (22), guard; verified on main by later green CI run d94a2311cb92d96a246701376c52efb145d70dc1 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 35633dab contains merge 4289c4b4",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 9 agent state directories (17 transcript files preserved); No strike branch strike/pan-3752 found; Pruned 46 checkpoint ref(s) for agent-pan-3752, planning-pan-3752, strike-pan-3752; No specialist registry entries for PAN-3752"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
