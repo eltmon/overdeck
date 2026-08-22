@@ -43,6 +43,20 @@
       "filesRemoved": [
         "lifecycle.log"
       ]
+    },
+    {
+      "at": "2026-08-22T18:55:00.340Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed",
+        "liveTmux": false,
+        "openChangeRequest": false,
+        "inFlightReviewOrTest": false
+      },
+      "filesRemoved": [
+        "lifecycle.log"
+      ]
     }
   ],
   "archiveRef": null,
