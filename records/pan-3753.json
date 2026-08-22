@@ -208,7 +208,7 @@
     "recordedAt": "2026-08-16T21:15:27.529Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-22T15:50:11.931Z",
+  "updated": "2026-08-22T16:52:07.010Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "passed",
@@ -219,7 +219,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-22T15:50:09.490Z",
+    "updatedAt": "2026-08-22T16:52:06.999Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Ran against reviewed HEAD a8b038b478 (matches PR #3757 headRefOid; review synthesis APPROVED cycle 4). npm run typecheck: exit 0. npm run lint: exit 0 (all guards incl. circular-deps 55/0new, effect-diagnostics 308/0new). npm test: 1479 test files/13947 tests passed (4 files/51 tests skipped) + dashboard-frontend subset 4 files/64 tests passed; overall exit 0. This resolves the prior FAILED verdict (missing retired_at column in the fresh-db migration) -- a8b038b478 fixed it. UAT not required: xBRIEF NonGoals state 'No flywheel UI row change', all 8 items are kind backend/api/docs, disposition surfaces via the pre-existing pipelineMembership DTO.",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
@@ -319,7 +319,9 @@
         "tests/unit/scripts/create-overdeck-db.test.ts"
       ],
       "recordedAt": "2026-08-16T21:15:27.529Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-22T16:52:06.999Z"
   },
   "closeOut": {
     "usage": {
@@ -389,7 +391,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3757"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-22T16:52:07.010Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a8b038b478bfbe40bc40fbddbd948de01dfe5bde",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3757 MERGED at 2026-08-17T10:19:00Z",
+          "status": "pass",
+          "mergedAt": "2026-08-17T10:19:00Z",
+          "mergeCommit": "c53c45f81cf7ccc13a59d9f2e061c9f35531a22b"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on c53c45f81cf7ccc13a59d9f2e061c9f35531a22b: test, lint, build (22), guard; verified on main by later green CI run d94a2311cb92d96a246701376c52efb145d70dc1 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 35633dab contains merge c53c45f8",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 9 agent state directories (17 transcript files preserved); No strike branch strike/pan-3753 found; Pruned 71 checkpoint ref(s) for agent-pan-3753, planning-pan-3753, strike-pan-3753; No specialist registry entries for PAN-3753"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
