@@ -208,7 +208,7 @@
     "recordedAt": "2026-08-16T21:15:27.529Z"
   },
   "created": "2026-08-16T17:58:15.519Z",
-  "updated": "2026-08-21T23:13:45.889Z",
+  "updated": "2026-08-22T00:17:26.951Z",
   "pipeline": {
     "issueId": "PAN-3753",
     "reviewStatus": "passed",
@@ -219,7 +219,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-21T23:13:39.706Z",
+    "updatedAt": "2026-08-22T00:17:26.926Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Ran against reviewed HEAD a8b038b478 (matches PR #3757 headRefOid; review synthesis APPROVED cycle 4). npm run typecheck: exit 0. npm run lint: exit 0 (all guards incl. circular-deps 55/0new, effect-diagnostics 308/0new). npm test: 1479 test files/13947 tests passed (4 files/51 tests skipped) + dashboard-frontend subset 4 files/64 tests passed; overall exit 0. This resolves the prior FAILED verdict (missing retired_at column in the fresh-db migration) -- a8b038b478 fixed it. UAT not required: xBRIEF NonGoals state 'No flywheel UI row change', all 8 items are kind backend/api/docs, disposition surfaces via the pre-existing pipelineMembership DTO.",
     "inspectNotes": "All 4 ACs verified in the tree at 8c5fc6a8 (this commit is comment-only, behaviorally a no-op; v65 DDL preserved). AC1: deacon-merge.ts:388-394 closed-unmerged branch writes retiredAt+readyForMerge:false and never touches mergeStatus. AC2: deacon-merge.ts:464 retires when isMergeEligible is false, and merge-eligibility.ts:25 is exactly bucket==='in_flight'. AC3: review-status.ts:245-249 freshPrIdentity clears retiredAt on a differing prNumber/prUrl and persists it on the same prNumber; the DB upsert writes retired_at=null and the journal cannot resurrect it (retiredAt is absent from durableSubset). AC4: review-status.ts:60 returns eligible:false reason 'retired'; loadReadyForMergeFlags (review-status.ts:120-128) preserves retiredAt through the journal+DB merge and forces the flag false. Non-blocking observations: (1) reconcileJournalIntoCacheSync (review-status-reconcile.ts:109) recomputes readyForMerge WITHOUT the retiredAt term that loadReadyForMergeFlags has, so a journal-newer read can flip the flag back to true on a retired record - mergeGateEligibility still blocks the merge, but the two read paths disagree; (2) this commit deleted the v65 migration comment explaining what retired_at means, the only in-code doc for the field, to fit the size gate.",
@@ -383,7 +383,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.651706000000004,
-        "pricingAsOf": "2026-08-21T23:13:39.803Z"
+        "pricingAsOf": "2026-08-22T00:17:26.932Z"
       }
     },
     "merges": [
