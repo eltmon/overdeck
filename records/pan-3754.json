@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-16T18:32:02.394Z"
   },
   "created": "2026-08-16T17:58:49.533Z",
-  "updated": "2026-08-22T15:50:09.641Z",
+  "updated": "2026-08-22T16:52:02.953Z",
   "pipeline": {
     "issueId": "PAN-3754",
     "reviewStatus": "passed",
@@ -99,7 +99,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-16T19:59:49.647Z",
-    "updatedAt": "2026-08-22T15:50:09.488Z",
+    "updatedAt": "2026-08-22T16:52:02.940Z",
     "testNotes": "Automated gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3754 on branch feature/pan-3754. npm run typecheck: clean (tsc --noEmit, hooks, evals, dashboard-types guard, frontend-types guard, acp all pass, no new errors). npm run lint: clean (eslint + all repo lint gates including state-write/state-path/pipeline-membership/workspace-doors/file-size/circular-deps/ratchet-audit/quarantine-audit/effect-diagnostics all pass with 0 new findings). Full suite `npx vitest run --configLoader runner`: 1476 test files passed, 4 skipped; 13943 tests passed, 51 skipped, 0 failed (577s). Diff vs origin/main (local main ref was stale, verified against fetched origin/main) touches only src/lib/cloister/memory-governor.ts, memory-pressure-patrol.ts, memory-verdict-cache.ts, src/lib/config-yaml/{schema,defaults,merge}.ts, docs/RESOURCE-GOVERNOR.md, scripts/file-size-allowlist.txt, and their tests — matches xBRIEF declared scope plus the two audited scope-drift files (file-size-allowlist.txt, tests/lib/config-yaml.test.ts) already noted in the record. No UI/dashboard files touched; UAT not required per xBRIEF NonGoals ('No frontend/dashboard UI changes — activity.entry rendering already handles the messages') and confirmed by the file-scoped diff.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3755",
     "reviewedAtCommit": "f6d0093074bf2aeb267bea104fdbd9e2a4982b67",
@@ -137,7 +137,9 @@
         "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
       ],
       "recordedAt": "2026-08-16T18:32:02.394Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-22T16:52:02.940Z"
   },
   "closeOut": {
     "usage": {
@@ -193,7 +195,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3755"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-22T16:52:02.952Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at f6d0093074bf2aeb267bea104fdbd9e2a4982b67",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3755 MERGED at 2026-08-17T10:19:00Z",
+          "status": "pass",
+          "mergedAt": "2026-08-17T10:19:00Z",
+          "mergeCommit": "c53c45f81cf7ccc13a59d9f2e061c9f35531a22b"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "missing required checks on c53c45f81cf7ccc13a59d9f2e061c9f35531a22b: test, lint, build (22), guard; verified on main by later green CI run d94a2311cb92d96a246701376c52efb145d70dc1 containing the merge (required checks concluded successfully: test, lint, build (22), guard)",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 35633dab contains merge c53c45f8",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (15 transcript files preserved); No strike branch strike/pan-3754 found; Pruned 23 checkpoint ref(s) for agent-pan-3754, planning-pan-3754, strike-pan-3754; No specialist registry entries for PAN-3754"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
