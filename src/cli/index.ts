@@ -437,6 +437,7 @@ program
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--issue <id>', 'Issue ID to associate with the new conversation')
+  .option('--title <title>', 'Title for the new conversation; defaults to "Handoff: <focus>" (first ~70 chars) or "Handoff: <source title>" without focus')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
   .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
