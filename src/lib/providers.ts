@@ -175,7 +175,11 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenRouter',
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
-    baseUrl: 'https://openrouter.ai/api/v1',
+    // Claude Code appends /v1/messages to ANTHROPIC_BASE_URL, so this must NOT
+    // end in /v1 — 'https://openrouter.ai/api/v1' produced /api/v1/v1/messages
+    // 404s that surfaced as "model may not exist". Pi ignores this var (it
+    // auths via OPENROUTER_API_KEY through its own provider registry).
+    baseUrl: 'https://openrouter.ai/api',
     authType: 'static',
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
     tested: true,

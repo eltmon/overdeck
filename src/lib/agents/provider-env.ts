@@ -8,7 +8,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
-import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -142,6 +142,20 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
   if (provider.name === 'anthropic') return {};
 
   const resolvedModel = resolveModelIdSync(model);
+  // OpenRouter models are unknown to Claude Code, which assumes a 200K window
+  // for unrecognized ids. Pin both vars (K3 precedent — only
+  // CLAUDE_CODE_MAX_CONTEXT_TOKENS is verified to lift the 200K assumption;
+  // CLAUDE_CODE_AUTO_COMPACT_WINDOW keeps the PAN-2441 compaction pin aligned).
+  if (provider.name === 'openrouter') {
+    const openrouterWindow = OPENROUTER_MODEL_CONTEXT_WINDOWS[resolvedModel];
+    if (openrouterWindow !== undefined) {
+      return {
+        autoCompactWindow: openrouterWindow,
+        maxContextTokens: openrouterWindow,
+      };
+    }
+    return {};
+  }
   if (GPT_56_LONG_MODELS.has(resolvedModel)) {
     return {
       autoCompactWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,

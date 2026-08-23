@@ -110,7 +110,7 @@ type CapabilityModelId = ModelId;
 
 // CLIProxy context ceilings live in their own module so this table stays a table;
 // re-exported here because they are part of the capability contract.
-export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
+export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
 
 export interface ModelCapability {
   /** Model identifier */

@@ -80,6 +80,20 @@ export const GPT56_LONG_CONTEXT_VARIANTS: Record<string, string> = {
   'gpt-5.6-luna[372k]': 'gpt-5.6-luna',
 };
 
+/**
+ * Context-window pins for OpenRouter models launched under the claude-code
+ * harness. OpenRouter's catalog is dynamic, but the harness env pin
+ * (CLAUDE_CODE_MAX_CONTEXT_TOKENS / CLAUDE_CODE_AUTO_COMPACT_WINDOW) is
+ * resolved synchronously at launcher-generation time, so models the fleet
+ * depends on get a static entry here, sourced from OpenRouter's
+ * /api/v1/models `context_length`. Claude Code does not recognize these ids
+ * and would otherwise assume a 200K window. Models absent from this map get
+ * no pin (Claude Code's 200K default applies).
+ */
+export const OPENROUTER_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'stealth/ox-alpha': 1_048_576,
+};
+
 /** True when `modelId` is an Overdeck-side GPT-5.6 long-context variant. */
 export function isGpt56LongContextVariantSync(modelId: string): boolean {
   return modelId in GPT56_LONG_CONTEXT_VARIANTS;
