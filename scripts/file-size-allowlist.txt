@@ -64,3 +64,4 @@
 1170 src/lib/cloister/deacon-swarm.ts # PAN-3690
 1370 src/cli/index.ts # PAN-3729
 1070 src/dashboard/server/routes/conversations.ts # PAN-3766
+1525 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3767

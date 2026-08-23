@@ -408,13 +408,22 @@ export function ConversationPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, harness }),
-      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
+      }).then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => null) as { error?: string } | null;
+          throw new Error(body?.error || `Failed to switch model (${r.status})`);
+        }
+        return r.json();
+      });
     },
     onSuccess: (_, { model, harness }) => {
       saveStoredModel(model);
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
     },
   });
 
