@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-08-14T02:41:29.854Z",
-  "updated": "2026-08-24T09:55:04.769Z",
+  "updated": "2026-08-24T10:07:03.524Z",
   "pipeline": {
     "issueId": "PAN-3695",
     "reviewStatus": "pending",
@@ -163,6 +163,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-23T14:35:11.433Z"
+    },
+    {
+      "issue": "PAN-3695",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-08-24T09:55:04.755Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-24T10:07:03.522Z"
     }
   ]
 }
