@@ -98,12 +98,26 @@ export async function summarizeConversationActivity(
   // nothing for a while); during a real in-progress compaction the PreCompact
   // hook's activity event keeps the card "working" independently.
   const workingFileRecent = Date.now() - mtimeMs < WORKING_STALENESS_MS;
+  // Codex-style gap signal (PAN-3770): harnesses that append COMPLETE messages
+  // mid-turn narrate ("Checking the branch first.") before running tools, so a
+  // completed-looking tail plus tool/workLog activity newer than the last
+  // message still means working. Recency-guarded like everything above.
+  const lastWork = workLog[workLog.length - 1];
+  let workGapWorking = false;
+  if (lastWork) {
+    const workTs = Date.parse(lastWork.createdAt || '');
+    if (!Number.isNaN(workTs) && Date.now() - workTs < WORKING_STALENESS_MS) {
+      const msgTs = Date.parse(lastMsg?.completedAt || lastMsg?.createdAt || '');
+      workGapWorking = Number.isNaN(msgTs) || workTs >= msgTs;
+    }
+  }
   const isWorking = workingFileRecent && !lastTurnCompletedAt && (
     streaming ||
     pendingToolUse.size > 0 ||
     messages.length === 0 ||
     lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt));
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt) ||
+    workGapWorking);
 
   // Find the most recent pending tool (tool_use sent but tool_result not yet received).
   // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for

@@ -5,7 +5,7 @@
  * uses to pick an appropriate icon and tooltip for the active spinner.
  */
 
-import type { WorkLogEntry } from '../components/chat/chat-types';
+import type { ChatMessage, WorkLogEntry } from '../components/chat/chat-types';
 
 // ─── Phase types ─────────────────────────────────────────────────────────────
 
@@ -162,4 +162,51 @@ export function getPendingToolEntry(workLog: WorkLogEntry[]): WorkLogEntry | und
     if (entry.tone === 'tool' && !entry.result) return entry;
   }
   return undefined;
+}
+
+// ─── Working detection ───────────────────────────────────────────────────────
+
+/**
+ * How long after the newest transcript activity a conversation may still count
+ * as "working" — bounds false positives from stale tails (PAN-1635 pattern).
+ */
+export const TURN_STALL_MS = 4 * 60_000;
+
+/**
+ * Whether the conversation's transcript implies the agent is mid-turn.
+ *
+ * Two signals, in priority order:
+ *  1. Message shape (Claude-style streaming): the last message is a user
+ *     prompt, or an assistant turn that has no `completedAt` yet. Recency-
+ *     guarded so a stale tail can't spin forever.
+ *  2. Work-log gap (Codex-style, PAN-3770): harnesses that append COMPLETE
+ *     messages mid-turn narrate ("Checking...") before running tools, so tool
+ *     activity newer than the last message means the turn continues even
+ *     though the transcript tail looks completed. Also recency-guarded.
+ */
+export function isConversationWorking(
+  sessionAlive: boolean,
+  messages: ChatMessage[],
+  workLog: WorkLogEntry[],
+  nowMs: number = Date.now(),
+): boolean {
+  if (!sessionAlive) return false;
+  const lastMsg = messages[messages.length - 1];
+  const lastWork = workLog[workLog.length - 1];
+  // Startup: nothing on record yet.
+  if (!lastMsg && !lastWork) return true;
+
+  const msgTs = Date.parse(lastMsg?.completedAt || lastMsg?.createdAt || '');
+  const msgRecent = !lastMsg || Number.isNaN(msgTs) || nowMs - msgTs < TURN_STALL_MS;
+  if (msgRecent && (lastMsg?.role === 'user' || (lastMsg?.role === 'assistant' && !lastMsg.completedAt))) {
+    return true;
+  }
+
+  if (!lastWork) return false;
+  const workTs = Date.parse(lastWork.createdAt || '');
+  if (Number.isNaN(workTs) || nowMs - workTs >= TURN_STALL_MS) return false;
+  // No message to compare against, or an unparseable one: fresh tool activity
+  // alone counts as working.
+  if (!lastMsg || Number.isNaN(msgTs)) return true;
+  return workTs >= msgTs;
 }

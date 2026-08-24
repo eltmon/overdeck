@@ -106,6 +106,11 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
   const toolCallsByCallId = new Map<string, WorkLogEntry>();
   let totalTokens = 0;
   let sequence = 0;
+  // The trailing agent_message, if the file ends on one. Codex narrates
+  // mid-turn ("Checking the branch first.") before running tools, so a
+  // completed-looking assistant message does NOT mean the turn ended — only a
+  // message with no tool activity after it does (PAN-3770 spinner fix).
+  let trailingAgentMessageAt: string | undefined;
 
   for (const line of lines) {
     let entry: CodexEntry;
@@ -125,6 +130,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
         const text = typeof payload.message === 'string' ? payload.message.trim() : '';
         if (!text) continue;
         sequence += 1;
+        trailingAgentMessageAt = ptype === 'agent_message' ? createdAt : undefined;
         messages.push({
           id: `codex-${ptype === 'user_message' ? 'user' : 'agent'}-${sequence}`,
           role: ptype === 'user_message' ? 'user' : 'assistant',
@@ -148,6 +154,8 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
 
     if (entry.type === 'response_item') {
       if (ptype === 'function_call' || ptype === 'custom_tool_call') {
+        // Tool activity after a narration message means the turn continues.
+        trailingAgentMessageAt = undefined;
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
         const name = typeof payload.name === 'string' ? payload.name : 'tool';
         const args = typeof payload.arguments === 'string'
@@ -206,6 +214,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
     messages,
     workLog,
     byteOffset: fileStats.size,
+    lastTurnCompletedAt: trailingAgentMessageAt,
     streaming,
     totalCost,
     totalTokens,

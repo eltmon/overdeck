@@ -25,7 +25,7 @@ import {
   useConversationOptimistic,
   useConversationOptimisticBaseCount,
 } from '../../lib/composerStore';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, TURN_STALL_MS, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -49,8 +49,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 // stalled, not working. Covers a slow compaction + response (a Claude-native
 // /compact here ran ~128s before any follow-up); finite so a prompt that was
 // eaten by submit-time compaction can't strand the spinner forever.
-const TURN_STALL_MS = 4 * 60_000;
-
+// Now lives in lib/workingPhase.ts alongside isConversationWorking (PAN-3770).
 /**
  * How long a conversation row may show "Starting…" without a live session.
  * Genuine spawns are seconds-to-a-couple-minutes; anything older with no
@@ -65,17 +64,6 @@ function isWithinSpawnWindow(createdAt: string | null | undefined, nowMs = Date.
   if (!createdAt) return false;
   const createdMs = Date.parse(createdAt);
   return Number.isFinite(createdMs) && nowMs - createdMs < SPAWN_PLACEHOLDER_MAX_AGE_MS;
-}
-
-/**
- * Whether the conversation's latest transcript entry is recent enough that the
- * agent could still be mid-turn. Empty/loading history counts as recent (startup).
- */
-function lastActivityRecent(lastMsg: ChatMessage | undefined): boolean {
-  if (!lastMsg) return true;
-  const ts = Date.parse(lastMsg.completedAt || lastMsg.createdAt || '');
-  if (Number.isNaN(ts)) return true;
-  return Date.now() - ts < TURN_STALL_MS;
 }
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -257,23 +245,19 @@ export function ConversationPanel({
   const { selectedAgentId: selectedSubagentId, selectedSubagent, clearSelection: clearSubagent } = useSubagentSelection(subagents);
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
-  const headerLastMsg = headerMessages[headerMessages.length - 1];
   const canSwitchConversationModel =
     !agentId &&
     !conversation.sessionAlive &&
     !conversation.claudeSessionId &&
     headerMessages.length === 0;
-  // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
-  // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
-  // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
-  // recent — otherwise a prompt eaten by submit-time compaction spins the header forever.
-  const isWorking = conversation.sessionAlive && (
-    messagesData == null ||
-    headerMessages.length === 0 ||
-    (lastActivityRecent(headerLastMsg) && (
-      headerLastMsg?.role === 'user' ||
-      (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
-    ))
+  // Spin unless truly idle. Message shape (trailing user / incomplete
+  // assistant) plus, for harnesses that append complete messages mid-turn
+  // (Codex narrates before tool runs), recent work-log activity newer than
+  // the last message. PAN-3770; recency guards per PAN-1635.
+  const isWorking = isConversationWorking(
+    conversation.sessionAlive,
+    messagesData == null ? [] : headerMessages,
+    headerWorkLog,
   );
   const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
@@ -1336,17 +1320,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
   // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
-  const lastMsg = messages[messages.length - 1];
-  // PAN-1635: an in-progress compaction keeps us working; otherwise a trailing
-  // user/incomplete-assistant entry only implies "working" while it's recent, so a
-  // prompt eaten by Claude's submit-time compaction can't spin the panel forever.
-  const isWorking = conversation.sessionAlive && (
-    isCompacting ||
-    messages.length === 0 ||
-    (lastActivityRecent(lastMsg) && (
-      lastMsg?.role === 'user' ||
-      (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
-    ))
+  // PAN-1635: an in-progress compaction keeps us working; otherwise the shared
+  // helper applies message shape plus the Codex-style work-log gap signal
+  // (recent tool activity newer than the last completed message, PAN-3770).
+  const isWorking = isCompacting || isConversationWorking(
+    conversation.sessionAlive,
+    messages,
+    workLog,
   );
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;

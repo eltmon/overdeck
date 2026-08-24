@@ -104,4 +104,36 @@ describe('codex conversation parser', () => {
     expect(result.isWorking).toBe(true);
     expect(result.currentTool).toBe('Shell');
   });
+
+  it('keeps a narrated mid-turn Codex conversation "working" while tools run after the last message', async () => {
+    // The bug in PAN-3770: codex narrates ("Checking the branch first.") and
+    // then runs tools. The completed-looking assistant message must not end
+    // the turn while tool activity follows it.
+    const midTurnFile = join(dir, 'rollout-mid-turn.jsonl');
+    const lines = [
+      { type: 'event_msg', timestamp: new Date(Date.now() - 30_000).toISOString(), payload: { type: 'user_message', message: 'check the config' } },
+      { type: 'event_msg', timestamp: new Date(Date.now() - 25_000).toISOString(), payload: { type: 'agent_message', message: 'Checking the branch first.' } },
+      { type: 'response_item', timestamp: new Date(Date.now() - 20_000).toISOString(), payload: { type: 'function_call', name: 'exec_command', arguments: JSON.stringify({ cmd: 'git status' }), call_id: 'call_mid' } },
+      { type: 'response_item', timestamp: new Date(Date.now() - 15_000).toISOString(), payload: { type: 'function_call_output', call_id: 'call_mid', output: 'Output:\nclean\n' } },
+    ];
+    await writeFile(midTurnFile, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+
+    const result = await summarizeConversationActivity(midTurnFile, { harness: 'codex' });
+    expect(result.isWorking).toBe(true);
+  });
+
+  it('marks a Codex turn complete when the final agent message trails all tool activity', async () => {
+    const doneFile = join(dir, 'rollout-done.jsonl');
+    const lines = [
+      { type: 'event_msg', timestamp: new Date(Date.now() - 60_000).toISOString(), payload: { type: 'user_message', message: 'fix the bug' } },
+      { type: 'response_item', timestamp: new Date(Date.now() - 50_000).toISOString(), payload: { type: 'function_call', name: 'exec_command', arguments: JSON.stringify({ cmd: 'git status' }), call_id: 'call_done' } },
+      { type: 'event_msg', timestamp: new Date(Date.now() - 5_000).toISOString(), payload: { type: 'agent_message', message: 'Done.' } },
+      // usage tail after the final message is normal and must not un-complete the turn
+      { type: 'event_msg', timestamp: new Date(Date.now() - 4_000).toISOString(), payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } } },
+    ];
+    await writeFile(doneFile, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+
+    const result = await summarizeConversationActivity(doneFile, { harness: 'codex' });
+    expect(result.isWorking).toBe(false);
+  });
 });
