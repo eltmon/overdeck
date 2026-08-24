@@ -9,6 +9,7 @@ import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { RunningAgentsPill } from '../components/RunningAgentsPill';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
+import { ConversationSearchBanner } from '../components/ConversationSearchBanner';
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
 import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
@@ -93,6 +94,10 @@ export function AppChrome({
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
         <CodexAuthBanner />
+
+        {/* Conversation Search Banner — shown when transcript indexing/palette
+            search cannot run (no API key, out of credits, quota, network) */}
+        <ConversationSearchBanner />
 
         {/* inotify file-watcher budget nearly exhausted — new dev servers
             would fail with ENOSPC (PAN-3063) */}

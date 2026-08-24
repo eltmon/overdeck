@@ -50,6 +50,7 @@ import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { getConversationSearchHealth, recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 import { getLegacyHome } from '../../../lib/paths.js';
 import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
@@ -747,6 +748,9 @@ const getConversationSearchStatusRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const config = getConversationSearchConfigSync();
+        // Runtime embed failures (exhausted credits, quota, network) are recorded
+        // by the search service and watcher; surface them in every shape (PAN-3771).
+        const health = getConversationSearchHealth();
         if (!config.enabled) {
           return jsonResponse({
             enabled: false,
@@ -756,6 +760,7 @@ const getConversationSearchStatusRoute = HttpRouter.add(
             chunkCount: 0,
             indexedFileCount: 0,
             lastIndexedAt: null,
+            health,
           });
         }
 
@@ -769,6 +774,7 @@ const getConversationSearchStatusRoute = HttpRouter.add(
             chunkCount: 0,
             indexedFileCount: 0,
             lastIndexedAt: null,
+            health,
           });
         }
 
@@ -781,6 +787,7 @@ const getConversationSearchStatusRoute = HttpRouter.add(
             unavailableReason: db.unavailableReason,
             dbPath: config.dbPath,
             ...stats,
+            health,
           });
         } finally {
           db.close();
@@ -853,7 +860,17 @@ const postConversationSearchReindexRoute = HttpRouter.add(
               conversationReindexProgress = { active: true, startedAt: conversationReindexProgress.startedAt, ...p };
             },
           });
+          // PAN-3771: feed reindex outcomes into the banner health state.
+          const firstError = result.errors[0];
+          if (firstError) {
+            recordConversationSearchFailure(firstError.message);
+          } else if (!result.disabled) {
+            recordConversationSearchSuccess();
+          }
           return jsonResponse(result);
+        } catch (error) {
+          recordConversationSearchFailure(error);
+          throw error;
         } finally {
           conversationReindexProgress = { ...conversationReindexProgress, active: false };
           await syncConversationSearchWatcher();

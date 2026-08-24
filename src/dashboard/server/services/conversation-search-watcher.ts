@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
@@ -105,7 +106,14 @@ export class ConversationSearchWatcher {
         if (signal.aborted || this.stopped) return;
         if (result.disabled) {
           this.log.warn(`[conversation-search] startup index skipped: ${result.unavailableReason ?? 'disabled'}`);
+        } else if (result.errors.length > 0) {
+          // PAN-3771: surface per-file embed failures (e.g. exhausted credits)
+          // through the health state instead of only the log.
+          recordConversationSearchFailure(result.errors[result.errors.length - 1]?.message ?? 'startup indexing reported errors');
+          const prunedNote = result.sessionsPruned > 0 ? `, pruned ${result.sessionsPruned} stale session${result.sessionsPruned === 1 ? '' : 's'}` : '';
+          this.log.warn(`[conversation-search] startup indexed with ${result.errors.length} error${result.errors.length === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}${prunedNote}: ${result.errors[0]?.message}`);
         } else {
+          recordConversationSearchSuccess();
           const prunedNote = result.sessionsPruned > 0 ? `, pruned ${result.sessionsPruned} stale session${result.sessionsPruned === 1 ? '' : 's'}` : '';
           this.log.log(`[conversation-search] startup indexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}${prunedNote}`);
         }
@@ -201,8 +209,19 @@ export class ConversationSearchWatcher {
       this.inFlight.add(filePath);
       this.activeIndexers += 1;
       const task = this.indexFile({ filePath, config: this.config, signal })
-        .catch((error) => {
-          if (!isAbortError(error)) this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
+        .then((result) => {
+          if (result.disabled) return;
+          const firstError = result.errors[0];
+          if (firstError) {
+            recordConversationSearchFailure(firstError.message);
+          } else {
+            recordConversationSearchSuccess();
+          }
+        }, (error) => {
+          if (!isAbortError(error)) {
+            recordConversationSearchFailure(error);
+            this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
+          }
         })
         .finally(() => {
           this.activeTasks.delete(task);
