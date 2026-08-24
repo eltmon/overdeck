@@ -136,8 +136,10 @@ describe('providers', () => {
 
   it('routes OpenRouter through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.openrouter.compatibility).toBe('direct');
+    // The harness appends /v1/messages itself, so the base URL must NOT end
+    // in /v1 — '/api/v1' produced /api/v1/v1/messages (707089c5711).
     expect(getProviderEnvSync(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
-      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1',
+      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
       OPENROUTER_API_KEY: 'sk-or-test',
     });
