@@ -117,6 +117,8 @@ Type to filter. Press `Enter` to execute, `Escape` to close.
 
 Conversation results default to newest-first order. Use the **Newest first** toggle in the palette footer to switch to relevance-rank order; the choice persists per browser.
 
+Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette shows no conversation hits.
+
 The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
 
 ---

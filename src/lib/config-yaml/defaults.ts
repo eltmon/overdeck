@@ -114,7 +114,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     },
   },
   conversationSearch: {
-    enabled: false,
+    enabled: true,
     provider: 'openai',
     model: 'text-embedding-3-small',
     apiKeyRef: undefined,

@@ -23,11 +23,11 @@ vi.mock('fs', async (importOriginal) => {
 import { getConversationSearchConfigSync, loadConfigSync, mergeConfigs } from '../config-yaml.js';
 
 describe('conversationSearch configuration', () => {
-  it('defaults to disabled with openai provider and text-embedding-3-small', () => {
+  it('defaults to enabled with openai provider and text-embedding-3-small', () => {
     const { config } = mergeConfigs({});
 
     expect(config.conversationSearch).toEqual({
-      enabled: false,
+      enabled: true,
       provider: 'openai',
       model: 'text-embedding-3-small',
       apiKeyRef: undefined,
@@ -36,8 +36,8 @@ describe('conversationSearch configuration', () => {
   });
 
   it('merges enabled flag from YAML', () => {
-    const { config } = mergeConfigs({ conversationSearch: { enabled: true } });
-    expect(config.conversationSearch.enabled).toBe(true);
+    const { config } = mergeConfigs({ conversationSearch: { enabled: false } });
+    expect(config.conversationSearch.enabled).toBe(false);
   });
 
   it('merges provider, model, apiKeyRef, and dbPath overrides', () => {
