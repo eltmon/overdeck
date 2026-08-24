@@ -155,7 +155,12 @@ export function ConversationPanel({
   hideComposer = false,
   onSendFailed,
 }: ConversationPanelProps) {
-  const [resumed, setResumed] = useState(false);
+  // Resume-click latch: bridges the gap between a successful resume POST and
+  // the conversations poll reporting the session alive (up to one poll tick).
+  // Spent as soon as the server confirms the session — alive, or endedAt
+  // stamped because the resumed session died again — so a twice-stopped
+  // conversation gets its resume bar back instead of a read-only composer.
+  const [resumedAwaitingConfirm, setResumedAwaitingConfirm] = useState(false);
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -216,6 +221,25 @@ export function ConversationPanel({
       void queryClient.cancelQueries({ queryKey: messagesQueryKey });
     }
   }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
+
+  // The resume latch is spent once the poll confirms the resumed session came
+  // alive. Clearing on endedAt instead would let a stale pre-resume row
+  // (still carrying the previous death's endedAt) kill the bridge during the
+  // click→poll window. Without this effect, a session that stopped a second
+  // time left `showTerminal` — and with it the composer-vs-resume-bar choice
+  // — pinned until a full browser refresh.
+  useEffect(() => {
+    if (resumedAwaitingConfirm && conversation.sessionAlive) {
+      setResumedAwaitingConfirm(false);
+    }
+  }, [resumedAwaitingConfirm, conversation.sessionAlive]);
+
+  // A ConversationPanel instance can be reused for a different conversation
+  // (drawer / flywheel embeds switch the row in place) — never carry a resume
+  // latch across conversations.
+  useEffect(() => {
+    setResumedAwaitingConfirm(false);
+  }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
   // Live claude-code conversations are pushed through useConversationMessagesStream;
@@ -379,9 +403,11 @@ export function ConversationPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
-      // PAN-2975: the resume bar reports the actual outcome too.
+      // PAN-2975: the resume bar reports the actual outcome too. The latch is
+      // only a bridge until the poll confirms the session — see the
+      // resumedAwaitingConfirm clear effect below.
       toastResumeOutcome(conversation.name);
-      setResumed(true);
+      setResumedAwaitingConfirm(true);
     },
   });
 
@@ -611,7 +637,7 @@ export function ConversationPanel({
     }
   }, [conversation.handoffTargetConvId]);
 
-  const showTerminal = conversation.sessionAlive || resumed;
+  const showTerminal = conversation.sessionAlive || resumedAwaitingConfirm;
   // Diff deep-links are transcript-oriented. If this pane was previously left in
   // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
   // and looks like a reconnect loop when the user only asked to inspect a diff.
