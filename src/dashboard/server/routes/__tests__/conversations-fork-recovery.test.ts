@@ -49,7 +49,7 @@ async function resetDb() {
   closeOverdeckDatabaseSync();
 }
 
-async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain' } = {}) {
+async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain'; title?: string } = {}) {
   const { createConversation, setForkRequest } = await import('../../../../lib/overdeck/conversations.js');
   const { buildForkRequest } = await import('../../../../lib/overdeck/conversation-forks.js');
 
@@ -77,6 +77,7 @@ async function createForkPair(options: { forkStatus?: string; forkMode?: 'summar
     localSummaryOnly: false,
     includeThinkingInSummary: false,
     handoffAuthor: 'external',
+    ...(options.title !== undefined ? { title: options.title } : {}),
   })));
   return { parent, fork };
 }
@@ -296,5 +297,56 @@ describe('fork pipeline recovery and re-entry', () => {
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith('conv-fork-conv', docText, 'handoff', 'auto');
     expect(recovered?.forkStatus).toBeNull();
     expect(recovered?.forkRetryCount).toBe(1);
+  });
+});
+
+describe('fork pipeline custom title (PAN-3774)', () => {
+  function mockHandoffAuthoring(fileName: string, docText: string) {
+    const docPath = join(TEST_HOME, fileName);
+    mocks.authorHandoffExternal.mockImplementation(async () => {
+      writeFileSync(docPath, docText);
+      return { docText, docPath };
+    });
+  }
+
+  it('keeps an operator-provided --title through handoff authoring instead of the focus-derived fallback', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
+    const { parent } = await createForkPair({ forkMode: 'handoff' });
+    mockHandoffAuthoring('titled-handoff.md', '## Handoff\n\nContinue the work.');
+
+    await runForkPipeline(
+      'fork-conv', parent, 'fork-session', undefined, 'handoff', false, false, undefined,
+      'Read /home/eltmon/Projects/lexerra-c2/.pan/handoff-brief.md FIRST and follow it exactly. Begin now.',
+      'external', undefined, undefined,
+      'C2 Mountains iter11 (crown anisotropy)',
+    );
+
+    expect(getConversationByName('fork-conv')?.title).toBe('C2 Mountains iter11 (crown anisotropy)');
+  });
+
+  it('keeps the custom title when a stuck fork is recovered from its persisted request', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff', title: 'Recovered custom title' });
+    mockHandoffAuthoring('recovered-handoff.md', '## Handoff\n\nRecovered.');
+
+    await expect(recoverStuckForks()).resolves.toBe(1);
+
+    expect(getConversationByName('fork-conv')?.title).toBe('Recovered custom title');
+  });
+
+  it('still derives the focus fallback when no custom title was given', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
+    const { parent } = await createForkPair({ forkMode: 'handoff' });
+    mockHandoffAuthoring('untitled-handoff.md', '## Handoff\n\nNo custom title.');
+
+    await runForkPipeline(
+      'fork-conv', parent, 'fork-session', undefined, 'handoff', false, false, undefined,
+      'Short focus text', 'external',
+    );
+
+    expect(getConversationByName('fork-conv')?.title).toBe('Handoff: Short focus text');
   });
 });

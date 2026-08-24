@@ -656,6 +656,10 @@ export interface ForkRequest {
   handoffAuthor: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
+  /** Operator-provided title (--title / fork modal). Authoritative: the
+   * pipeline must re-apply it after authoring instead of the focus-derived
+   * fallback (PAN-3774). */
+  title?: string;
 }
 
 export interface LegacyConversation {
