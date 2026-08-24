@@ -27,7 +27,7 @@ export function ConversationSearchBanner() {
   return (
     <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-center gap-3 shrink-0">
       <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0" />
-      <p className="text-warning-foreground text-sm font-semibold flex-1">
+      <p className="text-warning-foreground text-sm font-semibold flex-1 min-w-0 [&_span]:break-words">
         Conversation search is not working: <span className="font-normal">{reason}</span>
         <span className="font-normal ml-1 opacity-80">
           — Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.
