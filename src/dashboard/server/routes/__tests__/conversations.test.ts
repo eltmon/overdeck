@@ -537,6 +537,31 @@ async function withTestHome<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 describe('conversations route — DB integration', () => {
+  describe('conversation key resolution', () => {
+    it('renames conversations by numeric id and tmux session name', async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+      const { patchConversationTitle } = await import('../../../../lib/overdeck/conversation-reads.js');
+      const conversation = createConversation({
+        name: 'rename-target',
+        tmuxSession: 'conv-rename-target',
+        cwd: '/cwd',
+        title: 'Original title',
+      });
+
+      expect(patchConversationTitle(String(conversation.id), { title: 'Renamed by id' })).toEqual({
+        status: 200,
+        body: { success: true },
+      });
+      expect(getConversationByName('rename-target')?.title).toBe('Renamed by id');
+
+      expect(patchConversationTitle('conv-rename-target', { title: 'Renamed by tmux name' })).toEqual({
+        status: 200,
+        body: { success: true },
+      });
+      expect(getConversationByName('rename-target')?.title).toBe('Renamed by tmux name');
+    });
+  });
+
   describe('conversation live control endpoints', () => {
     afterEach(() => {
       clearPendingConversationControlAcksForTests();

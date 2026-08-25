@@ -26,6 +26,7 @@ import {
   getConversationByClaudeSessionId,
   getConversationById,
   getConversationByName,
+  getConversationByTmuxSession,
   listConversations,
   updateConversationCost,
   updateConversationTitle,
@@ -423,10 +424,7 @@ export async function getConversationRead(
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'tmuxSessionExists'>,
 ): Promise<ConversationReadResult> {
   try {
-    const numericId = Number(rawId);
-    const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
-      ? getConversationById(numericId)
-      : getConversationByName(rawId);
+    const conv = resolveConversationKey(rawId);
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const sessionAlive = conv.status === 'active' && !conv.forkStatus && await deps.tmuxSessionExists(conv.tmuxSession);
@@ -735,11 +733,19 @@ export async function generateAiTitle(
 
 const MAX_TITLE_LENGTH = 200;
 
+function resolveConversationKey(key: string): Conversation | null {
+  const numericId = Number(key);
+  if (!Number.isNaN(numericId) && /^\d+$/.test(key)) {
+    return getConversationById(numericId);
+  }
+  return getConversationByName(key) ?? getConversationByTmuxSession(key);
+}
+
 export function patchConversationTitle(
-  name: string,
+  key: string,
   body: Record<string, unknown>,
 ): { status: number; body: { success: true } | { error: string } } {
-  const conv = getConversationByName(name);
+  const conv = resolveConversationKey(key);
   if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
 
   if (typeof body.title === 'string' && body.title.trim()) {
@@ -747,7 +753,7 @@ export function patchConversationTitle(
     if (trimmed.length > MAX_TITLE_LENGTH) {
       return { status: 400, body: { error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters` } };
     }
-    updateConversationTitle(name, trimmed, 'manual');
+    updateConversationTitle(conv.name, trimmed, 'manual');
   }
 
   return { status: 200, body: { success: true } };
