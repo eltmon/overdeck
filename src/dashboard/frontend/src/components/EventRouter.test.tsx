@@ -279,7 +279,9 @@ describe('EventRouter memory updates', () => {
     warn.mockRestore()
   })
 
-  it('shows reconnect overlay on retries and hides it after reconnect', async () => {
+  it('keeps early retries banner-only and escalates to the blocking overlay when unreachable', async () => {
+    const reconnecting = vi.fn()
+    window.addEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
     render(<EventRouter />)
 
     await act(async () => {
@@ -288,10 +290,19 @@ describe('EventRouter memory updates', () => {
     expect(wsTransport.subscribeOptions?.onRetry).toBeTypeOf('function')
     expect(wsTransport.subscribeOptions?.onReconnect).toBeTypeOf('function')
 
+    // Early transient retries: reconnecting event fires (non-blocking banner),
+    // but the full-screen recovery overlay must NOT appear.
     act(() => {
       wsTransport.subscribeOptions!.onRetry!(1)
     })
-    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Reconnecting to the dashboard…')
+    expect(reconnecting).toHaveBeenCalled()
+    expect(document.getElementById('pan-recovery-overlay')).toBeNull()
+
+    // Persistent failure escalates to the blocking unreachable overlay.
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(6)
+    })
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
 
     await act(async () => {
       wsTransport.subscribeOptions!.onReconnect!()
@@ -299,6 +310,7 @@ describe('EventRouter memory updates', () => {
       await Promise.resolve()
     })
     expect(document.getElementById('pan-recovery-overlay')).toBeNull()
+    window.removeEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
   })
 
   it('re-bootstraps through the live transport before announcing recovery', async () => {

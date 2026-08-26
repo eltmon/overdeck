@@ -139,8 +139,9 @@ export function EventRouter() {
       stopStalenessWatchdog()
       stalenessTimeout = setTimeout(() => {
         console.warn('[EventRouter] domain event stream stale — scheduling reconnect')
+        // Transient blip: announce via the reconnecting event (non-blocking
+        // banner in BackendConnectionBoundary) — never the full-screen overlay.
         markBackendReconnecting()
-        showOverlay('Reconnecting to the dashboard…')
         scheduleReconnectDomainStream()
       }, STREAM_STALENESS_TIMEOUT_MS)
     }
@@ -304,12 +305,13 @@ export function EventRouter() {
             bootstrapWithReconnectRetry()
           },
           onRetry: (attempt) => {
+            // Early retries are transient: the reconnecting event drives a
+            // non-blocking banner. Escalate to the blocking overlay only once
+            // the server looks genuinely unreachable.
             markBackendReconnecting()
             if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {
               showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
-              return
             }
-            showOverlay('Reconnecting to the dashboard…')
           },
         },
       )

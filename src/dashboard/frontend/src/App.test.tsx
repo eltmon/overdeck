@@ -416,7 +416,7 @@ describe('App primary routing', () => {
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
-  it('suppresses definitive route states until EventRouter restores the snapshot', async () => {
+  it('keeps route views mounted with a banner during a transient stream reconnect', async () => {
     window.history.replaceState(null, '', '/command-deck/panopticon-cli');
     renderApp();
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
@@ -425,14 +425,17 @@ describe('App primary routing', () => {
       window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTING_EVENT));
     });
 
-    expect(screen.getByRole('status')).toHaveTextContent('Waiting for backend data');
-    expect(screen.queryByTestId('selected-project')).toBeNull();
+    // Transient reconnects must NOT tear down the UI (PAN-3373 regression):
+    // the route view stays mounted and a non-blocking banner announces it.
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+    expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
 
     act(() => {
       window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTED_EVENT));
     });
 
-    await waitFor(() => expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli'));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
   it('updates the URL when a command deck project is selected', () => {
