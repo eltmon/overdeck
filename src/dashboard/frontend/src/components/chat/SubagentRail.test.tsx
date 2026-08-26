@@ -63,7 +63,14 @@ describe('SubagentRail', () => {
     expect(screen.getByText('general-purpose')).toBeInTheDocument();
     expect(screen.getByText('depth 2')).toBeInTheDocument();
     expect(screen.getAllByLabelText('running')).toHaveLength(2); // main agent + Explore
-    expect(screen.getByLabelText('done')).toHaveClass('bg-muted-foreground/40');
+    // Active rows get a pulsing primary halo behind a solid dot; done rows stay a recessive static dot.
+    for (const indicator of screen.getAllByLabelText('running')) {
+      expect(indicator.querySelector('.animate-ping')).toBeInTheDocument();
+      expect(indicator.querySelector('.bg-primary')).toBeInTheDocument();
+    }
+    const done = screen.getByLabelText('done');
+    expect(done.querySelector('.animate-ping')).not.toBeInTheDocument();
+    expect(done.querySelector('.bg-muted-foreground\\/40')).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveClass('min-w-0');
   });
 

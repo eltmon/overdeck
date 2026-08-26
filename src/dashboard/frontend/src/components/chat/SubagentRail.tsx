@@ -129,10 +129,15 @@ function AgentRow({ label, description, status, depth, selected, onClick }: Agen
       className={`flex w-full items-start gap-2 border-b border-l-2 border-b-border px-3 py-2 text-left transition-colors ${selected ? 'border-l-primary bg-accent' : 'border-l-transparent hover:bg-accent'}`}
       onClick={onClick}
     >
-      <span
-        aria-label={status}
-        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${status === 'running' ? 'bg-primary' : 'bg-muted-foreground/40'}`}
-      />
+      <span aria-label={status} className="relative mt-1.5 flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+        {/* Live halo: the core dot stays solid so the row reads as active even at the ping's faded phase. */}
+        {status === 'running' && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+        )}
+        <span
+          className={`relative inline-flex rounded-full ${status === 'running' ? 'h-2.5 w-2.5 bg-primary' : 'h-2 w-2 bg-muted-foreground/40'}`}
+        />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-foreground">{label}</span>
         <span className="block truncate text-xs text-muted-foreground">{description}</span>
