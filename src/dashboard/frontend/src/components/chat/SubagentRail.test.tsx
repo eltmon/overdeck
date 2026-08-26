@@ -63,11 +63,13 @@ describe('SubagentRail', () => {
     expect(screen.getByText('general-purpose')).toBeInTheDocument();
     expect(screen.getByText('depth 2')).toBeInTheDocument();
     expect(screen.getAllByLabelText('running')).toHaveLength(2); // main agent + Explore
-    // Active rows get a pulsing primary halo behind a solid dot; done rows stay a recessive static dot.
-    for (const indicator of screen.getAllByLabelText('running')) {
-      expect(indicator.querySelector('.animate-ping')).toBeInTheDocument();
-      expect(indicator.querySelector('.bg-primary')).toBeInTheDocument();
-    }
+    // Only real activity pulses: the halo belongs to a working subagent, never to the
+    // main agent (whose 'running' is tmux liveness) and never to a finished subagent.
+    const [mainIndicator, exploreIndicator] = screen.getAllByLabelText('running');
+    expect(exploreIndicator?.querySelector('.animate-ping')).toBeInTheDocument();
+    expect(exploreIndicator?.querySelector('.bg-primary')).toBeInTheDocument();
+    expect(mainIndicator?.querySelector('.animate-ping')).not.toBeInTheDocument();
+    expect(mainIndicator?.querySelector('.bg-primary')).toBeInTheDocument();
     const done = screen.getByLabelText('done');
     expect(done.querySelector('.animate-ping')).not.toBeInTheDocument();
     expect(done.querySelector('.bg-muted-foreground\\/40')).toBeInTheDocument();

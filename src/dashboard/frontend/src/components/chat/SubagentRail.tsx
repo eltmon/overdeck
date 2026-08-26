@@ -92,6 +92,7 @@ export function SubagentRail({ conversation, subagents, selectedAgentId }: Subag
         <AgentRow
           label="Main agent"
           description={conversation.title ?? conversation.name}
+          /* Session liveness, not activity — so no halo: an idle conversation must not ping forever. */
           status={conversation.sessionAlive ? 'running' : 'done'}
           selected={selectedAgentId === null}
           onClick={() => select(null)}
@@ -102,6 +103,7 @@ export function SubagentRail({ conversation, subagents, selectedAgentId }: Subag
             label={subagent.agentType}
             description={subagent.description}
             status={subagent.status}
+            halo={subagent.status === 'running'}
             depth={subagent.spawnDepth}
             selected={selectedAgentId === subagent.agentId}
             onClick={() => select(subagent.agentId)}
@@ -116,12 +118,14 @@ interface AgentRowProps {
   label: string;
   description: string;
   status: 'running' | 'done';
+  /** Draw the pulsing halo — reserved for real activity (a subagent with a pending tool call). */
+  halo?: boolean;
   depth?: number;
   selected: boolean;
   onClick: () => void;
 }
 
-function AgentRow({ label, description, status, depth, selected, onClick }: AgentRowProps) {
+function AgentRow({ label, description, status, halo = false, depth, selected, onClick }: AgentRowProps) {
   return (
     <button
       type="button"
@@ -131,7 +135,7 @@ function AgentRow({ label, description, status, depth, selected, onClick }: Agen
     >
       <span aria-label={status} className="relative mt-1.5 flex h-2.5 w-2.5 shrink-0 items-center justify-center">
         {/* Live halo: the core dot stays solid so the row reads as active even at the ping's faded phase. */}
-        {status === 'running' && (
+        {halo && (
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
         )}
         <span
