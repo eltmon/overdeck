@@ -67,6 +67,11 @@ export function EventRouter() {
     let stalenessTimeout: ReturnType<typeof setTimeout> | null = null
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
     let reconnectAttempt = 0
+    // Consecutive staleness-watchdog firings with no domain event in between.
+    // Drives PAN-3778 escalation: strike 1 resubscribes only the domain
+    // stream on the live socket; strike 2+ falls back to a full transport
+    // reset (the socket itself is presumed wedged).
+    let stalenessStrikes = 0
     let unsubscribe: (() => void) | null = null
 
     function stopFallbackPoller() {
@@ -87,7 +92,7 @@ export function EventRouter() {
       }, SNAPSHOT_FALLBACK_INTERVAL_MS)
       fallbackTimeout = setTimeout(() => {
         if (!bootstrapComplete) {
-          showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
+          showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: () => reconnectDomainStream() })
         }
         stopFallbackPoller()
       }, SNAPSHOT_FALLBACK_WINDOW_MS)
@@ -114,35 +119,45 @@ export function EventRouter() {
       })
     }
 
-    function reconnectDomainStream() {
+    function reconnectDomainStream(options?: { fullReset?: boolean }) {
       if (bootstrapInFlight) return
+      const fullReset = options?.fullReset ?? true
       stopScheduledReconnect()
       markBackendReconnecting()
       unsubscribe?.()
       unsubscribe = null
-      resetTransport()
+      // PAN-3778: a full transport reset kills EVERY subscription on the
+      // shared socket, and each one (the conversation stream in particular)
+      // replays its full snapshot on resubscribe — heavy enough to starve the
+      // domain stream past the staleness watchdog again, locking the tab in a
+      // self-sustaining reconnect loop. The first staleness recovery therefore
+      // resubscribes only the domain stream on the live socket; the reset is
+      // reserved for repeated staleness (socket presumed wedged), bootstrap
+      // failures, and the explicit Retry button.
+      if (fullReset) resetTransport()
       subscribeToDomainEvents()
       bootstrapWithReconnectRetry()
     }
 
-    function scheduleReconnectDomainStream() {
+    function scheduleReconnectDomainStream(options?: { fullReset?: boolean }) {
       if (reconnectTimeout || bootstrapInFlight) return
       reconnectAttempt += 1
       const delayMs = eventRouterReconnectDelayMs(reconnectAttempt)
       reconnectTimeout = setTimeout(() => {
         reconnectTimeout = null
-        reconnectDomainStream()
+        reconnectDomainStream(options)
       }, delayMs)
     }
 
     function resetStalenessWatchdog() {
       stopStalenessWatchdog()
       stalenessTimeout = setTimeout(() => {
-        console.warn('[EventRouter] domain event stream stale — scheduling reconnect')
+        stalenessStrikes += 1
+        console.warn(`[EventRouter] domain event stream stale — scheduling reconnect (strike ${stalenessStrikes})`)
         // Transient blip: announce via the reconnecting event (non-blocking
         // banner in BackendConnectionBoundary) — never the full-screen overlay.
         markBackendReconnecting()
-        scheduleReconnectDomainStream()
+        scheduleReconnectDomainStream({ fullReset: stalenessStrikes > 1 })
       }, STREAM_STALENESS_TIMEOUT_MS)
     }
 
@@ -266,6 +281,7 @@ export function EventRouter() {
     // ── Event handler ─────────────────────────────────────────────────────────
     function handleEvent(event: DomainEvent) {
       reconnectAttempt = 0
+      stalenessStrikes = 0
       stopScheduledReconnect()
       resetStalenessWatchdog()
       if (!reconnecting) hideOverlay()
@@ -310,7 +326,7 @@ export function EventRouter() {
             // the server looks genuinely unreachable.
             markBackendReconnecting()
             if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {
-              showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
+              showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: () => reconnectDomainStream() })
             }
           },
         },

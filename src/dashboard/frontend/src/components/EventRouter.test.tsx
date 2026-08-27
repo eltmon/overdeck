@@ -193,11 +193,14 @@ describe('EventRouter memory updates', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000)
     })
-    expect(resetTransport).toHaveBeenCalledTimes(1)
+    // First staleness recovery is soft (PAN-3778): resubscribe on the live
+    // socket, never a transport reset that would replay every subscription.
+    expect(resetTransport).not.toHaveBeenCalled()
+    expect(subscribe).toHaveBeenCalledTimes(2)
     random.mockRestore()
   })
 
-  it('forces a fresh reconnect when the domain stream goes stale', async () => {
+  it('resubscribes the domain stream on the live socket when it goes stale', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
     render(<EventRouter />)
@@ -232,9 +235,42 @@ describe('EventRouter memory updates', () => {
     })
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
-    expect(resetTransport).toHaveBeenCalledTimes(1)
+    // Soft recovery: the shared transport survives so other subscriptions
+    // (conversation stream etc.) never replay their snapshots (PAN-3778).
+    expect(resetTransport).not.toHaveBeenCalled()
     expect(subscribe).toHaveBeenCalledTimes(2)
     expect(request).toHaveBeenCalledTimes(2)
+    random.mockRestore()
+    warn.mockRestore()
+  })
+
+  it('escalates to a full transport reset on consecutive staleness without events', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(subscribe).toHaveBeenCalledTimes(1)
+
+    // Strike 1: watchdog (35s) + reconnect delay (2s) → soft resubscribe.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(37_000)
+      await Promise.resolve()
+    })
+    expect(subscribe).toHaveBeenCalledTimes(2)
+    expect(resetTransport).not.toHaveBeenCalled()
+
+    // Strike 2 with no event in between: watchdog (35s) + backed-off delay
+    // (4s) → the socket is presumed wedged and the transport is reset.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(39_000)
+      await Promise.resolve()
+    })
+    expect(subscribe).toHaveBeenCalledTimes(3)
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+
     random.mockRestore()
     warn.mockRestore()
   })
@@ -252,7 +288,6 @@ describe('EventRouter memory updates', () => {
       await vi.advanceTimersByTimeAsync(37_000)
       await Promise.resolve()
     })
-    expect(resetTransport).toHaveBeenCalledTimes(1)
     expect(subscribe).toHaveBeenCalledTimes(2)
 
     act(() => {
@@ -262,18 +297,21 @@ describe('EventRouter memory updates', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(35_000)
     })
-    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledTimes(2)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_999)
     })
-    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledTimes(2)
 
+    // The event between stalenesses reset the backoff (base 2s delay) and the
+    // strike counter, so this reconnect is soft again — no transport reset.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1)
       await Promise.resolve()
     })
-    expect(resetTransport).toHaveBeenCalledTimes(2)
+    expect(subscribe).toHaveBeenCalledTimes(3)
+    expect(resetTransport).not.toHaveBeenCalled()
 
     random.mockRestore()
     warn.mockRestore()
