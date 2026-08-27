@@ -31,6 +31,12 @@
         ],
         "createdAt": "2026-08-01T20:26:45.357Z",
         "reason": "God view is an operator-mandated neon/Winamp visualizer surface that intentionally breaks the dashboard style guide; its shipped production theme (GodView/theme.css: gv-glow drop-shadow, gv-topbar box-shadow 0 0 20px var(--gv-border-glow), gvNeonPulse) already uses colored glows on dark backgrounds as the surface's design language"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.34, 1.56, .64, 1)",
+        "createdAt": "2026-08-27T02:02:43.886Z",
+        "reason": "User confirmed the Broadsheet --ease-spring token is intentional (PAN-3706 design system)"
       }
     ]
   }
