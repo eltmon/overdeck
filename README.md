@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Overdeck is discontinuing in its current form.** Its agent orchestration — the issue-to-merge pipeline, multi-agent review/test/merge workflow, and flywheel — will soon be available as a **plugin** for [t3code](https://github.com/pingdotgg/t3code), rather than a standalone dashboard. t3code provides the app shell (chat, terminals, diffs, desktop and mobile apps); Overdeck becomes the orchestration engine and views on top. Progress is tracked in [#3776](https://github.com/eltmon/overdeck/issues/3776).
+
 <div align="center">
 
 <picture>
