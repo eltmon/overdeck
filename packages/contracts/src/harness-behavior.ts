@@ -3,7 +3,7 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "prime-agent-rpc"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
@@ -11,6 +11,7 @@ export type HarnessDeliveryKind =
   | "codex-app-server-rpc"
   | "acp-host-rpc"
   | "tmux-paste"
+  | "prime-agent-rpc"
 export type HarnessReadinessKind =
   | "claude-session-signal"
   | "ohmypi-ready-file"
@@ -18,10 +19,11 @@ export type HarnessReadinessKind =
   | "codex-app-server-ready"
   | "acp-host-ready"
   | "kimi-session-signal"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code"
+  | "prime-agent-ready"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "prime-agent-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "prime-agent-session-id"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "prime-agent"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "prime_agent"
 
 export interface HarnessNativeCommand {
   readonly name: string
@@ -48,7 +50,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "prime-agent-rpc"
   readonly readyTimeoutSeconds: number
 }
 
@@ -176,12 +178,36 @@ export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 60,
 }
 
+export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
+  displayName: "Prime Agent",
+  nativeCommands: [],
+  executableName: "prime-agent",
+  processNames: ["prime-agent"],
+  launchCommandKind: "prime-agent-rpc",
+  deliveryKind: "prime-agent-rpc",
+  readinessKind: "prime-agent-ready",
+  transcriptKind: "prime-agent-jsonl",
+  sessionIdSource: "prime-agent-session-id",
+  contextLayerKind: "prime-agent",
+  feedKind: "prime_agent",
+  supportsPtySupervisor: false,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: true,
+  workAgentMode: "prime-agent-rpc",
+  readyTimeoutSeconds: 120,
+}
+
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "claude-code": CLAUDE_CODE_BEHAVIOR,
   ohmypi: OHMYPI_BEHAVIOR,
   codex: CODEX_BEHAVIOR,
   acp: ACP_BEHAVIOR,
   "kimi-code": KIMI_CODE_BEHAVIOR,
+  "prime-agent": PRIME_AGENT_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
@@ -189,6 +215,7 @@ export function getHarnessBehavior(harness: HarnessName | undefined | null): Har
   if (harness === "codex") return CODEX_BEHAVIOR
   if (harness === "acp") return ACP_BEHAVIOR
   if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
+  if (harness === "prime-agent") return PRIME_AGENT_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 

@@ -31,7 +31,6 @@ import { Effect } from 'effect';
 
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
-import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome, sessionFilePath } from '../paths.js';
 import { findKimiWirePathAsync } from '../runtimes/kimi-code.js';
@@ -41,62 +40,9 @@ import {
   generateSmartSummary,
   summarizeSerializedText,
 } from './smart-compaction.js';
-
-export interface CompactSummaryOptions {
-  /** Model for the summarizer LLM. */
-  model?: string;
-  /** Use the rich (Claude-native-style) summary prompt variant. */
-  richMode?: boolean;
-  /** Include thinking blocks in the serialized source. Default: true. */
-  includeThinking?: boolean;
-  /** Harness backend the summarizer LLM runs on. Default: 'claude-code'. */
-  harness?: RuntimeName;
-  /** Per-LLM-call timeout (ms). */
-  timeoutMs?: number;
-}
-
-export interface ConversationTranscriptAdapter {
-  /** Display name for logging/errors. */
-  readonly name: RuntimeName;
-
-  /** Plain forks copy raw Claude JSONL and spawn Claude with `--resume` —
-   * only Claude Code can be the source of a plain fork. */
-  readonly supportsPlainForkAsSource: boolean;
-
-  /** Source-authored handoff requires delivering a prompt to the live source
-   * agent and waiting for it to write a sentinel file. Claude Code supports
-   * this via deliverAgentMessage; Pi has no hook-equivalent signaling channel
-   * for the .done sentinel (see PAN-1134), so source authoring is gated off
-   * for Pi until that lands. */
-  readonly supportsSourceAuthoredHandoff: boolean;
-
-  /** Resolve the path to the source conversation's transcript file.
-   * Returns null if the conversation has no transcript yet (e.g. session
-   * just started and hasn't produced a JSONL line). */
-  resolveSessionFile(conv: Conversation): Promise<string | null>;
-
-  /** Serialize the transcript into a harness-agnostic canonical text that
-   * the handoff prompt template can embed verbatim. Each turn is rendered
-   * with a `[user]` / `[assistant]` header followed by text and tool-use
-   * summaries; thinking blocks are optional (defaults to including them).
-   */
-  serializeTranscript(sessionFile: string, options?: { includeThinking?: boolean }): Promise<string>;
-
-  /**
-   * Produce a model-generated compact summary of the transcript, suitable for
-   * seeding a summary fork or feeding the handoff authoring prompt.
-   *
-   * claude-code uses the entry-aware smart-compaction flow (rich, file-op
-   * aware); other harnesses serialize the transcript and run a generic
-   * chunk-and-merge summarizer over the text. The `harness` option selects the
-   * summarizer LLM backend and is independent of which adapter (= source
-   * harness) produced the transcript.
-   */
-  compactSummary(
-    sessionFile: string,
-    options?: CompactSummaryOptions,
-  ): Promise<{ summary: string; summaryModel: string | null }>;
-}
+import { primeAgentAdapter } from './prime-transcript-adapter.js';
+import type { ConversationTranscriptAdapter } from './transcript-adapter-types.js';
+export type { CompactSummaryOptions, ConversationTranscriptAdapter } from './transcript-adapter-types.js';
 
 // ─── Claude Code ──────────────────────────────────────────────────────────
 
@@ -583,6 +529,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'codex': codexAdapter,
   'acp': acpAdapter,
   'kimi-code': kimiCodeAdapter,
+  'prime-agent': primeAgentAdapter,
 };
 
 /**

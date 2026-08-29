@@ -518,7 +518,7 @@ export async function handleConversationMessage(
     );
   }
 
-  if (isPiControlChannelHarness(harness)) {
+  if (isPiControlChannelHarness(harness) || harness === 'prime-agent') {
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
       deliverAs: pickDeliverAs(body['deliverAs']),

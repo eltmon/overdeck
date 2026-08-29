@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'prime-agent') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, or prime-agent`);
   }
 }
 
@@ -242,6 +242,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       permissionMode: DEFAULT_CONFIG.acp.permissionMode,
     },
     kimiCode: {},
+    primeAgent: {
+      rpcStartupTimeoutMs: DEFAULT_CONFIG.primeAgent.rpcStartupTimeoutMs,
+    },
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -809,6 +812,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.kimiCode?.binaryPath !== undefined) {
       result.kimiCode.binaryPath = config.kimiCode.binaryPath;
+    }
+    if (config.primeAgent?.binaryPath !== undefined) {
+      result.primeAgent.binaryPath = config.primeAgent.binaryPath;
+    }
+    if (config.primeAgent?.rpcStartupTimeoutMs !== undefined) {
+      if (!Number.isInteger(config.primeAgent.rpcStartupTimeoutMs) || config.primeAgent.rpcStartupTimeoutMs <= 0) {
+        throw new Error('config.yaml: primeAgent.rpcStartupTimeoutMs must be a positive integer');
+      }
+      result.primeAgent.rpcStartupTimeoutMs = config.primeAgent.rpcStartupTimeoutMs;
     }
 
     // Merge remote work-agent provisioning settings

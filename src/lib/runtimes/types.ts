@@ -41,7 +41,7 @@ export type {
  * by normalizeHarness() on read. normalizeHarness still accepts the raw string
  * 'pi' as input so old rows round-trip safely.
  */
-export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent';
 
 /**
  * Legacy harness strings that can still appear in persisted state or older
@@ -205,6 +205,13 @@ export interface AgentRuntimeSync {
    * @returns Cost breakdown, or null if not available
    */
   getSessionCost(agentId: string): CostBreakdown | null;
+
+  /** Read dashboard metrics in one pass. Request-time routes use this to avoid repeated transcript scans. */
+  getSessionMetrics?(agentId: string): {
+    lastActivity: Date | null;
+    tokenUsage: TokenUsage | null;
+    cost: CostBreakdown | null;
+  };
 
   /**
    * Send a message to a running agent

@@ -888,7 +888,7 @@ function toMillis(value: Date | string | number = new Date()): number {
 /** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
 export function normalizeHarness(harness: string | null): RuntimeName | null {
   if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
-  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code') return harness;
+  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'prime-agent') return harness;
   return null;
 }
 

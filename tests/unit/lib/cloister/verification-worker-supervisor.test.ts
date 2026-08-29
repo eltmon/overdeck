@@ -188,17 +188,19 @@ describe('verification worker supervisor', () => {
 });
 
 describe('PAN-3674 follow-up: expired workers', () => {
-  function writeWorkerState(home: string, issueId: string, state: Record<string, unknown>): void {
+  function writeWorkerState(home: string, issueId: string, state: Record<string, unknown>): string {
     const dir = join(home, 'verification-workers', issueId.toLowerCase());
     mkdirSync(dir, { recursive: true });
+    const resultPath = join(dir, 'result-seeded.json');
     writeFileSync(join(dir, 'state.json'), JSON.stringify({
       runId: 'run-seeded',
       issueId,
       workspacePath: '/tmp/workspace',
-      resultPath: join(dir, 'result-seeded.json'),
+      resultPath,
       phase: 'running',
       ...state,
     }));
+    return resultPath;
   }
 
   it('never joins a worker past its deadline — kills it and starts fresh', async () => {
@@ -219,6 +221,7 @@ describe('PAN-3674 follow-up: expired workers', () => {
     if (outcome.outcome !== 'passed') {
       throw new Error(`unexpected outcome: ${JSON.stringify(outcome)}; disk=${JSON.stringify(readVerificationWorkerState('PAN-3674'))}`);
     }
+    expect(outcome.outcome).toBe('passed');
     // The expired worker was killed rather than joined.
     expect(() => process.kill(zombiePid, 0)).toThrow();
     // A fresh worker took over the registration.

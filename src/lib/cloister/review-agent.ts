@@ -729,7 +729,6 @@ async function spawnReviewRoleForIssuePromise(
  * sessions so callers do not need to know which review phase has started.
  */
 export { isReviewSessionForIssue };
-
 async function killAllReviewerSessionsPromise(
   projectKey: string | undefined,
   issueId: string,

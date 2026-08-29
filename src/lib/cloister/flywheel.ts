@@ -16,6 +16,7 @@ import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
 import { getBookAsync as getOrderBook } from '../orders/resolver.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { XBriefDocument } from '../xbrief/types.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
@@ -75,7 +76,7 @@ export interface FlywheelLifecycleOptions {
   briefOverlayContent?: string;
   prompt?: string;
   model?: string;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness?: RuntimeName;
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;

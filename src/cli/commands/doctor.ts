@@ -36,6 +36,7 @@ import { checkInotify } from './doctor-inotify.js';
 import { checkStateDivergence } from './doctor-state-divergence.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
+import { checkPrimeAgent } from './doctor-prime-agent.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -745,10 +746,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
-
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
-
+  for (const c of await checkPrimeAgent()) checks.push(c);
   // Check Overdeck directories
   const directories = [
     { path: OVERDECK_HOME, name: 'Overdeck Home', fix: 'Run: pan init' },

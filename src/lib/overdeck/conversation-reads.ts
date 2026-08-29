@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { access, readdir, stat } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,7 +12,7 @@ import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
 import { capturePane, listSessionNames } from '../tmux.js';
 import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
-import { sessionFilePath } from '../paths.js';
+import { getOverdeckHome, sessionFilePath } from '../paths.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   CONVERSATION_TITLE_MODEL,
@@ -117,6 +117,12 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
 }
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  if (conv.harness === 'prime-agent') {
+    const sessionPath = await readFile(join(getOverdeckHome(), 'agents', conv.tmuxSession, 'prime-agent-session-path'), 'utf8')
+      .then(value => value.trim() || null)
+      .catch(() => null);
+    if (sessionPath) return sessionPath;
+  }
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {

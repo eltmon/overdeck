@@ -30,6 +30,7 @@ import { answerPiAskModal, type PiAskModalDeps } from '../pi-ask-modal.js';
 import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-enrichment.js';
 import { getOverdeckHome } from '../paths.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
+import { deliverPrimeAgentMessage } from '../prime-agent/session-controller.js';
 
 export const CONTROL_ACK_TIMEOUT_MS = 10_000;
 
@@ -265,7 +266,6 @@ type ConversationControlCommandInput = ControlCommand extends infer C
 
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
 const PI_CONVERSATION_ABORT_KEY = 'Escape';
-
 export function isPiControlChannelHarness(harness: RuntimeName | 'pi'): boolean {
   return harness === 'ohmypi' || harness === 'pi';
 }
@@ -280,7 +280,6 @@ export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDelive
   if (bodyDeliverAs === 'follow_up') return 'follow_up';
   return 'steer';
 }
-
 export function resolveConversationDeliveryMethod(conv: Pick<Conversation, 'harness' | 'deliveryMethod'>): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
   if (harness === 'acp') return 'auto';
@@ -310,13 +309,14 @@ export async function sendConversationControlCommand(
 }
 
 export async function deliverConversationViaControlChannel(
-  conv: Pick<Conversation, 'tmuxSession'>,
+  conv: Pick<Conversation, 'tmuxSession' | 'harness'>,
   message: string,
   options: {
     source: 'operator' | 'orchestrator'
     deliverAs: ConversationControlDeliverAs
   },
 ): Promise<void> {
+  if (conv.harness === 'prime-agent') return void await deliverPrimeAgentMessage(conv.tmuxSession, message, options.deliverAs);
   await sendConversationControlCommand(conv, {
     type: options.deliverAs,
     message,

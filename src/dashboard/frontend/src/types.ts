@@ -93,7 +93,7 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent' | null;
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
   error?: string;

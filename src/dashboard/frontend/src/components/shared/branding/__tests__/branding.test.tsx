@@ -22,7 +22,7 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'prime-agent']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();

@@ -195,7 +195,7 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
 
       expect(decodeJsonResponse(response)).toEqual({ ok: true });
       expect(deps.transformMessageForHarness).toHaveBeenCalledWith(message, harness, []);
-      if (harness === 'ohmypi') {
+      if (harness === 'ohmypi' || harness === 'prime-agent') {
         expect(mocks.deliverControl).toHaveBeenCalledOnce();
         expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
       } else {

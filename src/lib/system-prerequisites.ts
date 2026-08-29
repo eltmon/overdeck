@@ -178,17 +178,29 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
       win: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
     },
   },
+  {
+    id: 'prime-agent',
+    name: 'Prime Agent',
+    required: false,
+    purpose: 'Prime Agent managed harness using persistent RPC mode',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'https://github.com/PrimeIntellect-ai/prime-agent#installation',
+      mac: 'https://github.com/PrimeIntellect-ai/prime-agent#installation',
+      win: 'Prime Agent supports macOS and Linux; use a supported workspace host',
+    },
+  },
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
 export type PrerequisiteResolver = (
   command: string,
-  options?: { acpHarness?: boolean; pathValue?: string },
+  options?: { acpHarness?: boolean; primeAgentHarness?: boolean; pathValue?: string },
 ) => Promise<string | null>;
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
-  const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
-  return stdout;
+  const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
+  return stdout || stderr;
 };
 
 const defaultResolver: PrerequisiteResolver = async (command, options) => {
@@ -197,6 +209,8 @@ const defaultResolver: PrerequisiteResolver = async (command, options) => {
     : undefined;
   return options?.acpHarness
     ? resolveHarnessBinary('acp', resolutionOptions)
+    : options?.primeAgentHarness
+      ? resolveHarnessBinary('prime-agent', resolutionOptions)
     : resolveExecutable(command, resolutionOptions);
 };
 
@@ -207,6 +221,7 @@ function resolvePrerequisiteExecutable(
 ): Promise<string | null> {
   const options = {
     ...(id === 'kimi' ? { acpHarness: true } : {}),
+    ...(id === 'prime-agent' ? { primeAgentHarness: true } : {}),
     ...(pathValue !== undefined ? { pathValue } : {}),
   };
   return Object.keys(options).length > 0

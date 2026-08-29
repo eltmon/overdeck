@@ -104,6 +104,11 @@ export function codexGlobalContextFile(): string {
   return join(getOverdeckHome(), 'context', 'codex-global.md');
 }
 
+/** `~/.overdeck/context/prime-agent-global.md` — supplemental Prime context. */
+export function primeAgentGlobalContextFile(): string {
+  return join(getOverdeckHome(), 'context', 'prime-agent-global.md');
+}
+
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */

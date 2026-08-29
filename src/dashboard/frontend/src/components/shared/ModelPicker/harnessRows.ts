@@ -27,6 +27,7 @@ export const KIMI_NATIVE_EFFORT_LEVELS = ['low', 'high', 'max'] as const;
 const HARNESS_ROW_LABELS = {
   'claude-code': 'Claude Code',
   'kimi-code': 'Kimi Code CLI',
+  'prime-agent': 'Prime Agent',
   acp: 'ACP (Kimi Code)',
 } as const;
 

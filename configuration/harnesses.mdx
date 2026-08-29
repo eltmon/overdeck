@@ -12,7 +12,7 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, and `kimi-code`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, and `prime-agent`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -24,6 +24,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
+| `prime-agent` | Prime Agent (`prime-agent`) | Opt-in multi-provider RPC work and conversations | Overdeck owns one persistent root RPC process per session; supported versions are `>=0.1.0 <1.0.0`. |
 
 ## Composer commands across harnesses
 
@@ -59,6 +60,39 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
   receive neither override, so Claude Code's native context behavior remains in
   control.
+
+### Prime Agent RPC (alternative)
+
+Install a compatible Prime Agent release with the upstream installer, then verify it:
+
+```bash
+curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh
+prime-agent --version   # must be >=0.1.0 and <1.0.0
+prime-agent --help      # must list --mode rpc
+pan doctor
+```
+
+If the binary is outside `PATH`, set `primeAgent.binaryPath` in
+`~/.overdeck/config.yaml`. Configure the provider's API credentials through
+the provider's normal environment variables or Overdeck provider settings.
+Overdeck maps Anthropic models to `anthropic`, OpenAI models to `openai`, and
+Google models to `google`; an unknown provider/model pair fails instead of
+silently switching harnesses.
+
+Overdeck owns the persistent root RPC process, session directory, resume,
+delivery, abort, and termination. A detached session resumes only when its
+recorded model, provider, and workspace match. Otherwise Overdeck starts a
+fresh session or reports a recovery error. Prime schedules, heartbeats,
+observation, autonomous continuation, and cross-agent messaging are disabled
+because Cloister owns that lifecycle. RLM children remain internal tool work
+attributed to the root session and cannot claim Overdeck tasks.
+
+Prime's worker/kernel separation is an execution boundary, not a security
+sandbox. Use the same workspace and credential isolation you use for other
+coding harnesses. Overdeck writes managed context only under
+`~/.overdeck/context`; it never changes `~/.prime/agent`. To uninstall, stop
+Prime sessions, remove `primeAgent` from the Overdeck config, and remove the
+upstream `prime-agent` package with the package manager that installed it.
 
 ### oh-my-pi / ohmypi (alternative)
 

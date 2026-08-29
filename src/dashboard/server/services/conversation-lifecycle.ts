@@ -38,7 +38,7 @@ import {
 import { isRespawnPending } from './pending-respawn.js';
 import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
-import type { HarnessName } from '../../../lib/runtimes/types.js';
+import type { HarnessName, RuntimeName } from '../../../lib/runtimes/types.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -115,7 +115,7 @@ interface AgentStateFile {
   workspace?: string;
   role?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: RuntimeName;
   startedAt?: string;
 }
 

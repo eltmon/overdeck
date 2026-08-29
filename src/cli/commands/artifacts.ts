@@ -281,7 +281,7 @@ export function registerArtifactCommands(program: Command): void {
     .option('--issue <id>', 'Issue ID for artifact provenance')
     .option('--workspace <id>', 'Workspace ID for artifact provenance')
     .option('--agent-role <role>', 'Agent role: plan, work, review, test, ship, flywheel, or user')
-    .option('--agent-harness <harness>', 'Agent harness: claude-code, pi, ohmypi, codex, acp, kimi-code, or user')
+    .option('--agent-harness <harness>', 'Agent harness: claude-code, pi, ohmypi, codex, acp, kimi-code, prime-agent, or user')
     .option('--run-id <id>', 'Run ID for artifact provenance')
     .option('--session-id <id>', 'Session ID for artifact provenance')
     .option('--title <title>', 'Artifact title')
@@ -387,7 +387,7 @@ function parseAgentRole(value: string | undefined): ArtifactAgentRole | undefine
 
 export function parseAgentHarness(value: string | undefined): ArtifactAgentHarness | undefined {
   if (value === undefined) return undefined;
-  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'user') return value;
+  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'prime-agent' || value === 'user') return value;
   throw new Error(`Invalid --agent-harness: ${value}`);
 }
 

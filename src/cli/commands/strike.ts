@@ -14,12 +14,13 @@ import { ACTIVITY_STALLED_MS } from '../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness?: RuntimeName;
   effort?: RoleEffort;
   dryRun?: boolean;
 }

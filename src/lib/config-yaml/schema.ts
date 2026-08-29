@@ -379,7 +379,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -662,6 +662,12 @@ export interface YamlConfig {
    */
   kimiCode?: {
     binaryPath?: string;
+  };
+
+  /** Prime Agent RPC process settings. */
+  primeAgent?: {
+    binaryPath?: string;
+    rpcStartupTimeoutMs?: number;
   };
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
@@ -990,6 +996,12 @@ export interface NormalizedConfig {
   /** Native Kimi Code CLI process settings. */
   kimiCode: {
     binaryPath?: string;
+  };
+
+  /** Prime Agent RPC process settings. */
+  primeAgent: {
+    binaryPath?: string;
+    rpcStartupTimeoutMs: number;
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */
