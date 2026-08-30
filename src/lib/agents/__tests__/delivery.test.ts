@@ -402,6 +402,61 @@ describe('PTY supervisor delivery', () => {
   });
 });
 
+describe('state-projected supervisor method (PAN-3743 review-loop stall)', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-state-supervisor-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  // Reproduces the 2026-08-16 PAN-3743 stall: a codex app-server work agent
+  // whose state.json carries deliveryMethod: 'supervisor' (projected from
+  // supervisorEnabled) but has no PTY supervisor socket. A state-routed
+  // delivery (the inspect verdict) previously threw socket-missing with no
+  // fallback; it must now ride the resilient cascade to the app-server tier.
+  it('routes a state-stamped supervisor method to the live app-server socket', async () => {
+    const agentId = 'agent-state-supervisor-appserver';
+    writeAgentState(agentId, { deliveryMethod: 'supervisor', supervisorEnabled: true });
+    writeAppServerToken(agentId);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `appserver-${agentId}.sock`), { capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'inspect verdict', 'inspect-verdict');
+      expect(result).toEqual({ ok: true, path: 'app-server' });
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({ op: 'message', content: 'inspect verdict' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('falls through to tmux when a state-stamped supervisor method has no sockets at all', async () => {
+    const agentId = 'agent-state-supervisor-tmux';
+    writeAgentState(agentId, { deliveryMethod: 'supervisor', supervisorEnabled: true });
+    const result = await deliverAgentMessage(agentId, 'inspect verdict', 'inspect-verdict');
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'inspect verdict');
+  });
+
+  it('keeps the strict PAN-1769 contract for an explicit supervisor argument', async () => {
+    const agentId = 'agent-explicit-supervisor-strict';
+    writeAgentState(agentId);
+    await expect(
+      deliverAgentMessage(agentId, 'resume continue', 'test-caller', 'supervisor'),
+    ).rejects.toThrow(/PTY supervisor delivery failed.*socket-missing/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+  });
+});
+
 describe('keyedSupervisorFailureKind (PAN-1837)', () => {
   it('classifies connect-phase failures as definitive, never ambiguous', async () => {
     const { keyedSupervisorFailureKind } = await import('../delivery.js');
