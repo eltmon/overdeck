@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-07T20:17:07Z · model: claude-opus-5 · open: 872_
+_Last sequenced: 2026-09-07T20:18:04Z · model: claude-opus-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,8 +8,8 @@ _Last sequenced: 2026-09-07T20:17:07Z · model: claude-opus-5 · open: 872_
 | 1 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
 | 2 | PAN-2746 | XS | critical | ok |  | PAN-2742, PAN-2695 | infra-failure bypass writes reviewStatus='passed' |
 | 3 | PAN-3740 | XS | critical | ok |  |  | Red main: lint:slash-commands finds composer-manifest drift (handoff cap 500 vs 10000) — every merge blocked until regenerated |
-| 4 | PAN-2689 | S | critical | ok |  |  | Review verdicts from sandboxed codex review agents are silently lost |
 | 4 | PAN-3690 | S | critical | ok |  |  | Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit |
+| 5 | PAN-2689 | S | critical | ok |  |  | Review verdicts from sandboxed codex review agents are silently lost |
 | 6 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 7 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
 | 8 | PAN-3761 | M | critical | ok |  |  | Ready-to-merge issues never keep a UAT train: durable review status disagrees with passed PR stamps; re-dispatch yanks members. |
@@ -892,13 +892,13 @@ Highest integrity risk — infra-failure bypass writes reviewStatus=passed, indi
 
 Main CI is red on the merge commit because the generated composer-command manifest still declares the old 500-character pan handoff cap while the command description says 10000. A red main empties the merge gate silently and blocks every other issue from landing, so this outranks all non-red-main work regardless of how small the fix is. The change itself is a regeneration of one committed artifact, so the cost of clearing it is near zero and the cost of leaving it is the whole pipeline. In pipeline — rank set once here and pinned from now on; gate stays auto.
 
-### PAN-2689 (rank 4)
-
-Sandboxed codex review verdicts fire-and-forget into a journal that loses them; review convoy reports green on evidence never delivered.
-
 ### PAN-3690 (rank 4)
 
 Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
+
+### PAN-2689 (rank 5)
+
+Sandboxed codex review verdicts fire-and-forget into a journal that loses them; review convoy reports green on evidence never delivered.
 
 ### PAN-3566 (rank 6)
 
@@ -1207,7 +1207,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-07T20:17:07Z",
+  "generatedAt": "2026-09-07T20:18:04Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 872,
@@ -1256,7 +1256,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2689",
-      "rank": 4,
+      "rank": 5,
       "size": "S",
       "importance": "critical",
       "score": 93,
