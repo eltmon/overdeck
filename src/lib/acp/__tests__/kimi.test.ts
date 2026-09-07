@@ -44,7 +44,14 @@ describe("Kimi ACP support", () => {
       command: "/opt/kimi/bin/kimi",
       args: ["acp"],
       cwd: "/workspace",
+      env: expect.any(Object),
     });
+  });
+
+  it("removes an inherited forced effort without mutating the caller environment", () => {
+    const env = { KIMI_MODEL_THINKING_EFFORT: "max", PATH: "/bin" };
+    expect(buildKimiAcpSpawnInput(undefined, "/workspace", env).env).toEqual({ PATH: "/bin" });
+    expect(env.KIMI_MODEL_THINKING_EFFORT).toBe("max");
   });
 
   it("prefers an advertised cached-credential authentication method", () => {
@@ -98,6 +105,7 @@ describe("Kimi ACP support", () => {
 describe("Kimi ACP model translation", () => {
   it.each([
     ["k3", "kimi-code/k3-256k"],
+    ["k3-256k", "kimi-code/k3-256k"],
     ["k3[1m]", "kimi-code/k3"],
     ["kimi-k2.7-code", "kimi-code/kimi-for-coding"],
     ["kimi-for-coding", "kimi-code/kimi-for-coding"],

@@ -39,6 +39,7 @@ interface StubRuntime {
   readonly prompts: EffectAcpSchema.PromptRequest["prompt"][];
   readonly order: string[];
   readonly setModels: string[];
+  readonly setThinking: string[];
   readonly startCalls: () => number;
   readonly requestPermission: (
     request: EffectAcpSchema.RequestPermissionRequest,
@@ -50,6 +51,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
   const prompts: EffectAcpSchema.PromptRequest["prompt"][] = [];
   const order: string[] = [];
   const setModels: string[] = [];
+  const setThinking: string[] = [];
   let starts = 0;
   let remainingPromptErrors = options.promptErrorCount ?? (options.promptError ? Number.POSITIVE_INFINITY : 0);
   let sessionUpdateHandler:
@@ -128,6 +130,11 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         return { stopReason: "end_turn" as const };
       }),
     cancel: Effect.void,
+    setConfigOption: (configId, value) => Effect.sync(() => {
+      order.push(`set-${configId}`);
+      setThinking.push(String(value));
+      return { configOptions: [] };
+    }),
     setModel: (model) =>
       Effect.gen(function* () {
         order.push("set-model");
@@ -146,6 +153,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
     prompts,
     order,
     setModels,
+    setThinking,
     startCalls: () => starts,
     requestPermission: (permissionRequest) =>
       Effect.runPromise(permissionHandler!(permissionRequest)),
@@ -308,6 +316,43 @@ describe("AcpHost", () => {
     await host.start();
 
     expect(stub.setModels).toEqual(["kimi-code/k3"]);
+    expect(stub.setThinking).toEqual(["high"]);
+    expect(stub.order.indexOf("set-model")).toBeLessThan(stub.order.indexOf("set-thinking"));
+  });
+
+  it.each(["low", "high", "max"])("applies requested K3 %s effort on resume before accepting prompts", async (effort) => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-effort",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/k3-256k",
+      effort,
+      resumeSessionId: "existing-session",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setThinking).toEqual([effort]);
+  });
+
+  it("does not send unsupported effort levels to always-thinking K2.7", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-k27",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/kimi-for-coding",
+      effort: "high",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setThinking).toEqual([]);
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {
@@ -738,11 +783,14 @@ describe("AcpHost", () => {
         process.cwd(),
         "--binary-path",
         "/opt/kimi/bin/kimi",
+        "--effort",
+        "low",
         "--resume",
         persisted!,
       ]),
     ).toMatchObject({
       binaryPath: "/opt/kimi/bin/kimi",
+      effort: "low",
       resumeSessionId: "persisted-session",
     });
   });

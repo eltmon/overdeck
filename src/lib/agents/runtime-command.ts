@@ -223,6 +223,7 @@ export function getAcpLauncherFields(
   workspace: string,
   binaryPath: string,
   _role?: Role,
+  effort?: string,
 ): {
   harness: 'acp';
   acpAgentId: string;
@@ -230,6 +231,7 @@ export function getAcpLauncherFields(
   acpWorkspace: string;
   acpBinaryPath: string;
   acpContextFile: string;
+  acpEffort?: string;
   model: string;
   unsetProviderEnv: true;
 } {
@@ -240,15 +242,17 @@ export function getAcpLauncherFields(
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
     acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
   };
 }
 
-export function getKimiCodeLauncherFields(model: string): {
+export function getKimiCodeLauncherFields(model: string, effort?: string): {
   harness: 'kimi-code';
   kimiCodeModel: string;
   kimiCodeYolo: true;
+  kimiCodeEffort?: string;
   model: string;
   unsetProviderEnv: true;
 } {
@@ -257,6 +261,7 @@ export function getKimiCodeLauncherFields(model: string): {
     harness: 'kimi-code',
     kimiCodeModel,
     kimiCodeYolo: true,
+    ...(effort ? { kimiCodeEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
   };
