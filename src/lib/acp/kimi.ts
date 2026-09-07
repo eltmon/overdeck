@@ -31,11 +31,15 @@ export function buildKimiAcpSpawnInput(
   cwd: string,
   environment?: NodeJS.ProcessEnv,
 ): AcpSpawnInput {
+  // The host applies the selected effort through ACP after selecting the
+  // model. A parent-shell forced override would silently defeat that choice.
+  const env = { ...(environment ?? process.env) };
+  delete env.KIMI_MODEL_THINKING_EFFORT;
   return {
     command: kimiSettings?.binaryPath || "kimi",
     args: ["acp"],
     cwd,
-    ...(environment ? { env: environment } : {}),
+    env,
   };
 }
 
@@ -64,6 +68,7 @@ export function buildKimiAcpSpawnInput(
  */
 const KIMI_ACP_MODEL_IDS: Record<string, string> = {
   "k3": "kimi-code/k3-256k",
+  "k3-256k": "kimi-code/k3-256k",
   "k3[1m]": "kimi-code/k3",
   "kimi-k2.7-code": "kimi-code/kimi-for-coding",
   "kimi-for-coding": "kimi-code/kimi-for-coding",
