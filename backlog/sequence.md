@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-07T20:18:04Z · model: claude-opus-5 · open: 872_
+_Last sequenced: 2026-09-07T20:21:31Z · model: claude-opus-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -130,56 +130,56 @@ _Last sequenced: 2026-09-07T20:18:04Z · model: claude-opus-5 · open: 872_
 | 123 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
 | 124 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
 | 125 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 126 | PAN-3778 | S | high | ok |  |  | Reconnect loop from full-transcript snapshot on resubscribe; fix commit 48fd8f7a landed on main, awaiting verify/close-out. |
-| 127 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
-| 128 | PAN-3650 | S | high | ok |  |  | Strike self-abort is not terminal — state.json stays running and the deacon resurrects the aborted strike on every recovery pass. |
+| 126 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
+| 127 | PAN-3650 | S | high | ok |  |  | Strike self-abort is not terminal — state.json stays running and the deacon resurrects the aborted strike on every recovery pass. |
+| 128 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
 | 129 | PAN-3689 | S | high | ok |  |  | Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures |
-| 130 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
-| 131 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
-| 132 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
-| 133 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
-| 134 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan, so the state-recreation patrol logs a stray-writer warning ~68k times — dominant log volume. |
-| 135 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
-| 136 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 137 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 138 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 139 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 140 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 141 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 142 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 143 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 145 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
-| 146 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
-| 147 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
-| 148 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
-| 149 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
-| 150 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
-| 151 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
-| 152 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
-| 153 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 154 | PAN-3651 | M | high | ok |  |  | Re-land the reverted overdeck-state non-fast-forward push retry; without it a concurrent state writer wedges every state write. |
-| 155 | PAN-3634 | S | high | ok |  |  | Planning auto-handoff stamps the ambient flywheelRunId on operator-started work, stripping its reaping exemption. |
-| 156 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
-| 157 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
-| 158 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
-| 159 | PAN-3464 | XS | high | ok |  |  | pan swarm reset never clears slotCompletions, so a stale marker re-arms the exact wedge the operator ran reset to escape. |
-| 160 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
-| 161 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
-| 162 | PAN-3344 | M | high | ok |  |  | Governor gates dispatch on memory alone; agent-shell test runs drove load to ~48 on 24 cores with memory fine. PRD written. |
-| 163 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
-| 164 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
-| 165 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
-| 166 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 167 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 168 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
-| 169 | PAN-3139 | S | high | ok |  |  | The authoritative agents table under-reports a live 4h agent as stopped while pan start's own liveness check correctly refuses. |
-| 170 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
-| 171 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 172 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item. |
-| 173 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
-| 174 | PAN-3048 | XS | high | ok |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
-| 175 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 130 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
+| 131 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
+| 132 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
+| 133 | PAN-3301 | S | high | ok |  |  | Backlog manifest still writes legacy .pan, so the state-recreation patrol logs a stray-writer warning ~68k times — dominant log volume. |
+| 134 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
+| 135 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 136 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 137 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 138 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 139 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 140 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 141 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 142 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 143 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 144 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
+| 145 | PAN-2075 | XL | high | ok | ✓ |  | Boot Reconciliation + Operator Inbox |
+| 146 | PAN-2077 | M | high | ok |  | PAN-1775 | Substrate-complete reconciliation inventory (local tmux + remote Fly machines) |
+| 147 | PAN-2078 | M | high | ok |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all|--select|--freeze|--kill-remote |
+| 148 | PAN-2079 | M | high | ok |  | PAN-2077 | Operator Inbox: durable server-side queue + in-dashboard surface (the notification spine) |
+| 149 | PAN-2080 | M | high | ok |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) |
+| 150 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
+| 151 | PAN-454 | XS | high | ok |  | PAN-2077 | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 152 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 153 | PAN-3651 | M | high | ok |  |  | Re-land the reverted overdeck-state non-fast-forward push retry; without it a concurrent state writer wedges every state write. |
+| 154 | PAN-3634 | S | high | ok |  |  | Planning auto-handoff stamps the ambient flywheelRunId on operator-started work, stripping its reaping exemption. |
+| 155 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
+| 156 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
+| 157 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
+| 158 | PAN-3464 | XS | high | ok |  |  | pan swarm reset never clears slotCompletions, so a stale marker re-arms the exact wedge the operator ran reset to escape. |
+| 159 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
+| 160 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
+| 161 | PAN-3344 | M | high | ok |  |  | Governor gates dispatch on memory alone; agent-shell test runs drove load to ~48 on 24 cores with memory fine. PRD written. |
+| 162 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
+| 163 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
+| 164 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
+| 165 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 166 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
+| 167 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
+| 168 | PAN-3139 | S | high | ok |  |  | The authoritative agents table under-reports a live 4h agent as stopped while pan start's own liveness check correctly refuses. |
+| 169 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
+| 170 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
+| 171 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item. |
+| 172 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
+| 173 | PAN-3048 | XS | high | ok |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
+| 174 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 175 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
 | 177 | PAN-3022 | S | high | ok |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 178 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
@@ -464,313 +464,313 @@ _Last sequenced: 2026-09-07T20:18:04Z · model: claude-opus-5 · open: 872_
 | 457 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
 | 458 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 459 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 460 | PAN-3307 | XS | medium | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 461 | PAN-3157 | XS | medium | ok |  |  | The Flywheel renders in the Awareness feed as a generic 'Claude Code / No messages yet' chat row despite emitting a snapshot every tick. |
-| 462 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 463 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 464 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 465 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 466 | PAN-1440 | S | medium | ok |  |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
-| 467 | PAN-1438 | S | medium | ok |  |  | pan flywheel start launcher process orphans when orchestrator dies externally |
-| 468 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 469 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 470 | PAN-1392 | S | medium | ok |  |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
-| 471 | PAN-1386 | S | medium | ok |  |  | Flywheel orchestrator never emits status snapshots |
-| 472 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 473 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
-| 474 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 475 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
-| 476 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
-| 477 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 478 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 479 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 480 | PAN-3540 | M | medium | ok |  |  | God View shows phantom agent orbs from state rows with no live session, a dead Hook Bus panel, and a pressure-blind swap header. |
-| 481 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 482 | PAN-3321 | XS | medium | needs-refinement |  |  | Escalation text and CLAUDE.md advertise 'pan unstick', which errored as unknown; re-verify against the current CLI before picking up. |
-| 483 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 484 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 460 | PAN-3157 | XS | medium | ok |  |  | The Flywheel renders in the Awareness feed as a generic 'Claude Code / No messages yet' chat row despite emitting a snapshot every tick. |
+| 461 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 462 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 463 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 464 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 465 | PAN-1440 | S | medium | ok |  |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
+| 466 | PAN-1438 | S | medium | ok |  |  | pan flywheel start launcher process orphans when orchestrator dies externally |
+| 467 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 468 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 469 | PAN-1392 | S | medium | ok |  |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
+| 470 | PAN-1386 | S | medium | ok |  |  | Flywheel orchestrator never emits status snapshots |
+| 471 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 472 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
+| 473 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 474 | PAN-1240 | S | medium | ok |  |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
+| 475 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
+| 476 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 477 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 478 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 479 | PAN-3540 | M | medium | ok |  |  | God View shows phantom agent orbs from state rows with no live session, a dead Hook Bus panel, and a pressure-blind swap header. |
+| 480 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 481 | PAN-3321 | XS | medium | needs-refinement |  |  | Escalation text and CLAUDE.md advertise 'pan unstick', which errored as unknown; re-verify against the current CLI before picking up. |
+| 482 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 483 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 484 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 485 | PAN-3705 | XS | medium | ok |  |  | Ctrl-K: add Conversations as a first-class entry in the type list |
-| 486 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 487 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 488 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 489 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 490 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 491 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 492 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 493 | PAN-1027 | S | medium | ok |  |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
-| 494 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 495 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 496 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 497 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 498 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 499 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 500 | PAN-727 | M | medium | ok |  |  | Fix orphaned work-agent start handoff after planning |
-| 501 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 502 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 503 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 504 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 505 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 506 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 507 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 508 | PAN-324 | XS | medium | stale |  |  | Agent detail pane missing Merge/Approve button |
-| 509 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 510 | PAN-247 | S | medium | stale |  |  | Deacon has no backoff or escalation for repeated specialist startup failures |
-| 511 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 512 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 513 | PAN-178 | M | medium | stale |  |  | PAN-178: Crash recovery with granular task checkpointing |
-| 514 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 515 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 516 | PAN-1951 | M | medium | ok |  |  | Inspector resumes a warm per-issue session instead of cold-spawning per item |
-| 517 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 518 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 519 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 520 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 521 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 522 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 523 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 524 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 525 | PAN-3057 | S | medium | needs-refinement |  |  | Harness-initiated compaction idled six agents and GPT-5.6's window was declared twice; both fixes appear landed — verify and close. |
-| 526 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 527 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 528 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 529 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 530 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 531 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
-| 532 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 533 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 534 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 535 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 536 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 537 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
-| 538 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 539 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 540 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 541 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 542 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 543 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 544 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
-| 545 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 546 | PAN-2558 | L | medium | ok |  |  | support polyrepo projects |
-| 547 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 548 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 549 | PAN-2548 | XS | medium | ok |  |  | close the PAN-2541 legacy-fallback deprecation window |
-| 550 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 551 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 552 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 553 | PAN-2444 | L | medium | ok |  |  | optional SageOx re-integration |
-| 554 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 555 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 556 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 557 | PAN-2399 | M | medium | ok |  |  | wire replay_threshold/compaction_reroute into the slot-recovery respawn seam |
-| 558 | PAN-2392 | M | medium | ok |  |  | Standing Crew cost panel |
-| 559 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 560 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 561 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 562 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 563 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 564 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 565 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 566 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 567 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 568 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 569 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
-| 570 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
-| 571 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
-| 572 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
-| 573 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 574 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
-| 575 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
-| 576 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
-| 577 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 578 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 579 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
-| 580 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 581 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 582 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 583 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 584 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 585 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 586 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 587 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 588 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 589 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 590 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 591 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 592 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 593 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 486 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 487 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 488 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 489 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 490 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 491 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 492 | PAN-1027 | S | medium | ok |  |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
+| 493 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 494 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 495 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 496 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 497 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 498 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 499 | PAN-727 | M | medium | ok |  |  | Fix orphaned work-agent start handoff after planning |
+| 500 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 501 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 502 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 503 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 504 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 505 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 506 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 507 | PAN-324 | XS | medium | stale |  |  | Agent detail pane missing Merge/Approve button |
+| 508 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 509 | PAN-247 | S | medium | stale |  |  | Deacon has no backoff or escalation for repeated specialist startup failures |
+| 510 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 511 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 512 | PAN-178 | M | medium | stale |  |  | PAN-178: Crash recovery with granular task checkpointing |
+| 513 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 514 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 515 | PAN-1951 | M | medium | ok |  |  | Inspector resumes a warm per-issue session instead of cold-spawning per item |
+| 516 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 517 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 518 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 519 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 520 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 521 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 522 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 523 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 524 | PAN-3057 | S | medium | needs-refinement |  |  | Harness-initiated compaction idled six agents and GPT-5.6's window was declared twice; both fixes appear landed — verify and close. |
+| 525 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 526 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 527 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 528 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 529 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 530 | PAN-646 | XS | medium | ok |  |  | Canceled issues: add guided Recover workflow |
+| 531 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 532 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 533 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 534 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 535 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 536 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
+| 537 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 538 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 539 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 540 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 541 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 542 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 543 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
+| 544 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 545 | PAN-2558 | L | medium | ok |  |  | support polyrepo projects |
+| 546 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 547 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 548 | PAN-2548 | XS | medium | ok |  |  | close the PAN-2541 legacy-fallback deprecation window |
+| 549 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 550 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 551 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 552 | PAN-2444 | L | medium | ok |  |  | optional SageOx re-integration |
+| 553 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 554 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 555 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 556 | PAN-2399 | M | medium | ok |  |  | wire replay_threshold/compaction_reroute into the slot-recovery respawn seam |
+| 557 | PAN-2392 | M | medium | ok |  |  | Standing Crew cost panel |
+| 558 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 559 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 560 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 561 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 562 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 563 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 564 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 565 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 566 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 567 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 568 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
+| 569 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
+| 570 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
+| 571 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
+| 572 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 573 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
+| 574 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
+| 575 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
+| 576 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 577 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 578 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
+| 579 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 580 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 581 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 582 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 583 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 584 | PAN-1967 | M | medium | ok |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 585 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 586 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 587 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 588 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 589 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 590 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 591 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 592 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 593 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
 | 594 | PAN-3684 | XS | medium | ok |  | PAN-1641 | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
-| 595 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 596 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 597 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 598 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 599 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 600 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 601 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
-| 602 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 603 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 604 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 605 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 606 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 607 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
-| 608 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 609 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 610 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 611 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 612 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 613 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 614 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 615 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 616 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 617 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 618 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 619 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 620 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 621 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 622 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 623 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
-| 624 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 625 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
-| 626 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 627 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 628 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
-| 629 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 630 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
-| 631 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 632 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 633 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 634 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 635 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 636 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 637 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
-| 638 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 639 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 640 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 641 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 642 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 643 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 644 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 645 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 646 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 647 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
-| 648 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
-| 649 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 650 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 651 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 652 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 653 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 654 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 655 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 656 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 657 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 658 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 659 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 660 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 661 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 662 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 663 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 664 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 665 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 666 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 667 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 668 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 669 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 670 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 671 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 672 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 673 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 674 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 675 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 676 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 677 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 678 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 679 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 680 | PAN-2941 | M | low | ok |  |  | OKF v3 |
-| 681 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 682 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
-| 683 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 684 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 685 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 686 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 687 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 688 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 689 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 690 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 691 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 692 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 693 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 694 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 695 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 696 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 697 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 698 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
-| 699 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 700 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 701 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 702 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
-| 703 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
-| 704 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 705 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
-| 706 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 707 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 708 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
-| 709 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 710 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 595 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 596 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 597 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 598 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 599 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 600 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
+| 601 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 602 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 603 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 604 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 605 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 606 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
+| 607 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 608 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 609 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 610 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 611 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 612 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 613 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 614 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 615 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 616 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 617 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 618 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 619 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 620 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 621 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 622 | PAN-1497 | M | medium | ok |  |  | emit TTS announcements on lifecycle events (start, pause, resume, report) |
+| 623 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 624 | PAN-1489 | M | medium | needs-refinement |  |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
+| 625 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 626 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 627 | PAN-1443 | M | medium | ok |  |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
+| 628 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 629 | PAN-1437 | M | medium | ok |  |  | pan flywheel report semantics: split read-only snapshot from run finalization |
+| 630 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 631 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 632 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 633 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 634 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 635 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 636 | PAN-1040 | XS | medium | ok |  |  | event-driven dispatch for inspect-agent (requiresInspection=true beads) |
+| 637 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 638 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 639 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 640 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 641 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 642 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 643 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 644 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 645 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 646 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
+| 647 | PAN-709 | M | medium | ok |  |  | self-improving flywheel |
+| 648 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 649 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 650 | PAN-675 | M | medium | ok |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 651 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 652 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 653 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 654 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 655 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 656 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 657 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 658 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 659 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 660 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 661 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 662 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 663 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 664 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 665 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 666 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 667 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 668 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 669 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 670 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 671 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 672 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 673 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 674 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 675 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 676 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 677 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 678 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 679 | PAN-2941 | M | low | ok |  |  | OKF v3 |
+| 680 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 681 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
+| 682 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 683 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 684 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 685 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 686 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 687 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 688 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 689 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 690 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 691 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 692 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 693 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 694 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 695 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 696 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 697 | PAN-2507 | M | low | ok |  |  | Preemptive pipeline scheduler: yield idle work agents to unblock review/test/merge dispatch |
+| 698 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 699 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 700 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 701 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
+| 702 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
+| 703 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 704 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
+| 705 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
+| 706 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 707 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
+| 708 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 709 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 710 | PAN-3011 | M | low | ok |  |  | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 712 | PAN-3011 | M | low | ok |  |  | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 713 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 714 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 715 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 716 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 717 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 718 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 719 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 720 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
-| 721 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 722 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 723 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 724 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 725 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 726 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 727 | PAN-1980 | M | low | ok |  |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
-| 728 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 729 | PAN-1949 | M | low | ok |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
-| 730 | PAN-1914 | M | low | ok |  |  | Follow-up: move /api/health/agents off agent-directory scans |
-| 731 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 732 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 733 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 734 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 735 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 736 | PAN-1758 | M | low | ok |  |  | Watch: ready-for-merge work must converge despite a continuously moving main |
-| 737 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 738 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 739 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 740 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 741 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 742 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 743 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 744 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 745 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 746 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 747 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 748 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 749 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 750 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 751 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 752 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 753 | PAN-1136 | M | low | ok |  |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
-| 754 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 755 | PAN-1133 | M | low | ok |  |  | TLDR: deacon supervision + pan doctor check + GC |
-| 756 | PAN-1124 | M | low | ok |  |  | Decouple specs and PRDs from workspaces |
-| 757 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 758 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 759 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 760 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 761 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 762 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 763 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 764 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 765 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 766 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
+| 712 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 713 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 714 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 715 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 716 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 717 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 718 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 719 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 720 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 721 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 722 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 723 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 724 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 725 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 726 | PAN-1980 | M | low | ok |  |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
+| 727 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 728 | PAN-1949 | M | low | ok |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
+| 729 | PAN-1914 | M | low | ok |  |  | Follow-up: move /api/health/agents off agent-directory scans |
+| 730 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 731 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 732 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 733 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 734 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 735 | PAN-1758 | M | low | ok |  |  | Watch: ready-for-merge work must converge despite a continuously moving main |
+| 736 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 737 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 738 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 739 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 740 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 741 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 742 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 743 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 744 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 745 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 746 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 747 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 748 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 749 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 750 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 751 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 752 | PAN-1136 | M | low | ok |  |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
+| 753 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 754 | PAN-1133 | M | low | ok |  |  | TLDR: deacon supervision + pan doctor check + GC |
+| 755 | PAN-1124 | M | low | ok |  |  | Decouple specs and PRDs from workspaces |
+| 756 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 757 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 758 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 759 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 760 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 761 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 762 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 763 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 764 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 765 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
+| 766 | PAN-3778 | S | low | ok |  |  | Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out. |
 | 767 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
 | 768 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
 | 769 | PAN-962 | M | low | ok |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
@@ -1207,7 +1207,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-07T20:18:04Z",
+  "generatedAt": "2026-09-07T20:21:31Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 872,
@@ -1255,19 +1255,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-2689",
-      "rank": 5,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review verdicts from sandboxed codex review agents are silently lost",
-      "rationale": "Sandboxed codex review verdicts fire-and-forget into a journal that loses them; review convoy reports green on evidence never delivered.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3690",
       "rank": 4,
       "size": "S",
@@ -1277,6 +1264,19 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "dependsOn": [],
       "why": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit",
       "rationale": "Swarm reset leaves slot completion markers; fresh items inherit ready-to-merge before they commit. In pipeline — rank pinned while an agent is working it; gate stays auto so the pipeline, not the sequencer, decides the next move. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2689",
+      "rank": 5,
+      "size": "S",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review verdicts from sandboxed codex review agents are silently lost",
+      "rationale": "Sandboxed codex review verdicts fire-and-forget into a journal that loses them; review convoy reports green on evidence never delivered.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2849,20 +2849,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-3778",
-      "rank": 126,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reconnect loop from full-transcript snapshot on resubscribe; fix commit 48fd8f7a landed on main, awaiting verify/close-out.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3734",
-      "rank": 127,
+      "rank": 126,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2874,13 +2862,25 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3650",
-      "rank": 128,
+      "rank": 127,
       "size": "S",
       "importance": "high",
       "score": 80,
       "condition": "ok",
       "dependsOn": [],
       "why": "Strike self-abort is not terminal — state.json stays running and the deacon resurrects the aborted strike on every recovery pass.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3621",
+      "rank": 128,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2897,20 +2897,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-3621",
-      "rank": 130,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3555",
-      "rank": 131,
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2922,7 +2910,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3498",
-      "rank": 132,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2934,7 +2922,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3496",
-      "rank": 133,
+      "rank": 132,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2946,7 +2934,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3301",
-      "rank": 134,
+      "rank": 133,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2958,7 +2946,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3081",
-      "rank": 135,
+      "rank": 134,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2970,7 +2958,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2627",
-      "rank": 136,
+      "rank": 135,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2983,7 +2971,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2324",
-      "rank": 137,
+      "rank": 136,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -2996,7 +2984,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2165",
-      "rank": 138,
+      "rank": 137,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3009,7 +2997,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2905",
-      "rank": 139,
+      "rank": 138,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3022,7 +3010,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2259",
-      "rank": 140,
+      "rank": 139,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3035,7 +3023,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2379",
-      "rank": 141,
+      "rank": 140,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3048,7 +3036,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2421",
-      "rank": 142,
+      "rank": 141,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3061,7 +3049,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2430",
-      "rank": 143,
+      "rank": 142,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3074,7 +3062,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2593",
-      "rank": 144,
+      "rank": 143,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3087,7 +3075,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2656",
-      "rank": 145,
+      "rank": 144,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3100,7 +3088,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2075",
-      "rank": 146,
+      "rank": 145,
       "size": "XL",
       "importance": "high",
       "score": 78,
@@ -3114,7 +3102,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2077",
-      "rank": 147,
+      "rank": 146,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3129,7 +3117,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2078",
-      "rank": 148,
+      "rank": 147,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3144,7 +3132,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2079",
-      "rank": 149,
+      "rank": 148,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3159,7 +3147,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2080",
-      "rank": 150,
+      "rank": 149,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3174,7 +3162,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1775",
-      "rank": 151,
+      "rank": 150,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3187,7 +3175,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-454",
-      "rank": 152,
+      "rank": 151,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3202,7 +3190,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1436",
-      "rank": 153,
+      "rank": 152,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3215,7 +3203,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3651",
-      "rank": 154,
+      "rank": 153,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3227,7 +3215,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3634",
-      "rank": 155,
+      "rank": 154,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3239,7 +3227,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3556",
-      "rank": 156,
+      "rank": 155,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3251,7 +3239,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3553",
-      "rank": 157,
+      "rank": 156,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3263,7 +3251,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3535",
-      "rank": 158,
+      "rank": 157,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3275,7 +3263,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3464",
-      "rank": 159,
+      "rank": 158,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3287,7 +3275,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3429",
-      "rank": 160,
+      "rank": 159,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3299,7 +3287,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3397",
-      "rank": 161,
+      "rank": 160,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3311,7 +3299,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3344",
-      "rank": 162,
+      "rank": 161,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3323,7 +3311,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3325",
-      "rank": 163,
+      "rank": 162,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3335,7 +3323,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3317",
-      "rank": 164,
+      "rank": 163,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3347,7 +3335,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3284",
-      "rank": 165,
+      "rank": 164,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3359,7 +3347,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3270",
-      "rank": 166,
+      "rank": 165,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3371,7 +3359,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3257",
-      "rank": 167,
+      "rank": 166,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3383,7 +3371,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3188",
-      "rank": 168,
+      "rank": 167,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3395,7 +3383,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3139",
-      "rank": 169,
+      "rank": 168,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3407,7 +3395,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3129",
-      "rank": 170,
+      "rank": 169,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3419,7 +3407,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3120",
-      "rank": 171,
+      "rank": 170,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3431,7 +3419,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3077",
-      "rank": 172,
+      "rank": 171,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3443,7 +3431,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3062",
-      "rank": 173,
+      "rank": 172,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3455,7 +3443,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3048",
-      "rank": 174,
+      "rank": 173,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3467,7 +3455,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3032",
-      "rank": 175,
+      "rank": 174,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3476,6 +3464,19 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "why": "Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-3307",
+      "rank": 175,
+      "size": "XS",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it.",
+      "rationale": "Re-ranked up. It carries the substrate-improvement label, which the ranking rules floor at high importance regardless of how small the change reads. The substance is modest — a stale commitlint scope-enum — but it warns on the majority of legitimate commits and trains every agent to ignore commitlint output, which quietly disarms a gate.",
+      "gate": "auto",
+      "planning": "skip"
     },
     {
       "issue": "PAN-3668",
@@ -5141,6 +5142,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "condition": "ok",
       "dependsOn": [],
       "why": "Show merged-but-not-closed-out count in pan status and the dashboard headline",
+      "rationale": "Body updated since the last pass and the issue is now labelled planned and ready; no delta justified a rank change.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -5417,6 +5419,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
+      "rationale": "Body updated since the last pass; it remains the security prerequisite that blocks every other Overdeck Anywhere phase, so the rank holds.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -6924,20 +6927,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-3307",
-      "rank": 460,
-      "size": "XS",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3157",
-      "rank": 461,
+      "rank": 460,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6949,7 +6940,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2982",
-      "rank": 462,
+      "rank": 461,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6961,7 +6952,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2981",
-      "rank": 463,
+      "rank": 462,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6973,7 +6964,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2976",
-      "rank": 464,
+      "rank": 463,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6985,7 +6976,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1444",
-      "rank": 465,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6997,7 +6988,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1440",
-      "rank": 466,
+      "rank": 465,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7009,7 +7000,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1438",
-      "rank": 467,
+      "rank": 466,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7021,7 +7012,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1433",
-      "rank": 468,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7033,7 +7024,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1416",
-      "rank": 469,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7045,7 +7036,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1392",
-      "rank": 470,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7057,7 +7048,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1386",
-      "rank": 471,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -7069,7 +7060,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1330",
-      "rank": 472,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7081,7 +7072,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1245",
-      "rank": 473,
+      "rank": 472,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7093,7 +7084,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1244",
-      "rank": 474,
+      "rank": 473,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7105,7 +7096,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1240",
-      "rank": 475,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7117,7 +7108,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1227",
-      "rank": 476,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7129,7 +7120,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1226",
-      "rank": 477,
+      "rank": 476,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -7141,7 +7132,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1173",
-      "rank": 478,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7153,7 +7144,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1154",
-      "rank": 479,
+      "rank": 478,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7165,7 +7156,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3540",
-      "rank": 480,
+      "rank": 479,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7177,7 +7168,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3354",
-      "rank": 481,
+      "rank": 480,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -7189,7 +7180,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3321",
-      "rank": 482,
+      "rank": 481,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -7201,7 +7192,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3178",
-      "rank": 483,
+      "rank": 482,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -7213,13 +7204,25 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3017",
-      "rank": 484,
+      "rank": 483,
       "size": "S",
       "importance": "medium",
       "score": 52,
       "condition": "ok",
       "dependsOn": [],
       "why": "The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1150",
+      "rank": 484,
+      "size": "S",
+      "importance": "medium",
+      "score": 51,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Settings: \"Anthropic is not configured\" warning persists in Model Routing after claude /login (Provider tab disagrees)",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7236,20 +7239,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-1150",
-      "rank": 486,
-      "size": "S",
-      "importance": "medium",
-      "score": 51,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Settings: \"Anthropic is not configured\" warning persists in Model Routing after claude /login (Provider tab disagrees)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1149",
-      "rank": 487,
+      "rank": 486,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7261,7 +7252,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1130",
-      "rank": 488,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7273,7 +7264,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1129",
-      "rank": 489,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7285,7 +7276,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1128",
-      "rank": 490,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7297,7 +7288,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1113",
-      "rank": 491,
+      "rank": 490,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7309,7 +7300,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1068",
-      "rank": 492,
+      "rank": 491,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7321,7 +7312,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1027",
-      "rank": 493,
+      "rank": 492,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7333,7 +7324,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-933",
-      "rank": 494,
+      "rank": 493,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7345,7 +7336,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-932",
-      "rank": 495,
+      "rank": 494,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7357,7 +7348,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-927",
-      "rank": 496,
+      "rank": 495,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7369,7 +7360,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-900",
-      "rank": 497,
+      "rank": 496,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7381,7 +7372,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-886",
-      "rank": 498,
+      "rank": 497,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7393,7 +7384,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-778",
-      "rank": 499,
+      "rank": 498,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7405,7 +7396,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-727",
-      "rank": 500,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7417,7 +7408,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-681",
-      "rank": 501,
+      "rank": 500,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7429,7 +7420,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3732",
-      "rank": 502,
+      "rank": 501,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7441,7 +7432,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3700",
-      "rank": 503,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7453,7 +7444,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3290",
-      "rank": 504,
+      "rank": 503,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7465,7 +7456,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3132",
-      "rank": 505,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7477,7 +7468,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-538",
-      "rank": 506,
+      "rank": 505,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7489,7 +7480,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-334",
-      "rank": 507,
+      "rank": 506,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7501,7 +7492,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-324",
-      "rank": 508,
+      "rank": 507,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -7513,7 +7504,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-304",
-      "rank": 509,
+      "rank": 508,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7525,7 +7516,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-247",
-      "rank": 510,
+      "rank": 509,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7537,7 +7528,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-245",
-      "rank": 511,
+      "rank": 510,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7549,7 +7540,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-244",
-      "rank": 512,
+      "rank": 511,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7561,7 +7552,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-178",
-      "rank": 513,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7573,7 +7564,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-113",
-      "rank": 514,
+      "rank": 513,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7585,7 +7576,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-49",
-      "rank": 515,
+      "rank": 514,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -7597,7 +7588,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1951",
-      "rank": 516,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7609,7 +7600,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1164",
-      "rank": 517,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7621,7 +7612,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1041",
-      "rank": 518,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7633,7 +7624,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-924",
-      "rank": 519,
+      "rank": 518,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7645,7 +7636,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3770",
-      "rank": 520,
+      "rank": 519,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7657,7 +7648,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3731",
-      "rank": 521,
+      "rank": 520,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7669,7 +7660,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3530",
-      "rank": 522,
+      "rank": 521,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7681,7 +7672,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3131",
-      "rank": 523,
+      "rank": 522,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7693,7 +7684,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3061",
-      "rank": 524,
+      "rank": 523,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7705,7 +7696,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3057",
-      "rank": 525,
+      "rank": 524,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7717,7 +7708,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-863",
-      "rank": 526,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7729,7 +7720,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-817",
-      "rank": 527,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7741,7 +7732,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-802",
-      "rank": 528,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7753,7 +7744,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-713",
-      "rank": 529,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7765,7 +7756,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-700",
-      "rank": 530,
+      "rank": 529,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7777,7 +7768,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-646",
-      "rank": 531,
+      "rank": 530,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7789,7 +7780,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-532",
-      "rank": 532,
+      "rank": 531,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7801,7 +7792,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2896",
-      "rank": 533,
+      "rank": 532,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7813,7 +7804,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2685",
-      "rank": 534,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7825,7 +7816,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2626",
-      "rank": 535,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7837,7 +7828,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2625",
-      "rank": 536,
+      "rank": 535,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7849,7 +7840,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2609",
-      "rank": 537,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7861,7 +7852,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2608",
-      "rank": 538,
+      "rank": 537,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7873,7 +7864,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2582",
-      "rank": 539,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7885,7 +7876,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2566",
-      "rank": 540,
+      "rank": 539,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7899,19 +7890,20 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2565",
-      "rank": 541,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
       "dependsOn": [],
       "why": "Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging",
+      "rationale": "Body updated since the last pass; no delta justified a rank change.",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-3735",
-      "rank": 542,
+      "rank": 541,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7923,7 +7915,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3335",
-      "rank": 543,
+      "rank": 542,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7935,7 +7927,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3054",
-      "rank": 544,
+      "rank": 543,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7947,7 +7939,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2977",
-      "rank": 545,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7961,7 +7953,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2558",
-      "rank": 546,
+      "rank": 545,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -7973,7 +7965,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2557",
-      "rank": 547,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7985,7 +7977,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2553",
-      "rank": 548,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7997,7 +7989,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2548",
-      "rank": 549,
+      "rank": 548,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -8009,7 +8001,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2521",
-      "rank": 550,
+      "rank": 549,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -8021,7 +8013,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2493",
-      "rank": 551,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -8033,7 +8025,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3772",
-      "rank": 552,
+      "rank": 551,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -8045,7 +8037,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2444",
-      "rank": 553,
+      "rank": 552,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8057,7 +8049,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2443",
-      "rank": 554,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8069,7 +8061,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2442",
-      "rank": 555,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8081,7 +8073,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2409",
-      "rank": 556,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8093,7 +8085,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2399",
-      "rank": 557,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8105,7 +8097,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2392",
-      "rank": 558,
+      "rank": 557,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8117,7 +8109,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2335",
-      "rank": 559,
+      "rank": 558,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8129,7 +8121,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2295",
-      "rank": 560,
+      "rank": 559,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8141,7 +8133,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3767",
-      "rank": 561,
+      "rank": 560,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8153,7 +8145,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3615",
-      "rank": 562,
+      "rank": 561,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8165,7 +8157,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3558",
-      "rank": 563,
+      "rank": 562,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8177,7 +8169,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3469",
-      "rank": 564,
+      "rank": 563,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8189,7 +8181,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3333",
-      "rank": 565,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8201,7 +8193,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3058",
-      "rank": 566,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8213,7 +8205,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2288",
-      "rank": 567,
+      "rank": 566,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8225,7 +8217,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2065",
-      "rank": 568,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8237,7 +8229,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2035",
-      "rank": 569,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8249,7 +8241,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2034",
-      "rank": 570,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8261,7 +8253,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2033",
-      "rank": 571,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8273,7 +8265,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2032",
-      "rank": 572,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8285,7 +8277,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2031",
-      "rank": 573,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8297,7 +8289,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2030",
-      "rank": 574,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8309,7 +8301,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2029",
-      "rank": 575,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8321,7 +8313,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2028",
-      "rank": 576,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8333,7 +8325,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2026",
-      "rank": 577,
+      "rank": 576,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8345,7 +8337,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2025",
-      "rank": 578,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8357,7 +8349,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2024",
-      "rank": 579,
+      "rank": 578,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8369,7 +8361,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2004",
-      "rank": 580,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8381,7 +8373,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1995",
-      "rank": 581,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8393,7 +8385,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3739",
-      "rank": 582,
+      "rank": 581,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8405,7 +8397,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1985",
-      "rank": 583,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8417,7 +8409,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1968",
-      "rank": 584,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8429,7 +8421,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1967",
-      "rank": 585,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8441,7 +8433,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1965",
-      "rank": 586,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8453,7 +8445,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1937",
-      "rank": 587,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8465,7 +8457,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1926",
-      "rank": 588,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8477,7 +8469,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1916",
-      "rank": 589,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8489,7 +8481,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1854",
-      "rank": 590,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8501,7 +8493,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1853",
-      "rank": 591,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8513,7 +8505,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1852",
-      "rank": 592,
+      "rank": 591,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8525,13 +8517,25 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1844",
-      "rank": 593,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 40,
       "condition": "ok",
       "dependsOn": [],
       "why": "Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1840",
+      "rank": 593,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add 'pan switch <id>'",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8550,20 +8554,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "auto"
     },
     {
-      "issue": "PAN-1840",
-      "rank": 595,
-      "size": "M",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add 'pan switch <id>'",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1839",
-      "rank": 596,
+      "rank": 595,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8575,7 +8567,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1776",
-      "rank": 597,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8587,7 +8579,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3706",
-      "rank": 598,
+      "rank": 597,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8599,7 +8591,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3539",
-      "rank": 599,
+      "rank": 598,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8611,7 +8603,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3502",
-      "rank": 600,
+      "rank": 599,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8623,7 +8615,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3499",
-      "rank": 601,
+      "rank": 600,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8635,7 +8627,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2978",
-      "rank": 602,
+      "rank": 601,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8650,7 +8642,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1754",
-      "rank": 603,
+      "rank": 602,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8662,7 +8654,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1751",
-      "rank": 604,
+      "rank": 603,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8674,7 +8666,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1750",
-      "rank": 605,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8686,7 +8678,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1748",
-      "rank": 606,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8698,7 +8690,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1735",
-      "rank": 607,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8710,7 +8702,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1691",
-      "rank": 608,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8722,7 +8714,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1685",
-      "rank": 609,
+      "rank": 608,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8734,7 +8726,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1676",
-      "rank": 610,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8746,7 +8738,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1667",
-      "rank": 611,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8758,7 +8750,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1657",
-      "rank": 612,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8770,7 +8762,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1656",
-      "rank": 613,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8782,7 +8774,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1655",
-      "rank": 614,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8794,7 +8786,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1654",
-      "rank": 615,
+      "rank": 614,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8806,7 +8798,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1653",
-      "rank": 616,
+      "rank": 615,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8818,7 +8810,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1623",
-      "rank": 617,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8830,7 +8822,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1561",
-      "rank": 618,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8842,7 +8834,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1550",
-      "rank": 619,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8854,7 +8846,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1545",
-      "rank": 620,
+      "rank": 619,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8866,7 +8858,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1542",
-      "rank": 621,
+      "rank": 620,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8878,7 +8870,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1524",
-      "rank": 622,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8890,7 +8882,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1497",
-      "rank": 623,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8902,7 +8894,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1490",
-      "rank": 624,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8914,7 +8906,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1489",
-      "rank": 625,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8926,7 +8918,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1485",
-      "rank": 626,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8938,7 +8930,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1473",
-      "rank": 627,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8950,7 +8942,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1443",
-      "rank": 628,
+      "rank": 627,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8962,7 +8954,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1442",
-      "rank": 629,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8974,7 +8966,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1437",
-      "rank": 630,
+      "rank": 629,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8986,7 +8978,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1432",
-      "rank": 631,
+      "rank": 630,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8998,7 +8990,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1223",
-      "rank": 632,
+      "rank": 631,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9010,7 +9002,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1165",
-      "rank": 633,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -9022,7 +9014,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1151",
-      "rank": 634,
+      "rank": 633,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -9034,7 +9026,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1060",
-      "rank": 635,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9046,7 +9038,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1051",
-      "rank": 636,
+      "rank": 635,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9058,7 +9050,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1040",
-      "rank": 637,
+      "rank": 636,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -9070,7 +9062,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1037",
-      "rank": 638,
+      "rank": 637,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9082,7 +9074,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-958",
-      "rank": 639,
+      "rank": 638,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9094,7 +9086,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-949",
-      "rank": 640,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9106,7 +9098,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-947",
-      "rank": 641,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9118,7 +9110,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-938",
-      "rank": 642,
+      "rank": 641,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9130,7 +9122,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-903",
-      "rank": 643,
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9142,7 +9134,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-902",
-      "rank": 644,
+      "rank": 643,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9154,7 +9146,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-901",
-      "rank": 645,
+      "rank": 644,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9166,7 +9158,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-818",
-      "rank": 646,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9178,7 +9170,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-736",
-      "rank": 647,
+      "rank": 646,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9190,7 +9182,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-709",
-      "rank": 648,
+      "rank": 647,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9202,7 +9194,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3322",
-      "rank": 649,
+      "rank": 648,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9214,7 +9206,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-678",
-      "rank": 650,
+      "rank": 649,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9226,7 +9218,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-675",
-      "rank": 651,
+      "rank": 650,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9238,7 +9230,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-654",
-      "rank": 652,
+      "rank": 651,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -9250,7 +9242,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-649",
-      "rank": 653,
+      "rank": 652,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9262,7 +9254,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-637",
-      "rank": 654,
+      "rank": 653,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -9274,7 +9266,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-629",
-      "rank": 655,
+      "rank": 654,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9286,7 +9278,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-613",
-      "rank": 656,
+      "rank": 655,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9298,7 +9290,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-607",
-      "rank": 657,
+      "rank": 656,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9310,7 +9302,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-606",
-      "rank": 658,
+      "rank": 657,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9322,7 +9314,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-548",
-      "rank": 659,
+      "rank": 658,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9334,7 +9326,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-546",
-      "rank": 660,
+      "rank": 659,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9346,7 +9338,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-537",
-      "rank": 661,
+      "rank": 660,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9358,7 +9350,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-531",
-      "rank": 662,
+      "rank": 661,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9370,7 +9362,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-452",
-      "rank": 663,
+      "rank": 662,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9382,7 +9374,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-450",
-      "rank": 664,
+      "rank": 663,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9394,7 +9386,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-294",
-      "rank": 665,
+      "rank": 664,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9406,7 +9398,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-293",
-      "rank": 666,
+      "rank": 665,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9418,7 +9410,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-277",
-      "rank": 667,
+      "rank": 666,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9430,7 +9422,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-258",
-      "rank": 668,
+      "rank": 667,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9442,7 +9434,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-255",
-      "rank": 669,
+      "rank": 668,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9454,7 +9446,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-252",
-      "rank": 670,
+      "rank": 669,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9466,7 +9458,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-243",
-      "rank": 671,
+      "rank": 670,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -9478,7 +9470,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-77",
-      "rank": 672,
+      "rank": 671,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -9490,7 +9482,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-54",
-      "rank": 673,
+      "rank": 672,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -9502,7 +9494,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-38",
-      "rank": 674,
+      "rank": 673,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9514,7 +9506,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-37",
-      "rank": 675,
+      "rank": 674,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9526,7 +9518,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1126",
-      "rank": 676,
+      "rank": 675,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9538,7 +9530,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1066",
-      "rank": 677,
+      "rank": 676,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9550,7 +9542,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3441",
-      "rank": 678,
+      "rank": 677,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9562,7 +9554,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2968",
-      "rank": 679,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9574,7 +9566,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2941",
-      "rank": 680,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9586,7 +9578,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2936",
-      "rank": 681,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9598,7 +9590,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2922",
-      "rank": 682,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9610,7 +9602,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2868",
-      "rank": 683,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9622,7 +9614,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2767",
-      "rank": 684,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9634,7 +9626,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2679",
-      "rank": 685,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9646,7 +9638,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2662",
-      "rank": 686,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9658,7 +9650,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2645",
-      "rank": 687,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9670,7 +9662,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2635",
-      "rank": 688,
+      "rank": 687,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9682,7 +9674,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2630",
-      "rank": 689,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9694,7 +9686,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2629",
-      "rank": 690,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9706,7 +9698,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3443",
-      "rank": 691,
+      "rank": 690,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9718,7 +9710,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2628",
-      "rank": 692,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9730,7 +9722,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2622",
-      "rank": 693,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9742,7 +9734,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2600",
-      "rank": 694,
+      "rank": 693,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9754,7 +9746,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2533",
-      "rank": 695,
+      "rank": 694,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9766,7 +9758,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2527",
-      "rank": 696,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9778,7 +9770,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2514",
-      "rank": 697,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9790,7 +9782,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2507",
-      "rank": 698,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9802,7 +9794,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2505",
-      "rank": 699,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9814,7 +9806,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2504",
-      "rank": 700,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9826,7 +9818,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2449",
-      "rank": 701,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9838,7 +9830,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2424",
-      "rank": 702,
+      "rank": 701,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9850,7 +9842,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2406",
-      "rank": 703,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9862,7 +9854,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2394",
-      "rank": 704,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9874,7 +9866,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2356",
-      "rank": 705,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9887,31 +9879,33 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2355",
-      "rank": 706,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
+      "rationale": "Body updated since the last pass; the mobile PWA is a client surface either architecture supports, so the rank holds.",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-2354",
-      "rank": 707,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
       "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
+      "rationale": "Body updated since the last pass; unlike the transport phases, a needs-you push bridge survives the PAN-3762 direction change unchanged, so the rank holds.",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-2352",
-      "rank": 708,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9924,7 +9918,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2353",
-      "rank": 709,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9937,7 +9931,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3133",
-      "rank": 710,
+      "rank": 709,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9946,6 +9940,18 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "why": "Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-3011",
+      "rank": 710,
+      "size": "M",
+      "importance": "low",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1641",
@@ -9960,20 +9966,8 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "planning": "skip"
     },
     {
-      "issue": "PAN-3011",
-      "rank": 712,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2282",
-      "rank": 713,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9985,7 +9979,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2091",
-      "rank": 714,
+      "rank": 713,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9997,7 +9991,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2085",
-      "rank": 715,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10009,7 +10003,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2084",
-      "rank": 716,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10021,7 +10015,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2083",
-      "rank": 717,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10033,7 +10027,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2082",
-      "rank": 718,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10045,7 +10039,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2074",
-      "rank": 719,
+      "rank": 718,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -10057,7 +10051,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2046",
-      "rank": 720,
+      "rank": 719,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10069,7 +10063,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2006",
-      "rank": 721,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -10081,7 +10075,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2005",
-      "rank": 722,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10093,7 +10087,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2002",
-      "rank": 723,
+      "rank": 722,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -10105,7 +10099,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1999",
-      "rank": 724,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10117,7 +10111,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1986",
-      "rank": 725,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10129,7 +10123,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1983",
-      "rank": 726,
+      "rank": 725,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -10141,7 +10135,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1980",
-      "rank": 727,
+      "rank": 726,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10153,7 +10147,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1958",
-      "rank": 728,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10165,7 +10159,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1949",
-      "rank": 729,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10177,7 +10171,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1914",
-      "rank": 730,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10189,7 +10183,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1907",
-      "rank": 731,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10201,7 +10195,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1895",
-      "rank": 732,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10213,7 +10207,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1878",
-      "rank": 733,
+      "rank": 732,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10225,7 +10219,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1782",
-      "rank": 734,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10237,7 +10231,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1773",
-      "rank": 735,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10249,7 +10243,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1758",
-      "rank": 736,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10261,7 +10255,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1646",
-      "rank": 737,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10273,7 +10267,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1643",
-      "rank": 738,
+      "rank": 737,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10285,7 +10279,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1592",
-      "rank": 739,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10297,7 +10291,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1581",
-      "rank": 740,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10309,7 +10303,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1552",
-      "rank": 741,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10321,7 +10315,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1533",
-      "rank": 742,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10333,7 +10327,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1483",
-      "rank": 743,
+      "rank": 742,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -10345,7 +10339,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1482",
-      "rank": 744,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10357,7 +10351,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1481",
-      "rank": 745,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10369,7 +10363,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1356",
-      "rank": 746,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10381,7 +10375,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1242",
-      "rank": 747,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10393,7 +10387,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1222",
-      "rank": 748,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10405,7 +10399,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1208",
-      "rank": 749,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10417,7 +10411,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1166",
-      "rank": 750,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10429,7 +10423,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1153",
-      "rank": 751,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10441,7 +10435,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1152",
-      "rank": 752,
+      "rank": 751,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -10453,7 +10447,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1136",
-      "rank": 753,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10465,7 +10459,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1135",
-      "rank": 754,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10477,7 +10471,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1133",
-      "rank": 755,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10489,7 +10483,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1124",
-      "rank": 756,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10501,7 +10495,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1123",
-      "rank": 757,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10513,7 +10507,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1121",
-      "rank": 758,
+      "rank": 757,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10525,7 +10519,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1117",
-      "rank": 759,
+      "rank": 758,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10537,7 +10531,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1116",
-      "rank": 760,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10549,7 +10543,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1065",
-      "rank": 761,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10561,7 +10555,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1064",
-      "rank": 762,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10573,7 +10567,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-1063",
-      "rank": 763,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10585,7 +10579,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3768",
-      "rank": 764,
+      "rank": 763,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10597,7 +10591,7 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-3034",
-      "rank": 765,
+      "rank": 764,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10609,13 +10603,26 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
     },
     {
       "issue": "PAN-2983",
-      "rank": 766,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 20,
       "condition": "ok",
       "dependsOn": [],
       "why": "OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3778",
+      "rank": 766,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out.",
+      "rationale": "Re-ranked down. The staleness-reconnect fix landed on main as 48fd8f7a, so this is finished work awaiting close-out, not workable scope. Left high it would sit near the top of the pickable queue and invite a planning agent on already-shipped work — the waste PAN-3103 exists to stop. Scored with the other landed-pending-close-out issues (PAN-3768, PAN-3456, PAN-3034).",
       "gate": "auto",
       "planning": "auto"
     },
