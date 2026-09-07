@@ -32,6 +32,34 @@ const ROLLOUT_LINES = [
   { type: 'event_msg', timestamp: '2026-06-09T00:11:06.000Z', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 60000, cached_input_tokens: 8000, output_tokens: 700, total_tokens: 60700 } } } },
 ];
 
+/**
+ * The same conversation as written by codex-cli >= 0.153.4 (PAN-3781), trimmed
+ * from a real gpt-6-astra rollout. `user_message`/`agent_message` are gone —
+ * both arrive as `item_completed` items keyed by PascalCase variant name. Note
+ * the content `type` casing genuinely differs between the two variants, and the
+ * attachment turn carries a non-text part that must drop out.
+ */
+const ITEM_COMPLETED_ROLLOUT_LINES = [
+  { type: 'session_meta', timestamp: '2026-09-07T21:50:12.646Z', payload: { id: 'thread-2', model_provider: 'openai' } },
+  { type: 'turn_context', timestamp: '2026-09-07T21:50:12.700Z', payload: { turn_id: 't1', model: 'gpt-6-astra' } },
+  // Injected context still arrives as a response_item message — must be skipped.
+  { type: 'response_item', timestamp: '2026-09-07T21:50:13.000Z', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<injected AGENTS.md context> ...' }] } },
+  // User turn — lowercase 'text' part, plus an image part with no text.
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:14.000Z', payload: { type: 'item_completed', item: { type: 'UserMessage', id: 'um_1', content: [{ type: 'text', text: 'fix the bug' }, { type: 'image', image_url: 'file:///screenshot.png' }] } } },
+  // Assistant narration — capitalised 'Text' part, commentary phase.
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:18.901Z', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'am_1', content: [{ type: 'Text', text: 'Checking the branch first.' }], phase: 'commentary' } } },
+  // Tool activity still comes from response_item — the CommandExecution item
+  // below must NOT produce a second work-log row for the same command.
+  { type: 'response_item', timestamp: '2026-09-07T21:50:19.000Z', payload: { type: 'custom_tool_call', name: 'exec_command', arguments: JSON.stringify({ cmd: 'git status', workdir: '/repo' }), call_id: 'call_1' } },
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:19.100Z', payload: { type: 'item_completed', item: { type: 'CommandExecution', id: 'ce_1', command: 'git status' } } },
+  { type: 'response_item', timestamp: '2026-09-07T21:50:19.200Z', payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: 'Output:\nclean\n' } },
+  // Reasoning item — skipped like the legacy encrypted reasoning record.
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:20.000Z', payload: { type: 'item_completed', item: { type: 'Reasoning', id: 'r_1', content: [{ type: 'Text', text: 'internal chain of thought' }] } } },
+  // Final answer.
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:25.000Z', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'am_2', content: [{ type: 'Text', text: 'Done — the bug is fixed.' }], phase: 'final_answer' } } },
+  { type: 'event_msg', timestamp: '2026-09-07T21:50:26.000Z', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 60000, cached_input_tokens: 8000, output_tokens: 700, total_tokens: 60700 } } } },
+];
+
 describe('codex conversation parser', () => {
   let dir: string;
   let file: string;
@@ -135,5 +163,56 @@ describe('codex conversation parser', () => {
 
     const result = await summarizeConversationActivity(doneFile, { harness: 'codex' });
     expect(result.isWorking).toBe(false);
+  });
+});
+
+/**
+ * PAN-3781 — codex-cli >= 0.153.4 renamed the rollout's message events. Every
+ * assertion here has a twin in the legacy suite above; both shapes must render
+ * identically, because old rollouts on disk keep the old names forever.
+ */
+describe('codex conversation parser — cli >= 0.153.4 item_completed shape', () => {
+  let dir: string;
+  let file: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'codex-parse-item-'));
+    file = join(dir, 'rollout-2026-09-07T17-50-12-thread-2.jsonl');
+    await writeFile(file, ITEM_COMPLETED_ROLLOUT_LINES.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('extracts user and assistant turns from item_completed, across both content-type casings', async () => {
+    const result = await parseCodexConversationMessages(file);
+
+    expect(result.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'assistant']);
+    // Lowercase 'text' part on UserMessage; the image part contributes nothing.
+    expect(result.messages[0]?.text).toBe('fix the bug');
+    // Capitalised 'Text' part on AgentMessage — commentary renders like the
+    // legacy agent_message narration did.
+    expect(result.messages[1]?.text).toBe('Checking the branch first.');
+    expect(result.messages[2]?.text).toBe('Done — the bug is fixed.');
+    expect(result.messages.some((m) => m.text.includes('injected AGENTS.md'))).toBe(false);
+    // Reasoning items stay internal.
+    expect(result.messages.some((m) => m.text.includes('chain of thought'))).toBe(false);
+  });
+
+  it('builds the work log from response_item only, so a CommandExecution item does not duplicate the row', async () => {
+    const result = await parseCodexConversationMessages(file);
+
+    const shell = result.workLog.filter((w) => w.command === 'git status');
+    expect(shell).toHaveLength(1);
+    expect(shell[0]?.result).toContain('clean');
+    expect(result.workLog).toHaveLength(1);
+  });
+
+  it('still reports cumulative tokens and non-zero cost on the new shape', async () => {
+    const result = await parseCodexConversationMessages(file);
+
+    expect(result.totalTokens).toBe(60700);
+    expect(result.totalCost).toBeGreaterThan(0);
   });
 });

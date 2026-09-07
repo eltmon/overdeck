@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { SessionUsage } from './jsonl-parser.js';
 import { getPricingSync } from '../cost.js';
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface CodexTokenUsageFields {
   // Flat (legacy) rollout field names.
@@ -102,9 +103,20 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
       if (typeof data['model'] === 'string' && data['model']) model = data['model'];
       if (typeof data['thread_id'] === 'string') threadId = data['thread_id'];
       if (!startTime && ts) startTime = ts;
-    } else if (type === 'agent_message') {
-      messageCount++;
-      if (ts) endTime = ts;
+    } else if (type === 'agent_message' || type === 'item_completed') {
+      // Flat pre-0.137 rollouts put `agent_message` at the top level with no
+      // event_msg wrapper, which the shared reader deliberately rejects — count
+      // those directly. Wrapped records go through the reader, which knows both
+      // the legacy `agent_message` payload and the cli >= 0.153.4
+      // `item_completed` shape that replaced it (PAN-3781); asking it also
+      // keeps tool and reasoning items from counting as assistant turns.
+      const isAssistantTurn = payload
+        ? readCodexRolloutMessage(entry)?.role === 'assistant'
+        : type === 'agent_message';
+      if (isAssistantTurn) {
+        messageCount++;
+        if (ts) endTime = ts;
+      }
     } else if (type === 'token_count') {
       const info = data['info'] as { total_token_usage?: CodexTokenUsageFields } | undefined;
       const usage = info?.total_token_usage;

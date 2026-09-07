@@ -16,6 +16,15 @@
  *       - `user_message`  — the user's prompt (clean text in `payload.message`)
  *       - `agent_message` — the assistant's visible reply (`payload.message`)
  *       - `token_count`   — cumulative usage in `payload.info.total_token_usage`
+ *
+ * Codex cli ≥ 0.153.4 renamed both message events into a single
+ * `item_completed` record. Reading either shape is delegated to
+ * `readCodexRolloutMessage` in `src/lib/codex-rollout-message.ts`, which is the
+ * one place that knows the layouts; see that module for the details and for why
+ * `item_completed` tool items are not read here (the `response_item` branch
+ * below already builds the work log, so reading both would duplicate rows).
+ * Both shapes stay supported — rollouts written before the CLI upgrade use the
+ * old event names, and old conversations must keep rendering (PAN-3781).
  *   - `type: 'response_item'` with `payload.type`:
  *       - `function_call` / `custom_tool_call`        — tool invocation
  *       - `function_call_output` / `custom_tool_call_output` — tool result
@@ -28,6 +37,7 @@ import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
 import { parseCodexSessionSync } from '../../../lib/cost-parsers/codex-parser.js';
+import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -126,15 +136,18 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
     const ptype = payload.type;
 
     if (entry.type === 'event_msg') {
-      if (ptype === 'user_message' || ptype === 'agent_message') {
-        const text = typeof payload.message === 'string' ? payload.message.trim() : '';
-        if (!text) continue;
+      const rolloutMessage = readCodexRolloutMessage(entry);
+      if (rolloutMessage) {
+        const isUser = rolloutMessage.role === 'user';
         sequence += 1;
-        trailingAgentMessageAt = ptype === 'agent_message' ? createdAt : undefined;
+        // PAN-3770: a completed-looking assistant message does NOT mean the
+        // turn ended — Codex narrates mid-turn, so only a message with no tool
+        // activity after it does. The tool branches below clear this.
+        trailingAgentMessageAt = isUser ? undefined : createdAt;
         messages.push({
-          id: `codex-${ptype === 'user_message' ? 'user' : 'agent'}-${sequence}`,
-          role: ptype === 'user_message' ? 'user' : 'assistant',
-          text,
+          id: `codex-${isUser ? 'user' : 'agent'}-${sequence}`,
+          role: rolloutMessage.role,
+          text: rolloutMessage.text,
           createdAt,
           completedAt: createdAt,
           streaming: false,

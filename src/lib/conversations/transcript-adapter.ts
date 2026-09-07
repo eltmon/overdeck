@@ -29,6 +29,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
@@ -495,15 +496,9 @@ function serializeCodexEntry(entry: CodexRolloutEntry): string | undefined {
   if (!payload) return undefined;
 
   if (entry.type === 'event_msg') {
-    if (
-      (payload.type === 'user_message' || payload.type === 'agent_message')
-      && typeof payload.message === 'string'
-    ) {
-      const message = payload.message.trim();
-      if (!message) return undefined;
-      const role = payload.type === 'user_message' ? 'user' : 'assistant';
-      return `[${role}]\n${message}`;
-    }
+    // Both rollout message shapes (PAN-3781) — see codex-rollout-message.ts.
+    const message = readCodexRolloutMessage(entry);
+    if (message) return `[${message.role}]\n${message.text}`;
     return undefined;
   }
 

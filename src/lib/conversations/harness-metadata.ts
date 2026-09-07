@@ -7,6 +7,7 @@ import { createInterface } from 'readline';
 
 import type { AcpTranscriptEntry } from '../acp/transcript.js';
 import type { SessionMetadata } from './jsonl-async.js';
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface PiSessionLine {
   type: 'session';
@@ -248,7 +249,8 @@ export async function parseCodexSessionMetadata(filePath: string): Promise<Sessi
     }
 
     if (entry.type === 'event_msg') {
-      if (recordType === 'user_message' || recordType === 'agent_message') {
+      // Both rollout message shapes (PAN-3781) — see codex-rollout-message.ts.
+      if (readCodexRolloutMessage(entry)) {
         result.messageCount++;
         if (currentModel) modelCounts[currentModel] = (modelCounts[currentModel] ?? 0) + 1;
         return;
