@@ -99,7 +99,7 @@ describe('model capabilities', () => {
   it('does not surface a gpt-6-astra[372k] variant', async () => {
     const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
     expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain('gpt-6-astra[372k]');
-    expect(MODEL_CAPABILITIES['gpt-6-astra[372k]']).toBeUndefined();
+    expect((MODEL_CAPABILITIES as Record<string, unknown>)['gpt-6-astra[372k]']).toBeUndefined();
   });
 
   it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {
