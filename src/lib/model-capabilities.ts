@@ -502,6 +502,29 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
+  'gpt-6-astra': {
+    model: 'gpt-6-astra',
+    provider: 'openai',
+    displayName: 'GPT-6 Astra',
+    costPer1MTokens: 30, // $10.00 in / $50.00 out
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 99,
+      'code-review': 97,
+      debugging: 98,
+      planning: 98,
+      documentation: 95,
+      testing: 96,
+      security: 95,
+      performance: 95,
+      synthesis: 97,
+      speed: 55,
+      'context-length': 95,
+    },
+    notes: 'OpenAI flagship (September 2026), first GPT-6 generation. Codex catalog (`codex debug models`, 2026-09-07): context_window 272000, max_context_window 872000, default effort medium, efforts up to ultra, supported_in_api true. Pinned to the same 272K billing tier as the GPT-5.6 family (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] opt-in variant yet: the 372K pin was measured on gpt-5.6-sol and has not been re-measured for astra. 1.05M marketing context.',
+  },
+
   'gpt-5.6-sol': {
     model: 'gpt-5.6-sol',
     provider: 'openai',

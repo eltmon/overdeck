@@ -113,6 +113,7 @@ describe('router-config', () => {
       expect(openaiProvider?.baseURL).toBe('https://api.openai.com/v1');
       expect(openaiProvider?.apiKey).toBe('sk-test-key');
       expect(openaiProvider?.models).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',

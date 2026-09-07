@@ -1467,9 +1467,10 @@ export function getAvailableModelsApi(): AvailableModelsApi {
     }
   }
 
-  // Order OpenAI models with latest family first: 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
+  // Order OpenAI models with latest family first: gpt-6-astra → 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
   const openaiOrder: Record<string, number> = {
-    'gpt-5.6-sol': 0, 'gpt-5.6-terra': 1, 'gpt-5.6-luna': 2,
+    'gpt-6-astra': 0,
+    'gpt-5.6-sol': 1, 'gpt-5.6-terra': 2, 'gpt-5.6-luna': 3,
     'gpt-5.5': 10, 'gpt-5.5-pro': 11,
     'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
     'gpt-5.3-codex': 30,

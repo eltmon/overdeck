@@ -49,8 +49,8 @@ describe('model capabilities', () => {
   // PAN-3057: the harness pin and the capability table are one number. If these
   // drift again, the dashboard meter and the Deacon's proactive compaction score
   // GPT-5.6 agents against a window the harness was never given.
-  it.each(['gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
-    'feeds the same GPT-5.6 window to the harness env exports and the capability table for %s',
+  it.each(['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
+    'feeds the same window to the harness env exports and the capability table for %s',
     async (model) => {
       const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
       const policy = getClaudeCodeContextPolicyForModel(model);
@@ -69,6 +69,37 @@ describe('model capabilities', () => {
     expect(shellQuoteModelIdSync('gpt-5.6-luna[372k]')).toBe("'gpt-5.6-luna'");
     // Kimi's [1m] suffix is a real endpoint alias and must pass through.
     expect(shellQuoteModelIdSync('k3[1m]')).toBe("'k3[1m]'");
+  });
+
+  // gpt-6-astra: added from the live Codex catalog (`codex debug models`,
+  // 2026-09-07 — context_window 272000, max_context_window 872000,
+  // supported_in_api true) with pricing from
+  // developers.openai.com/api/docs/models/gpt-6-astra ($10 in / $50 out /
+  // $1 cached). It shares the GPT-5.6 family's 272K billing tier, so it must
+  // resolve to the openai provider and carry the same context pin.
+  it('registers gpt-6-astra against the openai provider with the 272K billing-tier pin', async () => {
+    const { getProviderForModelSync } = await import('../providers.js');
+    const { getPricingSync } = await import('../cost.js');
+    const { CLIPROXY_GPT56_CONTEXT_WINDOW } = await import('../model-context-windows.js');
+
+    expect(getProviderForModelSync('gpt-6-astra').name).toBe('openai');
+
+    const capability = MODEL_CAPABILITIES['gpt-6-astra'];
+    expect(capability.displayName).toBe('GPT-6 Astra');
+    expect(capability.contextWindow).toBe(CLIPROXY_GPT56_CONTEXT_WINDOW);
+
+    const pricing = getPricingSync('openai', 'gpt-6-astra')!;
+    expect(pricing.inputPer1k).toBe(0.01);
+    expect(pricing.outputPer1k).toBe(0.05);
+    expect(pricing.cacheReadPer1k).toBe(0.001);
+  });
+
+  // No [372k] opt-in variant ships for astra: the 372K pin was measured on
+  // gpt-5.6-sol only. Guard against someone adding the id without measuring.
+  it('does not surface a gpt-6-astra[372k] variant', async () => {
+    const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
+    expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain('gpt-6-astra[372k]');
+    expect(MODEL_CAPABILITIES['gpt-6-astra[372k]']).toBeUndefined();
   });
 
   it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {

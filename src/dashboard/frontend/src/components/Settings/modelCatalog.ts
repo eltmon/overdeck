@@ -52,7 +52,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   openai: {
     name: 'OpenAI',
     // Trimmed 2026-05-23 to match OpenAI's Codex CLI published list;
-    // 2026-07-09 addendum adds the gpt-5.6 family without dropping anything.
+    // 2026-07-09 addendum adds the gpt-5.6 family without dropping anything;
+    // 2026-09-07 addendum adds gpt-6-astra, likewise dropping nothing.
     // Dropped: gpt-5.5-pro, gpt-5.4-pro, gpt-5.5-mini, gpt-5.5-nano,
     // gpt-5.4-nano, o3, o4-mini, gpt-4o, gpt-4o-mini.
     // Saved configs referencing dropped IDs are migrated by MODEL_DEPRECATIONS
@@ -61,6 +62,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       // PAN-3388: bare gpt-5.6 ids pin the session window to the 272K billing
       // tier (>272K input bills 2x in / 1.5x out for the full request); the
       // [372k] variants opt into the long window at that surcharge.
+      { id: 'gpt-6-astra' as ModelId, name: 'GPT-6 Astra', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (September 2026), first GPT-6 generation. 272K session window (billing-tier safe), $10 in / $50 out per 1M.' },
       { id: 'gpt-5.6-sol' as ModelId, name: 'GPT-5.6 Sol', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (July 2026), new default. 272K session window (billing-tier safe), $5 in / $30 out per 1M.' },
       { id: 'gpt-5.6-sol[372k]' as ModelId, name: 'GPT-5.6 Sol 372K', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Sol with the 372K long-context window. Input past 272K bills at 2x in / 1.5x out for the whole request — for long-research sessions that accept the surcharge.' },
       { id: 'gpt-5.6-terra' as ModelId, name: 'GPT-5.6 Terra', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at lower cost. 272K session window (billing-tier safe), $2 in / $12 out per 1M.' },

@@ -128,7 +128,10 @@ const PROVIDER_ENV_KEYS = [
 // window 2.5x smaller than the one the harness was actually given.
 // PAN-3388: bare ids pin to the 272K billing tier; [372k] variants opt into
 // the long window at 2x-input/1.5x-output quota burn past 272K.
-const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+// gpt-6-astra shares the 272K billing tier and the 872K raw ceiling with the
+// GPT-5.6 family (Codex catalog, 2026-09-07), so it takes the same pin. The
+// set name is kept for continuity with PAN-3057/PAN-3388.
+const GPT_56_MODELS = new Set(['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
 const GPT_56_LONG_MODELS = new Set(Object.keys(GPT56_LONG_CONTEXT_VARIANTS));
 const KIMI_K3_MODELS = new Set(['k3', 'k3[1m]']);
 

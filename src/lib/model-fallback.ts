@@ -31,7 +31,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models (supported per Codex CLI catalog, 2026-07-09)
+  // OpenAI models (supported per Codex CLI catalog, 2026-09-07)
+  'gpt-6-astra': 'openai',
   'gpt-5.6-sol': 'openai',
   'gpt-5.6-terra': 'openai',
   'gpt-5.6-luna': 'openai',
@@ -118,6 +119,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
+  'gpt-6-astra': 'claude-sonnet-5', // GPT-6 flagship → Sonnet
   'gpt-5.6-sol': 'claude-sonnet-5', // Flagship model → Sonnet
   'gpt-5.6-terra': 'claude-sonnet-5', // Balanced model → Sonnet
   'gpt-5.6-luna': 'claude-haiku-4-5', // Fast/cheap tier → Haiku
@@ -203,7 +205,8 @@ const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-5';
  * Used for within-provider tier-aware fallback.
  */
 const MODEL_TIER_RANK: Record<string, number> = {
-  // OpenAI tiers — addendum 2026-07-09 catalog (Codex CLI)
+  // OpenAI tiers — addendum 2026-09-07 catalog (Codex CLI)
+  'gpt-6-astra': 3,
   'gpt-5.6-sol': 2,
   'gpt-5.6-terra': 2,
   'gpt-5.6-luna': 1,
