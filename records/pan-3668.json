@@ -487,7 +487,7 @@
     "recordedAt": "2026-08-19T00:48:16.916Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-08-28T18:14:58.449Z",
+  "updated": "2026-09-07T19:56:01.239Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -499,7 +499,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-19T00:52:33.254Z",
-    "updatedAt": "2026-08-28T18:14:57.797Z",
+    "updatedAt": "2026-09-07T19:56:00.122Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -574,7 +574,7 @@
       },
       "costAtCloseOut": {
         "usd": 129.2961963,
-        "pricingAsOf": "2026-08-28T18:14:57.881Z"
+        "pricingAsOf": "2026-09-07T19:56:00.479Z"
       }
     },
     "merges": [
