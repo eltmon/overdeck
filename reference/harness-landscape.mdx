@@ -118,6 +118,11 @@ Overdeck does not edit the shared Kimi configuration. Saved Medium maps to High,
 and Extra High maps to Max. K2.7 Code and HighSpeed always think and do not
 offer adjustable effort.
 
+For a running ACP session, the host accepts the authenticated `set-effort`
+operation with an `effort` string. It acknowledges the normalized effort only
+after Kimi accepts the session configuration change. Invalid values and models
+without adjustable effort are rejected.
+
 The native/ACP aliases `kimi-code/k3` and `kimi-code/k3-256k` have context
 windows of 1,048,576 and 262,144 tokens, respectively. Both K2.7 variants have
 262,144 tokens. K3's full 1M window requires the corresponding membership

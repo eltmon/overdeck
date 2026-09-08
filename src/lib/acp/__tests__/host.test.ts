@@ -355,6 +355,97 @@ describe("AcpHost", () => {
     expect(stub.setThinking).toEqual([]);
   });
 
+  it("acknowledges set-effort only after Kimi accepts the change", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const changing = await Effect.runPromise(Deferred.make<void>());
+    const accepted = await Effect.runPromise(Deferred.make<void>());
+    const host = new AcpHost({
+      agentId: "agent-live-effort",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/k3",
+      overdeckHome,
+      runtime: {
+        ...stub.runtime,
+        setConfigOption: (id, value) => Effect.gen(function* () {
+          if (value === "low") {
+            yield* Deferred.succeed(changing, undefined);
+            yield* Deferred.await(accepted);
+          }
+          return yield* stub.runtime.setConfigOption(id, value);
+        }),
+      },
+    });
+    hosts.push(host);
+    await host.start();
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-live-effort.sock");
+    const token = (await readFile(join(overdeckHome, "agents", "agent-live-effort", "acp-token"), "utf-8")).trim();
+    await expect(postSocket(socketPath, "wrong-token", { op: "set-effort", effort: "low" }))
+      .resolves.toMatchObject({ status: 401 });
+    let acknowledged = false;
+    const response = postSocket(socketPath, token, { op: "set-effort", effort: "low" })
+      .then((result) => { acknowledged = true; return result; });
+    await Effect.runPromise(Deferred.await(changing));
+    try {
+      expect(acknowledged).toBe(false);
+      expect(stub.setThinking).toEqual(["high"]);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(accepted, undefined));
+    }
+    await expect(response).resolves.toEqual({ status: 200, body: { ok: true, effort: "low" } });
+    expect(stub.setThinking).toEqual(["high", "low"]);
+    await expect(host.handleOp({ op: "set-effort", effort: "xhigh" }))
+      .resolves.toEqual({ status: 200, body: { ok: true, effort: "max" } });
+  });
+
+  it.each([undefined, "", "invalid", 3])("rejects invalid live effort %s", async (effort) => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-invalid-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/k3", overdeckHome, runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort })).resolves.toMatchObject({ status: 400 });
+    expect(stub.setThinking).toEqual(["high"]);
+  });
+
+  it("rejects live effort changes for K2.7 without calling the provider", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-fixed-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/kimi-for-coding", overdeckHome, runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort: "low" })).resolves.toMatchObject({ status: 400 });
+    expect(stub.setThinking).toEqual([]);
+  });
+
+  it("returns a failed acknowledgment when Kimi rejects the live change", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-rejected-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/k3", overdeckHome,
+      runtime: {
+        ...stub.runtime,
+        setConfigOption: (id, value) => value === "low"
+          ? Effect.die(new Error("Kimi rejected thinking change"))
+          : stub.runtime.setConfigOption(id, value),
+      },
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort: "low" })).resolves.toEqual({
+      status: 500, body: { error: "Kimi rejected thinking change" },
+    });
+    expect(stub.setThinking).toEqual(["high"]);
+  });
+
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime({ assistantResponse: "hello from kimi" });

@@ -196,6 +196,7 @@ export class AcpHost {
       if (name === "status") return { status: 200, body: this.status() };
       if (name === "message") return await this.handleMessageOp(body);
       if (name === "interrupt") return await this.handleInterruptOp();
+      if (name === "set-effort") return await this.handleSetEffortOp(body);
       return {
         status: 400,
         body: { error: `unsupported ACP host op: ${name || "<missing>"}` },
@@ -277,6 +278,29 @@ export class AcpHost {
   private async handleInterruptOp(): Promise<HostOpResult> {
     await Effect.runPromise(this.options.runtime.cancel);
     return { status: 200, body: { ok: true } };
+  }
+
+  private async handleSetEffortOp(op: JsonRecord): Promise<HostOpResult> {
+    if (this.state !== "ready") {
+      return { status: 409, body: { error: "ACP session is not ready" } };
+    }
+    if (this.options.provider !== "kimi" || !this.options.model) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
+    }
+    if (typeof op.effort !== "string" || !op.effort.trim()) {
+      return { status: 400, body: { error: "effort is required" } };
+    }
+    let effort: ReturnType<typeof resolveKimiNativeEffort>;
+    try {
+      effort = resolveKimiNativeEffort(this.options.model, op.effort.trim());
+    } catch (error) {
+      return { status: 400, body: { error: errorMessage(error) } };
+    }
+    if (!effort) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
+    }
+    await Effect.runPromise(this.options.runtime.setConfigOption("thinking", effort));
+    return { status: 200, body: { ok: true, effort } };
   }
 
   private async handlePermissionRequest(
