@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     output: 'captured output',
     truncated: false,
   })),
+  runComposerReload: vi.fn(async () => ({ kind: 'activity', status: 'accepted', command: '/pan reload', activityId: 'reload-42', message: 'Building.' })),
   runDetachedCommand: vi.fn(async (argv: readonly string[]) => ({
     kind: 'activity' as const,
     status: 'accepted' as const,
@@ -24,6 +25,8 @@ const mocks = vi.hoisted(() => ({
     message: 'Started command. Watch activity activity-42 for progress.',
   })),
 }));
+
+vi.mock('../reload.js', () => ({ runComposerReload: mocks.runComposerReload }));
 
 vi.mock('../detached.js', () => ({
   runDetachedCommand: mocks.runDetachedCommand,
@@ -112,6 +115,15 @@ beforeEach(() => {
 });
 
 describe('conversation composer command routing', () => {
+  it('routes reload without an issue ID or sending it to the harness', async () => {
+    const deps = dependencies();
+    await handleConversationMessage('test-conversation', { message: '/pan reload' }, deps);
+    expect(mocks.runComposerReload).toHaveBeenCalledWith(['reload']);
+    expect(mocks.runDetachedCommand).not.toHaveBeenCalled();
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    expect(mocks.deliverControl).not.toHaveBeenCalled();
+  });
+
   it('intercepts registered /pan commands before compact, transform, or delivery', async () => {
     const deps = dependencies();
     const response = await handleConversationMessage(

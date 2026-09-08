@@ -79,7 +79,7 @@ describe('computeContextUsage', () => {
     expect(result).toMatchObject({
       activeBytes: buffer.length,
       estimatedTokens: 33_041,
-      contextWindow: 200_000,
+      contextWindow: 1_000_000,
       lastInputTokens: 4_200,
       lastCacheReadTokens: 26_000,
       lastCacheCreationTokens: 2_841,
@@ -87,7 +87,7 @@ describe('computeContextUsage', () => {
       lastModel: 'claude-opus-4-7',
       lastTurnAt: '2026-05-26T14:30:00Z',
     });
-    expect(result?.percentUsed).toBeCloseTo((33_041 / 200_000) * 100, 5);
+    expect(result?.percentUsed).toBeCloseTo((33_041 / 1_000_000) * 100, 5);
   });
 
   it('returns context usage for a known GPT model', async () => {
@@ -110,7 +110,7 @@ describe('computeContextUsage', () => {
       // gpt-5.5 routes through CLIProxy, whose effective ceiling is the
       // conservative CLIPROXY_CODEX_CONTEXT_WINDOW (150k), not the 200k
       // marketing window — see model-capabilities.ts (PAN-1672).
-      contextWindow: 150_000,
+      contextWindow: 272_000,
     });
   });
 
@@ -124,7 +124,7 @@ describe('computeContextUsage', () => {
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-deprecated.jsonl', 'claude-opus-4-5');
 
-    expect(result?.contextWindow).toBe(200_000);
+    expect(result?.contextWindow).toBe(1_000_000);
   });
 
   it('auto-promotes the effective context window to 1M when observed input exceeds the default', async () => {
@@ -211,7 +211,7 @@ describe('computeContextUsage', () => {
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-empty-file.jsonl', 'claude-opus-4-7');
 
-    expect(result).toEqual({ activeBytes: 0, estimatedTokens: 0, contextWindow: 200000, percentUsed: 0 });
+    expect(result).toEqual({ activeBytes: 0, estimatedTokens: 0, contextWindow: 1000000, percentUsed: 0 });
   });
 
   it('returns zero usage when the file has lines but no assistant turn with usage data', async () => {

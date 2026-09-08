@@ -297,10 +297,10 @@ async function spawnRunWithoutConsentClaim(
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'ohmypi'
-    ? await getOhmypiLauncherFields(agentId, selectedModel)
+    ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(
@@ -309,6 +309,7 @@ async function spawnRunWithoutConsentClaim(
         workspace,
         harnessLaunch.binaryPath,
         role,
+        options.effort,
       )
     : {};
   const museSavedSession = resolvedHarness === 'muse' && options.resumeSessionId
@@ -320,8 +321,9 @@ async function spawnRunWithoutConsentClaim(
     museContextFile: await materializeMuseContext(agentId, workspace, roleAgentDefinitionPath(role)),
     museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
   } : {};
+  // Kimi launchers require their model and effort fields even for specialist roles.
   const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
-    ? getKimiCodeLauncherFields(selectedModel)
+    ? getKimiCodeLauncherFields(selectedModel, options.effort)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,

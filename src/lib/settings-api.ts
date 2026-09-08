@@ -298,6 +298,7 @@ type AvailableModel = {
   id: ModelId;
   name: string;
   costPer1MTokens: number;
+  contextWindow: number;
   /**
    * Kimi-only: which harness family this id launches under. `claude-code` ids
    * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
@@ -592,7 +593,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
                 const supported = getModelEffortLevelsSync(resolvedModel);
-                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                   );
@@ -603,7 +604,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
               const supported = getModelEffortLevelsSync(resolvedModel);
-              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                 );
@@ -1428,14 +1429,13 @@ export function getAvailableModelsApi(): AvailableModelsApi {
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Skip deprecated models — they should not appear in user-facing pickers.
-    // MODEL_DEPRECATIONS is the single source of truth for "this model has
-    // been retired and remapped to a current one"; capability entries are kept
-    // for back-compat (cost/capability lookups for old configs and historical
-    // conversations), but they must not surface in dropdowns.
+    // Retain historical capabilities, but expose only active selections.
     if (capability.displayName.includes('(deprecated)')) continue;
     if (modelId in MODEL_DEPRECATIONS) continue;
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const contextWindow = capability.contextWindow;
+    const name = capability.displayName.replace(/\s*\(?[\d.]+[KM]\)?$/, '');
+    const contextLabel = contextWindow === 1_048_576 ? '1M' : contextWindow === 262_144 ? '256K' : contextWindow >= 1_000_000 ? `${Number((contextWindow / 1_000_000).toFixed(3))}M` : `${Number((contextWindow / 1000).toFixed(3))}K`;
+    const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
     const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
       case 'meta':

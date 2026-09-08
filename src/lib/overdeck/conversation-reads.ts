@@ -50,6 +50,7 @@ import { isPiSessionFile, parsePiConversationMessages } from '../../dashboard/se
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dashboard/server/services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
+import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import {
   readLauncherPinnedSessionId,
@@ -630,7 +631,9 @@ export async function getConversationMessagesRead(
 
     const parentSessionFile = sessionFile;
     if (agentId !== undefined) {
-      sessionFile = subagentTranscriptPath(parentSessionFile, agentId);
+      sessionFile = isCodexSessionFile(parentSessionFile)
+        ? await resolveCodexSubagentTranscript(parentSessionFile, agentId)
+        : subagentTranscriptPath(parentSessionFile, agentId);
       if (!sessionFile) return result({ error: 'Invalid subagent id' }, 400);
     }
 
@@ -649,7 +652,9 @@ export async function getConversationMessagesRead(
         }
       }
       const subagents = agentId === undefined
-        ? (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
+        ? isCodexSessionFile(parentSessionFile)
+          ? await listCodexSubagents(parentSessionFile, parsed.workLog)
+          : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
       return result({

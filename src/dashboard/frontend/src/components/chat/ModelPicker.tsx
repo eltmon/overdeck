@@ -52,17 +52,18 @@ type ProviderHarnesses = Partial<Record<string, Harness>>;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-fable-5-1': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-fable-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
-  'claude-sonnet-5': ['low', 'medium', 'high'],
-  'claude-sonnet-4-6': ['low', 'medium', 'high'],
+  'claude-sonnet-5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
   'claude-haiku-4-5-20251001': [],
 };
 
@@ -89,29 +90,28 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-fable-5', label: 'Claude Fable 5', provider: 'anthropic', costDisplay: '$90/1M', costPer1MTokens: 90, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high'] },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high'] },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'max'] },
-      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', costPer1MTokens: 1, effortLevels: [] },
+      { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-fable-5', label: 'Claude Fable 5 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-opus-5', label: 'Claude Opus 5 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'max'] },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (200K context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'max'] },
+      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (200K context)', provider: 'anthropic', costDisplay: '$3/1M', costPer1MTokens: 3, effortLevels: [] },
     ],
   },
   {
     provider: 'openai',
     label: 'OpenAI',
     models: [
-      { id: 'gpt-6-astra', label: 'GPT-6 Astra', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-sol[372k]', label: 'GPT-5.6 Sol 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-terra[372k]', label: 'GPT-5.6 Terra 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.6-luna[372k]', label: 'GPT-5.6 Luna 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
-      { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-6-astra', label: 'GPT-6 Astra (272K context)', provider: 'openai', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (272K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-sol[372k]', label: 'GPT-5.6 Sol (372K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (272K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-terra[372k]', label: 'GPT-5.6 Terra (372K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (272K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.6-luna[372k]', label: 'GPT-5.6 Luna (372K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
     ],
   },
 ];
@@ -174,8 +174,8 @@ export function saveStoredHarness(harness: Harness): void {
   try { localStorage.setItem(HARNESS_STORAGE_KEY, harness); } catch { /* ignore */ }
 }
 
-function formatCost(costPer1M: number): string {
-  if (costPer1M === 0) return 'FREE';
+function formatCost(costPer1M: number, provider?: string): string {
+  if (costPer1M === 0) return provider === 'dashscope' ? 'See pricing' : 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
   return `$${Math.round(costPer1M)}/1M`;
 }
@@ -290,7 +290,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             id: m.id,
             label: m.baseName ?? m.name.replace(/ — Kimi Code CLI$/, ''),
             provider: prov,
-            costDisplay: formatCost(m.costPer1MTokens),
+            costDisplay: formatCost(m.costPer1MTokens, prov),
             costPer1MTokens: m.costPer1MTokens,
             effortLevels: m.effortLevels ?? STATIC_EFFORT_LEVELS[m.id] ?? [],
             baseName: m.baseName,

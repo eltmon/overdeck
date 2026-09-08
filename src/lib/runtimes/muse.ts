@@ -62,7 +62,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
     await writePtyToken(config.agentId);
     const launcher = join(dir, 'launcher.sh');
     const script = generateLauncherScriptSync({
-      role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model,
+      role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model, museEffort: config.effort,
       museContextFile: await materializeMuseContext(config.agentId, config.workspace),
       museResumeSessionId: config.sessionId, overdeckEnv: { agentId: config.agentId },
       extraEnvExports: [launch.pathExport], useSupervisor: true,

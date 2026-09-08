@@ -8,7 +8,7 @@
 
 import { Effect } from 'effect';
 import { ModelId, AnthropicModel } from './settings.js';
-import { resolveModelIdSync } from './model-capabilities.js';
+import { resolveModelIdSync, MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
@@ -23,6 +23,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'muse-spark-1.3': 'meta',
   'muse-spark-1.3-contributor': 'meta',
   // Anthropic models
+  'claude-fable-5-1': 'anthropic',
   'claude-fable-5': 'anthropic',
   'claude-opus-5': 'anthropic',
   'claude-opus-4-8': 'anthropic',
@@ -56,6 +57,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-4o-mini': 'openai',
 
   // Google models (current)
+  'gemini-3.8-flash': 'google',
+  'gemini-3.5-flash-lite': 'google',
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
@@ -80,6 +83,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'MiniMax-M3': 'minimax',
 
   // Z.AI models
+  'glm-5.3': 'zai',
   'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
@@ -97,6 +101,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'qwen3-coder-plus': 'dashscope',
   'qwen3-plus': 'dashscope',
   'qwen3.7-max': 'dashscope',
+  'qwen3.7-plus': 'dashscope',
+  'qwen3.8-flash': 'dashscope',
   'qwen3.8-max': 'dashscope',
 
   // xAI models
@@ -544,10 +550,9 @@ export function filterAvailableModelsSync(
  * @returns List of available model IDs
  */
 export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): ModelId[] {
-  return Object.keys(MODEL_PROVIDERS).filter((modelId) => {
-    const provider = MODEL_PROVIDERS[modelId as ModelId];
-    return isProviderEnabled(provider, enabledProviders);
-  }) as ModelId[];
+  return Object.entries(MODEL_CAPABILITIES)
+    .filter(([id, capability]) => !(id in MODEL_DEPRECATIONS) && !capability.displayName.includes('(deprecated)') && isProviderEnabled(capability.provider, enabledProviders))
+    .map(([id]) => id as ModelId);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

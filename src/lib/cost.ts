@@ -89,6 +89,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
   // Anthropic - Fable 5 (Mythos-class flagship): $10/M input, $50/M output. Cache
   // rates mirror Anthropic's standard ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
+  { provider: 'anthropic', model: 'claude-fable-5-1', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.00025, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-fable-5', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },
   // Anthropic - Opus 5 (July 2026): $5/M input, $25/M output — same rates as Opus 4.8,
   // half of Fable 5. Standard cache ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
@@ -97,9 +98,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'anthropic', model: 'claude-opus-4-8', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.7 series
   { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
-  // Anthropic - Sonnet 5 introductory pricing through 2026-08-31.
-  // Standard pricing starts 2026-09-01: input 0.003, output 0.015,
-  // cache read 0.0003, 5m write 0.00375, 1h write 0.006 per 1K tokens.
+  // Anthropic retained Sonnet 5 launch pricing as standard; the planned September increase was cancelled.
   { provider: 'anthropic', model: 'claude-sonnet-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
   { provider: 'anthropic', model: 'claude-opus-4-6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
@@ -130,6 +129,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
   { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
   // Google
+  { provider: 'google', model: 'gemini-3.8-flash', inputPer1k: 0.0015, outputPer1k: 0.009, cacheReadPer1k: 0.00015, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3.5-flash-lite', inputPer1k: 0.0003, outputPer1k: 0.0025, cacheReadPer1k: 0.00003, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
   { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-flash-lite-preview', inputPer1k: 0.00025, outputPer1k: 0.0015, currency: 'USD' },
