@@ -1,0 +1,28 @@
+{
+  "issueId": "PAN-3790",
+  "schemaVersion": 2,
+  "created": "2026-09-08T18:06:51.265Z",
+  "updated": "2026-09-08T18:06:51.266Z",
+  "pipeline": {
+    "issueId": "PAN-3790",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-09-08T18:06:51.265Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3791",
+    "prNumber": 3791,
+    "prHeadSha": "b6d93db8ad438f24d5ffa4806d2a69c0437526cf",
+    "mergeStatus": "merged",
+    "mergeNotes": "Operator-authorized supervised merge from feature/muse-harness; forge-confirmed merge commit 1a21cdb736fac04be47e0eaf555e31ff4a627d28."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3791"
+    ],
+    "ranOn": "eltmon-z790"
+  }
+}
