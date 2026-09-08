@@ -1,3 +1,4 @@
+import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
@@ -90,6 +91,10 @@ export interface RestartAgentDeps {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
+  if (harness === 'muse') {
+    const path = resolveMuseSessionPathSync(agentId);
+    return path ? museSessionId(path) : undefined;
+  }
   if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }

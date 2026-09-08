@@ -1,3 +1,5 @@
+import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
 /**
  * Conversation transcript adapter.
  *
@@ -425,6 +427,28 @@ function serializeKimiEntry(entry: KimiWireLine, includeThinking: boolean): stri
   return undefined;
 }
 
+const museAdapter: ConversationTranscriptAdapter = {
+  name: 'muse', supportsPlainForkAsSource: false, supportsSourceAuthoredHandoff: false,
+  async resolveSessionFile(conv) { return resolveMuseSessionPath(conv.tmuxSession); },
+  async serializeTranscript(sessionFile) {
+    return parseMuseRecords(await readFile(sessionFile, 'utf8')).flatMap(record => {
+      if (record.payload?.kind !== 'run') return [];
+      const event = record.payload.event;
+      if (event?.kind === 'started' && event.prompt) return [`[user]\n${event.prompt}`];
+      if (event?.kind === 'assistant_message_committed' && event.text) return [`[assistant]\n${event.text}`];
+      return [];
+    }).join('\n\n');
+  },
+  async compactSummary(sessionFile, options) {
+    const serialized = await museAdapter.serializeTranscript(sessionFile, options);
+    if (!serialized.trim()) return { summary: '', summaryModel: null };
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model, richMode: options?.richMode ?? false, harness: options?.harness ?? 'claude-code',
+    });
+    return { summary, summaryModel: options?.model ?? null };
+  },
+};
+
 const kimiCodeAdapter: ConversationTranscriptAdapter = {
   name: 'kimi-code',
   // Not the raw Claude JSONL a `claude --resume` can consume; Kimi has its
@@ -578,6 +602,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'codex': codexAdapter,
   'acp': acpAdapter,
   'kimi-code': kimiCodeAdapter,
+  muse: museAdapter,
 };
 
 /**

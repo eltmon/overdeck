@@ -1,3 +1,5 @@
+import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -117,6 +119,7 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
 }
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
@@ -257,6 +260,8 @@ export async function getCachedMessages(
     parsed = await parseCodexConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
+  } else if (sessionFile.includes('/muse-data/muse/sessions/') && sessionFile.endsWith('/session.jsonl')) {
+    parsed = await parseMuseConversationMessages(sessionFile);
   } else if (isKimiWireSessionFile(sessionFile)) {
     parsed = await parseKimiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
@@ -529,10 +534,11 @@ async function resolveSpecialistSessionFile(name: string): Promise<string | null
       agentHarness !== 'codex' &&
       agentHarness !== 'ohmypi' &&
       agentHarness !== 'pi' &&
-      agentHarness !== 'kimi-code'
+      agentHarness !== 'kimi-code' && agentHarness !== 'muse'
     ) {
       return null;
     }
+    if (agentHarness === 'muse') return resolveMuseSessionPath(name);
     const agentBehavior = getHarnessBehavior(agentHarness);
     if (agentBehavior.transcriptKind === 'codex-rollout-jsonl') {
       const rollout = await resolveCodexRolloutPath(name);

@@ -1,3 +1,5 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
@@ -509,8 +511,15 @@ export async function buildAgentLaunchConfig(opts: {
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
     : {};
-  // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
-  // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
+  const museSavedSession = opts.harness === 'muse' && opts.spawnMode === 'resume'
+    ? await resolveMuseSessionPath(opts.agentId) : null;
+  const museLauncherFields = opts.harness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: model,
+    museEffort: opts.effort,
+    museContextFile: await materializeMuseContext(opts.agentId, opts.workspace, roleAgentDefinitionPath(launchRole)),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : {};
   const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
     ? getKimiCodeLauncherFields(model)
     : {};
@@ -578,6 +587,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...codexLauncherFields,
       ...acpLauncherFields,
       ...kimiCodeLauncherFields,
+      ...museLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -617,6 +627,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...codexLauncherFields,
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
+    ...museLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,

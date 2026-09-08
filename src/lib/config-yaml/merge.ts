@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, or muse`);
   }
 }
 
@@ -287,6 +287,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       } else if (providers.openai !== undefined) {
         explicitlyDisabled.add('openai');
       }
+
+      // Muse Code owns credentials; enabling Meta only exposes its model choices.
+      const meta = normalizeProviderConfig(providers.meta, undefined);
+      applyProviderHarness(result, 'meta', meta.harness);
+      if (meta.enabled) result.enabledProviders.add('meta');
+      else if (providers.meta !== undefined) explicitlyDisabled.add('meta');
 
       // Google
       const google = normalizeProviderConfig(providers.google, legacyKeys.google);

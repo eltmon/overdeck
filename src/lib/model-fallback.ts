@@ -14,12 +14,14 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta';
 
 /**
  * Map of model ID to provider
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
+  'muse-spark-1.3': 'meta',
+  'muse-spark-1.3-contributor': 'meta',
   // Anthropic models
   'claude-fable-5': 'anthropic',
   'claude-opus-5': 'anthropic',
@@ -363,6 +365,11 @@ export function applyTierAwareFallbackSync(
   userTier?: SubscriptionPlan
 ): ModelId {
   const provider = getModelProviderSync(modelId);
+  // Native Muse credentials are resolved by its CLI; never substitute another tier or provider.
+  if (provider === 'meta') {
+    if (!isProviderEnabled(provider, enabledProviders)) throw new Error('Meta (Muse) is disabled; enable it in Settings before selecting a Muse model');
+    return modelId;
+  }
 
   // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {

@@ -15,7 +15,7 @@ import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta';
 
 /**
  * Provider configuration
@@ -61,6 +61,13 @@ export function getKimiAnthropicBaseUrl(apiKey: string): string {
 }
 
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
+  meta: {
+    name: 'meta', displayName: 'Meta (Muse)', compatibility: 'direct',
+    defaultHarness: 'muse',
+    models: ['muse-spark-1.3', 'muse-spark-1.3-contributor'],
+    tested: false,
+    description: 'Muse Code with Standard or Contributor pricing; Contributor permits training on submitted content.',
+  },
   anthropic: {
     name: 'anthropic',
     displayName: 'Anthropic',
@@ -394,6 +401,7 @@ function nearestKnownModelId(modelId: string): string | undefined {
  * Get provider for a given model ID
  */
 export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
+  if (PROVIDERS.meta.models.includes(modelId)) return PROVIDERS.meta;
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {

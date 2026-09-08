@@ -116,7 +116,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama' | 'meta';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -164,6 +164,9 @@ export interface ModelCapability {
  * These are baseline scores - run Kimi 2.5 research to refine.
  */
 export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
+  'muse-spark-1.3': { model: 'muse-spark-1.3', provider: 'meta', displayName: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms. Capability scores are unranked pending evaluation.' },
+  'muse-spark-1.3-contributor': { model: 'muse-spark-1.3-contributor', provider: 'meta', displayName: 'Muse Spark 1.3 Contributor (training data)', costPer1MTokens: 0.15, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Discounted tier: prompts and completions may train Meta models. Capability scores are unranked pending evaluation.' },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════

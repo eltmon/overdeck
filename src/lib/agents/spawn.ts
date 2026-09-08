@@ -1,3 +1,5 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { mkdir, readdir as readdirAsync, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
@@ -50,6 +52,7 @@ import {
   getOhmypiLauncherFields,
   getProviderAuthMode,
   getRoleRuntimeBaseCommand,
+  roleAgentDefinitionPath,
   waitForPromptReady,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
@@ -252,7 +255,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
-  const shouldDeliverPromptViaKimiCode = shouldRegisterConversation && resolvedHarness === 'kimi-code';
+  const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || (shouldRegisterConversation && resolvedHarness === 'kimi-code');
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -308,10 +311,15 @@ async function spawnRunWithoutConsentClaim(
         role,
       )
     : {};
-  // PAN-1837 review fix: role runs (review/test/ship/plan/flywheel) reached
-  // this launcher path without a Kimi field spread, so buildKimiCodeCommand()
-  // threw 'kimi-code launcher requires kimiCodeModel' before a session could
-  // even be created.
+  const museSavedSession = resolvedHarness === 'muse' && options.resumeSessionId
+    ? await resolveMuseSessionPath(agentId) : null;
+  const museLauncherFields = resolvedHarness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: selectedModel,
+    museEffort: options.effort,
+    museContextFile: await materializeMuseContext(agentId, workspace, roleAgentDefinitionPath(role)),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : {};
   const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
     ? getKimiCodeLauncherFields(selectedModel)
     : {};
@@ -399,6 +407,7 @@ async function spawnRunWithoutConsentClaim(
     ...codexLauncherFields,
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
+    ...museLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

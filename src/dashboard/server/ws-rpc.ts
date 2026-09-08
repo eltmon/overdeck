@@ -1,3 +1,4 @@
+import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -284,6 +285,10 @@ export function streamHarnessFullParseSnapshots(
     case 'acp-jsonl': return streamResolved(
       () => resolveAcpTranscriptPath(sessionName),
       file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'acp' }),
+    );
+    case 'muse-jsonl': return streamResolved(
+      () => resolveMuseSessionPath(sessionName),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'muse' }),
     );
     case 'kimi-wire-jsonl': return streamResolved(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),

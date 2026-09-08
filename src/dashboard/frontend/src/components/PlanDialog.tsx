@@ -60,7 +60,7 @@ type SettingsResponse = {
     plan?: {
       model?: string;
       // PAN-1055: per-role harness override surfaced through Settings → Roles.
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
     };
   };
 };
@@ -159,6 +159,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     kimi: 'Kimi',
     nous: 'Nous Portal',
     dashscope: 'Alibaba DashScope',
+  meta: 'Meta (Muse)',
     openrouter: 'OpenRouter',
   };
 
