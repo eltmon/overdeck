@@ -29,6 +29,8 @@ describe('Claude Code K2.7 endpoint routing', () => {
     routing.apiKey = apiKey;
     const env = getProviderEnvSync(PROVIDERS.kimi, apiKey, 'claude-code');
     expect(env.ANTHROPIC_BASE_URL).toBe(endpoint);
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe(endpoint === KIMI_CODING_BASE_URL ? 'k3-256k' : 'k3');
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('k3[1m]');
     for (const key of ['ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL']) {
       expect(env[key]).toBe(wireModel);
     }

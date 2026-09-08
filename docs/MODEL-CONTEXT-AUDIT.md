@@ -38,7 +38,7 @@ Managed Codex configuration and app-server turns explicitly default to High. The
 
 Managed omp launches explicitly supply `--thinking high` unless an effort was chosen. Native Kimi and ACP launches initialize the chosen effort. K3 supports Low/High/Max; saved Medium maps to High and Extra High maps to Max. K2.7 Code has no adjustable effort, so its picker does not advertise one. ACP live updates wait for provider acceptance. Terminal-only sessions use launch settings and their native terminal controls; a dashboard-only label change is not treated as a runtime update.
 
-Kimi's bare Overdeck `k3` historically denotes the smaller window. It now translates to the real `k3-256k` endpoint; `k3[1m]` remains Claude Code's full-window syntax. Native aliases retain the CLI's own namespace.
+Kimi's bare Overdeck `k3` historically denotes the smaller window. It now translates to the real `k3-256k` endpoint; `k3[1m]` remains Claude Code's full-window syntax. Native aliases retain the CLI's own namespace. Claude tier environment values use the same 256K route. K2.7 maps to `kimi-for-coding` on the coding endpoint, while Moonshot platform requests retain their platform ID.
 
 ## Sources
 

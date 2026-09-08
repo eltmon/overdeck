@@ -60,11 +60,11 @@ export function getKimiAnthropicBaseUrl(apiKey: string): string {
     : KIMI_PLATFORM_BASE_URL;
 }
 
-/** The coding subscription and Moonshot platform expose different K2.7 IDs. */
+/** Translate configured Kimi tiers only for the coding endpoint. */
 export function resolveKimiModelForEndpoint(model: string, baseUrl: string): string {
-  return model === 'kimi-k2.7-code' && baseUrl.replace(/\/$/, '') === KIMI_CODING_BASE_URL
-    ? 'kimi-for-coding'
-    : model;
+  if (baseUrl.replace(/\/$/, '') !== KIMI_CODING_BASE_URL) return model;
+  if (model === 'k3') return 'k3-256k';
+  return model === 'kimi-k2.7-code' ? 'kimi-for-coding' : model;
 }
 
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
