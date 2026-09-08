@@ -8,7 +8,7 @@ import {
   copyFileSync,
 } from 'fs';
 import { join, relative, dirname } from 'path';
-import { SKILLS_DIR, CACHE_AGENTS_DIR, CACHE_RULES_DIR } from './paths.js';
+import { SKILLS_DIR, CACHE_AGENTS_DIR } from './paths.js';
 import {
   readManifestSync,
   writeManifestSync,
@@ -19,6 +19,7 @@ import {
   pruneStaleManifestEntriesSync,
 } from './manifest.js';
 import { FsError } from './errors.js';
+import { isHarnessNativeTarget } from './context-layers/native-instructions.js';
 
 export interface MergeResult {
   added: string[];
@@ -45,6 +46,7 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
         walk(fullPath);
       } else if (entry.isFile()) {
         const rel = relative(sourceDir, fullPath);
+        if (isHarnessNativeTarget(join('.claude', rel))) continue;
         const targetPath = join(targetDir, rel);
         mkdirSync(dirname(targetPath), { recursive: true });
         copyFileSync(fullPath, targetPath);
@@ -58,10 +60,10 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
 }
 
 /**
- * Merge Overdeck skills, agents, and rules into a workspace using file copies.
+ * Merge Overdeck skills and agent definitions into a workspace using file copies.
  *
  * Flow:
- * 1. Copy from cache (skills, agent-definitions, rules) → workspace/.claude/
+ * 1. Copy from cache (skills and agent-definitions) → workspace/.claude/
  * 2. Write manifest tracking what was placed
  *
  * Project template overlay is handled separately by workspace-manager.ts
@@ -89,7 +91,6 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
   const sources: Array<{ sourceDir: string; targetSubdir: string }> = [
     { sourceDir: SKILLS_DIR, targetSubdir: 'skills' },
     { sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
-    { sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
   ];
   const sourceSet = new Set(sources.flatMap(({ sourceDir, targetSubdir }) =>
     collectSourceFilesSync(sourceDir, '').map((file) => `${targetSubdir}/${file.relativePath}`),
@@ -103,6 +104,7 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
 
     for (const file of files) {
       const relativePath = `${prefix}${file.relativePath}`;
+      if (isHarnessNativeTarget(join('.claude', relativePath))) continue;
       const targetPath = join(claudeDir, relativePath);
       const sourceHash = hashFileSync(file.absolutePath);
 
@@ -138,8 +140,12 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
     }
   }
 
+  // Historical native files remain untouched, even when a manifest owns them.
+  for (const path of Object.keys(manifest.installed)) {
+    if (isHarnessNativeTarget(join('.claude', path))) sourceSet.add(path);
+  }
   const pruneResult = pruneStaleManifestEntriesSync(claudeDir, manifest, sourceSet, {
-    prefixes: ['skills/', 'agents/', 'rules/'],
+    prefixes: ['skills/', 'agents/'],
   });
   result.pruned.push(...pruneResult.pruned);
   result.keptModified.push(...pruneResult.keptModified);
@@ -173,9 +179,10 @@ export function applyProjectTemplateOverlaySync(
 
   if (!existsSync(templateDir)) return overlayed;
 
-  if (templates && templates.length > 0) {
+  if (templates !== undefined) {
     // Process specific template mappings
     for (const { source, target } of templates) {
+      if (isHarnessNativeTarget(target)) continue;
       const sourcePath = join(templateDir, source);
       if (!existsSync(sourcePath)) continue;
 
@@ -333,6 +340,7 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
     mkdirSync(targetSkillDir, { recursive: true });
     let anyAdded = false;
     for (const file of files) {
+      if (isHarnessNativeTarget(join('.claude', 'skills', skillName, file.relativePath))) continue;
       const targetPath = join(targetSkillDir, file.relativePath);
       mkdirSync(dirname(targetPath), { recursive: true });
       copyFileSync(file.absolutePath, targetPath);
