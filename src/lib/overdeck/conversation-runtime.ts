@@ -585,6 +585,7 @@ export async function spawnConversationSession(
     codexMode: 'app-server' | 'tui';
     codexHome: string;
     codexSessionDir: string;
+    codexEffort?: string;
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
@@ -651,6 +652,8 @@ export async function spawnConversationSession(
       const { initCodexHome, extractThreadIdFromRollout } = await import('../runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
+        model,
+        effort,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
@@ -662,6 +665,7 @@ export async function spawnConversationSession(
       codexFields = {
         harness: 'codex',
         codexMode: codexTransport,
+        codexEffort: effort ?? 'high',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
         resumeSessionId,

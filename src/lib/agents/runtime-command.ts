@@ -262,9 +262,10 @@ export function getKimiCodeLauncherFields(model: string): {
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
+  codexEffort: string;
   codexHome: string;
   codexSessionDir: string;
   model: string;
@@ -287,6 +288,8 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
   initCodexHome(codexHome, {
     trustedDir: workspacePath,
+    model,
+    effort,
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
@@ -295,6 +298,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   return {
     harness: 'codex',
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
+    codexEffort: effort ?? 'high',
     codexHome,
     codexSessionDir: join(codexHome, 'sessions'),
     model,

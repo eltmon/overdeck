@@ -264,7 +264,7 @@ export function ComposerFooter({
   const handleEffortChange = useCallback((nextEffort: EffortLevel) => {
     const previousEffort = effort;
     setEffort(nextEffort);
-    if (!piConversation || agentId || !conversation.sessionAlive) return;
+    if ((!piConversation && harness !== 'codex') || agentId || !conversation.sessionAlive) return;
     void (async () => {
       const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/thinking-level`, {
         method: 'POST',
@@ -280,7 +280,7 @@ export function ComposerFooter({
       console.error('[ComposerFooter] Failed to set thinking level:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to set thinking level');
     });
-  }, [agentId, conversation.name, conversation.sessionAlive, effort, piConversation]);
+  }, [agentId, conversation.name, conversation.sessionAlive, effort, harness, piConversation]);
 
   const handleCompact = useCallback(() => {
     if (!piConversation || agentId || compactPending) return;

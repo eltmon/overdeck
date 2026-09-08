@@ -664,7 +664,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? await getOhmypiLauncherFields(sessionName, planningModel)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
-      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan')
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', effort)
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
       ? getAcpLauncherFields(

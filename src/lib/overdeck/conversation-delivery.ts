@@ -367,17 +367,24 @@ export async function handleConversationThinkingLevel(
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
+  if (harness !== 'codex' && !isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is supported for Codex and Pi conversations' }, { status: 400 });
   }
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
   }
 
-  const level = parseThinkingLevel(body['level']);
+  const level = harness === 'codex'
+    ? (typeof body['level'] === 'string' && ['low', 'medium', 'high', 'xhigh', 'max'].includes(body['level']) ? body['level'] : null)
+    : parseThinkingLevel(body['level']);
   if (!level) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
 
-  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
+  if (harness === 'codex') {
+    // Use the live socket, not a mutable global transport preference.
+    await postCodexAppServerOp(conv.tmuxSession, { op: 'set-effort', effort: level });
+  } else {
+    await sendConversationControlCommand(conv, { type: 'set_thinking_level', level: level as ThinkingLevel });
+  }
   setConversationEffort(name, level);
   const updated = getConversationByName(name) ?? conv;
   return jsonResponse({ ok: true, effort: updated.effort ?? level });

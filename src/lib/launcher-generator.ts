@@ -58,6 +58,7 @@ export interface LauncherConfig {
    *   - 'app-server': persistent Codex app-server host process
    */
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.

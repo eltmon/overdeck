@@ -297,7 +297,7 @@ async function spawnRunWithoutConsentClaim(
     ? await getOhmypiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(

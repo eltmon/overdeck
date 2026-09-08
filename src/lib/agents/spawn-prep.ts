@@ -507,7 +507,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
     : {};
   // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
   // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
