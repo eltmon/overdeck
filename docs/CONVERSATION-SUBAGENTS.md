@@ -1,6 +1,6 @@
 # Conversation subagents
 
-Claude Code writes each subagent beside its parent conversation transcript. Overdeck reads these files to list subagents and show their full transcripts in the conversation panel. The dashboard never modifies the files.
+Claude Code and Codex expose subagents through the same conversation rail. Claude Code writes each subagent beside its parent conversation transcript. Overdeck reads these files to list subagents and show their full transcripts in the conversation panel. The dashboard never modifies the files.
 
 ## On-disk layout
 
@@ -68,3 +68,33 @@ Subagent transcript lookup accepts only ids that match:
 ```
 
 The resolver then builds the candidate with `path.resolve` and verifies that its parent directory is the resolved `subagents` directory. Invalid ids return `null`, and the REST route returns HTTP 400 before any transcript read. Discovery and transcript access use asynchronous filesystem APIs and remain read-only.
+
+## Codex child threads
+
+Codex stores children as separate `rollout-*.jsonl` files in the parent's
+`codex-home/sessions/YYYY/MM/DD/` tree. The first `session_meta` record supplies
+`payload.id` and `payload.source.subagent.thread_spawn.parent_thread_id`.
+`agent_path`, `agent_nickname`, and `agent_role` supply display labels when present.
+The resolver follows these parent IDs to discover descendants across date directories.
+It computes depth relative to the selected parent and excludes ordinary conversation forks.
+
+Codex uses the same list event, `agentId` subscription field, REST query, URL
+selection, and isolated transcript cache as Claude Code. The selected child passes
+through the Codex parser and existing full-snapshot file watcher. A two-second
+poll discovers new children and changes to their status even when the parent
+transcript does not change. Child streams do not emit their own subagent lists.
+
+The resolver reads and caches metadata separately from transcript content. It reads
+a bounded 128 KiB tail for status: the most recent `task_started` means running;
+`task_complete` or `turn_aborted` means done. A later task starts the running status
+again. Without a terminal event in that tail, it reports running.
+
+A parent `spawn_agent` work-log row joins to a child through its result's
+`agent_id` or `thread_id`, or through the collaboration tool's `task_name`, which
+matches the child's `agent_path`. That row offers **Open subagent transcript**.
+Children without a matching spawn row remain accessible through the rail.
+
+Selection accepts only safe IDs and requires membership in the parent's verified
+descendant tree. It never interprets an ID as a path, follows directory/file
+symlinks during discovery, or searches another Codex home. Missing or unrelated
+IDs cannot fall back to the parent transcript. All discovery and reads are asynchronous.
