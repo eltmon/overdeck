@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 
@@ -528,12 +529,12 @@ function formatAppServerApprovalQuestion(request: CodexAppServerPendingRequest):
   return `Codex requests approval for ${request.method}`;
 }
 
-async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | 'acp' = 'appserver'): Promise<T> {
+export async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | 'acp' = 'appserver'): Promise<T> {
   const socketPath = join(getOverdeckHome(), 'sockets', `${transport}-${tmuxSession}.sock`);
   const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, `${transport}-token`);
   if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${tmuxSession}`);
   if (!existsSync(tokenPath)) throw new Error(`app-server token missing for ${tmuxSession}`);
-  const token = readFileSync(tokenPath, 'utf-8').trim();
+  const token = (await readFile(tokenPath, 'utf-8')).trim();
   if (!token) throw new Error(`app-server token missing for ${tmuxSession}`);
   const payload = JSON.stringify(body);
   return new Promise<T>((resolve, reject) => {

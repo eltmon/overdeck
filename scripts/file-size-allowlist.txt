@@ -70,3 +70,6 @@
 1531 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3773
 1189 src/dashboard/server/routes/settings.ts # PAN-3771
 1578 src/lib/model-capabilities.ts # PAN-3780
+
+# Two registration lines; implementation is in the extracted child input route module.
+1072 src/dashboard/server/routes/conversations.ts # PAN-3787

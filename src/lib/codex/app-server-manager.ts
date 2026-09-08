@@ -140,6 +140,45 @@ export class CodexAppServerManager extends EventEmitter {
     return this.request('thread/read', { threadId, includeTurns: true });
   }
 
+  /** Read-only capability check. Never resumes or forks a child as a side effect. */
+  async readSubagentInput(threadId: string, includeTurns = false): Promise<{ direct: boolean; activeTurnId?: string }> {
+    const root = this.sessionState.threadId;
+    if (!root || threadId === root) return { direct: false };
+    const child = asRecord(asRecord(await this.request('thread/read', { threadId, includeTurns })).thread);
+    if (child.id !== threadId) return { direct: false };
+    const seen = new Set<string>([threadId]);
+    let current = child;
+    // Verify the entire ancestor chain, including nested subagents. Ordinary
+    // forks do not establish membership in this parent's child tree.
+    for (;;) {
+      const spawn = asRecord(asRecord(asRecord(current.source).subagent).thread_spawn);
+      const parent = typeof spawn.parent_thread_id === 'string' ? spawn.parent_thread_id : current.parentThreadId;
+      if (parent === root) break;
+      if (typeof parent !== 'string' || seen.has(parent) || seen.size >= 64) return { direct: false };
+      seen.add(parent);
+      current = asRecord(asRecord(await this.request('thread/read', { threadId: parent, includeTurns: false })).thread);
+      if (current.id !== parent) return { direct: false };
+    }
+    const status = asRecord(child.status).type;
+    const turns = Array.isArray(child.turns) ? child.turns.map(asRecord) : [];
+    const activeTurn = turns.findLast(turn => turn.status === 'inProgress');
+    if (status === 'active' && !includeTurns) return { direct: true };
+    if (status === 'active' && typeof activeTurn?.id === 'string') {
+      return { direct: true, activeTurnId: activeTurn.id };
+    }
+    return { direct: status === 'idle' };
+  }
+
+  async sendSubagentMessage(threadId: string, text: string): Promise<unknown> {
+    const inputState = await this.readSubagentInput(threadId, true);
+    if (!inputState.direct) throw new Error('Direct input is unavailable for this subagent.');
+    const input = [{ type: 'text', text, text_elements: [] }];
+    // A raced turn completion is rejected by Codex; never retry as a new turn.
+    return inputState.activeTurnId
+      ? this.request('turn/steer', { threadId, input, expectedTurnId: inputState.activeTurnId })
+      : this.request('turn/start', { threadId, input });
+  }
+
   readAccount(): Promise<unknown> {
     return this.request('account/read', {});
   }
@@ -230,9 +269,10 @@ export class CodexAppServerManager extends EventEmitter {
     if (message.method === 'thread/started') {
       const thread = asRecord(params.thread);
       const threadId = typeof thread.id === 'string' ? thread.id : typeof params.threadId === 'string' ? params.threadId : undefined;
-      if (threadId) this.sessionState = { ...this.sessionState, state: 'idle', threadId };
+      if (threadId && (!this.sessionState.threadId || threadId === this.sessionState.threadId)) this.sessionState = { ...this.sessionState, state: 'idle', threadId };
       return;
     }
+    if (typeof params.threadId === 'string' && params.threadId !== this.sessionState.threadId) return;
     if (message.method === 'turn/started') {
       const turn = asRecord(params.turn);
       const activeTurnId = typeof turn.id === 'string' ? turn.id : typeof params.turnId === 'string' ? params.turnId : undefined;
