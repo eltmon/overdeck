@@ -401,7 +401,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -711,6 +711,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...piLauncherFields,
         ...codexLauncherFields,
         ...acpLauncherFields,
+        effort: effectiveHarness === 'opencode' ? effort : undefined,
         ...kimiCodeLauncherFields,
       }),
       { mode: 0o755 },

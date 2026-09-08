@@ -12,7 +12,7 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, and `kimi-code`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, and `opencode`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -24,6 +24,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
+| `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.29. |
 
 ## Composer commands across harnesses
 
@@ -305,6 +306,56 @@ Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 session id and it cannot be preset) enables transcript resolution
 (`resolveKimiWirePath` in `src/dashboard/server/routes/jsonl-resolver.ts`) and
 cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
+
+### OpenCode with Go and Zen
+
+Overdeck supports the OpenCode harness with OpenCode Go and OpenCode Zen.
+The integration was verified against OpenCode **1.18.29**. Install or update the
+CLI with `npm install -g opencode-ai@latest`, then check `opencode --version`.
+The official release feed is [anomalyco/opencode](https://github.com/anomalyco/opencode/releases).
+
+Run `opencode auth login` on the host and select **OpenCode Zen** or **OpenCode Go**.
+OpenCode owns the saved credentials. Overdeck does not copy them into a workspace
+or require a second API key. The `OPENCODE_API_KEY` environment variable is also
+recognized by OpenCode. Go requires an active Go subscription; Zen uses its own
+billing. See [Go](https://opencode.ai/docs/go/) and [Zen](https://opencode.ai/docs/zen/).
+
+Enable the provider under **Settings → Providers**, then select a model in the
+conversation picker. Overdeck discovers the installed CLI's available models,
+prices, and effort variants with `opencode models --verbose`; the discovery cache
+lasts one minute. Sign in to Go before expecting Go models to appear.
+
+The provider IDs also work in configuration:
+
+```yaml
+models:
+  providers:
+    opencode:
+      enabled: true
+      harness: opencode
+    opencode-go:
+      enabled: true
+      harness: opencode
+```
+
+Choose an exact model ID from `opencode models`, such as `opencode/<model-id>`
+for Zen or `opencode-go/<model-id>` for Go. These namespaces remain distinct from
+OpenRouter and the model manufacturer's direct API. OpenCode model IDs only
+launch through the OpenCode harness; invalid combinations fail before launch.
+There is no fallback model when the requested model is unavailable.
+
+Overdeck runs a persistent `opencode acp` process through its ACP host. Dashboard
+messages, interruption, restart, session resume, and transcript rendering use
+that transport. The terminal shows the ACP host's output; it is not the native
+OpenCode TUI. Plain transcript forks are unavailable; use a summary fork instead.
+The existing ACP transport does not report session token usage or billed cost.
+Catalog prices shown in the picker are model rates, not a session billing report.
+
+OpenCode receives Overdeck's rendered context at session start. Use
+`harness:opencode` blocks for OpenCode-specific instructions. Native OpenCode
+rules and its Agent Skills discovery remain available. Effort defaults to `high`
+when the selected model exposes effort controls. An unsupported explicit effort
+or an unavailable model fails visibly instead of selecting another value.
 
 ## Installing oh-my-pi
 

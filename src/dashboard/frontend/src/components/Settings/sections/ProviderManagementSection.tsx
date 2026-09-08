@@ -52,10 +52,13 @@ const HARNESS_LABELS: Record<Harness, string> = {
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
   acp: 'ACP',
+  opencode: 'OpenCode',
   'kimi-code': 'Kimi Code',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
+  { id: 'opencode', name: 'OpenCode Zen', placeholder: '' },
+  { id: 'opencode-go', name: 'OpenCode Go', placeholder: '' },
   { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
   { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
   { id: 'google', name: 'Google', placeholder: 'AIza...' },
@@ -77,6 +80,7 @@ function harnessLabel(harness: Harness): string {
  * provider would write a config that fails at every spawn.
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
+  if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
   const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
   return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
 }
@@ -241,6 +245,7 @@ export function ProviderManagementSection({
         <div className="space-y-1">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';
+            const isOpenCode = provider.id === 'opencode' || provider.id === 'opencode-go';
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
@@ -248,6 +253,7 @@ export function ProviderManagementSection({
             const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
+              if (isOpenCode) return { text: 'OpenCode sign-in', variant: 'neutral' as const };
               if (isDefault) {
                 if (claudeAuth?.loggedIn) return { text: claudeAuth.subscriptionType ? `${claudeAuth.subscriptionType} plan` : 'Subscription', variant: 'success' as const };
                 if (claudeAuth?.hasAnthropicApiKey) return { text: 'API key', variant: 'neutral' as const };
@@ -283,7 +289,7 @@ export function ProviderManagementSection({
                       role="switch"
                       aria-checked={isEnabled}
                       aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${provider.name}`}
-                      className={`w-8 h-4.5 rounded-full relative transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      className={`w-8 h-[18px] rounded-full relative transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                         isEnabled ? 'bg-primary' : 'bg-muted'
                       }`}
                     >
@@ -305,7 +311,9 @@ export function ProviderManagementSection({
 
                 {isExpanded && (
                   <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
-                    {isDefault ? (
+                    {isOpenCode ? (
+                      <p className="text-xs text-muted-foreground">Run <code>opencode auth login</code> on the host and select {provider.name}. Overdeck uses OpenCode’s saved credentials and discovers its available models.</p>
+                    ) : isDefault ? (
                       <div className="space-y-2">
                         {claudeAuth?.loggedIn ? (
                           <div className="flex items-center gap-2 text-xs">
@@ -520,7 +528,7 @@ export function ProviderManagementSection({
                   role="switch"
                   aria-checked={!!formData.models.providers.openrouter}
                   aria-label={`${formData.models.providers.openrouter ? 'Disable' : 'Enable'} OpenRouter`}
-                  className={`w-8 h-4.5 rounded-full relative transition-colors ${
+                  className={`w-8 h-[18px] rounded-full relative transition-colors ${
                     formData.models.providers.openrouter ? 'bg-primary' : 'bg-muted'
                   }`}
                 >

@@ -577,6 +577,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'ohmypi': piAdapter,
   'codex': codexAdapter,
   'acp': acpAdapter,
+  'opencode': acpAdapter,
   'kimi-code': kimiCodeAdapter,
 };
 

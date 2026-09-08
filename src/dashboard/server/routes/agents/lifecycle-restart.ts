@@ -263,7 +263,7 @@ export const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message, force = false } = body as {
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
       graceful?: boolean;
       message?: string;
       force?: boolean;
@@ -452,7 +452,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness, force = false } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
       force?: boolean;
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
@@ -486,7 +486,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // pointers and runtime files without spawning a replacement. Resolve
     // spawnModel and check policy here, before killSession/wipeAgentStateDirs.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | null = null;
     if (wantsSpawn && harness) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),

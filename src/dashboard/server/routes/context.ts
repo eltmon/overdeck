@@ -76,7 +76,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -390,7 +390,7 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
   return layers
     .map((layer) => {
       const raw = contentForLayer(layer, drafts);
-      const effective = harness === 'acp' && layer.kind === 'workspace'
+      const effective = (harness === 'acp' || harness === 'opencode') && layer.kind === 'workspace'
         ? workspaceContextWithoutProjectLayer(raw)
         : raw;
       const rendered = renderForHarness(effective, harness).trim();
@@ -505,6 +505,7 @@ export async function previewContextLayers(
       codex: previews.codex,
       acp: previews.acp,
       'kimi-code': previews['kimi-code'],
+      opencode: previews.opencode,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

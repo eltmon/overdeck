@@ -286,7 +286,7 @@ export async function resolveAgentHarness(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   const recorded = (await readRecordedState(agentId, opts)).harness;
-  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp' || recorded === 'kimi-code') {
+  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp' || recorded === 'kimi-code' || recorded === 'opencode') {
     return recorded;
   }
   // 'claude-code' (or null) is the default that can go stale. Correct it from

@@ -13,7 +13,7 @@ import { shellQuote } from './shell-quote.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
 
 export interface LauncherConfig {
   role: Role;
@@ -28,6 +28,8 @@ export interface LauncherConfig {
    * to the tmux pane.
    */
   harness?: LauncherHarness;
+  /** Requested OpenCode model effort; defaults to high when supported. */
+  effort?: string;
   /**
    * Pi output mode (mapped to `pi --mode <mode>`).
    *
@@ -779,6 +781,9 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+  if (config.harness === 'opencode' && config.effort) {
+    tokens.push('--effort', shellQuote(config.effort));
   }
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));

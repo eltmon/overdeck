@@ -577,6 +577,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...piLauncherFields,
       ...codexLauncherFields,
       ...acpLauncherFields,
+      effort: opts.harness === 'opencode' ? opts.effort : undefined,
       ...kimiCodeLauncherFields,
     });
     return { launcherContent, providerEnv };
@@ -616,6 +617,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
+    effort: opts.harness === 'opencode' ? opts.effort : undefined,
     ...kimiCodeLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {

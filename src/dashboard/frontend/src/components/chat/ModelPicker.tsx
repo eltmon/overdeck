@@ -81,6 +81,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   nous: 'Nous Portal',
   dashscope: 'Alibaba DashScope',
   openrouter: 'OpenRouter',
+  opencode: 'OpenCode Zen',
+  'opencode-go': 'OpenCode Go',
 };
 
 const FALLBACK_GROUPS: ModelGroup[] = [
@@ -180,7 +182,7 @@ function formatCost(costPer1M: number): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {

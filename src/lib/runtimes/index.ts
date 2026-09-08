@@ -108,6 +108,7 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'codex') {
       return this.get('codex') ?? null;
     }
+    if (harness === 'opencode') return this.get('opencode') ?? null;
     if (harness === 'acp') {
       return this.get('acp') ?? null;
     }
@@ -141,6 +142,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createOhmypiRuntimeSync());
     globalRegistry.register(createCodexRuntimeSync());
     globalRegistry.register(createAcpRuntimeSync());
+    globalRegistry.register(createAcpRuntimeSync({ name: 'opencode', provider: 'opencode' }));
     globalRegistry.register(createKimiCodeRuntimeSync());
   }
   return globalRegistry;

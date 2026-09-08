@@ -14,7 +14,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'opencode' | 'opencode-go';
 
 /**
  * Map of model ID to provider
@@ -240,13 +240,15 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
 export function isOpenRouterModelSync(modelId: string): boolean {
-  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus';
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
 }
 
 /**
  * Get the provider for a model ID
  */
 export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
+  if (modelId.startsWith('opencode/')) return 'opencode';
+  if (modelId.startsWith('opencode-go/')) return 'opencode-go';
   if (isOpenRouterModelSync(modelId)) return 'openrouter';
   const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
   if (direct) return direct;

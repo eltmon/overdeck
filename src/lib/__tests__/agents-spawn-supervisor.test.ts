@@ -705,18 +705,18 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
-  it('stops and rejects a non-flywheel ACP role when its initial prompt fails', async () => {
+  it.each(['acp', 'opencode'] as const)('stops and rejects a %s role when its initial prompt fails', async (harness) => {
     deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
     const { spawnRun } = await import('../agents.js');
 
     await expect(spawnRun('PAN-1405', 'review', {
       workspace,
-      model: 'kimi-k2.6',
-      harness: 'acp',
+      model: harness === 'opencode' ? 'opencode/kimi-k3' : 'kimi-k2.6',
+      harness,
       prompt: 'review the change',
     })).rejects.toThrow('Agent agent-pan-1405-review kickoff delivery failed: provider rejected prompt');
 
-    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'acp', 30);
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', harness, 30);
     expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-1405-review');
     const persisted = JSON.parse(
       readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),

@@ -11,6 +11,8 @@ import {
 describe('shared branding registry', () => {
   it('defines every provider and harness brand with labels, colors, and icons', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
+      'opencode',
+      'opencode-go',
       'anthropic',
       'openai',
       'google',
@@ -22,7 +24,7 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();

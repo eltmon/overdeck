@@ -20,7 +20,7 @@ import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
  * catalog Overdeck syncs there, so no second ~/.kimi-code/skills target is
  * needed.
  */
-export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code'] as const;
+export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code', 'opencode'] as const;
 
 /** Plan the shared Agent Skills half of the harness fan-out. */
 export function planAgentSkillsSync(

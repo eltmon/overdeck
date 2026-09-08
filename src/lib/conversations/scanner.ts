@@ -85,7 +85,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (file.harness === 'codex') {
       return parseCodexSessionMetadata(file.jsonlPath);
     }
-    if (file.harness === 'acp') {
+    if (file.harness === 'acp' || file.harness === 'opencode') {
       return parseAcpSessionMetadata(file.jsonlPath);
     }
     return parseJsonl(file.jsonlPath);
@@ -97,7 +97,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (cwdFromFirstMessage) {
       return { workspacePath: cwdFromFirstMessage, workspaceHash: null as string | null, warning: null as string | null };
     }
-    if (file.harness === 'codex' || file.harness === 'acp') {
+    if (file.harness === 'codex' || file.harness === 'acp' || file.harness === 'opencode') {
       return { workspacePath: resolveAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
     }
     return { workspacePath: null as string | null, workspaceHash: null as string | null, warning: null as string | null };

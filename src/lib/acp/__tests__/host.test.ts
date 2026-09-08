@@ -23,6 +23,8 @@ import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
 
 interface StubRuntimeOptions {
   readonly sessionId?: string;
+  readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
+  readonly configError?: Error;
   readonly assistantResponse?: string;
   readonly updateDuringStart?: string;
   readonly startError?: Error;
@@ -128,6 +130,12 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         return { stopReason: "end_turn" as const };
       }),
     cancel: Effect.void,
+    getConfigOptions: Effect.succeed(options.configOptions ?? []),
+    setConfigOption: (id, value) => Effect.gen(function* () {
+      order.push(`config:${id}:${value}`);
+      if (options.configError) return yield* Effect.fail(options.configError);
+      return { configOptions: options.configOptions ?? [] };
+    }),
     setModel: (model) =>
       Effect.gen(function* () {
         order.push("set-model");
@@ -308,6 +316,29 @@ describe("AcpHost", () => {
     await host.start();
 
     expect(stub.setModels).toEqual(["kimi-code/k3"]);
+  });
+
+  it.each(["opencode", "opencode-go"])("sets %s effort after the chosen model", async (provider) => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "effort", name: "Thinking effort", type: "select", currentValue: "medium",
+      options: [{ value: "high", name: "High" }, { value: "medium", name: "Medium" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-opencode-effort", provider,
+      workspace: process.cwd(), model: `${provider}/kimi-k3`,
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setModels).toEqual([`${provider}/kimi-k3`]);
+    expect(stub.order.slice(-2)).toEqual(["set-model", "config:effort:high"]);
+  });
+
+  it("rejects an explicit effort when the OpenCode model has no effort option", async () => {
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({ agentId: "agent-opencode-effort", provider: "opencode",
+      workspace: process.cwd(), model: "opencode/big-pickle", effort: "low",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("does not expose an effort setting");
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {

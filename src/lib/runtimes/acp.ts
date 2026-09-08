@@ -43,6 +43,7 @@ export interface AcpSpawnConfig extends SpawnConfig {
 }
 
 export interface AcpRuntimeOptions {
+  readonly name?: 'acp' | 'opencode'
   readonly provider?: string
   readonly overdeckHome?: string
   readonly execCommand?: (command: string) => Promise<{ readonly stdout: string }>
@@ -60,7 +61,7 @@ export class AcpSpawnTimeout extends Error {
 }
 
 export class AcpRuntimeSync implements AgentRuntimeSync {
-  readonly name = 'acp' as const
+  readonly name: 'acp' | 'opencode'
   private readonly provider: string
   private readonly overdeckHome: string | undefined
   private readonly execCommand: (command: string) => Promise<{ readonly stdout: string }>
@@ -68,15 +69,16 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   private readonly resolveAgentStates: () => AgentState[]
 
   constructor(options: AcpRuntimeOptions = {}) {
-    this.provider = options.provider ?? 'kimi'
+    this.name = options.name ?? 'acp'
+    this.provider = options.provider ?? (this.name === 'opencode' ? 'opencode' : 'kimi')
     this.overdeckHome = options.overdeckHome
     this.execCommand = options.execCommand ?? execAsync
-    this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch('acp'))
+    this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch(this.name))
     this.resolveAgentStates = options.listAgentStates ?? (() => listAgentStates())
   }
 
   getHarnessBehavior(): HarnessBehavior {
-    return getRuntimeBehavior('acp')
+    return getRuntimeBehavior(this.name)
   }
 
   getSessionPath(agentId: string): string {
@@ -169,11 +171,13 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   }
 
   async spawnAgent(config: AcpSpawnConfig): Promise<Agent> {
-    const provider = config.provider ?? this.provider
+    if (this.name === 'opencode' && !config.model) throw new Error('OpenCode requires an explicit model')
+    const provider = config.provider ?? (this.name === 'opencode' && config.model?.startsWith('opencode-go/') ? 'opencode-go' : this.provider)
     const { binaryPath } = await this.prepareLaunch()
     const contextFile = materializeAcpContextFile(
       join(this.home(), 'agents', config.agentId),
       config.workspace,
+      this.name,
     )
     const command = [
       'node',
@@ -214,7 +218,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       return {
         id: config.agentId,
         sessionId,
-        runtime: 'acp',
+        runtime: this.name,
         model: config.model ?? '',
         workspace: config.workspace,
         startedAt: new Date(),
@@ -228,7 +232,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   listSessions(workspace?: string): Session[] {
     const sessions: Session[] = []
     for (const state of this.resolveAgentStates()) {
-      if (state.harness !== 'acp') continue
+      if (state.harness !== this.name) continue
       if (workspace && state.workspace !== workspace) continue
 
       const sessionId = this.readSessionId(state.id)

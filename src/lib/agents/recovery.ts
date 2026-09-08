@@ -90,7 +90,7 @@ export interface RestartAgentDeps {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
-  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') return undefined;
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
@@ -229,7 +229,7 @@ export async function restartAgent(
     // from claiming this session or vice versa.
     const launchAndCaptureKimiSession = async (): Promise<void> => {
       let kimiExistingSessionsBefore: Set<string> | undefined;
-      if (effectiveHarness === 'kimi-code') {
+      if (effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
         try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
         try {
           const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
@@ -268,7 +268,7 @@ export async function restartAgent(
       }
     };
 
-    if (effectiveHarness === 'kimi-code') {
+    if (effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
       const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
       await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), agentState.workspace, launchAndCaptureKimiSession);
     } else {
@@ -295,7 +295,7 @@ export async function restartAgent(
         throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within 30s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code') {
+      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
         // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
         // it must not fall through to the legacy sync sendKeys() branch below,
         // which bypasses the supervisor cascade entirely.
@@ -501,7 +501,7 @@ export async function recoverAgent(
     return { action: 'respawned', state };
   }
 
-  if (recoveryHarness === 'acp') {
+  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode') {
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -510,7 +510,7 @@ export async function recoverAgent(
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
       ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
-      harness: 'acp',
+      harness: recoveryHarness,
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
     });
