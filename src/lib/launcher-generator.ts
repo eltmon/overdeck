@@ -11,6 +11,7 @@ import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
+import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -601,7 +602,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelIdSync(config.model)}`;
+    cmd += ` --model ${shellQuoteModelIdSync(getClaudeCodeLaunchModelSync(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;

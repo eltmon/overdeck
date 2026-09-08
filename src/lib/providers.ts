@@ -60,6 +60,13 @@ export function getKimiAnthropicBaseUrl(apiKey: string): string {
     : KIMI_PLATFORM_BASE_URL;
 }
 
+/** The coding subscription and Moonshot platform expose different K2.7 IDs. */
+export function resolveKimiModelForEndpoint(model: string, baseUrl: string): string {
+  return model === 'kimi-k2.7-code' && baseUrl.replace(/\/$/, '') === KIMI_CODING_BASE_URL
+    ? 'kimi-for-coding'
+    : model;
+}
+
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   anthropic: {
     name: 'anthropic',
@@ -593,6 +600,15 @@ export function getProviderEnvSync(
     }
   }
 
+  if (provider.name === 'kimi' && !isKimiCode) {
+    for (const key of [
+      'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
+      'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL',
+      'CLAUDE_CODE_SUBAGENT_MODEL',
+    ]) {
+      if (env[key]) env[key] = resolveKimiModelForEndpoint(env[key], env.ANTHROPIC_BASE_URL);
+    }
+  }
   return env;
 }
 

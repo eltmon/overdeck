@@ -30,6 +30,7 @@ import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
+import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -763,7 +764,7 @@ export async function getAgentRuntimeBaseCommand(
   effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(validatedModel);
+  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
@@ -954,7 +955,7 @@ export async function getRoleRuntimeBaseCommand(
   effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(validatedModel);
+  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
