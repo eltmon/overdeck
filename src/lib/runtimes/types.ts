@@ -119,6 +119,7 @@ export interface SpawnConfig {
   workspace: string;
   prompt?: string;
   model?: string;
+  effort?: string;
   sessionId?: string; // For resuming existing sessions
   runtime?: RuntimeName;
   env?: Record<string, string>;

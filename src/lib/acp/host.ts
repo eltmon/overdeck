@@ -23,6 +23,7 @@ import type * as EffectAcpSchema from "effect-acp/schema";
 
 import { BRIDGE_TOKEN_HEADER } from "../bridge-token.js";
 import { INPUT_PURGE_MAX_CHARS } from "../channels/injection-budget.js";
+import { resolveKimiNativeEffort } from "../kimi-effort.js";
 import { renderAcpHostEvent, stripAcpPaneControl } from "./host-render.js";
 import {
   isRejectPermissionOption,
@@ -142,6 +143,12 @@ export class AcpHost {
           throw new Error(`The selected OpenCode model does not expose an effort setting (${this.options.effort} requested).`);
         }
       }
+      if (this.options.provider === "kimi" && this.options.model) {
+        const effort = resolveKimiNativeEffort(this.options.model, this.options.effort);
+        if (effort) {
+          await Effect.runPromise(this.options.runtime.setConfigOption("thinking", effort));
+        }
+      }
       if (this.options.resumeSessionId) {
         for (const owed of await readOwedAcpPrompts(this.transcriptPath())) {
           this.enqueuePrompt(owed.content, owed.promptId, !owed.started);
@@ -199,6 +206,7 @@ export class AcpHost {
       if (name === "status") return { status: 200, body: this.status() };
       if (name === "message") return await this.handleMessageOp(body);
       if (name === "interrupt") return await this.handleInterruptOp();
+      if (name === "set-effort") return await this.handleSetEffortOp(body);
       return {
         status: 400,
         body: { error: `unsupported ACP host op: ${name || "<missing>"}` },
@@ -280,6 +288,34 @@ export class AcpHost {
   private async handleInterruptOp(): Promise<HostOpResult> {
     await Effect.runPromise(this.options.runtime.cancel);
     return { status: 200, body: { ok: true } };
+  }
+
+  private async handleSetEffortOp(op: JsonRecord): Promise<HostOpResult> {
+    if (this.state !== "ready") {
+      return { status: 409, body: { error: "ACP session is not ready" } };
+    }
+    if (typeof op.effort !== "string" || !op.effort.trim()) {
+      return { status: 400, body: { error: "effort is required" } };
+    }
+    if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
+      const effort = op.effort.trim();
+      await Effect.runPromise(this.options.runtime.setConfigOption("effort", effort));
+      return { status: 200, body: { ok: true, effort } };
+    }
+    if (this.options.provider !== "kimi" || !this.options.model) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
+    }
+    let effort: ReturnType<typeof resolveKimiNativeEffort>;
+    try {
+      effort = resolveKimiNativeEffort(this.options.model, op.effort.trim());
+    } catch (error) {
+      return { status: 400, body: { error: errorMessage(error) } };
+    }
+    if (!effort) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
+    }
+    await Effect.runPromise(this.options.runtime.setConfigOption("thinking", effort));
+    return { status: 200, body: { ok: true, effort } };
   }
 
   private async handlePermissionRequest(

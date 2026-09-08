@@ -577,7 +577,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
                 const supported = getModelEffortLevelsSync(resolvedModel);
-                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                   );
@@ -588,7 +588,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
               const supported = getModelEffortLevelsSync(resolvedModel);
-              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                 );

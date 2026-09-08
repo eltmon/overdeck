@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getAvailableModelsApi } from '../settings-model-catalog.js';
 import { getAvailableModelsApi as compatibilityExport } from '../settings-api.js';
 
-// Captured by executing the catalog functions from a23fe407d4f before extraction.
+// Captured by executing the catalog functions from 96d3714cc17 before extraction.
 const previousCatalog = JSON.parse(readFileSync(new URL('./fixtures/pre-opencode-model-catalog.json', import.meta.url), 'utf8'));
 
 describe('model catalog no-loss audit', () => {

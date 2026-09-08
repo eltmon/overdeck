@@ -41,6 +41,7 @@ interface StubRuntime {
   readonly prompts: EffectAcpSchema.PromptRequest["prompt"][];
   readonly order: string[];
   readonly setModels: string[];
+  readonly setThinking: string[];
   readonly startCalls: () => number;
   readonly requestPermission: (
     request: EffectAcpSchema.RequestPermissionRequest,
@@ -52,6 +53,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
   const prompts: EffectAcpSchema.PromptRequest["prompt"][] = [];
   const order: string[] = [];
   const setModels: string[] = [];
+  const setThinking: string[] = [];
   let starts = 0;
   let remainingPromptErrors = options.promptErrorCount ?? (options.promptError ? Number.POSITIVE_INFINITY : 0);
   let sessionUpdateHandler:
@@ -132,7 +134,8 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
     cancel: Effect.void,
     getConfigOptions: Effect.succeed(options.configOptions ?? []),
     setConfigOption: (id, value) => Effect.gen(function* () {
-      order.push(`config:${id}:${value}`);
+      order.push(id === "thinking" ? "set-thinking" : `config:${id}:${value}`);
+      if (id === "thinking") setThinking.push(String(value));
       if (options.configError) return yield* Effect.fail(options.configError);
       return { configOptions: options.configOptions ?? [] };
     }),
@@ -154,6 +157,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
     prompts,
     order,
     setModels,
+    setThinking,
     startCalls: () => starts,
     requestPermission: (permissionRequest) =>
       Effect.runPromise(permissionHandler!(permissionRequest)),
@@ -316,6 +320,134 @@ describe("AcpHost", () => {
     await host.start();
 
     expect(stub.setModels).toEqual(["kimi-code/k3"]);
+    expect(stub.setThinking).toEqual(["high"]);
+    expect(stub.order.indexOf("set-model")).toBeLessThan(stub.order.indexOf("set-thinking"));
+  });
+
+  it.each(["low", "high", "max"])("applies requested K3 %s effort on resume before accepting prompts", async (effort) => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-effort",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/k3-256k",
+      effort,
+      resumeSessionId: "existing-session",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setThinking).toEqual([effort]);
+  });
+
+  it("does not send unsupported effort levels to always-thinking K2.7", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-k27",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/kimi-for-coding",
+      effort: "high",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setThinking).toEqual([]);
+  });
+
+  it("acknowledges set-effort only after Kimi accepts the change", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const changing = await Effect.runPromise(Deferred.make<void>());
+    const accepted = await Effect.runPromise(Deferred.make<void>());
+    const host = new AcpHost({
+      agentId: "agent-live-effort",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-code/k3",
+      overdeckHome,
+      runtime: {
+        ...stub.runtime,
+        setConfigOption: (id, value) => Effect.gen(function* () {
+          if (value === "low") {
+            yield* Deferred.succeed(changing, undefined);
+            yield* Deferred.await(accepted);
+          }
+          return yield* stub.runtime.setConfigOption(id, value);
+        }),
+      },
+    });
+    hosts.push(host);
+    await host.start();
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-live-effort.sock");
+    const token = (await readFile(join(overdeckHome, "agents", "agent-live-effort", "acp-token"), "utf-8")).trim();
+    await expect(postSocket(socketPath, "wrong-token", { op: "set-effort", effort: "low" }))
+      .resolves.toMatchObject({ status: 401 });
+    let acknowledged = false;
+    const response = postSocket(socketPath, token, { op: "set-effort", effort: "low" })
+      .then((result) => { acknowledged = true; return result; });
+    await Effect.runPromise(Deferred.await(changing));
+    try {
+      expect(acknowledged).toBe(false);
+      expect(stub.setThinking).toEqual(["high"]);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(accepted, undefined));
+    }
+    await expect(response).resolves.toEqual({ status: 200, body: { ok: true, effort: "low" } });
+    expect(stub.setThinking).toEqual(["high", "low"]);
+    await expect(host.handleOp({ op: "set-effort", effort: "xhigh" }))
+      .resolves.toEqual({ status: 200, body: { ok: true, effort: "max" } });
+  });
+
+  it.each([undefined, "", "invalid", 3])("rejects invalid live effort %s", async (effort) => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-invalid-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/k3", overdeckHome, runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort })).resolves.toMatchObject({ status: 400 });
+    expect(stub.setThinking).toEqual(["high"]);
+  });
+
+  it("rejects live effort changes for K2.7 without calling the provider", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-fixed-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/kimi-for-coding", overdeckHome, runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort: "low" })).resolves.toMatchObject({ status: 400 });
+    expect(stub.setThinking).toEqual([]);
+  });
+
+  it("returns a failed acknowledgment when Kimi rejects the live change", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-rejected-effort", provider: "kimi", workspace: process.cwd(),
+      model: "kimi-code/k3", overdeckHome,
+      runtime: {
+        ...stub.runtime,
+        setConfigOption: (id, value) => value === "low"
+          ? Effect.die(new Error("Kimi rejected thinking change"))
+          : stub.runtime.setConfigOption(id, value),
+      },
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(host.handleOp({ op: "set-effort", effort: "low" })).resolves.toEqual({
+      status: 500, body: { error: "Kimi rejected thinking change" },
+    });
+    expect(stub.setThinking).toEqual(["high"]);
   });
 
   it.each(["opencode", "opencode-go"])("sets %s effort after the chosen model", async (provider) => {
@@ -330,6 +462,10 @@ describe("AcpHost", () => {
     await host.start();
     expect(stub.setModels).toEqual([`${provider}/kimi-k3`]);
     expect(stub.order.slice(-2)).toEqual(["set-model", "config:effort:high"]);
+    await expect(host.handleOp({ op: "set-effort", effort: "medium" })).resolves.toEqual({
+      status: 200, body: { ok: true, effort: "medium" },
+    });
+    expect(stub.order.at(-1)).toBe("config:effort:medium");
   });
 
   it("rejects an explicit effort when the OpenCode model has no effort option", async () => {
@@ -769,11 +905,14 @@ describe("AcpHost", () => {
         process.cwd(),
         "--binary-path",
         "/opt/kimi/bin/kimi",
+        "--effort",
+        "low",
         "--resume",
         persisted!,
       ]),
     ).toMatchObject({
       binaryPath: "/opt/kimi/bin/kimi",
+      effort: "low",
       resumeSessionId: "persisted-session",
     });
   });

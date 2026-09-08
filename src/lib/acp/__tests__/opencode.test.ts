@@ -73,7 +73,7 @@ describe('OpenCode Go and Zen', () => {
       acpAgentId: 'conv-opencode', acpProvider: provider,
       acpWorkspace: '/workspace with spaces', acpBinaryPath: '/tools/opencode',
       acpContextFile: '/managed/context.md', model: `${provider}/kimi-k3`,
-      resumeSessionId: 'ses_saved', effort: 'high',
+      resumeSessionId: 'ses_saved', acpEffort: 'high',
     });
     expect(script).toContain('acp-host.js');
     expect(script).toContain(`--provider '${provider}'`);

@@ -9,6 +9,7 @@ export interface OpenCodeModel {
   id: OpenCodeModelId;
   name: string;
   costPer1MTokens: number;
+  contextWindow?: number;
   harness: 'opencode';
   effortLevels: string[];
 }
@@ -24,6 +25,7 @@ export function parseOpenCodeModels(output: string): OpenCodeModel[] {
     if (!/^opencode(?:-go)?\/[^\s/]+$/.test(id)) continue;
     const model = JSON.parse(record.slice(newline + 1)) as {
       name?: string; status?: string; cost?: { input?: number; output?: number };
+      limit?: { context?: number };
       variants?: Record<string, unknown>;
     };
     if (model.status === 'deprecated') continue;
@@ -31,6 +33,7 @@ export function parseOpenCodeModels(output: string): OpenCodeModel[] {
       id: id as OpenCodeModelId,
       name: model.name ?? id,
       costPer1MTokens: ((model.cost?.input ?? 0) + (model.cost?.output ?? 0)) / 2,
+      ...(model.limit?.context ? { contextWindow: model.limit.context } : {}),
       harness: 'opencode',
       effortLevels: Object.keys(model.variants ?? {}),
     });

@@ -504,15 +504,15 @@ export async function buildAgentLaunchConfig(opts: {
   // and they're spread into generateLauncherScript() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
   const piLauncherFields = behavior.usesRpcFifo
-    ? await getOhmypiLauncherFields(opts.agentId, model)
+    ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
     : {};
   // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
   // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
   const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
-    ? getKimiCodeLauncherFields(model)
+    ? getKimiCodeLauncherFields(model, opts.effort)
     : {};
   if (isAcp && !opts.harnessBinaryPath) {
     throw new Error('ACP launch requires the executable path resolved by preflight');
@@ -524,6 +524,7 @@ export async function buildAgentLaunchConfig(opts: {
         opts.workspace,
         opts.harnessBinaryPath!,
         launchRole,
+        opts.effort,
       )
     : {};
 
@@ -577,7 +578,6 @@ export async function buildAgentLaunchConfig(opts: {
       ...piLauncherFields,
       ...codexLauncherFields,
       ...acpLauncherFields,
-      effort: opts.harness === 'opencode' ? opts.effort : undefined,
       ...kimiCodeLauncherFields,
     });
     return { launcherContent, providerEnv };
@@ -617,7 +617,6 @@ export async function buildAgentLaunchConfig(opts: {
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
-    effort: opts.harness === 'opencode' ? opts.effort : undefined,
     ...kimiCodeLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {

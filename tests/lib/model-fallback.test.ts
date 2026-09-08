@@ -84,7 +84,7 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(9);
+      expect(models).toHaveLength(10);
     });
 
     it('should return all OpenAI models', () => {
@@ -117,7 +117,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3-pro-preview'); // legacy
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
-      expect(models).toHaveLength(6);
+      expect(models).toHaveLength(8);
     });
 
     it('should return all Nous Portal models', () => {
@@ -382,7 +382,7 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-opus-4-6');
       expect(models).toContain('claude-sonnet-5');
       expect(models).toContain('claude-sonnet-4-6');
-      expect(models).toContain('claude-sonnet-4-5');
+      expect(models).not.toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
       expect(models).toHaveLength(9);
     });
@@ -391,7 +391,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModelsSync(enabled);
 
-      expect(models.length).toBe(39); // 9 Anthropic + 17 OpenAI + 6 Google + 7 Kimi
+      expect(models.length).toBe(28); // 9 Anthropic + 17 OpenAI + 6 Google + 7 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -402,12 +402,12 @@ describe('model-fallback', () => {
       expect(models).toContain('gpt-5.6-sol');
       expect(models).toContain('gpt-5.6-terra');
       expect(models).toContain('gpt-5.6-luna');
-      expect(models).toContain('gpt-5.5');
-      expect(models).toContain('gpt-5.4');
-      expect(models).toContain('o3');
-      expect(models).toContain('gpt-5.3-codex');
-      expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(26); // 9 Anthropic + 17 OpenAI
+      expect(models).not.toContain('gpt-5.5');
+      expect(models).not.toContain('gpt-5.4');
+      expect(models).not.toContain('o3');
+      expect(models).not.toContain('gpt-5.3-codex');
+      expect(models).not.toContain('gpt-4o');
+      expect(models.length).toBe(16); // 9 Anthropic + 17 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -417,9 +417,9 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
-      expect(models).toContain('gemini-2.5-pro');
-      expect(models).toContain('gemini-2.5-flash');
-      expect(models.length).toBe(15); // 9 Anthropic + 6 Google
+      expect(models).not.toContain('gemini-2.5-pro');
+      expect(models).not.toContain('gemini-2.5-flash');
+      expect(models.length).toBe(14); // 9 Anthropic + 6 Google
     });
   });
 
@@ -597,12 +597,12 @@ describe('model-fallback', () => {
       expect(requiresExternalKeySync('claude-opus-4-7')).toBe(false);
     });
 
-    it('glm-4.7 and glm-4.7-flash appear in getAvailableModels when zai is enabled', () => {
+    it('retired GLM models stay out of available selections when zai is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'zai']);
       const models = getAvailableModelsSync(enabled);
       expect(models).toContain('glm-5.2');
-      expect(models).toContain('glm-4.7');
-      expect(models).toContain('glm-4.7-flash');
+      expect(models).not.toContain('glm-4.7');
+      expect(models).not.toContain('glm-4.7-flash');
       expect(models).toContain('glm-5.1');
     });
 

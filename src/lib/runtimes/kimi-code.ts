@@ -587,6 +587,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       workingDir: config.workspace,
       harness: 'kimi-code',
       kimiCodeModel: model,
+      kimiCodeEffort: config.effort,
       kimiCodeYolo: true,
       extraEnvExports: [pathExport],
       overdeckEnv: { agentId: config.agentId },

@@ -10,6 +10,7 @@ import { materializeAcpContextFile } from '../acp/context.js'
 import { listAgentStates } from '../agents/queries.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
+import { resolveKimiNativeEffort } from '../kimi-effort.js'
 import { getOverdeckHome, packageRoot } from '../paths.js'
 import { getRuntimeBehavior } from './behavior.js'
 import {
@@ -193,8 +194,13 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       '--context-file',
       shellQuote(contextFile),
     ]
+    if (this.name === 'opencode' && config.effort) command.push('--effort', shellQuote(config.effort))
     if (config.sessionId) command.push('--resume', shellQuote(config.sessionId))
     if (config.model) command.push('--model', shellQuote(config.model))
+    if (provider === 'kimi' && config.model) {
+      const effort = resolveKimiNativeEffort(config.model, config.effort)
+      if (effort) command.push('--effort', shellQuote(effort))
+    }
 
     rmSync(this.agentPath(config.agentId, 'acp-session-id'), { force: true })
     rmSync(this.agentPath(config.agentId, 'acp-launch-error'), { force: true })

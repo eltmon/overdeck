@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { Effect, Stream } from 'effect';
 
 // Stub the transcript resolvers so the dispatch can be asserted on the exact
@@ -6,12 +9,18 @@ import { Effect, Stream } from 'effect';
 const resolverMock = vi.hoisted(() => ({
   resolveAgentHarness: vi.fn(async () => 'claude-code'),
   resolvePiSessionPath: vi.fn(async () => null),
-  resolveCodexRolloutPath: vi.fn(async () => null),
+  resolveCodexRolloutPath: vi.fn(async (): Promise<string | null> => null),
   resolveAcpTranscriptPath: vi.fn(async () => null),
   resolveKimiWirePath: vi.fn(async () => null),
   readLauncherPinnedSessionId: vi.fn(async () => null),
 }));
 vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
+vi.mock('../services/dashboard-db-task.js', () => ({
+  runDashboardDbJob: vi.fn(async (_operation: string, input: { sessionFile: string }) => {
+    const { parseCodexConversationMessages } = await import('../services/codex-conversation-parser.js');
+    return parseCodexConversationMessages(input.sessionFile);
+  }),
+}));
 
 import {
   streamHarnessFullParseSnapshots,
@@ -128,5 +137,42 @@ describe('streamResolvedFullParseSnapshots — unresolved transcript', () => {
     );
 
     expect(Array.from(first)).toEqual([{ kind: 'discovering' }]);
+  });
+});
+
+
+describe('Codex subagent stream dispatch', () => {
+  it('emits a parent list and streams only the selected child with no nested list', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'codex-subagent-stream-'));
+    const folder = join(dir, 'sessions', '2026', '09', '08');
+    await mkdir(folder, { recursive: true });
+    const parent = join(folder, 'rollout-parent.jsonl');
+    const child = join(folder, 'rollout-child.jsonl');
+    try {
+      for (const [file, id, source, message] of [
+        [parent, 'parent', 'cli', 'Parent'],
+        [child, 'child', { subagent: { thread_spawn: { parent_thread_id: 'parent' } } }, 'Child'],
+      ] as const) {
+        await writeFile(file, [
+          { type: 'session_meta', payload: { id, source } },
+          { type: 'event_msg', payload: { type: 'agent_message', message } },
+          { type: 'event_msg', payload: { type: 'task_complete' } },
+        ].map(e => JSON.stringify(e)).join('\n') + '\n');
+      }
+      resolverMock.resolveCodexRolloutPath.mockResolvedValue(parent);
+      const stream = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true)!;
+      const events = Array.from(await Effect.runPromise(stream.pipe(Stream.take(2), Stream.runCollect)));
+      expect(events[0]).toMatchObject({ kind: 'messages', messages: [{ text: 'Parent' }] });
+      expect(events[1]).toMatchObject({ kind: 'subagents', subagents: [{ agentId: 'child' }] });
+      const selected = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true, null, 'child')!;
+      const childEvents = Array.from(await Effect.runPromise(selected.pipe(Stream.take(1), Stream.runCollect)));
+      expect(childEvents).toEqual([expect.objectContaining({ kind: 'messages', messages: [expect.objectContaining({ text: 'Child' })] })]);
+      const invalid = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true, null, 'parent')!;
+      expect(Array.from(await Effect.runPromise(invalid.pipe(Stream.take(1), Stream.runCollect))))
+        .toEqual([{ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true }]);
+    } finally {
+      resolverMock.resolveCodexRolloutPath.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

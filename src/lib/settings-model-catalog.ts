@@ -8,6 +8,7 @@ type AvailableModel = {
   id: ModelId;
   name: string;
   costPer1MTokens: number;
+  contextWindow?: number;
   /** Native catalog rows carry the harness required to launch that model ID. */
   harness?: RuntimeName;
   /** Effort levels the row's harness actually offers. */
@@ -37,6 +38,8 @@ function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effo
 
 export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] = []): AvailableModelsApi {
   const result: AvailableModelsApi = {
+    opencode: openCodeModels.filter((model) => model.id.startsWith('opencode/')),
+    'opencode-go': openCodeModels.filter((model) => model.id.startsWith('opencode-go/')),
     anthropic: [],
     openai: [],
     google: [],
@@ -47,19 +50,16 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
     openrouter: [],
     nous: [],
     dashscope: [],
-    opencode: openCodeModels.filter((model) => model.id.startsWith('opencode/')),
-    'opencode-go': openCodeModels.filter((model) => model.id.startsWith('opencode-go/')),
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Skip deprecated models — they should not appear in user-facing pickers.
-    // MODEL_DEPRECATIONS is the single source of truth for "this model has
-    // been retired and remapped to a current one"; capability entries are kept
-    // for back-compat (cost/capability lookups for old configs and historical
-    // conversations), but they must not surface in dropdowns.
+    // Retain historical capabilities, but expose only active selections.
     if (capability.displayName.includes('(deprecated)')) continue;
     if (modelId in MODEL_DEPRECATIONS) continue;
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const contextWindow = capability.contextWindow;
+    const name = capability.displayName.replace(/\s*\(?[\d.]+[KM]\)?$/, '');
+    const contextLabel = contextWindow === 1_048_576 ? '1M' : contextWindow === 262_144 ? '256K' : contextWindow >= 1_000_000 ? `${Number((contextWindow / 1_000_000).toFixed(3))}M` : `${Number((contextWindow / 1000).toFixed(3))}K`;
+    const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
     const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
       case 'anthropic':
@@ -110,7 +110,6 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
 
   return result;
 }
-
 
 export async function getAvailableModelsWithOpenCodeApi(): Promise<AvailableModelsApi> {
   const models = await discoverOpenCodeModels().catch((error) => {

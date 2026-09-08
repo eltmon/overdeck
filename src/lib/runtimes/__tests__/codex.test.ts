@@ -104,6 +104,19 @@ describe('initCodexHome', () => {
   beforeEach(() => { ctx = withFakeCodexHome() })
   afterEach(() => ctx.cleanup())
 
+  it.each([
+    ['gpt-6-astra', undefined, 272000, 'high'],
+    ['gpt-5.6-sol', 'low', 272000, 'low'],
+    ['gpt-5.6-terra[372k]', 'high', 372000, 'high'],
+    ['gpt-5.6-luna', 'medium', 272000, 'medium'],
+  ])('pins %s context and effort in the managed Codex home', (model, effort, window, expectedEffort) => {
+    const codexDir = join(ctx.codexHome, 'explicit-policy')
+    initCodexHome(codexDir, { model, effort })
+    const config = readFileSync(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain(`model_context_window = ${window}`)
+    expect(config).toContain(`model_reasoning_effort = "${expectedEffort}"`)
+  })
+
   it('creates sessions/ subdirectory', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-01')
     initCodexHome(codexDir)

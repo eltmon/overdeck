@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  reportComposerReloadProgress: vi.fn(async () => undefined),
   acquireRestartLock: vi.fn(),
   readRestartLockHolder: vi.fn(),
   readPlatformConfig: vi.fn(),
@@ -33,6 +34,8 @@ const mocks = vi.hoisted(() => ({
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
 }));
+
+vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
 // Without mocking this, the test outcome depends on whether the host happens to
@@ -787,6 +790,8 @@ describe('reloadCommand', () => {
 
   describe('restart-approval gate (PAN-3729)', () => {
     it('builds first, then waits for approval before restarting', async () => {
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_ACTIVITY', 'reload-42');
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_LOG', '/tmp/reload-42.log');
       mocks.statSync
         .mockReturnValueOnce({ mtimeMs: 1000 })
         .mockReturnValueOnce({ mtimeMs: 2000 });
@@ -798,6 +803,12 @@ describe('reloadCommand', () => {
         kind: 'reload',
         requesterId: 'reload:1234',
       }));
+      expect(mocks.reportComposerReloadProgress.mock.calls.map(([phase]) => phase))
+        .toEqual(['building', 'awaiting-approval', 'restarting', 'completed']);
+      expect(mocks.reportComposerReloadProgress).toHaveBeenLastCalledWith('completed', 'reload-42', '/tmp/reload-42.log');
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY).toBeUndefined();
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_LOG).toBeUndefined();
+      vi.unstubAllEnvs();
       // The build is ungated; only the restart waits.
       expect(mocks.spawn.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.waitForRestartApproval.mock.invocationCallOrder[0]);

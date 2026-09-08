@@ -558,7 +558,7 @@ export async function spawnConversationSession(
   cwd: string,
   claudeSessionId: string,
   model?: string,
-  effort?: string,
+  effort: string = 'high',
   issueId?: string,
   resume = false,
   harness: RuntimeName = 'claude-code',
@@ -575,6 +575,7 @@ export async function spawnConversationSession(
   let providerExportsStr = '';
   let piFields: {
     harness: 'ohmypi';
+    piEffort?: string;
     piMode: 'tui';
     piExtensionPath: string;
     piSessionDir: string;
@@ -585,10 +586,11 @@ export async function spawnConversationSession(
     codexMode: 'app-server' | 'tui';
     codexHome: string;
     codexSessionDir: string;
+    codexEffort?: string;
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
-  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; resumeSessionId?: string } | undefined;
+  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiCodeEffort?: string; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -599,7 +601,7 @@ export async function spawnConversationSession(
       : undefined;
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
-      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work'),
+      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', effort),
       resumeSessionId,
     };
     runtimeCommand = 'acp-host';
@@ -608,9 +610,7 @@ export async function spawnConversationSession(
       throw new Error('Invalid model name');
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
-    // The mode→flag mapping lives in claude-permissions.ts. The inline ternary
-    // that used to live here emitted the literal value `auto` under
-    // claude.permissionMode=auto, which Claude Code strict-validates and rejects.
+    // Map permissions through the canonical helper; Claude rejects the literal `auto` flag.
     runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
@@ -632,6 +632,7 @@ export async function spawnConversationSession(
         : undefined;
       piFields = {
         harness: 'ohmypi',
+        piEffort: effort ?? 'high',
         piMode: 'tui',
         piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
         piSessionDir,
@@ -651,6 +652,8 @@ export async function spawnConversationSession(
       const { initCodexHome, extractThreadIdFromRollout } = await import('../runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
+        model,
+        effort,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
@@ -662,6 +665,7 @@ export async function spawnConversationSession(
       codexFields = {
         harness: 'codex',
         codexMode: codexTransport,
+        codexEffort: effort ?? 'high',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
         resumeSessionId,
@@ -671,10 +675,7 @@ export async function spawnConversationSession(
       // so a stopped Kimi conversation actually resumes its native session
       // (-S <id>) instead of always launching fresh and silently overwriting
       // the pinned transcript pointer with a brand-new session directory.
-      // Verify the pinned wire.jsonl still exists on disk before trusting the
-      // id — if it was cleaned up, fall through to the fresh-launch path
-      // (kimiExistingSessionsBefore capture below) instead of resuming a
-      // session Kimi can no longer find.
+      // Resume only when Kimi's pinned transcript still exists.
       let kimiResumeSessionId: string | undefined;
       if (resume) {
         const kimiSessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
@@ -690,6 +691,7 @@ export async function spawnConversationSession(
         harness: 'kimi-code',
         kimiCodeModel: model,
         kimiCodeYolo: true,
+        kimiCodeEffort: effort ?? 'high',
         ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
       };
     }
@@ -779,7 +781,6 @@ export async function spawnConversationSession(
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        effort: harness === 'opencode' ? effort : undefined,
         extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: true,
         fileMode: 0o700,

@@ -661,10 +661,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
     const behavior = getHarnessBehavior(effectiveHarness);
     const piLauncherFields = behavior.usesRpcFifo
-      ? await getOhmypiLauncherFields(sessionName, planningModel)
+      ? await getOhmypiLauncherFields(sessionName, planningModel, effort)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
-      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan')
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', effort)
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
       ? getAcpLauncherFields(
@@ -673,13 +673,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           workspacePath,
           harnessLaunch.binaryPath,
           'plan',
+          effort,
         )
       : {};
     // PAN-1837 review fix: planning explicitly threads harness but omitted
     // kimiCodeModel — buildKimiCodeCommand() throws 'kimi-code launcher
     // requires kimiCodeModel' before a session could be created.
     const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
-      ? getKimiCodeLauncherFields(planningModel)
+      ? getKimiCodeLauncherFields(planningModel, effort)
       : {};
 
     const providerExports = behavior.launchCommandKind === 'acp-host'
@@ -711,7 +712,6 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...piLauncherFields,
         ...codexLauncherFields,
         ...acpLauncherFields,
-        effort: effectiveHarness === 'opencode' ? effort : undefined,
         ...kimiCodeLauncherFields,
       }),
       { mode: 0o755 },
