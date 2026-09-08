@@ -110,6 +110,29 @@ compatibility as automatic support.
 | **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 | **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 
+Kimi K3 supports Low, High, and Max effort through both native CLI and ACP.
+Overdeck initializes managed K3 sessions at High unless another effort was
+selected. Native launches use the per-process `KIMI_MODEL_THINKING_EFFORT`
+override; ACP sets the session's `thinking` option after selecting the model.
+Overdeck does not edit the shared Kimi configuration. Saved Medium maps to High,
+and Extra High maps to Max. K2.7 Code and HighSpeed always think and do not
+offer adjustable effort.
+
+For a running ACP session, the host accepts the authenticated `set-effort`
+operation with an `effort` string. It acknowledges the normalized effort only
+after Kimi accepts the session configuration change. Invalid values and models
+without adjustable effort are rejected.
+
+For Claude Code, the saved `kimi-k2.7-code` selection launches as
+`kimi-for-coding` when using a Kimi coding-subscription key. The main model
+and tier/subagent model variables use the same endpoint mapping. Moonshot
+platform keys retain `kimi-k2.7-code`.
+
+The native/ACP aliases `kimi-code/k3` and `kimi-code/k3-256k` have context
+windows of 1,048,576 and 262,144 tokens, respectively. Both K2.7 variants have
+262,144 tokens. K3's full 1M window requires the corresponding membership
+entitlement. See the [official Kimi model reference](https://www.kimi.com/code/docs/en/kimi-code/models.html).
+
 Kimi is therefore a supported agent through the `acp` harness. Cursor, Grok,
 and Gemini remain candidates: their ACP support reduces the adapter to
 provider-specific startup and auth, but they are not selectable until those

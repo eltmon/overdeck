@@ -34,7 +34,7 @@ interface OmpModelDef {
 interface OmpProviderDef {
   baseUrl: string;
   apiKey: string;
-  api: 'openai-completions';
+  api: 'openai-completions' | 'google-generative-ai';
   models: OmpModelDef[];
 }
 
@@ -43,11 +43,24 @@ interface OmpProviderDef {
  * when the provider needs no provisioning (bundled catalog covers it).
  */
 function ompProviderDef(providerName: string): OmpProviderDef | undefined {
+  if (providerName === 'google') {
+    return {
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      apiKey: 'GEMINI_API_KEY',
+      api: 'google-generative-ai',
+      models: [
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', cost: { input: 1.5, output: 9, cacheRead: 0.15, cacheWrite: 0 } },
+        { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', cost: { input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0 } },
+      ].map((model) => ({ ...model, reasoning: true, supportsTools: true, contextWindow: 1048576, maxTokens: 65536 })),
+    };
+  }
   if (providerName !== 'dashscope') return undefined;
   // contextWindow values mirror model-capabilities.ts; maxTokens for the
   // older ids are conservative caps (Alibaba does not publish per-model max
   // output on the standard endpoint) — qwen3.8-max's 131072 is documented.
   const models: OmpModelDef[] = [
+    { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0.4, output: 1.6, cacheRead: 0.08, cacheWrite: 0 } },
+    { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', contextWindow: 1000000, maxTokens: 131072, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
     { id: 'qwen3-max', name: 'Qwen3 Max', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
     { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', contextWindow: 262144, maxTokens: 65536, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
     { id: 'qwen3-plus', name: 'Qwen3 Plus', contextWindow: 131072, maxTokens: 32768, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
@@ -63,7 +76,7 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
 }
 
 /** Providers Overdeck provisions into the omp user registry at spawn time. */
-const PROVISIONED_PROVIDERS = new Set(['dashscope']);
+const PROVISIONED_PROVIDERS = new Set(['dashscope', 'google']);
 
 /**
  * Merge-write the omp user registry for the provider behind `modelId`.

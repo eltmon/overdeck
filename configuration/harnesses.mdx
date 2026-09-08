@@ -542,3 +542,13 @@ using the OS-bundled `curl` and `tar` tools.
   loading curated skill bundles into a single conversation
 - [Skills System](/features/skills) — how Overdeck distributes skills across
   harnesses
+
+## Context and reasoning effort
+
+Model pickers show the configured session context beside each model. This budget differs from the provider's maximum API context and from the remaining space shown in a running session. Runtime overhead and response reservations reduce usable space.
+
+Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
+
+Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort.
+
+Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.

@@ -60,8 +60,8 @@ vi.mock('../defaultConversationModel', () => ({
 }));
 
 vi.mock('../EffortPicker', () => ({
-  EffortPicker: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
-    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{value}</button>
+  EffortPicker: ({ value, onChange, unverified }: { value: string; onChange: (value: string) => void; unverified?: boolean }) => (
+    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{unverified ? 'Effort unverified' : value}</button>
   ),
   loadStoredEffort: () => storedEffort.value,
 }));
@@ -149,7 +149,7 @@ describe('ComposerFooter attachments', () => {
     storedEffort.value = 'max';
     render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);
 
-    expect(screen.getByTestId('effort-picker')).toHaveTextContent('high');
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('Effort unverified');
   });
 
   it('uses the browser default only before a conversation session exists', () => {
@@ -702,6 +702,26 @@ describe('ComposerFooter attachments', () => {
         body: JSON.stringify({ message: 'hello pi' }),
       }),
     );
+  });
+
+  it('posts live thinking-level changes for Codex conversations', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const piConversation = { ...conversation, harness: 'codex' as const };
+
+    render(<ComposerFooter conversation={piConversation} />);
+
+    fireEvent.click(screen.getByTestId('effort-picker'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/thinking-level',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ level: 'high' }),
+        }),
+      );
+    });
   });
 
   it('posts live thinking-level changes for pi conversations', async () => {

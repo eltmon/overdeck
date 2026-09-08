@@ -38,17 +38,10 @@ export const CLIPROXY_CODEX_CONTEXT_WINDOW = 150_000;
  * gpt-5.5's 150K), which made a 186K session read ~18% full and silently disabled
  * proactive compaction for every GPT-5.6 agent.
  *
- * PAN-3388: 272K is a BILLING tier, not a capability limit. All three GPT-5.6
- * models share a 1.05M raw window, but OpenAI prices "prompts with >272K input
- * tokens at 2x input and 1.5x output for the full request"
- * (https://developers.openai.com/api/docs/models/gpt-5.6-sol — same note on
- * -terra and -luna). OpenAI cut Codex's own client window 372K→272K because the
- * 372K profile "caused more subscription usage to be charged than intended"
- * (openai/codex#34619) and advises non-Codex harnesses to pin 272K. Defaulting
- * higher makes every long session burn subscription quota at 2x for its whole
- * tail, so the bare model ids pin here and auto-compact at ~91% (~248K), under
- * the tier. Sessions that genuinely need the longer window opt in via the
- * `[372k]` variants below.
+ * Bare GPT models use the installed Codex catalog's 272K default. Explicit
+ * [372k] variants opt into a larger configured budget. The API has a separate
+ * >272K input pricing tier; its multiplier is not a verified subscription-credit
+ * multiplier. See docs/MODEL-CONTEXT-AUDIT.md for the provider and runtime limits.
  */
 export const CLIPROXY_GPT56_CONTEXT_WINDOW = 272_000;
 
@@ -104,5 +97,5 @@ export function isGpt56LongContextVariantSync(modelId: string): boolean {
  * their base API model id, everything else passes through unchanged.
  */
 export function apiLaunchModelIdSync(modelId: string): string {
-  return GPT56_LONG_CONTEXT_VARIANTS[modelId] ?? modelId;
+  return modelId === 'k3' ? 'k3-256k' : GPT56_LONG_CONTEXT_VARIANTS[modelId] ?? modelId;
 }

@@ -461,11 +461,11 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const openaiIds = models.openai.map(m => m.id);
-      expect(openaiIds).toContain('gpt-5.5');
-      expect(openaiIds).toContain('gpt-5.4');
-      expect(openaiIds).toContain('gpt-5.4-mini');
-      expect(openaiIds).toContain('gpt-5.3-codex');
-      expect(openaiIds).toContain('gpt-5.2');
+      expect(openaiIds).not.toContain('gpt-5.5');
+      expect(openaiIds).not.toContain('gpt-5.4');
+      expect(openaiIds).not.toContain('gpt-5.4-mini');
+      expect(openaiIds).not.toContain('gpt-5.3-codex');
+      expect(openaiIds).not.toContain('gpt-5.2');
     });
   });
 

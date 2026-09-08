@@ -197,6 +197,21 @@ describe('CodexAppServerHost', () => {
     });
   });
 
+  it('uses High by default and applies acknowledged effort changes to subsequent turns', async () => {
+    const manager = new FakeManager();
+    const host = makeHost(manager);
+    await host.handleOp({ op: 'message', content: 'first', model: 'gpt-6-astra' });
+    expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('high');
+    expect((await host.handleOp({ op: 'set-effort', effort: 'low' })).status).toBe(200);
+    manager.setState({ state: 'idle', threadId: 'thread-started' });
+    await host.handleOp({ op: 'message', content: 'second' });
+    expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('low');
+    expect((await host.handleOp({ op: 'set-effort', effort: 'invalid' })).status).toBe(400);
+    manager.setState({ state: 'idle', threadId: 'thread-started' });
+    await host.handleOp({ op: 'message', content: 'third' });
+    expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('low');
+  });
+
   it('starts a thread, persists threadId, starts a turn, and logs manager notifications', async () => {
     const manager = new FakeManager();
     const host = makeHost(manager);
@@ -245,7 +260,7 @@ describe('CodexAppServerHost', () => {
     await host.handleOp({ op: 'message', content: 'second', model: 'gpt-5.6-codex' });
 
     expect(manager.startThreadCalls).toHaveLength(1);
-    expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'second', options: { model: 'gpt-5.6-codex' } });
+    expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'second', options: { model: 'gpt-5.6-codex', effort: 'high' } });
   });
 
   it('resumes an existing thread on the first message when resumeThreadId is supplied', async () => {
@@ -348,7 +363,7 @@ describe('CodexAppServerHost', () => {
 
     stdin.write('typed turn\n');
 
-    await vi.waitFor(() => expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'typed turn', options: {} }));
+    await vi.waitFor(() => expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'typed turn', options: { effort: 'high' } }));
   });
 
   it('renders a stdin turn failure into the pane instead of crashing the host', async () => {

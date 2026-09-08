@@ -294,10 +294,10 @@ async function spawnRunWithoutConsentClaim(
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'ohmypi'
-    ? await getOhmypiLauncherFields(agentId, selectedModel)
+    ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(
@@ -306,14 +306,12 @@ async function spawnRunWithoutConsentClaim(
         workspace,
         harnessLaunch.binaryPath,
         role,
+        options.effort,
       )
     : {};
-  // PAN-1837 review fix: role runs (review/test/ship/plan/flywheel) reached
-  // this launcher path without a Kimi field spread, so buildKimiCodeCommand()
-  // threw 'kimi-code launcher requires kimiCodeModel' before a session could
-  // even be created.
+  // Kimi launchers require their model and effort fields even for specialist roles.
   const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
-    ? getKimiCodeLauncherFields(selectedModel)
+    ? getKimiCodeLauncherFields(selectedModel, options.effort)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,

@@ -337,7 +337,7 @@ export function validateRoleModelRefs(config: NormalizedConfig): void {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
       if (roleConfig.effort !== undefined) {
         const supported = getModelEffortLevelsSync(resolvedModel);
-        if (supported !== undefined && !supported.includes(roleConfig.effort)) {
+        if (supported !== undefined && supported.length > 0 && !supported.includes(roleConfig.effort)) {
           throw new Error(
             `config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
           );

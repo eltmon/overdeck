@@ -10,6 +10,8 @@ import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+import { resolveKimiNativeEffort } from './kimi-effort.js';
+import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -58,6 +60,7 @@ export interface LauncherConfig {
    *   - 'app-server': persistent Codex app-server host process
    */
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -84,6 +87,8 @@ export interface LauncherConfig {
   acpBinaryPath?: string;
   /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
   acpContextFile?: string;
+  /** Requested effort applied after the ACP model is selected. */
+  acpEffort?: string;
 
   /**
    * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
@@ -93,6 +98,8 @@ export interface LauncherConfig {
    * workDirKey bucket.
    */
   kimiCodeModel?: string;
+  /** Per-launch effort supplied without editing the shared Kimi config. */
+  kimiCodeEffort?: string;
   /** Auto-approve regular tool calls (`kimi --yolo`). Required for harness='kimi-code'. */
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
@@ -149,6 +156,7 @@ export interface LauncherConfig {
   resumeSessionId?: string;
   sessionId?: string;
   model?: string;
+  piEffort?: string;
   permissionFlags?: string[];
   extraArgs?: string;
 
@@ -596,7 +604,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelIdSync(config.model)}`;
+    cmd += ` --model ${shellQuoteModelIdSync(getClaudeCodeLaunchModelSync(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -665,6 +673,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
+  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }
@@ -783,6 +792,10 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
+  if (config.acpProvider === 'kimi' && config.model) {
+    const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
+    if (effort) tokens.push('--effort', shellQuote(effort));
+  }
 
   const cmd = tokens.join(' ');
   return [useExec ? `exec ${cmd}` : cmd];
@@ -826,7 +839,13 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   }
 
   const cmd = wrapWithSupervisor(config, tokens.join(' '));
-  return [useExec ? `exec ${cmd}` : cmd];
+  const effort = resolveKimiNativeEffort(config.kimiCodeModel, config.kimiCodeEffort);
+  return [
+    // 0.40.1 reads this operational override after model/config effort
+    // resolution. It applies to managed OAuth models without a synthetic model.
+    effort ? `export KIMI_MODEL_THINKING_EFFORT=${shellQuote(effort)}` : 'unset KIMI_MODEL_THINKING_EFFORT',
+    useExec ? `exec ${cmd}` : cmd,
+  ];
 }
 
 export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
