@@ -265,3 +265,20 @@ and the original's context is never lost.
 - [Harnesses](/configuration/harnesses) — `claude-code` vs `pi`, and the ToS rules that gate them
 - `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
 - `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff
+
+## Subagent activity and direct messages
+
+Select a child in the conversation's agent rail to read its transcript. Active
+children display “Working for …” with the same activity indicator as the main
+conversation.
+
+A bottom composer appears when the selected child supports direct messages.
+For Codex, this requires a loaded child in a conversation running the structured
+app-server transport. Messages go to that child's existing thread, with its
+current model and permissions. Drafts are separate for each child.
+
+Claude Code sessions, Codex terminal sessions, and unavailable children show the
+transcript without a composer. Messages are never relayed through the main agent.
+Existing Codex conversations need a restart after upgrading their host before
+they can expose this capability. If delivery cannot be confirmed, check the
+child's transcript before retrying.

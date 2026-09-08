@@ -1,7 +1,9 @@
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import type { Conversation } from '../CommandDeck/ConversationList';
+import { SubagentComposer } from './SubagentComposer';
 import { MessagesTimeline } from './MessagesTimeline';
 import type { SubagentSummary } from './chat-types';
+import { getWorkingPhase } from '../../lib/workingPhase';
 import { useSubagentTranscript } from './useConversationMessagesStream';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -15,11 +17,14 @@ interface SubagentTranscriptProps {
 
 /**
  * Full-width transcript for one subagent. Rendered in place of the parent
- * conversation body while a rail row is selected — no composer, because a
- * subagent has no input channel of its own.
+ * conversation body while a rail row is selected. Direct input is capability-gated.
  */
 export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBack }: SubagentTranscriptProps) {
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
+  // Codex snapshots deliberately report streaming=false. Child lifecycle comes
+  // from the subagent list; the parent's activity must never light up this view.
+  const isWorking = !conversation.endedAt && conversation.sessionAlive
+    && (subagent.status === 'running' || (conversation.harness !== 'codex' && transcript.data?.streaming === true));
 
   return (
     <div className={`${styles.subagentTranscript} flex min-h-0 min-w-0 flex-1 flex-col`}>
@@ -53,7 +58,8 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
           <MessagesTimeline
             messages={transcript.data?.messages ?? []}
             workLog={transcript.data?.workLog ?? []}
-            streaming={transcript.data?.streaming ?? subagent.status === 'running'}
+            streaming={isWorking}
+            workingPhase={isWorking ? getWorkingPhase(transcript.data?.messages ?? [], transcript.data?.workLog ?? []) : undefined}
             conversationName={`${conversation.name}:${subagent.agentId}`}
             cwd={conversation.cwd}
             issueId={conversation.issueId}
@@ -61,6 +67,7 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
           />
         )}
       </div>
+      <SubagentComposer key={`${conversation.name}:${subagent.agentId}`} conversation={conversation} subagent={subagent} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { conversationSubagentInputRoutes } from './conversation-subagent-input.js';
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
@@ -1052,6 +1053,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
+  conversationSubagentInputRoutes,
   postConversationCodexApprovalRoute,
   postConversationPaneChoiceRoute,
   postConversationPiAskAnswerRoute,

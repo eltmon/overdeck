@@ -173,6 +173,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/stop',                       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stop' },
   { surface: 'POST /api/conversations/:name/resume',                     kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.resume' },
   { surface: 'POST /api/conversations/:name/switch-model',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setHarness/setModel before first session only' },
+  { surface: 'GET /api/conversations/:name/subagents/:agentId/input', kind: 'http', disposition: 'READ', door: 'conversationSubagentInput: validate parent membership and read live direct-input capability' },
+  { surface: 'POST /api/conversations/:name/subagents/:agentId/input', kind: 'http', disposition: 'WRITE', door: 'conversationSubagentInput: direct validated child delivery through the persistent Codex host' },
   { surface: 'GET /api/conversations/:name/messages',                    kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.parse' },
   { surface: 'GET /api/conversations/:name/message-locator',             kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.resolveFile' },
   { surface: 'POST /api/conversations/:name/upload-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stageAttachment' },
