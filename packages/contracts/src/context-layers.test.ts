@@ -70,28 +70,28 @@ describe("context dashboard contracts", () => {
         {
           harness: "claude-code",
           layerKind: "global",
-          label: "Claude Code · global",
-          path: "/home/user/.claude/CLAUDE.md",
+          label: "Claude · managed launch",
+          path: "/home/user/.overdeck/context/claude-global.md",
           exists: true,
-          hasManagedRegion: true,
-          hasUserContent: true,
+          deliveryChannel: "claude-append-system-prompt",
+          byteCount: 42,
+          sha256: "abc123",
         },
         {
           harness: "ohmypi",
-          layerKind: "project",
-          projectKey: "overdeck",
-          label: "overdeck · AGENTS.md",
-          path: "/repo/overdeck/AGENTS.md",
+          layerKind: "global",
+          label: "Pi · managed launch",
+          path: "/home/user/.overdeck/context/pi-global.md",
           exists: false,
-          hasManagedRegion: false,
-          hasUserContent: false,
+          deliveryChannel: "pi-append-system-prompt",
+          byteCount: 0,
         },
       ],
     })
 
     expect(parsed.layers.map((layer) => layer.kind)).toEqual(["global", "project", "workspace"])
     expect(parsed.targets.map((target) => target.harness)).toEqual(["claude-code", "ohmypi"])
-    expect(parsed.targets[0].hasUserContent).toBe(true)
+    expect(parsed.targets[0].deliveryChannel).toBe("claude-append-system-prompt")
   })
 
   it("names harness previews with shared harness values and fullPrompt", () => {

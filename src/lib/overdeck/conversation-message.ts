@@ -531,12 +531,18 @@ export async function handleConversationMessage(
     }
 
     try {
-      await deliverAgentMessage(
-        conv.tmuxSession,
-        deliveredMessage,
-        'conversation-message',
-        resolveConversationDeliveryMethod(conv),
-      );
+      const method = resolveConversationDeliveryMethod(conv);
+      if (harness === 'kimi-code') {
+        await deliverAgentMessage(
+          conv.tmuxSession,
+          deliveredMessage,
+          'conversation-message',
+          method,
+          { kimiContext: { workspace: conv.cwd } },
+        );
+      } else {
+        await deliverAgentMessage(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
+      }
     } catch (deliveryErr: unknown) {
       const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
       if (errMsg.includes('MessageDeliveryFailed')) {

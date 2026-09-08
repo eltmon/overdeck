@@ -70,3 +70,7 @@
 1531 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-3773
 1189 src/dashboard/server/routes/settings.ts # PAN-3771
 1578 src/lib/model-capabilities.ts # PAN-3780
+# Managed context launch wiring; composition and cleanup live in separate modules.
+1379 src/cli/index.ts # PAN-3783
+1076 src/lib/agents/spawn.ts # PAN-3783
+1146 src/lib/overdeck/conversation-runtime.ts # PAN-3783

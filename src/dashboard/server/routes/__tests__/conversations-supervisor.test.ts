@@ -270,7 +270,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
-    expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
+    expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home-v2')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/codex-app-server-host.js'");
     expect(launcher).not.toContain('pty-supervisor.js');

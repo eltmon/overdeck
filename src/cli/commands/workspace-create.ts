@@ -23,7 +23,6 @@ import {
   resolveProjectFromIssueSync,
 } from '../../lib/projects.js';
 import { mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
-import { generateClaudeMdSync, TemplateVariables } from '../../lib/template.js';
 import { createWorkspace as createWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { createWorktree } from '../../lib/worktree.js';
 import { createRemoteWorkspace } from './workspace-remote.js';
@@ -268,28 +267,14 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       console.log('  Cleared stale workspace-local .pan runtime state');
     }
 
-    // Generate CLAUDE.md
-    spinner.text = 'Generating CLAUDE.md...';
-    const variables: TemplateVariables = {
-      FEATURE_FOLDER: folderName,
-      BRANCH_NAME: branchName,
-      ISSUE_ID: issueId.toUpperCase(),
-      WORKSPACE_PATH: workspacePath,
-      FRONTEND_URL: `https://${folderName}.localhost:3000`,
-      API_URL: `https://api-${folderName}.localhost:8080`,
-      PROJECT_NAME: projectName,
-    };
-
-    const claudeMd = generateClaudeMdSync(variables);
-    writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
-
-    // PAN-1201: assemble the workspace context layer. The bundle composes the
-    // parent project's layer with issue metadata; PAN-1052 memory injection
-    // and live status are layered on at spawn time. Non-fatal on failure.
+    // Assemble the Overdeck-owned workspace context layer. Native harness
+    // instruction files in the worktree remain exactly as Git/user authored them.
+    spinner.text = 'Assembling managed-session context...';
+    // PAN-1201: persist only harness-neutral issue/workspace metadata. The
+    // canonical project layer is rendered for the active harness at launch;
+    // PAN-1052 memory injection and live status can join this neutral bundle.
     try {
       const wsContext = assembleWorkspaceContext({
-        projectRoot,
-        harness: 'claude-code',
         issueId: issueId.toUpperCase(),
         workspacePath,
         branch: branchName,

@@ -129,15 +129,14 @@ describe('seedUatFixturesLocal', () => {
     expect(doc.plan.items).toHaveLength(3);
   });
 
-  it('writes a CLAUDE.md marker at the workspace root so GET /api/workspaces/FIX-1 does not report corrupted (AC-5)', async () => {
+  it('uses Overdeck-owned workspace state as the validity marker without creating CLAUDE.md (AC-5)', async () => {
     const { seed } = await importSeedModules();
     const { fixtureWorkspacePath } = await import('../../../../src/lib/uat-fixtures/fixture-data.js');
 
     await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
-    const claudeMdPath = join(fixtureWorkspacePath(), 'CLAUDE.md');
-    expect(existsSync(claudeMdPath)).toBe(true);
-    expect(readFileSync(claudeMdPath, 'utf-8').length).toBeGreaterThan(0);
+    expect(existsSync(join(fixtureWorkspacePath(), 'CLAUDE.md'))).toBe(false);
+    expect(existsSync(join(fixtureWorkspacePath(), '.overdeck', 'spec.vbrief.json'))).toBe(true);
   });
 
   it('appends a review.status_changed event with prUrl, and every agent row carries a branch (AC-6, review finding UAT cycle 2)', async () => {

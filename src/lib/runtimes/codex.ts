@@ -18,7 +18,7 @@
  * per-home discovery location.
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, chmodSync, openSync, readSync, closeSync, copyFileSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
@@ -308,12 +308,23 @@ export interface InitCodexHomeOpts {
  *   <codexHomeDir>/
  *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
  *                     trust, notify hooks)
- *     AGENTS.md     — Populated by context-layering bead; placeholder for now
  *     rules/        — Symlink to the user's global Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
 export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
-  mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+  mkdirSync(codexHomeDir, { recursive: true, mode: 0o700 })
+  if (codexHomeDir.endsWith('/codex-home-v2')) {
+    // Keep transcript data in the established private root while using a new
+    // config root that cannot discover historical codex-home/AGENTS.md.
+    const persistentSessions = join(dirname(codexHomeDir), 'codex-home', 'sessions')
+    mkdirSync(persistentSessions, { recursive: true, mode: 0o700 })
+    const sessionsLink = join(codexHomeDir, 'sessions')
+    if (!existsSync(sessionsLink)) {
+      symlinkSync(persistentSessions, sessionsLink, 'dir')
+    }
+  } else {
+    mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+  }
 
   const configPath = join(codexHomeDir, 'config.toml')
   // Always (re)write config.toml so permission-mode changes take effect on
@@ -408,25 +419,12 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   // Skills are copied rather than linked: every managed CODEX_HOME remains
-  // isolated, while `pan sync` updates in the Agent Skills standard home are
-  // refreshed on each init/resume.
+  // isolated, while `pan sync` updates the shared native skill tree.
   syncCodexSkillsIntoHome(
     join(homedir(), '.agents', 'skills'),
     join(codexHomeDir, 'skills'),
   )
 
-  const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
-  if (!existsSync(agentsMdPath)) {
-    // Seed from the pre-rendered Codex global context layer if available;
-    // fall back to a placeholder. The static file is written by `pan sync`
-    // via syncContextLayersSync → renderGlobalLayer('codex', …).
-    const globalCodexContext = join(homedir(), '.overdeck', 'context', 'codex-global.md')
-    if (existsSync(globalCodexContext)) {
-      copyFileSync(globalCodexContext, agentsMdPath)
-    } else {
-      writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
-    }
-  }
 }
 
 /**
@@ -736,7 +734,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) {
       throw new Error(`Codex agent ${agentId}: no captured thread-id — cannot send message`)
     }
-    const codexHomeDir = join(agentDirFor(agentId), 'codex-home')
+    const codexHomeDir = join(agentDirFor(agentId), 'codex-home-v2')
     const cmd = `CODEX_HOME=${shellQuote(codexHomeDir)} codex exec resume -c sandbox_mode=read-only ${shellQuote(threadId)} ${shellQuote(message)}`
     await execAsync(cmd)
   }
@@ -801,10 +799,10 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const harnessLaunch = await prepareHarnessLaunch('codex')
     const agentId = config.agentId
 
-    // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
-    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home')
+    // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home-v2
+    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2')
 
-    // 1. Create CODEX_HOME structure (config.toml + AGENTS.md + sessions/).
+    // 1. Create the private CODEX_HOME structure (config + sessions; no AGENTS.md).
     initCodexHome(codexHomeDir)
 
     // 2. Build the codex exec command — shell-quote every interpolated value.

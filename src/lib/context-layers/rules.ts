@@ -8,7 +8,7 @@
  *   dev       — distributed only on a overdeck checkout (rules about
  *               developing Overdeck itself)
  *
- * `pan sync` folds the applicable rules into the rendered global CLAUDE.md.
+ * `pan sync` folds the applicable rules into the managed launch context.
  * Their `paths:` frontmatter (Claude Code path-scoping) is dropped on fold —
  * a folded rule is always-on.
  */
@@ -75,7 +75,7 @@ export function disabledRuleNames(context: ContextConfig | undefined): Set<strin
 }
 
 /**
- * Render the applicable bundled rules into one CLAUDE.md section.
+ * Render the applicable bundled rules into one managed instruction section.
  *
  * `includeDev` admits `scope: dev` rules — set it from `isDevMode()` so they
  * only fold in on a overdeck checkout. `disabled` names rules switched off in
@@ -93,7 +93,10 @@ export function renderBundledRules(
     (r) => (includeDev || r.scope === 'universal') && !disabled.has(r.name),
   );
   const sections = rules
-    .map((r) => renderForHarness(r.body, harness).trim())
+    .map((r) => {
+      const body = renderForHarness(r.body, harness).trim();
+      return body ? `Source: ${join(SYNC_SOURCES.rules, `${r.name}.md`)} (scope: ${r.scope})\n\n${body}` : '';
+    })
     .filter((s) => s.length > 0);
   if (sections.length === 0) return '';
   return `## Overdeck Engineering Rules\n\n${sections.join('\n\n')}`;

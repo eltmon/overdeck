@@ -1,6 +1,6 @@
 # Overdeck CLI - Development Guidelines
 
-> **Note:** Universal and dev-scope engineering rules (async tmux, no execSync in server, fake timers, worktree/stash discipline, Karpathy rules, …) live in [`sync-sources/rules/`](sync-sources/rules/) and reach every session via `pan sync` → `~/.claude/CLAUDE.md`. This file holds only project-specific essentials; everything else is one link away.
+> **Note:** Universal and dev-scope engineering rules (async tmux, no execSync in server, fake timers, worktree/stash discipline, Karpathy rules, …) live in [`sync-sources/rules/`](sync-sources/rules/) and reach managed sessions through explicit launch context; `pan sync` updates only Overdeck-owned context artifacts. This file holds only project-specific essentials; everything else is one link away.
 
 > **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context and `/okf author`/`/okf sync`/`/okf study` to maintain it. Edit through `/okf author`; the upstream viewer does not preserve YAML formatting losslessly.
 

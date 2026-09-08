@@ -934,7 +934,8 @@ describe('generateLauncherScript', () => {
       ],
     });
 
-    expect(script).toContain("--append-system-prompt-file '/workspace/project/.pan/context/workspace.md' --append-system-prompt-file '/home/u/.overdeck/session-context.md'");
+    expect(script.match(/--append-system-prompt-file/g)).toHaveLength(1);
+    expect(script).toContain("'/workspace/project/.pan/context/workspace.md' '/home/u/.overdeck/session-context.md'");
     expect(script).not.toMatch(/--model/);
   });
 
@@ -1478,7 +1479,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
     expect(escapeHatch).toBe(legacy);
-    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
   });
 
   it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
@@ -1490,11 +1491,12 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'work-tui',
       appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
     });
-    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).toContain('developer_instructions=');
+    expect(script).toContain("'/workspace/project/.pan/context.md'");
     expect(script).not.toMatch(/--append-system-prompt-file/);
   });
 
-  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
+  it('codex conversation (tui) mode preserves native project AGENTS.md discovery', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -1502,7 +1504,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'tui',
       spawnMode: 'conversation',
     });
-    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^codex$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -1516,7 +1518,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -1531,7 +1533,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume -c project_doc_max_bytes=0 '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 

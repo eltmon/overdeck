@@ -12,9 +12,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
@@ -84,42 +82,7 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
   await renameAsync(tmp, launcherScript);
 }
 
-export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
-  const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp') {
-    return [];
-  }
-
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(workspace);
-  try {
-    await statAsync(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNodeNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  return files;
-}
+export { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 
 function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
@@ -251,6 +214,7 @@ export function getKimiCodeLauncherFields(model: string): {
   kimiCodeYolo: true;
   model: string;
   unsetProviderEnv: true;
+  kimiContextDelivery: 'initial-message';
 } {
   const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
@@ -259,6 +223,7 @@ export function getKimiCodeLauncherFields(model: string): {
     kimiCodeYolo: true,
     model,
     unsetProviderEnv: true,
+    kimiContextDelivery: 'initial-message',
   };
 }
 
@@ -269,7 +234,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the
@@ -906,7 +871,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   mkdirSync(dir, { recursive: true });
   const stem = basename(definitionPath).replace(/\.md$/, '');
   const outPath = join(dir, `${stem}.md`);
-  writeFileSync(outPath, body);
+  writeFileSync(outPath, `Source: ${abs}\n\n${body}`);
 
   const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
 
