@@ -744,8 +744,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
  * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
- * short-circuits to a
- * `omp --mode rpc --model <model>` line; the launcher generator then layers
+ * returns `omp --mode rpc --model <model>`; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
  * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
