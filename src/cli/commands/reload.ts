@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
+import { reportComposerReloadProgress } from '../../lib/composer-commands/reload.js';
 import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
@@ -122,6 +123,27 @@ async function recordReloadStatus(
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
+  const activityId = process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  const logPath = process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  // Do not pass this command's activity identity into the replacement server.
+  delete process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  delete process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  const progress = (phase: Parameters<typeof reportComposerReloadProgress>[0]) =>
+    reportComposerReloadProgress(phase, activityId, logPath);
+  await progress('building');
+  try {
+    await runReload(options, progress);
+    await progress(process.exitCode ? 'failed' : 'completed');
+  } catch (error) {
+    await progress('failed');
+    throw error;
+  }
+}
+
+async function runReload(
+  options: ReloadOptions,
+  progress: (phase: Parameters<typeof reportComposerReloadProgress>[0]) => Promise<void>,
+): Promise<void> {
   let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
@@ -267,6 +289,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     // Everything above is ungated: a build changes nothing the operator can see.
     // The restart below is voluntary, so it waits for the operator's approval
     // first (PAN-3729) and may find that an approved restart already happened.
+    await progress('awaiting-approval');
     const gate = await waitForRestartApproval({
       requesterId: restartGateRequesterId('reload'),
       kind: 'reload',
@@ -294,6 +317,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     }
     // The approval wait is unbounded, so the pre-wait clock would report a
     // reload that "took" as long as the operator was away from the dashboard.
+    await progress('restarting');
     startedAt = Date.now();
 
     let restartResult: DashboardRestartResult;

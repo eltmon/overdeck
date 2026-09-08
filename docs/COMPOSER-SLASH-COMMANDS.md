@@ -48,3 +48,17 @@ The parser rejects shell control syntax and returns typed errors for unknown com
 ## No-loss rule
 
 `src/dashboard/frontend/src/components/chat/__tests__/fixtures/slash-commands.pre-adapter.json` freezes the complete pre-adapter autocomplete surface. The no-loss audits map every unprefixed `pan` entry to its `/pan` equivalent, account for harness-native commands and all three handoff aliases, and require an explicit reason for any exclusion. The four-harness matrix separately proves that portable commands never call a delivery primitive while ordinary text still does. Update these audits only for an intentional, documented surface change; do not weaken them to make a refactor pass.
+
+## Reloading from the composer
+
+`/pan reload` starts the bundled reload CLI in a detached process. It uses the
+running dashboard's working directory, independently of the conversation or issue
+selected in the composer. The Activity feed reports build preparation, readiness,
+restart, and completion or failure. The existing restart banner still requires
+operator approval before the new build goes live.
+
+The detached CLI owns progress reporting, so completion survives the dashboard
+restart. Its stdout and stderr go to `~/.overdeck/logs/composer-reload-<id>.log`;
+completion and failure activity details include at most the final 64 KiB. The
+composer defaults the health timeout to 120 seconds and preserves explicit CLI
+options. Terminal reloads keep their existing behavior.
