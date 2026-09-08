@@ -66,7 +66,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Anthropic',
     compatibility: 'direct',
     defaultHarness: 'claude-code',
-    models: ['claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -111,8 +111,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenAI',
     compatibility: 'direct',
     defaultHarness: 'codex',
-    models: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
-    tierModels: { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
+    models: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'],
+    tierModels: { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.6-terra', haiku: 'gpt-5.6-luna' },
     tested: true,
     description: 'First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code.',
   },
@@ -122,7 +122,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
-    models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
+    models: ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
     tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
     tested: true,
     description: 'Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY',
@@ -149,7 +149,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
-    models: ['glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
+    models: ['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     haikuModel: 'glm-4.7-flash',
     tierModels: { opus: 'glm-5.2', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
     tested: true,
@@ -207,7 +207,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
-    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'],
+    models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'],
     haikuModel: 'qwen3-plus',
     tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
     tested: false,
@@ -399,7 +399,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
   }
-  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'].includes(modelId)) {
+  if (['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
   }
   // PAN-1837: native kimi-code CLI model aliases are namespaced `kimi-code/<alias>`
@@ -413,7 +413,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Anthropic models
-  if (['claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
@@ -424,7 +424,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Google models
-  if (['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
+  if (['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
@@ -435,7 +435,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
 
   // Check Kimi models — supported set + retired K2.5/K2.6-generation ids
   // (still routed so the deprecation-migration path can fire before remap).
-  if (['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['k3', 'k3-256k', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
@@ -445,7 +445,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Z.AI models
-  if (['glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+  if (['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 

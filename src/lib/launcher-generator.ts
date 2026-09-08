@@ -155,6 +155,7 @@ export interface LauncherConfig {
   resumeSessionId?: string;
   sessionId?: string;
   model?: string;
+  piEffort?: string;
   permissionFlags?: string[];
   extraArgs?: string;
 
@@ -671,6 +672,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
+  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }

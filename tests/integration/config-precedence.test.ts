@@ -73,7 +73,7 @@ describe('configuration precedence for role model routing', () => {
       },
     });
 
-    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.5');
+    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.6-sol');
     expect(resolveModel('work', undefined, config)).toBe('glm-5.1');
     expect(resolveModel('work', 'inspect', config)).toBe('minimax-m2.7-highspeed');
   });

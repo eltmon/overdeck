@@ -178,12 +178,7 @@ export async function getPiLauncherFields(agentId: string, model: string): Promi
       `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
     );
   }
-  // PAN-1048 review feedback 006 (S1): thread the resolved role/workhorse model
-  // through to buildPiCommand. The Pi launcher branch ignores baseCommand and
-  // rebuilds from scratch starting with the literal `pi`, so the only way to
-  // surface --model is via the launcher config's `model` field. Without this,
-  // a Pi-backed role silently fell back to Pi's default model and ignored the
-  // configured workhorse model entirely.
+  // The launcher rebuilds the command, so it must receive the selected model explicitly.
   return {
     harness: 'ohmypi',
     piExtensionPath,
@@ -193,8 +188,9 @@ export async function getPiLauncherFields(agentId: string, model: string): Promi
   };
 }
 
-export async function getOhmypiLauncherFields(agentId: string, model: string): Promise<{
+export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{
   harness: 'ohmypi';
+  piEffort: string;
   piExtensionPath: string;
   piFifoPath: string;
   piSessionDir: string;
@@ -210,6 +206,7 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
   }
   return {
     harness: 'ohmypi',
+    piEffort: effort ?? 'high',
     piExtensionPath: ohmypiExtensionPath,
     piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
@@ -277,13 +274,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
 } {
   const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
   const codexConfig = loadYamlConfig().config.codex;
-  // PAN-1803: codex work agents must inherit the user's configured codex
-  // permission level (Settings → Permissions → Codex) and pre-trust the
-  // workspace, EXACTLY like the conversation path
-  // (routes/conversations.ts). Without trustedDir, codex shows its first-run
-  // folder-trust / "load project-local config?" wizard and blocks the pane.
-  // Without the permission mapping, work agents ignore the Settings choice
-  // and run hardcoded never+workspace-write.
+  // Match conversation permissions and pre-trust the workspace to avoid onboarding prompts.
   const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
   const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
   const sandboxMode =

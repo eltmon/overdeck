@@ -46,11 +46,13 @@ interface EffortPickerProps {
   value: EffortLevel;
   onChange: (effort: EffortLevel) => void;
   disabled?: boolean;
+  unverified?: boolean;
+  title?: string;
   /** Effort level IDs available for the current model. Empty = not supported. */
   availableLevels?: readonly string[];
 }
 
-export function EffortPicker({ value, onChange, disabled = false, availableLevels }: EffortPickerProps) {
+export function EffortPicker({ value, onChange, disabled = false, availableLevels, unverified = false, title }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { openUp, align, maxHeight } = usePickerPosition(open, ref, { preferredHeight: 240 });
@@ -98,9 +100,10 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
         className={styles.pickerBtn}
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
+        title={title}
         type="button"
       >
-        <span className={styles.pickerLabel}>{selected.label}</span>
+        <span className={styles.pickerLabel}>{unverified ? 'Effort unverified' : selected.label}</span>
         <ChevronDown size={11} />
       </button>
 

@@ -318,9 +318,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
 
   const configPath = join(codexHomeDir, 'config.toml')
-  // Always (re)write config.toml so permission-mode changes take effect on
-  // resume. The file is Overdeck-managed ("do not edit manually") and
-  // contains no user state — only launch-time settings.
+  // Rewrite managed launch settings on resume so permission, effort, and context changes apply.
   {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
     // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a

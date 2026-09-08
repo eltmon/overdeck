@@ -39,112 +39,106 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5', icon: Gem, tier: 'premium', costPer1MTokens: 90, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
-      { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
-      { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
-      { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
-      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
-      { id: 'claude-sonnet-5' as ModelId, name: 'Claude Sonnet 5', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Sonnet — 1M context, intro pricing through Aug 31, 2026' },
-      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Sonnet — fast, capable, great for implementation' },
-      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', costPer1MTokens: 1, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
+      { id: 'claude-fable-5-1' as ModelId, name: 'Claude Fable 5.1 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
+      { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
+      { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
+      { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6 (200K context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
+      { id: 'claude-sonnet-5' as ModelId, name: 'Claude Sonnet 5 (1M context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Sonnet — 1M context, standard pricing' },
+      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6 (200K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Sonnet — fast, capable, great for implementation' },
+      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5 (200K context)', icon: Zap, tier: 'fast', costPer1MTokens: 3, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
-    // Trimmed 2026-05-23 to match OpenAI's Codex CLI published list;
-    // 2026-07-09 addendum adds the gpt-5.6 family without dropping anything;
-    // 2026-09-07 addendum adds gpt-6-astra, likewise dropping nothing.
-    // Dropped: gpt-5.5-pro, gpt-5.4-pro, gpt-5.5-mini, gpt-5.5-nano,
-    // gpt-5.4-nano, o3, o4-mini, gpt-4o, gpt-4o-mini.
-    // Saved configs referencing dropped IDs are migrated by MODEL_DEPRECATIONS
-    // in src/lib/model-capabilities.ts and warned-on by settings-api.ts.
+    // September 2026 catalog: GPT 5.2–5.5 selections migrate through MODEL_DEPRECATIONS.
     models: [
       // PAN-3388: bare gpt-5.6 ids pin the session window to the 272K billing
       // tier (>272K input bills 2x in / 1.5x out for the full request); the
       // [372k] variants opt into the long window at that surcharge.
-      { id: 'gpt-6-astra' as ModelId, name: 'GPT-6 Astra', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (September 2026), first GPT-6 generation. 272K session window (billing-tier safe), $10 in / $50 out per 1M.' },
-      { id: 'gpt-5.6-sol' as ModelId, name: 'GPT-5.6 Sol', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (July 2026), new default. 272K session window (billing-tier safe), $5 in / $30 out per 1M.' },
-      { id: 'gpt-5.6-sol[372k]' as ModelId, name: 'GPT-5.6 Sol 372K', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Sol with the 372K long-context window. Input past 272K bills at 2x in / 1.5x out for the whole request — for long-research sessions that accept the surcharge.' },
-      { id: 'gpt-5.6-terra' as ModelId, name: 'GPT-5.6 Terra', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at lower cost. 272K session window (billing-tier safe), $2 in / $12 out per 1M.' },
-      { id: 'gpt-5.6-terra[372k]' as ModelId, name: 'GPT-5.6 Terra 372K', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Terra with the 372K long-context window. Input past 272K bills at 2x in / 1.5x out for the whole request.' },
-      { id: 'gpt-5.6-luna' as ModelId, name: 'GPT-5.6 Luna', icon: Zap, tier: 'fast', costPer1MTokens: 0.7, capabilities: ['fast', 'cost-efficient', 'code'], description: 'OpenAI fastest/cheapest tier (July 2026). 272K session window (billing-tier safe), $0.20 in / $1.20 out per 1M.' },
-      { id: 'gpt-5.6-luna[372k]' as ModelId, name: 'GPT-5.6 Luna 372K', icon: Zap, tier: 'fast', costPer1MTokens: 0.7, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Luna with the 372K long-context window. Input past 272K bills at 2x in / 1.5x out for the whole request.' },
-      { id: 'gpt-5.5' as ModelId, name: 'GPT-5.5', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (April 2026). 1.05M context, $5 in / $30 out per 1M.' },
-      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', costPer1MTokens: 8.75, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Balanced GPT-5.4. 1.05M context, strong coding.' },
-      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', costPer1MTokens: 2.625, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context. $0.75 in / $4.50 out.' },
-      { id: 'gpt-5.3-codex' as ModelId, name: 'GPT-5.3 Codex', icon: Gem, tier: 'premium', costPer1MTokens: 7.875, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Coding-optimized (Feb 2026). 400K context, 85% SWE-Bench Verified. $1.75 in / $14 out.' },
-      { id: 'gpt-5.3-codex-spark' as ModelId, name: 'GPT-5.3 Codex Spark', icon: Zap, tier: 'fast', costPer1MTokens: 7.875, capabilities: ['fast', 'code', 'cost-efficient'], description: 'Ultra-fast coder (1000+ tok/s). ChatGPT-Pro-only research preview; routes via Codex CLI subscription auth — not generally available via raw API.' },
-      { id: 'gpt-5.2' as ModelId, name: 'GPT-5.2', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7.875, capabilities: ['reasoning', 'code', 'agentic'], description: 'Long-running agents (Dec 2025). 80% SWE-Bench, 92.4% GPQA-Diamond. Reserve for deep deliberation, not high-frequency polling.' },
+      { id: 'gpt-6-astra' as ModelId, name: 'GPT-6 Astra (272K context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (September 2026), first GPT-6 generation. 272K session window (billing-tier safe), $10 in / $50 out per 1M.' },
+      { id: 'gpt-5.6-sol' as ModelId, name: 'GPT-5.6 Sol (272K context)', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (July 2026), new default. 272K session window (billing-tier safe), $5 in / $30 out per 1M.' },
+      { id: 'gpt-5.6-sol[372k]' as ModelId, name: 'GPT-5.6 Sol (372K context)', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Sol with the 372K long-context window. API input past 272K bills at 2x in / 1.5x out for the whole request — for long-research sessions that accept the surcharge.' },
+      { id: 'gpt-5.6-terra' as ModelId, name: 'GPT-5.6 Terra (272K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at lower cost. 272K session window (billing-tier safe), $2 in / $12 out per 1M.' },
+      { id: 'gpt-5.6-terra[372k]' as ModelId, name: 'GPT-5.6 Terra (372K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 7, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Terra with the 372K long-context window. API input past 272K bills at 2x in / 1.5x out for the whole request.' },
+      { id: 'gpt-5.6-luna' as ModelId, name: 'GPT-5.6 Luna (272K context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.7, capabilities: ['fast', 'cost-efficient', 'code'], description: 'OpenAI fastest/cheapest tier (July 2026). 272K session window (billing-tier safe), $0.20 in / $1.20 out per 1M.' },
+      { id: 'gpt-5.6-luna[372k]' as ModelId, name: 'GPT-5.6 Luna (372K context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.7, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Luna with the 372K long-context window. API input past 272K bills at 2x in / 1.5x out for the whole request.' },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
-      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
+      { id: 'gemini-3.8-flash' as ModelId, name: 'Gemini 3.8 Flash (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 5.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
+      { id: 'gemini-3.5-flash-lite' as ModelId, name: 'Gemini 3.5 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 1.4, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'k3' as ModelId, name: 'Kimi K3', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
-      { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
-      { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
-      { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
-      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: FlaskConical, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
+      { id: 'k3' as ModelId, name: 'Kimi K3 (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
+      { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
+      { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
+      { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6 (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5 (256K context)', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
+      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview (256K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
     ],
   },
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-5.2' as ModelId, name: 'GLM-5.2', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 1M context, high/max effort, strong agentic coding. Text-only (vision is a separate model line).' },
-      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 200K context, strong agentic coding. Text-only (vision is a separate model line).' },
+      { id: 'glm-5.3' as ModelId, name: 'GLM-5.3 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'glm-5.2' as ModelId, name: 'GLM-5.2 (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 1M context, high/max effort, strong agentic coding. Text-only (vision is a separate model line).' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1 (200K context)', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 200K context, strong agentic coding. Text-only (vision is a separate model line).' },
     ],
   },
   minimax: {
     name: 'MiniMax',
     models: [
-      { id: 'MiniMax-M3' as ModelId, name: 'M3', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
-      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
-      { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
+      { id: 'MiniMax-M3' as ModelId, name: 'M3 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
+      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed (204.8K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
+      { id: 'minimax-m2.7' as ModelId, name: 'M2.7 (204.8K context)', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],
   },
   mimo: {
     name: 'Xiaomi MiMo',
     models: [
-      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
-      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 262K context, strong agentic coding' },
+      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
+      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5 (1M context)', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 1M context, strong agentic coding' },
     ],
   },
   nous: {
     name: 'Nous Portal',
     models: [
-      { id: 'qwen/qwen3.6-plus' as ModelId, name: 'Qwen 3.6 Plus', icon: Network, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'cost-efficient'], description: 'Qwen 3.6 Plus via Nous Portal, currently free with 1M context.' },
+      { id: 'qwen/qwen3.6-plus' as ModelId, name: 'Qwen 3.6 Plus (1M context)', icon: Network, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'cost-efficient'], description: 'Qwen 3.6 Plus via Nous Portal, currently free with 1M context.' },
     ],
   },
   dashscope: {
     name: 'Alibaba DashScope',
     models: [
-      { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
-      { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
-      { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
-      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
-      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max preview; free 1M-token Model Studio quota.' },
+      { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
+      { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus (256K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
+      { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus (131.072K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
+      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max (256K context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
+      { id: 'qwen3.7-plus' as ModelId, name: 'Qwen3.7 Plus (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 1, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'qwen3.8-flash' as ModelId, name: 'Qwen3.8 Flash (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'qwen3.8-max' as ModelId, name: 'Qwen3.8 Max (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.8 Max preview; free 1M-token Model Studio quota.' },
     ],
   },
   xai: {
     name: 'xAI (Grok)',
     models: [
-      { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
+      { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1 (256K context)', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
     ],
   },
   quantumllama: {
     name: 'QuantumLlama',
     models: [
-      { id: 'ql-reason-70b' as ModelId, name: 'QL Reason 70B', icon: FlaskConical, tier: 'premium', costPer1MTokens: 16, capabilities: ['reasoning', 'code', 'large-context'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 200K context, $8 in / $24 out per 1M.' },
-      { id: 'ql-swift-8b' as ModelId, name: 'QL Swift 8B', icon: FlaskConical, tier: 'balanced', costPer1MTokens: 4, capabilities: ['code', 'fast'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 128K context, $2 in / $6 out per 1M.' },
-      { id: 'ql-nano-1b' as ModelId, name: 'QL Nano 1B', icon: FlaskConical, tier: 'fast', costPer1MTokens: 0.8, capabilities: ['fast', 'cost-efficient'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 32K context, $0.40 in / $1.20 out per 1M.' },
+      { id: 'ql-reason-70b' as ModelId, name: 'QL Reason 70B (200K context)', icon: FlaskConical, tier: 'premium', costPer1MTokens: 16, capabilities: ['reasoning', 'code', 'large-context'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 200K context, $8 in / $24 out per 1M.' },
+      { id: 'ql-swift-8b' as ModelId, name: 'QL Swift 8B (128K context)', icon: FlaskConical, tier: 'balanced', costPer1MTokens: 4, capabilities: ['code', 'fast'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 128K context, $2 in / $6 out per 1M.' },
+      { id: 'ql-nano-1b' as ModelId, name: 'QL Nano 1B (32K context)', icon: FlaskConical, tier: 'fast', costPer1MTokens: 0.8, capabilities: ['fast', 'cost-efficient'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 32K context, $0.40 in / $1.20 out per 1M.' },
     ],
   },
 };

@@ -141,7 +141,11 @@ interface ClaudeCodeContextPolicy {
 
 export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
   const provider = getProviderForModelSync(model);
-  if (provider.name === 'anthropic') return {};
+  if (provider.name === 'anthropic') {
+    return hasModelCapabilitySync(model)
+      ? { autoCompactWindow: getModelCapabilitySync(resolveModelIdSync(model)).contextWindow }
+      : {};
+  }
 
   const resolvedModel = resolveModelIdSync(model);
   // OpenRouter models are unknown to Claude Code, which assumes a 200K window
