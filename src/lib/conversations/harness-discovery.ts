@@ -5,11 +5,12 @@
  * skipped silently; permission failures are reported through warnings.
  */
 
+import { listMuseSessionPaths } from '../runtimes/muse-session.js';
 import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
 
 export interface DiscoveredFile {
   jsonlPath: string;
@@ -147,6 +148,9 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
     result.push(...await collectPiFamilyRoot(join(agentDir, 'sessions'), piHarness, warnings));
     await collectAgentRootFiles(agentDir, piHarness, warnings, result);
     await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);
+    for (const jsonlPath of await listMuseSessionPaths(entry.name, root)) {
+      result.push({ projectDir: agentDir, jsonlPath, harness: 'muse' });
+    }
   }
 
   return result;

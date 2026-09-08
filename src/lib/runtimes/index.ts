@@ -1,3 +1,5 @@
+import { createMuseRuntimeSync } from './muse.js';
+export { MuseRuntimeSync, createMuseRuntimeSync } from './muse.js';
 /**
  * Cloister Runtime Abstraction
  *
@@ -111,6 +113,7 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'acp') {
       return this.get('acp') ?? null;
     }
+    if (harness === 'muse') return this.get('muse') ?? null;
     if (harness === 'kimi-code') {
       return this.get('kimi-code') ?? null;
     }
@@ -142,6 +145,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createCodexRuntimeSync());
     globalRegistry.register(createAcpRuntimeSync());
     globalRegistry.register(createKimiCodeRuntimeSync());
+    globalRegistry.register(createMuseRuntimeSync());
   }
   return globalRegistry;
 }

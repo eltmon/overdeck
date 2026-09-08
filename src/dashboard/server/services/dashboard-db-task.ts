@@ -1,3 +1,4 @@
+import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import {
@@ -58,7 +59,7 @@ export type DashboardDbOperation =
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -67,6 +68,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   codex: parseCodexConversationMessages,
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
+  muse: parseMuseConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 

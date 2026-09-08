@@ -3,6 +3,9 @@ import type { ModelCapability } from './model-capability-types.js';
 /** September 2026 additions; sources and context constraints: docs/MODEL-CONTEXT-AUDIT.md.
  * Skill scores inherit the previous family baseline until benchmarked. */
 export const AUDITED_MODEL_ADDITIONS = {
+  'muse-spark-1.3': { model: 'muse-spark-1.3', provider: 'meta', displayName: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms. Capability scores are unranked pending evaluation.' },
+  'muse-spark-1.3-contributor': { model: 'muse-spark-1.3-contributor', provider: 'meta', displayName: 'Muse Spark 1.3 Contributor (training data)', costPer1MTokens: 0.15, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Discounted tier: prompts and completions may train Meta models. Capability scores are unranked pending evaluation.' },
+
   'claude-fable-5-1': {
     model: 'claude-fable-5-1',
     provider: 'anthropic',

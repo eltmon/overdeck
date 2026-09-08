@@ -87,7 +87,7 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
 
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
   const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp') {
+  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'muse') {
     return [];
   }
 
@@ -147,7 +147,7 @@ export async function hasAgentRuntimeInSubtree(rootPid: string, harness: Runtime
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (expectedProcessNames.has(name)) return true;
+      if (expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'))) return true;
     } catch {
       continue;
     }
@@ -594,6 +594,7 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (readinessKind === 'muse-tui-prompt') return waitForMuseTuiReady(agentId, timeoutSec);
   if (readinessKind === 'kimi-session-signal') return waitForKimiCodeTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
@@ -771,6 +772,7 @@ export async function getAgentRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -964,6 +966,7 @@ export async function getRoleRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -1013,4 +1016,15 @@ export async function getRoleRuntimeBaseCommand(
   }
 
   return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+}
+
+async function waitForMuseTuiReady(agentId: string, timeoutSec: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
+    const pane = await Effect.runPromise(capturePane(agentId, 80));
+    if (/^\s*⟩\s/m.test(pane) && /(?:muse-spark|Muse Code)/.test(pane)) return true;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return false;
 }

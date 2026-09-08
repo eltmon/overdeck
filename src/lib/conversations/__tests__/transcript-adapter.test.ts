@@ -333,3 +333,17 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
     expect(getTranscriptAdapter(undefined).name).toBe('claude-code');
   });
 });
+
+
+describe('Muse transcript adapter', () => {
+  it('deduplicates committed messages and forwards a caller-selected summary timeout', async () => {
+    const file = join(workDir, 'muse.jsonl');
+    const record = { id: 'committed', payload_type: 'runtime.session',
+      payload: { kind: 'run', event: { kind: 'assistant_message_committed', text: 'Committed answer' } } };
+    await writeFile(file, [record, record].map(item => JSON.stringify(item)).join('\n'));
+    const adapter = getTranscriptAdapter('muse');
+    expect(await adapter.serializeTranscript(file)).toBe('[assistant]\nCommitted answer');
+    await adapter.compactSummary(file, { timeoutMs: 1234 });
+    expect(mockedSummarize).toHaveBeenCalledWith('[assistant]\nCommitted answer', expect.objectContaining({ timeoutMs: 1234 }));
+  });
+});

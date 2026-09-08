@@ -27,6 +27,8 @@ export const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
 export async function getProviderEnvForModel(model: string, harness?: RuntimeName): Promise<Record<string, string>> {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
+  // Muse owns login/API credentials; keep them out of Claude's environment.
+  if (provider.name === 'meta' && harness === 'muse') return {};
 
   // PAN-1837 review fix: native kimi-code auth is host-owned via `kimi login`
   // (~/.kimi-code/config.toml) — it does not need config.apiKeys.kimi at all.
@@ -146,6 +148,7 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
       ? { autoCompactWindow: getModelCapabilitySync(resolveModelIdSync(model)).contextWindow }
       : {};
   }
+
 
   const resolvedModel = resolveModelIdSync(model);
   // OpenRouter models are unknown to Claude Code, which assumes a 200K window
