@@ -163,22 +163,28 @@ pan context migrate               # one-shot migration off sync.devroot
 ## Dashboard Context page
 
 The dashboard Context page edits the same layered files as the CLI. Use the
-layer selector to switch between Global, Project, and Workspace context; project
+scope selector to switch between Machine, Project, and Workspace context; project
 and workspace selectors choose the registered project or workspace whose
 `.overdeck/context/project.md` or `.overdeck/context/workspace.md` file is loaded.
 The canonical context files are under `.overdeck/context/`; context is
 code-owned and is not stored in the permanent-state worktree.
 
-The editor shows per-harness previews for Claude Code and Pi. A separate **Full
-injected prompt** pane shows the complete Overdeck-controlled bundle that will
-be injected, including rendered layer content and audit sections for memory,
-status, and workspace briefing. It does not fabricate private harness base
-prompts that Overdeck cannot read.
+**Edit source** and **Preview for agent** share the available width so the editor
+remains usable beside the dashboard navigation. The preview selector includes
+Claude Code, Codex, Pi, Kimi Code, ACP, and an all-harness audit view. Preview
+content identifies its sources; it is not a transcript or a complete view of a
+harness's private system prompt. Draft edits remain when switching views or scopes.
 
-Previewing is read-only. **Save** writes only the selected layer file. **Save &
-Sync** writes the selected layer first, then explicitly runs `pan context sync`
-so the managed-session launch artifacts update. Live preview and ordinary Save
-do not run sync.
+Previewing is read-only. **Save** writes only the selected source. **Save & refresh
+outputs** saves first, then runs `pan context sync`. **Generated output files**
+shows the output locations and provides a separate refresh action when there are
+no unsaved edits. **Other instruction sources** explains bundled rules and the
+additional guidance a harness can load. Existing conversations retain their
+context; saved instructions apply to new sessions.
+
+The editor and its worker are bundled locally, so editing does not depend on a
+public CDN. At narrow widths the scope selector sits above the work area, with
+all actions retained.
 
 ## `sync-sources/` — Overdeck's own bundled content
 
