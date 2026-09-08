@@ -66,6 +66,14 @@ interface CodexEntry {
   [k: string]: unknown;
 }
 
+function parseToolInput(args: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(args);
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown> : undefined;
+  } catch { return undefined; }
+}
+
 /** Flatten a Codex tool output (usually a string) into display text. */
 function extractToolOutput(output: unknown): string {
   if (typeof output === 'string') return output.trim();
@@ -181,6 +189,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
           createdAt,
           label: command ? 'Shell' : name,
           tone: 'tool',
+          ...(name === 'spawn_agent' ? { toolInput: parseToolInput(args) } : {}),
           sequence,
           ...(command ? { command } : args ? { detail: args } : {}),
         };
