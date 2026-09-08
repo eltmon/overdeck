@@ -140,6 +140,12 @@ vi.mock('../../../../lib/runtimes/kimi-code.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../../lib/agents/runtime-command.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/agents/runtime-command.js')>();
+  return { ...actual, waitForPromptReady: vi.fn(async (...args: Parameters<typeof actual.waitForPromptReady>) =>
+    args[1] === 'muse' ? false : actual.waitForPromptReady(...args)) };
+});
+
 function conversationDir(session: string): string {
   return join(overdeckHome, 'conversations', session);
 }
@@ -574,12 +580,14 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(tmux.killSession).toHaveBeenCalledWith(session);
   });
 
-  it('tears down a newly resolved ACP runtime when restart readiness fails', async () => {
+  it.each(['acp', 'muse'])('tears down a newly resolved %s runtime when restart readiness fails', async harness => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
-      resolvedHarnessBinary = '/opt/kimi/bin/kimi';
-      resolvedConversationHarness = 'acp';
-      resolvedProviderName = 'kimi';
+      resolvedHarnessBinary = harness === 'muse' ? '/opt/muse/bin/muse' : '/opt/kimi/bin/kimi';
+      createSupervisorSocket = harness === 'muse';
+      resolvedConversationHarness = harness;
+      resolvedProviderName = harness === 'muse' ? 'meta' : 'kimi';
+      const model = harness === 'muse' ? 'muse-spark-1.3' : 'kimi-k2.7-code';
       const name = 'restart-to-acp';
       const session = 'conv-restart-to-acp';
       listedSessionNames = [session];
@@ -589,7 +597,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
         tmuxSession: session,
         cwd: tmpdir(),
         claudeSessionId: 'old-claude-session',
-        model: 'kimi-k2.7-code',
+        model,
         harness: 'claude-code',
       });
       const tmux = await import('../../../../lib/tmux.js');
@@ -602,11 +610,11 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       await vi.waitFor(() => {
         expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
       });
-      await vi.advanceTimersByTimeAsync(30_500);
+      await vi.advanceTimersByTimeAsync(60_500);
       const result = decodeJsonResponse(await restart);
 
       expect(result['results']).toEqual([
-        { name, model: 'kimi-k2.7-code', status: 'failed' },
+        { name, model, status: 'failed' },
       ]);
       expect(vi.mocked(tmux.killSession).mock.calls.filter(([target]) => target === session)).toHaveLength(3);
     } finally {

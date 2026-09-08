@@ -27,6 +27,9 @@ reads root logs at `muse/sessions/YYYY/MM/DD/<uuid>/session.jsonl`. It excludes
 nested subagent logs and chooses the newest root UUIDv7 by creation order.
 Resume passes that native UUID, never the generic Claude session identity.
 Muse's native configuration and credentials remain in its normal config home.
+Crash recovery uses the same native launcher and resume identity, without
+requiring a Meta API key in Overdeck settings. Recovery and restart wait for
+the interactive prompt before reporting success.
 
 The shared parser in `src/lib/cost-parsers/muse-parser.ts` reads the verified
 1.0.2 envelope format. Run-start and committed assistant events feed the chat

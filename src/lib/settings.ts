@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
@@ -361,6 +362,9 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
       command: 'claude',
       args: ['--model', getClaudeModelFlagSync(modelId)],
     };
+  }
+  if (modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+    return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.
   // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.

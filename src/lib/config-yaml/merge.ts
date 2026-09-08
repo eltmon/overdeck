@@ -292,7 +292,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       const meta = normalizeProviderConfig(providers.meta, undefined);
       applyProviderHarness(result, 'meta', meta.harness);
       if (meta.enabled) result.enabledProviders.add('meta');
-      else if (providers.meta !== undefined) explicitlyDisabled.add('meta');
+      else if (providers.meta !== undefined) {
+        explicitlyDisabled.add('meta');
+        result.enabledProviders.delete('meta');
+      }
 
       // Google
       const google = normalizeProviderConfig(providers.google, legacyKeys.google);

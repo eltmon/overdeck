@@ -444,6 +444,7 @@ const museAdapter: ConversationTranscriptAdapter = {
     if (!serialized.trim()) return { summary: '', summaryModel: null };
     const summary = await summarizeSerializedText(serialized, {
       model: options?.model, richMode: options?.richMode ?? false, harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
     });
     return { summary, summaryModel: options?.model ?? null };
   },

@@ -27,10 +27,14 @@ export interface MuseRecord {
 
 export function parseMuseRecords(raw: string): MuseRecord[] {
   const records: MuseRecord[] = [];
+  const seen = new Set<string>();
   for (const line of raw.split('\n')) {
     try {
       const value = JSON.parse(line);
-      if (value && typeof value === 'object' && value.payload_type) records.push(value);
+      if (!value || typeof value !== 'object' || !value.payload_type) continue;
+      if (value.id && seen.has(value.id)) continue;
+      if (value.id) seen.add(value.id);
+      records.push(value);
     } catch { /* A live log can end in a partial record. */ }
   }
   return records;

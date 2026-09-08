@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { getHarnessBehavior, KNOWN_HARNESSES } from '@overdeck/contracts';
 import { getProviderForModelSync } from '../providers.js';
 import { parseMuseSessionMetadata } from '../conversations/harness-metadata.js';
 import { applyFallbackSync } from '../model-fallback.js';
+import { getAgentCommandSync } from '../settings.js';
 import { getPricingSync } from '../cost.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -41,6 +42,42 @@ describe('Muse model and harness support', () => {
     expect(config.enabledProviders.has('meta')).toBe(true);
     expect(config.providerHarnesses.meta).toBe('muse');
     expect(renderForHarness('shared {{#harness:muse}}native{{/harness:muse}}{{#harness:claude}}claude{{/harness:claude}}', 'muse')).toBe('shared native');
+  });
+
+  it('honors a higher-precedence provider disable after Meta was enabled', () => {
+    const { config, explicitlyDisabled } = mergeConfigs(
+      { models: { providers: { meta: false } } },
+      { models: { providers: { meta: true } } },
+    );
+    expect(config.enabledProviders.has('meta')).toBe(false);
+    expect(explicitlyDisabled.has('meta')).toBe(true);
+    expect(() => applyFallbackSync(models[0], config.enabledProviders)).toThrow('Meta (Muse) is disabled');
+  });
+
+  it.each(models)('routes the command helper for %s to native Muse', model => {
+    expect(getAgentCommandSync(model)).toEqual({ command: 'muse', args: ['--model', model] });
+  });
+
+  it('clears the completed-turn marker when a resumed turn starts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-active-turn-')); temporary.push(root);
+    const file = join(root, 'session.jsonl');
+    const raw = await readFile(resolve('tests/fixtures/muse/echo-session.jsonl'), 'utf8');
+    await writeFile(file, raw + '\n' + JSON.stringify({ id: 'new-turn', payload_type: 'runtime.session',
+      payload: { kind: 'run', event: { kind: 'started', prompt: 'Continue' } } }));
+    const result = await parseMuseConversationMessages(file);
+    expect(result.streaming).toBe(true);
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+  });
+
+  it('deduplicates root record IDs consistently while preserving anonymous records', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-duplicate-turn-')); temporary.push(root);
+    const file = join(root, 'session.jsonl');
+    const raw = await readFile(resolve('tests/fixtures/muse/echo-session.jsonl'), 'utf8');
+    await writeFile(file, raw + '\n' + raw);
+    expect((await parseMuseSessionMetadata(file)).messageCount).toBe(4);
+    expect((await parseMuseConversationMessages(file)).messages).toHaveLength(4);
+    const anonymous = JSON.stringify({ id: '', payload_type: 'runtime.session', payload: {} });
+    expect(parseMuseRecords(anonymous + '\n' + anonymous)).toHaveLength(2);
   });
 
   it.each(models)('launches %s interactively and resumes only a native UUID', model => {

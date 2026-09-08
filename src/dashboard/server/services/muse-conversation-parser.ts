@@ -20,6 +20,7 @@ export async function parseMuseConversationMessages(sessionFile: string): Promis
     const createdAt = museTimestamp(record);
     if (event?.kind === 'started') {
       streaming = true;
+      lastTurnCompletedAt = undefined;
       if (event.prompt) messages.push({ id: record.id ?? `muse-${sequence + 1}`, role: 'user', text: event.prompt,
         createdAt, completedAt: createdAt, streaming: false, sequence: ++sequence });
     } else if (event?.kind === 'assistant_message_committed' && event.text) {

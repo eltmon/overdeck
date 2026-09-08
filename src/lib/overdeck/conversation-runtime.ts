@@ -1127,7 +1127,7 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
-        if (harness === 'acp') {
+        if (harness === 'acp' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
         setConversationHarness(conv.name, harness);

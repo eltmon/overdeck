@@ -62,7 +62,7 @@ const MOCK_ISSUE: Issue = {
   source: 'github',
 };
 
-function makeFetchMock(sessionName = 'planning-pan-503', active = true) {
+function makeFetchMock(sessionName = 'planning-pan-503', active = true, harness?: string) {
   return vi.fn((url: string | URL | Request) => {
     const urlStr = url.toString();
     if (urlStr.includes('/api/planning/') && urlStr.includes('/status')) {
@@ -89,7 +89,7 @@ function makeFetchMock(sessionName = 'planning-pan-503', active = true) {
         ok: true,
         json: () => Promise.resolve({
           workhorses: { expensive: 'claude-opus-4-7' },
-          roles: { plan: { model: 'workhorse:expensive' } },
+          roles: { plan: { model: 'workhorse:expensive', harness } },
         }),
       } as Response);
     }
@@ -167,6 +167,17 @@ describe('PlanDialog — XTerminal rendering', () => {
       const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
       expect(startCall).toBeTruthy();
       expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
+    });
+  });
+
+  it.each(['muse', 'kimi-code'])('uses the configured %s planning harness', async harness => {
+    const fetchMock = makeFetchMock('planning-pan-503', false, harness);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' }, true);
+    await waitFor(() => {
+      const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
+      expect(startCall).toBeTruthy();
+      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ harness });
     });
   });
 

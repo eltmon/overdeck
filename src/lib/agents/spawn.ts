@@ -498,12 +498,13 @@ async function spawnRunWithoutConsentClaim(
         // not a tmux pane-scrape. No dependency on permission-mode footer text.
         // Kimi Code's own readiness (readinessKind 'kimi-session-signal') is a
         // pane-scan, not a hook file — waitForPromptReady dispatches correctly.
-        const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
+        const timeout = getHarnessBehavior(resolvedHarness).readyTimeoutSeconds;
+        const ready = await waitForPromptReady(agentId, resolvedHarness, timeout);
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
         } else {
-          console.error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`);
+          throw new Error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within ${timeout}s`);
         }
       }
     }
