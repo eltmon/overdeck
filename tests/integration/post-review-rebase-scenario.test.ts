@@ -225,6 +225,7 @@ import { setReviewStatusSync, getReviewStatusSync, verificationSatisfied } from 
 import { checkPostReviewCommits } from '../../src/lib/cloister/deacon.js';
 import { doneCommand } from '../../src/cli/commands/specialists/done.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
+import { withReviewLifecycleGuard, withReviewLifecycleGuardForAgent } from '../../src/lib/review-lifecycle-guard.js';
 
 describe('PAN-1215 post-review-rebase scenario', () => {
   let testRepoDir: string;
@@ -330,6 +331,60 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     const after = getReviewStatusSync('PAN-1215-A2');
     expect(after?.reviewStatus).toBe('passed');
     expect(after?.reviewedAtCommit).toBe('newsha99');
+  });
+
+  it('serializes polyrepo anchor-drift re-review with active boot recovery', async () => {
+    const issueId = 'PAN-1215-POLY';
+    const reviewedAnchor = `api@${'a'.repeat(40)} fe@${'b'.repeat(40)}`;
+    const currentAnchor = `api@${'c'.repeat(40)} splash@${'d'.repeat(40)}`;
+    mockExecHeadSha = currentAnchor;
+    setReviewStatusSync(issueId, {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: reviewedAnchor,
+    });
+
+    let releaseRecovery!: () => void;
+    let recoveryStarted!: () => void;
+    const recoveryIsActive = new Promise<void>((resolve) => {
+      recoveryStarted = resolve;
+    });
+    const recoveryPause = new Promise<void>((resolve) => {
+      releaseRecovery = resolve;
+    });
+    const lifecycleOrder: string[] = [];
+    const bootRecovery = withReviewLifecycleGuardForAgent(`agent-${issueId.toLowerCase()}-review`, async () => {
+      lifecycleOrder.push('boot-recovery:provisioned');
+      recoveryStarted();
+      await recoveryPause;
+      lifecycleOrder.push('boot-recovery:started');
+    });
+    await recoveryIsActive;
+
+    mockSpawnReviewRoleForIssue.mockImplementationOnce((opts: { issueId: string }) =>
+      withReviewLifecycleGuard(opts.issueId, async () => {
+        lifecycleOrder.push('force-redispatch:entered');
+        return { success: true, message: 'spawned' };
+      }));
+    const patrol = checkPostReviewCommits();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(lifecycleOrder).toEqual(['boot-recovery:provisioned']);
+    releaseRecovery();
+    const [, actions] = await Promise.all([bootRecovery, patrol]);
+
+    expect(lifecycleOrder).toEqual([
+      'boot-recovery:provisioned',
+      'boot-recovery:started',
+      'force-redispatch:entered',
+    ]);
+    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+      issueId,
+      force: true,
+    }));
+    expect(actions).toContain(`Re-dispatched review for ${issueId}`);
   });
 
   // ─── Gap C: Review override clears stale verificationStatus ─────────────────

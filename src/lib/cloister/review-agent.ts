@@ -69,6 +69,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
@@ -438,11 +439,18 @@ async function spawnReviewRoleForIssuePromise(
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      await Effect.runPromise(
+      const stopped = await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
           Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
         ),
       );
+      if (stopped.failed.length > 0) {
+        return {
+          success: false,
+          message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+          error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -824,7 +832,10 @@ export const spawnReviewRoleForIssue = (
     if (reviewDispatchCoalescer.isInFlight(key)) {
       console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
     }
-    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+    return reviewDispatchCoalescer.run(
+      key,
+      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssuePromise(opts)),
+    );
   });
 
 /**
