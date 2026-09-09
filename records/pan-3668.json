@@ -257,9 +257,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-09-09T08:26:09.279Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-09-09T12:40Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-09-09T12:40:32.598Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-09-09T12:40:32Z",
+      "markdownBody": "# CI Failure Feedback for PAN-3668\n\nPull request: https://github.com/eltmon/overdeck/pull/3670 (head `07f77ef7`)\n\nSource: polling_reconciliation\n\n## Failing checks (1)\n\n### CI [INHERITED FROM MAIN — also failing on main]\n\nRun: `gh run view 34329087727 --repo eltmon/overdeck`  \n```\ntest\tTest\t﻿2026-09-09T12:26:45.9901836Z ##[group]Run npm test\ntest\tTest\t2026-09-09T12:26:45.9902150Z ^[[36;1mnpm test^[[0m\ntest\tTest\t2026-09-09T12:26:45.9938313Z shell: /usr/bin/bash -e {0}\ntest\tTest\t2026-09-09T12:26:45.9938571Z env:\ntest\tTest\t2026-09-09T12:26:45.9938773Z   SKIP_DOCS_INDEX: 1\ntest\tTest\t2026-09-09T12:26:45.9938990Z ##[endgroup]\ntest\tTest\t2026-09-09T12:26:46.0938391Z \ntest\tTest\t2026-09-09T12:26:46.0938972Z > @overdeck/core@0.50.1 pretest\ntest\tTest\t2026-09-09T12:26:46.0939878Z > npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\ntest\tTest\t2026-09-09T12:26:46.0940437Z \ntest\tTest\t2026-09-09T12:26:46.1868635Z \ntest\tTest\t2026-09-09T12:26:46.1869492Z > @overdeck/core@0.50.1 build:contracts\ntest\tTest\t2026-09-09T12:26:46.1870419Z > node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\ntest\tTest\t2026-09-09T12:26:46.1870978Z \ntest\tTest\t2026-09-09T12:26:46.3073845Z \ntest\tTest\t2026-09-09T12:26:46.3074439Z > @overdeck/contracts@0.50.1 build\ntest\tTest\t2026-09-09T12:26:46.3075185Z > cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\ntest\tTest\t2026-09-09T12:26:46.3075470Z \ntest\tTest\t2026-09-09T12:26:46.4577416Z ^[[34mℹ^[[39m ^[[34mtsdown v0.21.10^[[39m powered by ^[[38;2;255;126;23mrolldown v1.0.0-rc.17^[[39m\ntest\tTest\t2026-09-09T12:26:46.5429851Z ^[[34mℹ^[[39m config file: ^[[4m/home/runner/work/overdeck/overdeck/packages/contracts/tsdown.config.ts^[[24m \ntest\tTest\t2026-09-09T12:26:46.5458480Z ^[[34mℹ^[[39m entry: ^[[34msrc/index.ts^[[39m\ntest\tTest\t2026-09-09T12:26:46.5461602Z ^[[34mℹ^[[39m tsconfig: ^[[34mtsconfig.json^[[39m\ntest\tTest\t2026-09-09T12:26:46.5472881Z ^[[34mℹ^[[39m entry: ^[[34msrc/index.ts^[[39m\ntest\tTest\t2026-09-09T12:26:46.5474275Z ^[[34mℹ^[[39m tsconfig: ^[[34mtsconfig.json^[[39m\ntest\tTest\t2026-09-09T12:26:46.5480808Z ^[[34mℹ^[[39m Build start\ntest\tTest\t2026-09-09T12:26:52.3450661Z ^[[34mℹ^[[39m ^[[33m[CJS]^[[39m ^[[2mdist/^[[22m^[[1minde\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -532,7 +545,7 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T12:40:25.148Z",
+  "updated": "2026-09-09T12:40:32.598Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
