@@ -18,6 +18,9 @@ const emitOnlyMock = vi.fn();
 vi.mock('../../../dashboard/server/event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: emitOnlyMock })),
 }));
+vi.mock('../../../dashboard/server/services/dashboard-poll-snapshots.js', () => ({
+  getConversationLedgerCostsSnapshot: vi.fn(async () => []),
+}));
 
 const { handleConversationMove } = await import('../conversation-reads.js');
 const { createConversation, getConversationByName, setConversationClaudeSessionId } = await import('../conversations.js');

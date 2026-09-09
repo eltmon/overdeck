@@ -17,3 +17,15 @@ export {
   type EmbeddingsDbStats,
   type OpenEmbeddingsDbOptions,
 } from '../database/conversation-embeddings-db.js';
+
+import { openEmbeddingsDb, dimensionsForModel } from '../database/conversation-embeddings-db.js';
+
+/** Canonical counters/availability read; dashboard callers execute this in a DB worker. */
+export function getConversationSearchStats(input: { dbPath: string; model: string }) {
+  const db = openEmbeddingsDb(input.dbPath, dimensionsForModel(input.model));
+  try {
+    return { available: db.available, unavailableReason: db.unavailableReason, ...db.getStats() };
+  } finally {
+    db.close();
+  }
+}

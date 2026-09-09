@@ -48,9 +48,8 @@ import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '..
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
-import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
-import { getConversationSearchHealth, recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
+import { getConversationSearchStatus } from '../services/conversation-search-status.js';
+import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 import { getLegacyHome } from '../../../lib/paths.js';
 import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
@@ -745,53 +744,9 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/status',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const config = getConversationSearchConfigSync();
-        // Runtime embed failures (exhausted credits, quota, network) are recorded
-        // by the search service and watcher; surface them in every shape (PAN-3771).
-        const health = getConversationSearchHealth();
-        if (!config.enabled) {
-          return jsonResponse({
-            enabled: false,
-            available: false,
-            unavailableReason: 'conversationSearch is disabled',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-            health,
-          });
-        }
-
-        const provider = createConversationEmbeddingProvider({ config });
-        if (!provider.enabled) {
-          return jsonResponse({
-            enabled: config.enabled,
-            available: false,
-            unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-            health,
-          });
-        }
-
-        const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-        try {
-          const stats = db.getStats();
-          return jsonResponse({
-            enabled: config.enabled,
-            available: db.available && provider.enabled,
-            unavailableReason: db.unavailableReason,
-            dbPath: config.dbPath,
-            ...stats,
-            health,
-          });
-        } finally {
-          db.close();
-        }
+    return yield* Effect.tryPromise({
+      try: async () => {
+        return jsonResponse(await getConversationSearchStatus());
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
