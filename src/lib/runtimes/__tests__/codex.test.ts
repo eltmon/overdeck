@@ -124,6 +124,19 @@ describe('initCodexHome', () => {
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
   })
 
+  it('preserves historical native instructions while opening a clean config home with the same transcripts', () => {
+    const agent = join(ctx.codexHome, 'agent-context');
+    const oldHome = join(agent, 'codex-home');
+    const newHome = join(agent, 'codex-home-v2');
+    mkdirSync(join(oldHome, 'sessions'), { recursive: true });
+    writeFileSync(join(oldHome, 'AGENTS.md'), 'Historical user or generated content');
+    writeFileSync(join(oldHome, 'sessions', 'retained.jsonl'), 'retained');
+    initCodexHome(newHome);
+    expect(existsSync(join(newHome, 'AGENTS.md'))).toBe(false);
+    expect(readFileSync(join(oldHome, 'AGENTS.md'), 'utf8')).toBe('Historical user or generated content');
+    expect(readFileSync(join(newHome, 'sessions', 'retained.jsonl'), 'utf8')).toBe('retained');
+  })
+
   it('writes config.toml with flat top-level Codex keys', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-02')
     initCodexHome(codexDir)

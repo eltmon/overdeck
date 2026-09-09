@@ -47,6 +47,7 @@ import {
   contextDiffCommand,
   contextValidateCommand,
   contextMigrateCommand,
+  contextDetachCommand,
   contextLayersHelp,
 } from './commands/context-layers.js';
 import { restoreCommand } from './commands/restore.js';
@@ -210,7 +211,7 @@ program
 
 program
   .command('sync')
-  .description('Sync skills/agents to ~/.claude/ and render the context layers')
+  .description('Sync skills and render managed launch context')
   .option('--dry-run', 'Show what would be synced')
   .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
@@ -238,7 +239,7 @@ context
 
 context
   .command('sync')
-  .description('Render the context layers into harness CLAUDE.md files')
+  .description('Refresh Overdeck-managed session context artifacts')
   .action(contextSyncCommand);
 
 context
@@ -257,6 +258,13 @@ context
   .description('One-shot migration from the deprecated sync.devroot model')
   .option('--yes', 'Register every discovered project without prompting')
   .action(contextMigrateCommand);
+
+context
+  .command('detach')
+  .description('Explicitly remove historical Overdeck managed regions from native instruction files')
+  .option('--dry-run', 'Preview exact files and managed blocks without changing anything')
+  .option('--apply', 'Back up each file and remove only an unambiguous managed block')
+  .action(contextDetachCommand);
 
 context.action(contextLayersHelp);
 
@@ -663,8 +671,8 @@ program
     }
     console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
-    // Startup context sync (skills, agents, hooks, MCP config, rendered
-    // ~/.claude/CLAUDE.md + per-project CLAUDE.md) is DEFERRED to run in the
+    // Startup sync (skills, agents, hooks, MCP config, and Overdeck-owned
+    // launch context artifacts) is DEFERRED to run in the
     // background AFTER the dashboard is listening — see startPostLaunchSidecars
     // below. Running it here cost ~22s on every `overdeck up`, blocking the
     // server from even spawning, and the dashboard does not depend on synced

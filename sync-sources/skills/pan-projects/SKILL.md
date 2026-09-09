@@ -158,9 +158,9 @@ GITHUB_LOCAL_PATHS=owner/repo=/home/user/projects/my-app
 pan project add /path/to/project --name myproject
 ```
 
-### 2. Create CLAUDE.md (Recommended)
+### 2. Create project context (Recommended)
 
-Create a `CLAUDE.md` file in your project root with:
+Create `.overdeck/context/project.md` with the following content. Leave native instruction files unchanged:
 - Project overview
 - Key directories
 - Development guidelines
@@ -244,7 +244,7 @@ When you run `pan start ISSUE-1`, Overdeck will:
 
 **Problem:** Agent can't find project context
 **Solution:**
-- Create a CLAUDE.md in project root
+- Create `.overdeck/context/project.md` in the project
 - Ensure project is registered with correct path
 
 ## Best Practices

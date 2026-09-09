@@ -1,3 +1,4 @@
+import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
@@ -343,7 +344,7 @@ export function copyProjectTemplateDirs(
     const sourcePath = join(sourceDir, dir);
     const targetPath = join(targetDir, dir);
 
-    if (!existsSync(sourcePath)) continue;
+    if (!existsSync(sourcePath) || isHarnessNativeTarget(dir)) continue;
 
     // Recursively copy all files, applying placeholder substitution to text files
     function copyDir(src: string, dest: string): number {
@@ -353,6 +354,7 @@ export function copyProjectTemplateDirs(
       for (const entry of entries) {
         const srcEntry = join(src, entry.name);
         const destEntry = join(dest, entry.name);
+        if (isHarnessNativeTarget(relative(targetDir, destEntry))) continue;
         if (entry.isDirectory()) {
           count += copyDir(srcEntry, destEntry);
         } else if (entry.isFile()) {

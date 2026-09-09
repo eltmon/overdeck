@@ -33,6 +33,7 @@ export interface ThreadOptions {
   model: string;
   cwd?: string;
   runtimeMode?: CodexRuntimeMode;
+  developerInstructions?: string;
 }
 
 export interface TurnOptions {
@@ -253,6 +254,7 @@ export class CodexAppServerManager extends EventEmitter {
     return {
       model: options.model,
       cwd: options.cwd ?? this.options.cwd,
+      ...(options.developerInstructions ? { developerInstructions: options.developerInstructions } : {}),
       ...runtime,
       experimentalRawEvents: false,
     };

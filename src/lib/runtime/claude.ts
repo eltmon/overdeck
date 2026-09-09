@@ -21,7 +21,7 @@ import { CLAUDE_FEATURES } from './interface.js';
 import { FsError } from '../errors.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
-import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
+import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
 import { prepareHarnessLaunch, resolveHarnessBinary } from '../harness-binary.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
@@ -107,7 +107,7 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
             setTerminalEnv: true,
             promptFile,
             baseCommand: 'claude',
-            appendSystemPromptFiles: [await ensureSessionContextBriefingFile()],
+            appendSystemPromptFiles: await claudeSystemPromptFiles(options.workingDir, 'claude-code'),
             extraEnvExports: [harnessLaunch.pathExport],
             extraArgs: args.length > 0 ? args.join(' ') : undefined,
           }),
