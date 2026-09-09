@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T05:19:52.996Z",
-  "updated": "2026-09-09T07:59:27.497Z",
+  "updated": "2026-09-09T08:25:20.260Z",
   "pipeline": {
     "issueId": "PAN-3687",
     "reviewStatus": "pending",
@@ -13,14 +13,22 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T07:58:37.526Z",
+    "updatedAt": "2026-09-09T08:25:20.232Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "mergeNotes": "Stale strike signal: recorded HEAD 92d127e759eaafeabcfbd077142af4453a9b86f5 differs from origin/strike/pan-3687 at 9f719bfeda5446a5631e24776d3efbdd72d5a11d",
-    "strikeReadyHead": "92d127e759eaafeabcfbd077142af4453a9b86f5",
-    "strikeReadyAt": "2026-09-09T06:23:06.400Z",
-    "strikeLandingState": "landing",
+    "strikeReadyHead": "9f719bfeda5446a5631e24776d3efbdd72d5a11d",
+    "strikeReadyAt": "2026-09-09T08:25:20.231Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-09-09T07:58:37.537Z",
+        "strikeHead": "92d127e759eaafeabcfbd077142af4453a9b86f5",
+        "mainHead": "26d79d45d7b1c68de5dbdc8de79013aeceb13baf",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 92d127e759eaafeabcfbd077142af4453a9b86f5 differs from origin/strike/pan-3687 at 9f719bfeda5446a5631e24776d3efbdd72d5a11d"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -44,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.001227,
-        "pricingAsOf": "2026-09-09T07:59:13.390Z"
+        "pricingAsOf": "2026-09-09T08:25:20.246Z"
       }
     },
     "merges": [],
