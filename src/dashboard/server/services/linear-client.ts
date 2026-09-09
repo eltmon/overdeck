@@ -163,16 +163,7 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
     getIssue: (id) =>
       Effect.tryPromise({
         try: async () => {
-          const isUuid =
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-          let raw: any;
-          if (isUuid) {
-            raw = await sdk.issue(id);
-          } else {
-            const results = await sdk.searchIssues(id, { first: 1 });
-            raw = results.nodes[0];
-          }
+          const raw = await sdk.issue(id);
 
           if (!raw) {
             throw new IssueNotFound({ id });

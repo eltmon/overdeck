@@ -433,6 +433,10 @@ export interface ResourcesConfig {
   governor_psi_calm_readmit_avg10?: number;
   /** PAN-3754: continuous calm-PSI duration required for early re-admission */
   governor_psi_calm_window_ms?: number;
+  /** PAN-3344: hold admissions at or above this one-minute load per core */
+  governor_cpu_soft_load_per_core?: number;
+  /** PAN-3344: re-admit only below this load per core; must be lower than soft */
+  governor_cpu_recovery_load_per_core?: number;
 }
 
 export interface IssuesConfig {
@@ -953,6 +957,9 @@ export interface NormalizedConfig {
     governorPsiFullShedAvg10: number;
     governorPsiCalmReadmitAvg10: number;
     governorPsiCalmWindowMs: number;
+    /** PAN-3344: CPU runway thresholds. Lower load is healthier. */
+    governorCpuSoftLoadPerCore: number;
+    governorCpuRecoveryLoadPerCore: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */
