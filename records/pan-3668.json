@@ -562,20 +562,22 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T13:51:09.492Z",
+  "updated": "2026-09-09T13:51:49.413Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-09-09T06:31:21.466Z",
-    "updatedAt": "2026-09-09T13:43:08.816Z",
+    "updatedAt": "2026-09-09T13:51:08.340Z",
+    "testNotes": "Ran gates from this workspace (feature/pan-3668 @ 5caa78a8). npm run typecheck: PASSED on two clean sequential runs (0 errors); one earlier run failed with 34 HarnessName/RuntimeName mismatch errors while running concurrently with a separate lint job, but was not reproducible in isolation after a fresh `npm run build:contracts` + `npx tsc --noEmit -p tsconfig.json` (0 errors) and a full clean `npm run typecheck` (exit 0) -- judged an environment/concurrency artifact, not a code defect, since packages/contracts/src and dist consistently include 'prime-agent' in Harness/RuntimeName/HarnessName. npm run lint: PASSED (all 20 sub-checks including ratchet, circular, effect-diagnostics, quarantine audits). npm test (full suite, 14116 tests): 1 failed initially (tests/unit/lib/cloister/deacon-swarm-recovery.test.ts, an 'overdeck.db schema is incompatible' error in unrelated deacon-swarm-recovery machinery) -- confirmed pre-existing/unrelated to this PR: `git diff origin/main...HEAD` touches neither the test file nor its source (swarm-failed-slot.ts, overdeck/infra.ts), and the file passes cleanly in isolation (5/5... actually full file passed standalone). Judged full-suite-load flake, consistent with the flake pattern already documented in this PR's own docs/prime-agent-verification.md. tests/unit/lib/prime-agent-no-loss-audit.test.ts and tests/unit/lib/ohmypi-no-loss-audit.test.ts: PASSED (16/16).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
+    "reviewedAtCommit": "be1bc0bb6e9cbe1830da5684263d56901dcbd08e",
     "lastVerifiedCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
     "reviewSpawnedAt": "2026-09-09T13:43:08.815Z"
   },
@@ -590,9 +592,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 225294077,
-            "output": 407264,
-            "cacheRead": 215984512,
+            "input": 232868816,
+            "output": 428191,
+            "cacheRead": 222714240,
             "cacheWrite": 0
           }
         },
@@ -621,9 +623,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 225294077,
-          "output": 407264,
-          "cacheRead": 215984512,
+          "input": 232868816,
+          "output": 428191,
+          "cacheRead": 222714240,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -640,8 +642,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 172.6473953,
-        "pricingAsOf": "2026-09-09T13:43:08.901Z"
+        "usd": 180.8651243,
+        "pricingAsOf": "2026-09-09T13:51:39.153Z"
       }
     },
     "merges": [
@@ -649,8 +651,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3668",
