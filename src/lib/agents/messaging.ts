@@ -409,6 +409,12 @@ export async function messageAgent(
         fallbackHarness,
       ),
       appendSystemPromptFiles: await claudeSystemPromptFiles(agentState.workspace, fallbackHarness),
+      managedStateKey: normalizedId,
+      overdeckEnv: {
+        agentId: normalizedId,
+        issueId: agentState.issueId,
+        sessionType: resumeRole,
+      },
       useSupervisor: fallbackSupervisorLaunch.useSupervisor,
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,

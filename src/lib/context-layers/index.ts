@@ -32,6 +32,7 @@ export {
   workspaceContextFile,
   legacyWorkspaceContextFile,
   resolveWorkspaceContextFile,
+  claudeGlobalContextFile,
   piGlobalContextFile,
   codexGlobalContextFile,
   GLOBAL_STARTER,
@@ -52,16 +53,7 @@ export {
   renderBundledRules,
 } from './rules.js';
 
-export {
-  REGION_BEGIN,
-  REGION_END,
-  applyManagedRegion,
-  stripBeadsManagedRegion,
-  hasManagedRegion,
-  userContentOutsideRegion,
-  renderGlobalLayer,
-  renderProjectLayer,
-} from './render.js';
+export { renderGlobalLayer, renderProjectLayer } from './render.js';
 
 export {
   type WorkspaceContextInput,
@@ -70,7 +62,6 @@ export {
   assembleWorkspaceContext,
   workspaceContextWithoutProjectLayer,
 } from './assemble.js';
-export { type LegacyBeadsCleanup, cleanLegacyBeadsTargetSync } from './legacy-beads-cleanup.js';
 
 export {
   type DevrootMigrationResult,
@@ -78,3 +69,9 @@ export {
   discoverProjects,
   migrateDevroot,
 } from './migrate.js';
+
+export {
+  type ContextDetachItem,
+  planManagedRegionDetach,
+  detachManagedContextSync,
+} from './detach.js';

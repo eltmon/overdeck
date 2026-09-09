@@ -6,7 +6,6 @@
  * replaces that with `~/.overdeck/context/`. `pan context migrate` lifts
  * the old content across:
  *
- *   <devroot>/.claude/CLAUDE.md  →  ~/.overdeck/context/global.md
  *   <devroot>/.claude/skills/    →  ~/.overdeck/context/global/skills/
  *   <devroot>/.claude/agents/    →  ~/.overdeck/context/global/agents/
  *
@@ -14,10 +13,10 @@
  * never deletes the source. The CLI prints the "delete when ready" hint.
  */
 
-import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { globalContextFile, globalSkillsDir, globalAgentsDir } from './layers.js';
+import { globalSkillsDir, globalAgentsDir } from './layers.js';
 
 /** Result of {@link migrateDevroot}. */
 export interface DevrootMigrationResult {
@@ -98,20 +97,8 @@ export function migrateDevroot(options: DevrootMigrationOptions = {}): DevrootMi
 
   if (!result.detected) return result;
 
-  // 1. CLAUDE.md → global.md (no-overwrite).
-  const oldClaudeMd = join(oldClaudeDir, 'CLAUDE.md');
-  const newGlobalMd = globalContextFile();
-  if (existsSync(oldClaudeMd) && statSync(oldClaudeMd).isFile()) {
-    if (existsSync(newGlobalMd)) {
-      result.skipped.push(`global.md (target exists: ${newGlobalMd})`);
-    } else {
-      mkdirSync(join(newGlobalMd, '..'), { recursive: true });
-      copyFileSync(oldClaudeMd, newGlobalMd);
-      result.copied.push(`CLAUDE.md → ${newGlobalMd}`);
-    }
-  }
-
-  // 2. skills/ and agents/ → global/{skills,agents}/ (no-overwrite per file).
+  // Native instruction Markdown is intentionally not imported. Skills and
+  // agent definitions remain explicit Overdeck-owned distribution inputs.
   for (const [sub, dst] of [
     ['skills', globalSkillsDir()],
     ['agents', globalAgentsDir()],

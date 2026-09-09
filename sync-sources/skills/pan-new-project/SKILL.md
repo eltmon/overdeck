@@ -205,9 +205,9 @@ grep -q '^workspaces/' <project-path>/.gitignore 2>/dev/null || \
   echo 'workspaces/' >> <project-path>/.gitignore
 ```
 
-### Step 7: Create CLAUDE.md (if missing)
+### Step 7: Create the Overdeck project context (if missing)
 
-Check if the project has a `CLAUDE.md`. If not, create a minimal one:
+Check `<project-path>/.overdeck/context/project.md`. If absent, create a minimal project layer there. Preserve native `CLAUDE.md` and `AGENTS.md` files.
 
 ```markdown
 # <Project Name>

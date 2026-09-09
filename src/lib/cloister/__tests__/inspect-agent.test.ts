@@ -65,6 +65,10 @@ vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: mocks.prepareHarnessLaunch,
 }));
 
+vi.mock('../../agents/runtime-command.js', () => ({
+  claudeSystemPromptFiles: vi.fn(async () => ['/managed/context.md']),
+}));
+
 vi.mock('../../launcher-generator.js', () => ({
   generateLauncherScriptSync: mocks.generateLauncherScriptSync,
 }));

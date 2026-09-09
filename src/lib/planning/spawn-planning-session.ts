@@ -30,11 +30,12 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
-import { getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -45,7 +46,7 @@ import {
   getProjectConfigFromWorkspacePath,
   resolveProjectForIssue,
 } from '../pan-dir/record.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
+import { claudeGlobalContextFile, workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import {
   readAutoSpawnOnFinalizeFlagAsync,
@@ -403,37 +404,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * reference feature-level context (child stories, description, URL).
  */
 async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'): Promise<string[]> {
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(workspacePath);
-  try {
-    await access(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  const behavior = getHarnessBehavior(harness);
-  // PAN-1566: Pi/ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  // The per-agent CODEX_HOME/AGENTS.md is set up by initCodexHome at spawn time;
-  // this file provides context for the planning session before spawn.
-  if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  return files;
+  return claudeSystemPromptFiles(workspacePath, harness);
 }
 
 function isNotFound(error: unknown): boolean {
@@ -727,9 +698,26 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
     await ensureTmuxRunning();
-    await Effect.runPromise(createSession(sessionName, workspacePath, `bash '${launcherScript}'`, {
-      env: buildPlanningSessionEnv(startedBy),
-    }));
+    const launchPlanningSession = () => Effect.runPromise(createSession(
+      sessionName,
+      workspacePath,
+      `bash '${launcherScript}'`,
+      { env: buildPlanningSessionEnv(startedBy) },
+    ));
+    if (behavior.launchCommandKind === 'kimi-code-tui') {
+      try {
+        await launchAndCaptureManagedKimiSession({
+          agentId: sessionName,
+          workspace: workspacePath,
+          launch: launchPlanningSession,
+        });
+      } catch (error) {
+        await Effect.runPromise(killSession(sessionName)).catch(() => {});
+        throw error;
+      }
+    } else {
+      await launchPlanningSession();
+    }
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.

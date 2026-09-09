@@ -204,6 +204,7 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
           message,
           'conversation-message',
           'auto',
+          ...(harness === 'kimi-code' ? [{ kimiContext: { workspace: `/tmp/matrix-${harness}` } }] : []),
         );
         expect(mocks.deliverControl).not.toHaveBeenCalled();
       }
