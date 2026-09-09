@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { isClaudeCodeChannelsMcpEnabled } from '../config-yaml.js';
+import { isClaudeCodeChannelsMcpEnabled, loadConfigSync } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -154,6 +154,19 @@ export function decideSupervisorForWorkAgent(
     const reason = `harness-${state.harness ?? 'unknown'}`;
     log(false, reason);
     return { eligible: false, reason };
+  }
+
+  // Codex's app-server transport never wraps the launcher in the PTY
+  // supervisor (the app-server branch of buildCodexCommand skips the wrap), so
+  // a supervisor stamp here would project a strict 'supervisor' deliveryMethod
+  // with no socket behind it — every state-routed delivery then died with
+  // socket-missing (the PAN-3743 review-loop stall). Only the work-tui
+  // transport gets a real supervisor. Matches the launcher's own source of
+  // truth (getCodexLauncherFields reads the merged config the same way) and
+  // the conversation-side precedent in shouldUseSupervisorForConversation.
+  if (state.harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') {
+    log(false, 'codex-app-server-transport');
+    return { eligible: false, reason: 'codex-app-server-transport' };
   }
 
   log(true);
