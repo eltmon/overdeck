@@ -1,19 +1,46 @@
 {
   "issueId": "PAN-3570",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-09-09T05:23:18.960Z",
-  "updated": "2026-09-09T05:23:18.960Z",
+  "updated": "2026-09-09T06:34:54.258Z",
   "pipeline": {
     "issueId": "PAN-3570",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T05:23:18.960Z"
+    "updatedAt": "2026-09-09T06:34:54.019Z",
+    "strikeReadyHead": "b917df4fcddde37aa3cb30b7f702ce3fecb85459",
+    "strikeReadyAt": "2026-09-09T06:34:54.018Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 787,
+            "output": 91,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 787,
+          "output": 91,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.001242,
+        "pricingAsOf": "2026-09-09T06:34:54.236Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
