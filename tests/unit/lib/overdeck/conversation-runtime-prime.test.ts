@@ -12,6 +12,10 @@ vi.mock('../../../../src/lib/config-yaml.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../src/lib/config-yaml.js')>(),
   loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' }, primeAgent: { rpcStartupTimeoutMs: 45_000 } }, path: '/tmp/config.yaml' }),
 }));
+vi.mock('../../../../src/lib/harness-binary.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/lib/harness-binary.js')>(),
+  resolveHarnessBinary: vi.fn(async (harness: string) => harness === 'prime-agent' ? '/usr/bin/prime-agent' : null),
+}));
 
 const { preparePrimeAgentConversationLaunch, resolveAllowedHarness } = await import(
   '../../../../src/lib/overdeck/conversation-runtime.js'
@@ -28,6 +32,7 @@ describe('Prime Agent conversation launch', () => {
     const launch = await preparePrimeAgentConversationLaunch('conv-prime', '/workspaces/project', 'gpt-5.4');
     expect(launch.fields).toEqual({ harness: 'prime-agent' });
     expect(launch.runtimeCommand).toContain("prime-agent-host.js' --agent 'conv-prime'");
+    expect(launch.runtimeCommand).toContain("--binary '/usr/bin/prime-agent'");
     expect(launch.runtimeCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(launch.runtimeCommand).toContain("--session-dir '/tmp/conv-prime/prime-sessions'");
     expect(launch.runtimeCommand).toContain('--append-system-prompt');

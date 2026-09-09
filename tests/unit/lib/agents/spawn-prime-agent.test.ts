@@ -14,6 +14,10 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/config-yaml.js', () => ({ loadConfigSync: () => ({ config: { providerAuth: { openai: 'api-key' }, primeAgent: { rpcStartupTimeoutMs: 45_000 } } }) }));
+vi.mock('../../../../src/lib/harness-binary.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/lib/harness-binary.js')>(),
+  resolveHarnessBinary: vi.fn(async (harness: string) => harness === 'prime-agent' ? '/usr/bin/prime-agent' : null),
+}));
 vi.mock('../../../../src/lib/openai-auth.js', async () => {
   const { Effect } = await import('effect');
   return { getOpenAIAuthStatus: () => Effect.succeed({ loggedIn: false }) };
@@ -27,6 +31,7 @@ describe('Prime Agent work launch', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'prime-workspace-'));
     const baseCommand = await getPrimeAgentBaseCommand('agent-pan-3668', 'gpt-5.4', workspace);
     expect(baseCommand).toContain("prime-agent-host.js' --agent 'agent-pan-3668'");
+    expect(baseCommand).toContain("--binary '/usr/bin/prime-agent'");
     expect(baseCommand).toContain("--provider 'openai' --model 'gpt-5.4'");
     expect(baseCommand).toContain("--session-dir '/tmp/agent-pan-3668/prime-sessions'");
     expect(baseCommand).toContain('--append-system-prompt');
