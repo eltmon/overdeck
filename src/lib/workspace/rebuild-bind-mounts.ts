@@ -107,7 +107,7 @@ async function repairRepoCaches(
     const mismatch = await findMismatch(cachePath, owner.uid, owner.gid);
     if (!mismatch) continue;
     progress(
-      `Removing ownership-corrupt ${relative(targetPath, cachePath)} cache `
+      `Repairing ownership for ${relative(targetPath, cachePath)} cache `
       + `(found uid:gid ${mismatch.uid}:${mismatch.gid} at ${mismatch.path})...`,
     );
     try {
