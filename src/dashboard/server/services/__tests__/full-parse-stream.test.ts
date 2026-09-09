@@ -22,7 +22,8 @@ let change: (event: string, filename: string) => void;
 let controller: AbortController;
 let running: Promise<unknown>;
 let events: ConversationEvent[];
-const flush = () => vi.advanceTimersByTimeAsync(0);
+// Effect schedules queued offers on the next tick after promises resolve.
+const flush = () => vi.advanceTimersByTimeAsync(1);
 const start = (parse: (path: string) => Promise<ParseResult>, resolve = async () => '/tmp/rollout.jsonl', subagents = false) => {
   controller = new AbortController();
   events = [];
@@ -65,11 +66,11 @@ describe('full parser stream lifecycle', () => {
     start(parse); await flush();
     mocks.stat.mockResolvedValue({ dev: 1, ino: 3, size: 0, mtimeMs: 2 });
     parse.mockResolvedValue({ ...parsed(), messages: [] });
-    change('rename', 'rollout.jsonl'); await vi.advanceTimersByTimeAsync(300);
+    change('rename', 'rollout.jsonl'); await vi.advanceTimersByTimeAsync(300); await flush();
     expect(events[1]).toMatchObject({ snapshot: true, reset: true, messages: [] });
     mocks.stat.mockResolvedValue({ dev: 1, ino: 3, size: 100, mtimeMs: 3 });
     parse.mockResolvedValue(parsed('New'));
-    change('change', 'rollout.jsonl'); await vi.advanceTimersByTimeAsync(300);
+    change('change', 'rollout.jsonl'); await vi.advanceTimersByTimeAsync(300); await flush();
     expect(events[2]).toMatchObject({ snapshot: false, messages: [{ text: 'New' }] });
   });
 

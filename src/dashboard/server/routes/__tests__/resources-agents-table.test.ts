@@ -19,6 +19,10 @@ vi.mock('../../../../lib/agents.js', () => ({
   listAgentStates: mockListAgentStates,
 }));
 
+vi.mock('../../services/dashboard-poll-snapshots.js', () => ({
+  getAgentCostStatsSnapshot: async () => [],
+}));
+
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessions: () => Effect.succeed(mockListSessions()),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),

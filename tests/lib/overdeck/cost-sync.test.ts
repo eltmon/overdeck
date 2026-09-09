@@ -155,7 +155,7 @@ describe('agent resource cost aggregates', () => {
     const fixtures = [
       { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 1 },
       { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.5 },
-      { agentId: 'agent-a', ageMs: 60_000, cost: 0.255 },
+      { agentId: 'agent-a', ageMs: 60_000, cost: 0.256 },
       { agentId: 'agent-a', ageMs: -60_000, cost: 0.2 },
       { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 5, source: 'subscription-covered' },
       { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.125, source: 'subscription-covered' },
@@ -188,5 +188,13 @@ describe('agent resource cost aggregates', () => {
   it('returns no aggregates for an empty fleet or missing ledger history', () => {
     expect(getAgentCostStatsSync({ agentIds: [], nowMs: 0 })).toEqual([]);
     expect(getAgentCostStatsSync({ agentIds: ['missing'], nowMs: 0 })).toEqual([]);
+  });
+
+  it('rounds SQLite sums at half-cent boundaries without the old JS accumulation error', () => {
+    [1, 0.5, 0.255, 0.2].forEach((cost, index) => insertCostEventSync(costEvent({
+      agentId: 'agent-rounding', cost, requestId: `rounding-${index}`,
+    })));
+    expect(new Map(getAgentCostStatsSync({ agentIds: ['agent-rounding'], nowMs: Date.now() }))
+      .get('agent-rounding')?.totalUsd).toBe(1.96);
   });
 });

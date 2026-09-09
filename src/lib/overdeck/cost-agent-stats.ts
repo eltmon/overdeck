@@ -23,7 +23,7 @@ export function getAgentCostStatsSync(input: {
   `).all(input.nowMs - 30 * 60_000, input.nowMs - 30 * 60_000, ...input.agentIds) as Array<{
     agentId: string; totalUsd: number; recentBillable: number; recentHypothetical: number;
   }>;
-  // Preserve the resource builder's JS rounding, inclusive 30-minute window,
+  // Preserve rounding to cents, the inclusive 30-minute window,
   // and omission of subscription-covered charges from lifetime billable cost.
   // The ledger stores covered usage in source_file; hypotheticalCost and
   // subscriptionCovered are only fields on the pure builder's input events.

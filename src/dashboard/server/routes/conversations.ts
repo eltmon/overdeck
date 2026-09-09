@@ -599,10 +599,8 @@ const postConversationMessageRoute = HttpRouter.add(
           handleConversationMessage(name, body, conversationMessageDependencies));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        // Log the full stack (falls back to message) so a 500's cause is
-        // diagnosable after the fact, not just the bare message (PAN-1552).
+        // Include the stack so failures are diagnosable after the fact (PAN-1552).
         console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
-        // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
             error: 'Delivery could not be confirmed. Check the conversation before sending again.',
