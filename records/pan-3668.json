@@ -562,7 +562,7 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T14:53:35.959Z",
+  "updated": "2026-09-09T14:58:39.611Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -574,7 +574,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-09T06:31:21.466Z",
-    "updatedAt": "2026-09-09T14:53:33.160Z",
+    "updatedAt": "2026-09-09T14:58:38.968Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -592,15 +592,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 18413706,
-            "output": 18308,
-            "cacheRead": 14243072,
+            "input": 18432110,
+            "output": 18569,
+            "cacheRead": 14247936,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 233059670,
-            "output": 429487,
-            "cacheRead": 222901632,
+            "input": 234068283,
+            "output": 433649,
+            "cacheRead": 223844480,
             "cacheWrite": 0
           }
         },
@@ -623,15 +623,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 18413706,
-          "output": 18308,
-          "cacheRead": 14243072,
+          "input": 18432110,
+          "output": 18569,
+          "cacheRead": 14247936,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 233059670,
-          "output": 429487,
-          "cacheRead": 222901632,
+          "input": 234068283,
+          "output": 433649,
+          "cacheRead": 223844480,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -648,8 +648,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 181.0150103,
-        "pricingAsOf": "2026-09-09T14:53:33.304Z"
+        "usd": 181.9401193,
+        "pricingAsOf": "2026-09-09T14:58:39.167Z"
       }
     },
     "merges": [
