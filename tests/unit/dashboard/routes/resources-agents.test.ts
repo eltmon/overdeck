@@ -12,6 +12,20 @@ import {
 const NOW_MS = Date.parse('2026-07-07T12:00:00.000Z');
 
 describe('agent resource stats payload', () => {
+  it('does not query tmux or start a cost worker when no agents are active', async () => {
+    const listSessionNames = vi.fn(() => Effect.succeed([]));
+    const readCostStats = vi.fn(async () => []);
+    const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
+      listAgents: () => [{ ...agent('stopped'), status: 'stopped' }],
+      listSessionNames,
+      readCostStats,
+    }));
+    expect(snapshot.agents).toEqual([]);
+    expect(snapshot.hostVitals.agents.totalUsd).toBe(0);
+    expect(listSessionNames).not.toHaveBeenCalled();
+    expect(readCostStats).not.toHaveBeenCalled();
+  });
+
   it('reads one aggregate snapshot for active agents while retaining zero-cost missing rows', async () => {
     const readCostStats = vi.fn(async () => [['agent-a', {
       burnUsdPerHour: 2, hypotheticalUsdPerHour: 0.5, totalUsd: 10,

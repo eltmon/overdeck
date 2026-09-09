@@ -139,6 +139,9 @@ export function getAgentStatsSnapshotEffect(
     const nowMs = deps.nowMs ?? Date.now();
     const agents = (deps.listAgents ?? listAgentStates)()
       .filter((agent) => agent.status !== 'stopped');
+    if (agents.length === 0) {
+      return buildAgentStatsSnapshot({ agents, sessionRoots: [], processes: [], nowMs });
+    }
     const sessionNames = yield* (deps.listSessionNames ?? defaultListSessionNames)().pipe(
       Effect.catch(() => Effect.succeed([] as readonly string[])),
     );
