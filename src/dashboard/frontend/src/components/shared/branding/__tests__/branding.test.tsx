@@ -13,6 +13,7 @@ describe('shared branding registry', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
       'opencode',
       'opencode-go',
+      'meta',
       'anthropic',
       'openai',
       'google',
@@ -24,13 +25,15 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
       expect(brand.label).toBeTruthy();
       expect(brand.color).toMatch(/^#/);
-      expect(brand.Icon).toBeTypeOf('function');
+      const { container, unmount } = render(<brand.Icon />);
+      expect(container.querySelector('svg')).toBeInTheDocument();
+      unmount();
     }
   });
 
