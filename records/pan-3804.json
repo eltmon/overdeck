@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-09-09T09:12:31.929Z",
-  "updated": "2026-09-09T15:20:06.118Z",
+  "updated": "2026-09-09T15:23:22.976Z",
   "pipeline": {
     "issueId": "PAN-3804",
     "reviewStatus": "pending",
@@ -21,7 +21,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "reopenedAt": "2026-09-09T13:13:55.652Z",
-    "updatedAt": "2026-09-09T15:19:32.029Z",
+    "updatedAt": "2026-09-09T15:22:52.073Z",
     "reviewNotes": "Reopened",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3804 after its harness exited before push.",
     "strikeReadyHead": "fb5416eddd30094058f93aa300869e1300d351c0",
@@ -52,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.005083000000000001,
-        "pricingAsOf": "2026-09-09T15:19:32.064Z"
+        "pricingAsOf": "2026-09-09T15:22:52.197Z"
       }
     },
     "merges": [],
