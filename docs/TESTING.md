@@ -91,6 +91,17 @@ vi.mock('fs', () => ({
 }));
 ```
 
+Tests that need pre-existing review state should seed the test database with
+`upsertReviewStatusSync`. `setReviewStatusSync` is a production write surface:
+it can start journal, telemetry, and GitHub status work that outlives a test.
+An unawaited task that logs during worker teardown can leave Vitest's
+`onUserConsoleLog` RPC pending and fail an otherwise green suite.
+
+If a test exercises those side effects, mock or drain each one explicitly. Run
+the focused file with `--detectAsyncLeaks` to verify that no work remains after
+the test finishes. Do not disable unhandled-error reporting or reduce the
+repository's two-worker CI concurrency to hide a leak.
+
 ## Dashboard UI Testing
 
 ### Playwright MCP
