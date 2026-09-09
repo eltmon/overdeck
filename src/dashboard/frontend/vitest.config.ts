@@ -94,6 +94,7 @@ export default defineConfig({
     // verification, so unbounded threads multiply into a machine-wide CPU
     // storm. Mirror the root vitest.config.ts cap.
     maxWorkers: process.env.CI ? 2 : 4,
+    globalSetup: [path.resolve(__dirname, '../../../tests/vitest-cpu-admission.ts')],
     // canvas-setup.ts must load first — it stubs canvas before test-setup.ts
     // imports @xterm/xterm (which probes canvas on import). See PAN-1989.
     setupFiles: [

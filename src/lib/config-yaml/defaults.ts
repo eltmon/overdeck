@@ -218,6 +218,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorPsiFullShedAvg10: 1,
     governorPsiCalmReadmitAvg10: 0.05,
     governorPsiCalmWindowMs: 600_000,
+    governorCpuSoftLoadPerCore: 1.5,
+    governorCpuRecoveryLoadPerCore: 1,
   },
   issues: {
     closedWindowDays: 14,
