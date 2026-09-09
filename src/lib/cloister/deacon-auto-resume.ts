@@ -812,7 +812,8 @@ export async function handleAgentStoppedEvent(
     }
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`);
+      const cpuDetail = memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`;
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}${cpuDetail}`);
       return null;
     }
   }
@@ -929,7 +930,8 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
     }
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates to next patrol`);
+      const cpuDetail = memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`;
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}${cpuDetail}; deferring remaining candidates to next patrol`);
       break;
     }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate as realSetImmediate } from 'node:timers/promises'
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   acquireQualityGateAdmission,
+  QualityGateAdmissionTimeoutError,
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
 } from '../../../../src/lib/cloister/quality-gate-admission.js'
@@ -131,5 +132,19 @@ describe('quality gate admission', () => {
     )
     const handle = await driveUntilResolved(admission)
     await handle.release()
+  })
+
+  it('maxWaitMs expiry removes the waiter ticket and throws', async () => {
+    const rootDir = home()
+    const now = vi.fn()
+      .mockReturnValueOnce(0)
+      .mockReturnValue(101)
+
+    await expect(acquireQualityGateAdmission(
+      { workspacePath: '/tmp/one', gateName: 'test', attempt: 1 },
+      { ...deps(rootDir), now, maxWaitMs: 100 },
+    )).rejects.toBeInstanceOf(QualityGateAdmissionTimeoutError)
+
+    expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
   })
 })
