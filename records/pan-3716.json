@@ -3,21 +3,21 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-14T08:25:59.752Z",
-  "updated": "2026-09-09T04:55:00.253Z",
+  "updated": "2026-09-09T04:56:12.717Z",
   "pipeline": {
     "issueId": "PAN-3716",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T04:55:00.251Z",
+    "reopenedAt": "2026-09-09T04:55:00.251Z",
+    "updatedAt": "2026-09-09T04:55:48.073Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3716 after its harness exited before push.",
     "strikeReadyHead": "73daff1522271bdc7da1db8966adf16c9b61b473",
     "strikeReadyAt": "2026-09-09T04:52:36.061Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [],
-    "reopenedAt": "2026-09-09T04:55:00.251Z"
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
@@ -35,6 +35,14 @@
             "cacheRead": 21123584,
             "cacheWrite": 0
           }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 787,
+            "output": 88,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -49,11 +57,17 @@
           "output": 16869,
           "cacheRead": 21123584,
           "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 787,
+          "output": 88,
+          "cacheRead": 0,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.162557,
-        "pricingAsOf": "2026-09-09T04:52:36.072Z"
+        "usd": 13.163784,
+        "pricingAsOf": "2026-09-09T04:55:48.082Z"
       }
     },
     "merges": [],
