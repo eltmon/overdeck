@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-09-09T09:12:31.929Z",
-  "updated": "2026-09-09T15:48:16.918Z",
+  "updated": "2026-09-09T15:53:25.821Z",
   "pipeline": {
     "issueId": "PAN-3804",
     "reviewStatus": "passed",
@@ -21,10 +21,12 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "reopenedAt": "2026-09-09T13:13:55.652Z",
-    "updatedAt": "2026-09-09T15:47:47.581Z",
+    "updatedAt": "2026-09-09T15:52:51.536Z",
     "reviewNotes": "Reopened",
     "testNotes": "Skipped: issue is already merged",
-    "strikeLandingState": "landed",
+    "strikeReadyHead": "fb5416eddd30094058f93aa300869e1300d351c0",
+    "strikeReadyAt": "2026-09-09T15:52:51.535Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
   },
@@ -50,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.005083000000000001,
-        "pricingAsOf": "2026-09-09T15:48:08.159Z"
+        "pricingAsOf": "2026-09-09T15:52:51.545Z"
       }
     },
     "merges": [],
