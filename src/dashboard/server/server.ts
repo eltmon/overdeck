@@ -1,5 +1,4 @@
 import { jsonResponse } from "./http-helpers.js";
-import { getDashboardIdentity } from './identity.js';
 /**
  * Dashboard HTTP server — Effect-based with dual-runtime support (PAN-428 B5)
  *
@@ -89,6 +88,7 @@ import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDas
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { retryDashboardBind } from './server-bind.js';
+import { buildDashboardHealthResponse } from './health-response.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -137,7 +137,9 @@ const PlatformServicesLive = Layer.unwrap(
 const healthRouteLayer = HttpRouter.add(
   'GET',
   '/api/health',
-  jsonResponse({ status: 'ok', ...getDashboardIdentity() }),
+  Effect.promise(() => buildDashboardHealthResponse()).pipe(
+    Effect.map((health) => jsonResponse(health.body, { status: health.httpStatus })),
+  ),
 );
 
 function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
