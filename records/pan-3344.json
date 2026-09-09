@@ -7,9 +7,11 @@
     "issueId": "PAN-3344",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "queued",
+    "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T07:10:10.012Z",
+    "updatedAt": "2026-09-09T07:10:11.191Z",
     "strikeReadyHead": "76569866f57bb016fed2e309846d0caeafff2104",
     "strikeReadyAt": "2026-09-09T07:06:05.013Z",
     "strikeLandingState": "landing",
@@ -38,13 +40,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T07:10:10.045Z"
+        "pricingAsOf": "2026-09-09T07:10:40.736Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T07:10:37.590Z",
+  "updated": "2026-09-09T07:10:44.079Z",
   "harness": "codex"
 }
