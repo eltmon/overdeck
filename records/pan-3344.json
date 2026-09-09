@@ -9,21 +9,42 @@
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T13:06:47.367Z"
+    "updatedAt": "2026-09-09T07:06:05.015Z",
+    "strikeReadyHead": "76569866f57bb016fed2e309846d0caeafff2104",
+    "strikeReadyAt": "2026-09-09T07:06:05.013Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 787,
+            "output": 100,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 787,
+          "output": 100,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-04T13:06:47.367Z"
+        "usd": 0.001287,
+        "pricingAsOf": "2026-09-09T07:06:05.046Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T05:53:55.011Z",
+  "updated": "2026-09-09T07:06:05.073Z",
   "harness": "codex"
 }
