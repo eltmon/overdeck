@@ -532,7 +532,7 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T08:38:39.531Z",
+  "updated": "2026-09-09T08:38:41.881Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
@@ -544,10 +544,9 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-09-09T06:31:21.466Z",
-    "updatedAt": "2026-09-09T08:38:37.158Z",
+    "updatedAt": "2026-09-09T08:38:37.187Z",
     "reviewNotes": "Verification error: Verification worker 999024 exceeded 3900000ms after CPU admission",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "testNotes": "Ran gates from this workspace (feature/pan-3668 @ 5caa78a8). npm run typecheck: PASSED on two clean sequential runs (0 errors); one earlier run failed with 34 HarnessName/RuntimeName mismatch errors while running concurrently with a separate lint job, but was not reproducible in isolation after a fresh `npm run build:contracts` + `npx tsc --noEmit -p tsconfig.json` (0 errors) and a full clean `npm run typecheck` (exit 0) -- judged an environment/concurrency artifact, not a code defect, since packages/contracts/src and dist consistently include 'prime-agent' in Harness/RuntimeName/HarnessName. npm run lint: PASSED (all 20 sub-checks including ratchet, circular, effect-diagnostics, quarantine audits). npm test (full suite, 14116 tests): 1 failed initially (tests/unit/lib/cloister/deacon-swarm-recovery.test.ts, an 'overdeck.db schema is incompatible' error in unrelated deacon-swarm-recovery machinery) -- confirmed pre-existing/unrelated to this PR: `git diff origin/main...HEAD` touches neither the test file nor its source (swarm-failed-slot.ts, overdeck/infra.ts), and the file passes cleanly in isolation (5/5... actually full file passed standalone). Judged full-suite-load flake, consistent with the flake pattern already documented in this PR's own docs/prime-agent-verification.md. tests/unit/lib/prime-agent-no-loss-audit.test.ts and tests/unit/lib/ohmypi-no-loss-audit.test.ts: PASSED (16/16).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
     "lastVerifiedCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
@@ -887,7 +886,7 @@
       },
       "costAtCloseOut": {
         "usd": 165.6364113,
-        "pricingAsOf": "2026-09-09T08:38:39.524Z"
+        "pricingAsOf": "2026-09-09T08:38:41.872Z"
       }
     },
     "merges": [
