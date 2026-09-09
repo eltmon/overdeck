@@ -547,6 +547,38 @@ export async function checkMergedRow(
 
 const NEGATIVE_STRIKE_VERDICTS = new Set(['failed', 'blocked', 'dispatch_failed']);
 
+async function loadContainedStrikeStatus(
+  issueId: string,
+  deps: DodStatusRowDeps,
+): Promise<ReviewStatus | null> {
+  const [live, journal] = await Promise.all([
+    Promise.resolve(deps.getReviewStatus(issueId)).catch(() => null),
+    Promise.resolve(deps.getJournalStatus(issueId)).catch(() => null),
+  ]);
+  if (!live) return journal as ReviewStatus | null;
+  if (!journal) return live;
+
+  const reconciled = { ...live } as ReviewStatus;
+  const target = reconciled as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(journal)) {
+    if (target[key] === undefined && value !== undefined) target[key] = value;
+  }
+
+  // A negative durable verdict remains a blocker even when the cache projection
+  // still carries an earlier non-terminal value. The matching strike marker below
+  // binds this journal evidence to the exact contained branch tip.
+  if (NEGATIVE_STRIKE_VERDICTS.has(journal.reviewStatus)) {
+    reconciled.reviewStatus = journal.reviewStatus as ReviewStatus['reviewStatus'];
+  }
+  if (NEGATIVE_STRIKE_VERDICTS.has(journal.testStatus)) {
+    reconciled.testStatus = journal.testStatus as ReviewStatus['testStatus'];
+  }
+  if (NEGATIVE_STRIKE_VERDICTS.has(journal.verificationStatus ?? '')) {
+    reconciled.verificationStatus = journal.verificationStatus as ReviewStatus['verificationStatus'];
+  }
+  return reconciled;
+}
+
 /**
  * Reconcile an out-of-band strike landing only when its durable ready marker
  * names the exact strike tip proven contained in main. This is the evidence a
@@ -557,12 +589,16 @@ export async function reconcileContainedStrike(
   merged: MergedDodRowResult,
   deps: {
     getStatus?: (issueId: string) => Awaitable<ReviewStatus | null>;
+    getJournalStatus?: (issueId: string) => Awaitable<PanIssuePipelineRecord | null>;
     setStatus?: typeof setReviewStatusSync;
   } = {},
 ): Promise<void> {
   const head = merged.evidence === 'branch-containment' ? merged.containedStrikeHead : undefined;
   if (!head) return;
-  const current = await (deps.getStatus ?? (issueId => Effect.runPromise(getReviewStatus(issueId))))(ctx.issueId);
+  const current = await loadContainedStrikeStatus(ctx.issueId, {
+    getReviewStatus: deps.getStatus ?? defaultDeps.getReviewStatus,
+    getJournalStatus: deps.getJournalStatus ?? defaultDeps.getJournalStatus,
+  });
   if (!current || current.strikeReadyHead !== head) return;
 
   const update: ReviewStatusUpdate = {};
