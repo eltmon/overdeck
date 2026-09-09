@@ -148,9 +148,9 @@ describe('acp delivery tier', () => {
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
-  it('returns acp and leaves transcript echo ownership with the host', async () => {
+  it.each(['acp', 'opencode'])('delivers %s through ACP and leaves transcript echo ownership with the host', async (harness) => {
     const agentId = 'agent-acp-success';
-    writeAgentState(agentId, { harness: 'acp' });
+    writeAgentState(agentId, { harness });
     const host = new AcpHost({
       agentId,
       provider: 'kimi',

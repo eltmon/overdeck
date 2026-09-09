@@ -18,6 +18,7 @@ import {
   projectContextFile,
   workspaceContextFile,
 } from '../../../src/lib/context-layers/layers.js';
+import { materializeAcpContextFile } from '../../../src/lib/acp/context.js';
 import { assembleWorkspaceContext } from '../../../src/lib/context-layers/assemble.js';
 
 describe('managed launch context composition', () => {
@@ -67,6 +68,15 @@ describe('managed launch context composition', () => {
     expect(rendered).toContain(`Source: ${projectContextFile(projectRoot)}`);
     expect(rendered).toContain(`Source: ${workspaceContextFile(workspace)}`);
     expect(rendered).toContain('# Overdeck managed instructions');
+  });
+
+  it('preserves OpenCode filtering through its ACP context transport', () => {
+    writeFileSync(projectContextFile(projectRoot), '{{#harness:opencode}}OpenCode project.{{/harness:opencode}}\n{{#harness:acp}}ACP project.{{/harness:acp}}');
+    const path = materializeAcpContextFile(join(overdeckHome, 'agents', 'test'), workspace, 'opencode');
+    const rendered = readFileSync(path, 'utf8');
+    expect(rendered).toContain('OpenCode project.');
+    expect(rendered).not.toContain('ACP project.');
+    expect(rendered).toContain(`Source: ${projectContextFile(projectRoot)}`);
   });
 
   it('materializes only beneath the private Overdeck context tree', () => {

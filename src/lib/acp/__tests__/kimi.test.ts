@@ -147,7 +147,7 @@ describe("ACP provider registry", () => {
 
   it("lists supported providers when the provider is unknown", () => {
     expect(() => resolveAcpProviderSupport("unknown")).toThrow(
-      /unknown ACP provider.*supported providers: kimi/i,
+      /unknown ACP provider.*supported providers:.*kimi/i,
     );
   });
 });

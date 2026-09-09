@@ -379,7 +379,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -480,19 +480,10 @@ export interface YamlConfig {
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
-    providers?: {
-      anthropic?: ProviderConfig | boolean;
-      openai?: ProviderConfig | boolean;
-      google?: ProviderConfig | boolean;
-      minimax?: ProviderConfig | boolean;
-      zai?: ProviderConfig | boolean;
-      kimi?: ProviderConfig | boolean;
-      meta?: ProviderConfig | boolean;
-      mimo?: ProviderConfig | boolean;
-      openrouter?: ProviderConfig | boolean;
-      nous?: ProviderConfig | boolean;
-      dashscope?: ProviderConfig | boolean;
-    };
+    providers?: Partial<Record<
+      'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' |
+      'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', ProviderConfig | boolean
+    >>;
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<string, ModelId>>;

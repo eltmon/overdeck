@@ -73,4 +73,4 @@
 1694 src/lib/settings-api.ts # PAN-3790
 1084 src/lib/agents/spawn.ts # PAN-3783
 1163 src/lib/overdeck/conversation-runtime.ts # PAN-3783
-1009 src/lib/launcher-generator.ts # PAN-3783
+1012 src/lib/launcher-generator.ts # PAN-3783

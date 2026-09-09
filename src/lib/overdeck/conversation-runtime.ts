@@ -202,7 +202,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'muse'
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -317,7 +317,7 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
     if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
     return;
   }
-  if (harness === 'acp') {
+  if (harness === 'acp' || harness === 'opencode') {
     await waitForAcpHostReady(tmuxSession);
     return;
   }
@@ -358,7 +358,7 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'muse') {
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse') {
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
@@ -699,7 +699,7 @@ export async function spawnConversationSession(
     const piProvider = piProviderForModel(model);
     if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
-  if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+  if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) {
     throw new Error('Invalid effort level');
   }
   const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
@@ -928,7 +928,7 @@ export async function handleConversationCreate(
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
     if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-    if (effort && !SAFE_EFFORT_PATTERN.test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     let cwd = getDefaultCwd();
     let canonicalProjectKey: string | undefined;
     if (projectKey) {
@@ -965,7 +965,7 @@ export async function handleConversationCreate(
                 { kimiContext: { workspace: cwd } },
               )
             : await deliverAgentMessage(tmuxSession, message, 'conversation-message', method);
-          if ((harness === 'acp' || harness === 'kimi-code') && !delivery.ok) {
+          if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') && !delivery.ok) {
             throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
           }
         }
@@ -975,7 +975,7 @@ export async function handleConversationCreate(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with
         // no owned native identity presented as a healthy conversation.
-        if (harness === 'acp' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -1080,7 +1080,7 @@ export async function handleConversationResume(
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
       // owned native identity presented as a healthy conversation.
-      if (harness === 'acp' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
+      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
@@ -1130,7 +1130,7 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
-        if (harness === 'acp' || harness === 'kimi-code' || harness === 'muse') {
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
         if (harness === 'kimi-code') {
@@ -1147,7 +1147,7 @@ export async function handleConversationRestartAll(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with no
         // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'muse') await stopConversationRuntime(conv, conv.name);
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

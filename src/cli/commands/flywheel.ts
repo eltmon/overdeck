@@ -95,7 +95,7 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
-  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
   model: string;
   effort: RoleEffort;
   minAgents: number;

@@ -1,0 +1,472 @@
+{
+  "anthropic": [
+    {
+      "id": "claude-fable-5-1",
+      "name": "Claude Fable 5.1 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 30
+    },
+    {
+      "id": "claude-fable-5",
+      "name": "Claude Fable 5 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 30
+    },
+    {
+      "id": "claude-opus-5",
+      "name": "Claude Opus 5 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 15
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Claude Opus 4.8 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 15
+    },
+    {
+      "id": "claude-opus-4-7",
+      "name": "Claude Opus 4.7 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 15
+    },
+    {
+      "id": "claude-opus-4-6",
+      "name": "Claude Opus 4.6 (200K context)",
+      "contextWindow": 200000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 15
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 6
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "name": "Claude Sonnet 4.6 (200K context)",
+      "contextWindow": 200000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 9
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "name": "Claude Haiku 4.5 (200K context)",
+      "contextWindow": 200000,
+      "costPer1MTokens": 3
+    }
+  ],
+  "openai": [
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra (272K context)",
+      "contextWindow": 272000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 30
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol (272K context)",
+      "contextWindow": 272000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 17.5
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6 Terra (272K context)",
+      "contextWindow": 272000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 7
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna (272K context)",
+      "contextWindow": 272000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 0.7
+    },
+    {
+      "id": "gpt-5.6-sol[372k]",
+      "name": "GPT-5.6 Sol (372K context)",
+      "contextWindow": 372000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 17.5
+    },
+    {
+      "id": "gpt-5.6-terra[372k]",
+      "name": "GPT-5.6 Terra (372K context)",
+      "contextWindow": 372000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 7
+    },
+    {
+      "id": "gpt-5.6-luna[372k]",
+      "name": "GPT-5.6 Luna (372K context)",
+      "contextWindow": 372000,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 0.7
+    }
+  ],
+  "google": [
+    {
+      "id": "gemini-3.8-flash",
+      "name": "Gemini 3.8 Flash (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 5.25
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "name": "Gemini 3.5 Flash Lite (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 1.4
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 7
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 0.4
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 0.9
+    }
+  ],
+  "minimax": [
+    {
+      "id": "minimax-m2.7",
+      "name": "MiniMax M2.7 (204.8K context)",
+      "contextWindow": 204800,
+      "costPer1MTokens": 1.5
+    },
+    {
+      "id": "minimax-m2.7-highspeed",
+      "name": "MiniMax M2.7 Highspeed (204.8K context)",
+      "contextWindow": 204800,
+      "costPer1MTokens": 1.5
+    },
+    {
+      "id": "MiniMax-M3",
+      "name": "MiniMax M3 (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 1.5
+    }
+  ],
+  "zai": [
+    {
+      "id": "glm-5.3",
+      "name": "GLM-5.3 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "low",
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 2.9
+    },
+    {
+      "id": "glm-5.2",
+      "name": "GLM-5.2 (1M context)",
+      "contextWindow": 1000000,
+      "effortLevels": [
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 2.9
+    },
+    {
+      "id": "glm-5.1",
+      "name": "GLM-5.1 (200K context)",
+      "contextWindow": 200000,
+      "costPer1MTokens": 2.9
+    }
+  ],
+  "kimi": [
+    {
+      "id": "k3",
+      "name": "Kimi K3 (256K context)",
+      "contextWindow": 262144,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 9,
+      "baseName": "Kimi K3 (256K context)",
+      "harness": "claude-code"
+    },
+    {
+      "id": "k3[1m]",
+      "name": "Kimi K3 (1M context)",
+      "contextWindow": 1048576,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 9,
+      "baseName": "Kimi K3 (1M context)",
+      "harness": "claude-code"
+    },
+    {
+      "id": "kimi-k2.7-code",
+      "name": "Kimi K2.7 Code (256K context)",
+      "contextWindow": 262144,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "costPer1MTokens": 2.5,
+      "baseName": "Kimi K2.7 Code (256K context)",
+      "harness": "claude-code"
+    },
+    {
+      "id": "kimi-code/k3",
+      "name": "Kimi K3 (1M context) — Kimi Code CLI",
+      "contextWindow": 1048576,
+      "effortLevels": [
+        "low",
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 9,
+      "baseName": "Kimi K3 (1M context)",
+      "harness": "kimi-code"
+    },
+    {
+      "id": "kimi-code/k3-256k",
+      "name": "Kimi K3 (256K context) — Kimi Code CLI",
+      "contextWindow": 262144,
+      "effortLevels": [
+        "low",
+        "high",
+        "max"
+      ],
+      "costPer1MTokens": 9,
+      "baseName": "Kimi K3 (256K context)",
+      "harness": "kimi-code"
+    },
+    {
+      "id": "kimi-code/kimi-for-coding",
+      "name": "Kimi K2.7 Coding (256K context) — Kimi Code CLI",
+      "contextWindow": 262144,
+      "effortLevels": [],
+      "costPer1MTokens": 2.5,
+      "baseName": "Kimi K2.7 Coding (256K context)",
+      "harness": "kimi-code"
+    },
+    {
+      "id": "kimi-code/kimi-for-coding-highspeed",
+      "name": "Kimi K2.7 Coding Highspeed (256K context) — Kimi Code CLI",
+      "contextWindow": 262144,
+      "effortLevels": [],
+      "costPer1MTokens": 2.5,
+      "baseName": "Kimi K2.7 Coding Highspeed (256K context)",
+      "harness": "kimi-code"
+    }
+  ],
+  "mimo": [
+    {
+      "id": "mimo-v2.5-pro",
+      "name": "MiMo V2.5 Pro (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 2
+    },
+    {
+      "id": "mimo-v2.5",
+      "name": "MiMo V2.5 (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 1
+    }
+  ],
+  "openrouter": [],
+  "nous": [
+    {
+      "id": "qwen/qwen3.6-plus",
+      "name": "Qwen 3.6 Plus (Nous Portal) (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 0
+    }
+  ],
+  "dashscope": [
+    {
+      "id": "qwen3.7-plus",
+      "name": "Qwen3.7 Plus (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 1
+    },
+    {
+      "id": "qwen3.8-flash",
+      "name": "Qwen3.8 Flash (1M context)",
+      "contextWindow": 1000000,
+      "costPer1MTokens": 0
+    },
+    {
+      "id": "qwen3-max",
+      "name": "Qwen3 Max (DashScope) (256K context)",
+      "contextWindow": 262144,
+      "costPer1MTokens": 0
+    },
+    {
+      "id": "qwen3-coder-plus",
+      "name": "Qwen3 Coder Plus (DashScope) (256K context)",
+      "contextWindow": 262144,
+      "costPer1MTokens": 0
+    },
+    {
+      "id": "qwen3-plus",
+      "name": "Qwen3 Plus (DashScope) (131.072K context)",
+      "contextWindow": 131072,
+      "costPer1MTokens": 0
+    },
+    {
+      "id": "qwen3.7-max",
+      "name": "Qwen3.7 Max (DashScope) (256K context)",
+      "contextWindow": 262144,
+      "costPer1MTokens": 0
+    },
+    {
+      "id": "qwen3.8-max",
+      "name": "Qwen3.8 Max (DashScope) (1M context)",
+      "contextWindow": 1048576,
+      "costPer1MTokens": 0
+    }
+  ],
+  "meta": [
+    {
+      "id": "muse-spark-1.3",
+      "name": "Muse Spark 1.3 Standard (1M context)",
+      "contextWindow": 1048576,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "costPer1MTokens": 2.75,
+      "harness": "muse"
+    },
+    {
+      "id": "muse-spark-1.3-contributor",
+      "name": "Muse Spark 1.3 Contributor (training data) (1M context)",
+      "contextWindow": 1048576,
+      "effortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "costPer1MTokens": 0.15,
+      "harness": "muse"
+    }
+  ]
+}

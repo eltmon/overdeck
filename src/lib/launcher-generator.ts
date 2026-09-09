@@ -17,7 +17,7 @@ import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
 export interface LauncherConfig {
   role: Role;
@@ -839,6 +839,9 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+  if (config.harness === 'opencode' && config.acpEffort) {
+    tokens.push('--effort', shellQuote(config.acpEffort));
   }
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
