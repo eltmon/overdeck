@@ -103,7 +103,7 @@ export interface ContextUsage {
 }
 
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; reset?: boolean; metadataSnapshot?: boolean; totalCost?: number; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
   | { kind: 'discovering' }
   | { kind: 'subagents'; subagents: SubagentSummary[] };
 
