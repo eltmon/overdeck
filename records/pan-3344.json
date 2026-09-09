@@ -12,14 +12,15 @@
   "model": "gpt-5.6-sol",
   "pipeline": {
     "issueId": "PAN-3344",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T13:29:50.301Z",
+    "updatedAt": "2026-09-09T13:31:10.633Z",
+    "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
     "strikeReadyHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
     "strikeReadyAt": "2026-09-09T13:29:50.300Z",
@@ -71,13 +72,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T13:29:50.332Z"
+        "pricingAsOf": "2026-09-09T13:31:10.672Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T13:29:54.309Z",
+  "updated": "2026-09-09T13:31:10.798Z",
   "harness": "codex"
 }
