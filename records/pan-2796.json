@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T06:47:00.242Z",
-  "updated": "2026-09-09T09:12:49.808Z",
+  "updated": "2026-09-09T09:29:02.760Z",
   "pipeline": {
     "issueId": "PAN-2796",
     "reviewStatus": "pending",
@@ -13,15 +13,13 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T09:12:16.086Z",
+    "updatedAt": "2026-09-09T09:29:02.733Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "mergeNotes": "Stale strike signal: recorded HEAD 44745bff0454c05ece7909bb87a6a67d4e44f2b7 differs from origin/strike/pan-2796 at cd76f52bbf47d6d09274283d794b9ae2a9a13277",
-    "strikeReadyHead": "44745bff0454c05ece7909bb87a6a67d4e44f2b7",
-    "strikeReadyAt": "2026-09-09T07:55:52.451Z",
-    "strikeLandingState": "recovering",
-    "strikeRecoveryCount": 1,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-09-09T09:04:03.354Z",
+    "strikeReadyHead": "cd76f52bbf47d6d09274283d794b9ae2a9a13277",
+    "strikeReadyAt": "2026-09-09T09:29:02.732Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-09-09T09:03:03.354Z",
@@ -61,7 +59,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0012820000000000002,
-        "pricingAsOf": "2026-09-09T09:12:49.795Z"
+        "pricingAsOf": "2026-09-09T09:29:02.749Z"
       }
     },
     "merges": [],
