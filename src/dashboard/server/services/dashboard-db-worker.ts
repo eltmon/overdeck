@@ -1,3 +1,5 @@
+import { getCostsByIssueSnapshot } from './dashboard-cost-snapshot.js';
+import { getConversationSearchStats } from '../../../lib/overdeck/conversations-search.js';
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
 import {
@@ -8,7 +10,7 @@ import {
   getDiscoveredSessionById,
   getDiscoveredStats,
 } from '../../../lib/overdeck/discovered-sessions.js';
-import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { getConversationByName, getConversationLedgerCosts } from '../../../lib/overdeck/conversations.js';
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import type { ConversationFilter } from '../../../lib/overdeck/discovered-sessions.js';
 import { getSessionsFeedFacets, listSessionsFeed } from '../../../lib/overdeck/sessions-feed.js';
@@ -33,6 +35,9 @@ import { parseEntireConversation } from './conversation-service.js';
 import type { ParseResult } from './conversation-service.js';
 
 type DashboardDbOperation =
+  | 'getCostsByIssueSnapshot'
+  | 'getConversationSearchStats'
+  | 'getConversationLedgerCosts'
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
   | 'listSessionsFeed'
@@ -104,6 +109,12 @@ async function runJob(
   };
 
   switch (operation) {
+    case 'getCostsByIssueSnapshot':
+      return getCostsByIssueSnapshot();
+    case 'getConversationSearchStats':
+      return getConversationSearchStats(payload as { dbPath: string; model: string });
+    case 'getConversationLedgerCosts':
+      return [...getConversationLedgerCosts()];
     case 'getDiscoveredStats':
       return getDiscoveredStats();
     case 'listDiscoveredSessions': {

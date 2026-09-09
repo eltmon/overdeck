@@ -34,6 +34,9 @@ import { parseEntireConversation } from './conversation-service.js';
 import type { ParseResult } from './conversation-service.js';
 
 export type DashboardDbOperation =
+  | 'getCostsByIssueSnapshot'
+  | 'getConversationSearchStats'
+  | 'getConversationLedgerCosts'
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
   | 'listSessionsFeed'
@@ -111,6 +114,9 @@ interface WorkerResponse {
 const MAX_PENDING_JOBS = 32;
 const SEMANTIC_SEARCH_TIMEOUT_MS = Number.parseInt(process.env['OVERDECK_SEMANTIC_SEARCH_TIMEOUT_MS'] ?? '15000', 10);
 const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
+  'getCostsByIssueSnapshot',
+  'getConversationSearchStats',
+  'getConversationLedgerCosts',
   'scanConversations',
   'enrichSessions',
   'embedSessions',
@@ -171,6 +177,7 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 }
 
 export function workerLane(operation: DashboardDbOperation): WorkerLane {
+  if (isPollingSnapshot(operation)) return 'read';
   if (operation === 'searchSessionsSemantic') return 'semantic';
   if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';
@@ -354,6 +361,11 @@ async function runInline(
   }
 }
 
+function isPollingSnapshot(operation: DashboardDbOperation): boolean {
+  return operation === 'getCostsByIssueSnapshot' || operation === 'getConversationSearchStats'
+    || operation === 'getConversationLedgerCosts';
+}
+
 export function runDashboardDbJob<T>(
   operation: DashboardDbOperation,
   payload?: unknown,
@@ -366,7 +378,7 @@ export function runDashboardDbJob<T>(
     return existing.promise as Promise<T>;
   }
 
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
+  if (import.meta.url.endsWith('.ts') && process.env['VITEST'] && !isPollingSnapshot(operation)) {
     const progressListeners = new Set<ProgressHandler>();
     if (onProgress) progressListeners.add(onProgress);
     const promise = runInline(operation, payload, onProgress) as Promise<T>;

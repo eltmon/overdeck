@@ -1,3 +1,4 @@
+import { getCostsByIssueSnapshot } from '../services/dashboard-poll-snapshots.js';
 import { jsonResponse } from "../http-helpers.js";
 /**
  * Costs route module — Effect HttpRouter.Layer (PAN-428 B10)
@@ -31,7 +32,6 @@ import {
   type ReconcileResult as ClaudeReconcileResult,
 } from '../../../lib/costs/reconciler.js';
 import {
-  getCostsByIssueSync,
   getCostForIssueAggregateSync,
   getDailyTrendsSync,
   getModelRollupSync,
@@ -113,39 +113,9 @@ const getCostsSummaryRoute = HttpRouter.add(
 const getCostsByIssueRoute = HttpRouter.add(
   'GET',
   '/api/costs/by-issue',
-  httpHandler(Effect.try({
-    try: () => {
-      const dbIssues = getCostsByIssueSync();
-
-      const issues = Object.entries(dbIssues).map(([issueId, data]) => {
-        const d = data as {
-          totalCost: number; inputTokens: number; outputTokens: number;
-          cacheReadTokens: number; cacheWriteTokens: number; models: Record<string, { cost: number; tokens: number }>;
-          stages?: Record<string, { cost: number; tokens: number }>; budgetWarning?: boolean; lastUpdated?: string;
-        };
-        return {
-          issueId,
-          totalCost: d.totalCost,
-          tokenCount: d.inputTokens + d.outputTokens + d.cacheReadTokens + d.cacheWriteTokens,
-          inputTokens: d.inputTokens,
-          outputTokens: d.outputTokens,
-          cacheReadTokens: d.cacheReadTokens,
-          cacheWriteTokens: d.cacheWriteTokens,
-          models: d.models,
-          byModel: Object.fromEntries(
-            Object.entries(d.models).map(([model, stats]) => [model, { cost: stats.cost, tokens: stats.tokens }])
-          ),
-          byStage: Object.fromEntries(
-            Object.entries(d.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
-          ),
-          budgetWarning: d.budgetWarning,
-          lastUpdated: d.lastUpdated,
-        };
-      });
-
-      issues.sort((a, b) => b.totalCost - a.totalCost);
-
-      return jsonResponse({ status: 'live', eventCount: issues.length, issues });
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      return jsonResponse(await getCostsByIssueSnapshot());
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
