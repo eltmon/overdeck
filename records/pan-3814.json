@@ -1,9 +1,17 @@
 {
   "issueId": "PAN-3814",
   "schemaVersion": 2,
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "merge-agent",
+      "outcome": "needs-you",
+      "timestamp": "2026-09-09T15:52:54Z",
+      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3814 needs operator attention after 1 cycle(s).\n1. strike e71f3ae6cd8a9e6028da0991cc7048efaee9c84a; main 456a33352b96e9ddf3c3a0b70b5b02be9c5f6d8c; failed: GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.; recovery not delivered: agent is paused (Operator requested immediate PAN agent reduction due to extreme memory pressure)"
+    }
+  ],
   "created": "2026-09-09T13:35:30.301Z",
-  "updated": "2026-09-09T15:47:52.424Z",
+  "updated": "2026-09-09T15:52:54.027Z",
   "pipeline": {
     "issueId": "PAN-3814",
     "reviewStatus": "pending",
@@ -51,5 +59,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-09T15:52Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-09-09T15:52:54.027Z"
+    }
+  ]
 }
