@@ -9,6 +9,10 @@ const listRunningAgentsSyncMock = vi.fn();
 const getAgentRuntimeStateSyncMock = vi.fn();
 const setAgentPausedSyncMock = vi.fn();
 const stopAgentSyncMock = vi.fn();
+const osMocks = vi.hoisted(() => ({
+  cpus: vi.fn(),
+  loadavg: vi.fn(),
+}));
 const execFileMock = vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (err: unknown, res: { stdout: string; stderr: string }) => void) => {
   cb(null, { stdout: '', stderr: '' });
 });
@@ -54,6 +58,12 @@ vi.mock('node:child_process', () => ({
   execFile: (...args: unknown[]) => (execFileMock as any)(...args),
 }));
 
+vi.mock('node:os', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:os')>(),
+  cpus: (...args: unknown[]) => osMocks.cpus(...args),
+  loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
+}));
+
 import {
   assessMemoryPressure,
   classifyMemoryPressure,
@@ -86,6 +96,8 @@ const GOVERNOR_RESOURCES = {
   governorPsiFullShedAvg10: 1,
   governorPsiCalmReadmitAvg10: 0.05,
   governorPsiCalmWindowMs: 600_000,
+  governorCpuSoftLoadPerCore: 1.5,
+  governorCpuRecoveryLoadPerCore: 1,
 };
 
 function procMemory(
@@ -179,6 +191,8 @@ describe('nextGovernorMode — hysteresis (PAN-2500 hysteresis-bands)', () => {
 describe('assessMemoryPressure', () => {
   beforeEach(() => {
     resetGovernorModeForTests();
+    osMocks.cpus.mockReturnValue([{}, {}, {}, {}]);
+    osMocks.loadavg.mockReturnValue([0, 0, 0]);
     loadConfigSyncMock.mockReturnValue({
       config: { resources: GOVERNOR_RESOURCES },
     });
@@ -195,6 +209,60 @@ describe('assessMemoryPressure', () => {
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
     const verdict = await assessMemoryPressure();
     expect(verdict.band).toBe('ok');
+  });
+
+  it('cpu saturation holds an admitting governor at soft threshold', async () => {
+    osMocks.loadavg.mockReturnValue([6.4, 0, 0]);
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      band: 'soft',
+      loadPerCore: 1.6,
+    });
+  });
+
+  it('cpu saturation never sheds', async () => {
+    osMocks.loadavg.mockReturnValue([40, 0, 0]);
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+
+    expect((await assessMemoryPressure()).band).toBe('soft');
+  });
+
+  it('held governor re-admits only below cpu recovery', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+    osMocks.loadavg.mockReturnValue([6.4, 0, 0]);
+    expect((await assessMemoryPressure()).band).toBe('soft');
+
+    osMocks.loadavg.mockReturnValue([4.8, 0, 0]);
+    expect((await assessMemoryPressure()).band).toBe('soft');
+
+    osMocks.loadavg.mockReturnValue([3.6, 0, 0]);
+    expect((await assessMemoryPressure()).band).toBe('ok');
+  });
+
+  it('calm memory PSI does not bypass CPU recovery', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+      osMocks.loadavg.mockReturnValue([6.4, 0, 0]);
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(600_000);
+      osMocks.loadavg.mockReturnValue([4.8, 0, 0]);
+      expect((await assessMemoryPressure()).band).toBe('soft');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('swapless box still evaluates cpu', async () => {
+    osMocks.loadavg.mockReturnValue([8, 0, 0]);
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapTotal: 0,
+      swapFree: 0,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('soft');
   });
 
   it('holds across successive calls per the hysteresis state machine', async () => {

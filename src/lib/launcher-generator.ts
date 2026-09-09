@@ -1,3 +1,4 @@
+import { museDataHome } from './runtimes/muse-session.js';
 import { Effect } from 'effect';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
@@ -15,7 +16,7 @@ import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
 export interface LauncherConfig {
   role: Role;
@@ -104,6 +105,12 @@ export interface LauncherConfig {
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
   kimiCodeAddDirs?: string[];
+
+  /** Exact Muse model and saved native UUID; never reuse a Claude session id. */
+  museModel?: string;
+  museResumeSessionId?: string;
+  museEffort?: string;
+  museContextFile?: string;
 
   // Command construction
   /**
@@ -468,6 +475,7 @@ const PROVIDER_ENV_UNSETS = [
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, config.spawnMode !== 'conversation');
 
   if (config.spawnMode === 'conversation') {
     if (behavior.launchCommandKind === 'ohmypi-rpc') {
@@ -563,6 +571,7 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (config.harness === 'muse') return buildMuseCommand(config, useExec);
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
@@ -933,3 +942,24 @@ export const generateLauncherScript = (
 export const generateLauncherWrapper = (
   config: LauncherConfig,
 ): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));
+
+/** Persistent native TUI, verified against Muse Code 1.0.2. */
+function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const model = config.museModel ?? config.model;
+  if (model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor') {
+    throw new Error('Muse launcher requires an explicit supported Muse Spark model');
+  }
+  const agentId = config.overdeckEnv?.agentId;
+  if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');
+  const effort = config.museEffort ?? 'high';
+  if (!['low', 'medium', 'high', 'xhigh'].includes(effort)) throw new Error('Unsupported Muse reasoning effort');
+  const tokens = ['muse', '--model', shellQuote(model), '--reasoning-effort', shellQuote(effort),
+    '--workspace', shellQuote(config.workingDir), '--trust-workspace'];
+  if (config.museResumeSessionId) tokens.push('resume', shellQuote(config.museResumeSessionId));
+  const command = wrapWithSupervisor(config, tokens.join(' '));
+  return [
+    `export XDG_DATA_HOME=${shellQuote(museDataHome(agentId))}`,
+    ...(config.museContextFile ? [`export TBH_EVAL_APPEND_DEVELOPER_PROMPT_FILE=${shellQuote(config.museContextFile)}`] : []),
+    useExec ? `exec ${command}` : command,
+  ];
+}

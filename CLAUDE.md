@@ -33,6 +33,7 @@
 
 - The canonical xBRIEF spec on `overdeck-state` is **immutable after planning**; item status lives in the project-side per-issue record's `statusOverrides`. [docs/XBRIEF.md](docs/XBRIEF.md)
 - Every state domain has **one read door and one write door**; never touch stores directly. [docs/API-SURFACE.md](docs/API-SURFACE.md)
+- The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md)
 - The post-merge lifecycle runs **at most once per merge** — keep `tests/unit/lib/cloister/in-flight-guard.test.ts` green. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; three shipped subagents hardcode `model: haiku` (breaks on CLIProxy-routed models — prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Pipeline membership, decisions, and workspace tables each have a canonical resolver — never derive independently. [docs/PIPELINE-MEMBERSHIP.md](docs/PIPELINE-MEMBERSHIP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md)

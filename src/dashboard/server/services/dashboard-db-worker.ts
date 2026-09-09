@@ -1,3 +1,4 @@
+import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
 import {
   aggregateDiscoveredSessionCost,
@@ -54,7 +55,7 @@ type DashboardDbOperation =
   | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -63,6 +64,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   codex: parseCodexConversationMessages,
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
+  muse: parseMuseConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 

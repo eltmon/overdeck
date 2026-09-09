@@ -253,7 +253,8 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
       logDeaconEventSync(
-        `[preemption] resumeYieldedAgents: memory gate (${memVerdict.band}); deferring remaining yielded agents`,
+        `[preemption] resumeYieldedAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`
+        + `${memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`}; deferring remaining yielded agents`,
       );
       break;
     }

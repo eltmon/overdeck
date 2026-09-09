@@ -61,7 +61,7 @@ export default defineConfig({
         '**/*.d.ts',
       ],
     },
-    globalSetup: ['tests/global-setup.ts'],
+    globalSetup: ['tests/vitest-cpu-admission.ts', 'tests/global-setup.ts'],
     setupFiles: ['tests/setup/overdeck-home.ts', 'tests/setup/no-real-home-writes.ts', 'tests/setup.ts'],
     // 5s is enough for unit/integration tests; tests that legitimately need
     // more time should opt in via `test('...', { timeout: 20_000 }, ...)`.

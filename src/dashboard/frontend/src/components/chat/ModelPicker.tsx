@@ -81,6 +81,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   mimo: 'Xiaomi MiMo',
   nous: 'Nous Portal',
   dashscope: 'Alibaba DashScope',
+  meta: 'Meta (Muse)',
   openrouter: 'OpenRouter',
   opencode: 'OpenCode Zen',
   'opencode-go': 'OpenCode Go',
@@ -182,7 +183,7 @@ function formatCost(costPer1M: number, provider?: string): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {

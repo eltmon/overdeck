@@ -173,7 +173,7 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
-    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' ? harness : 'claude-code';
 
     // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any
     // mutation below (the workModel issue-record write, the preliminary

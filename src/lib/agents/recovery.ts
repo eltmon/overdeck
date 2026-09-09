@@ -1,3 +1,4 @@
+import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
@@ -90,6 +91,10 @@ export interface RestartAgentDeps {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
+  if (harness === 'muse') {
+    const path = resolveMuseSessionPathSync(agentId);
+    return path ? museSessionId(path) : undefined;
+  }
   if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
@@ -229,7 +234,7 @@ export async function restartAgent(
     // from claiming this session or vice versa.
     const launchAndCaptureKimiSession = async (): Promise<void> => {
       let kimiExistingSessionsBefore: Set<string> | undefined;
-      if (effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
+      if (effectiveHarness === 'kimi-code') {
         try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
         try {
           const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
@@ -268,7 +273,7 @@ export async function restartAgent(
       }
     };
 
-    if (effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
+    if (effectiveHarness === 'kimi-code') {
       const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
       await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), agentState.workspace, launchAndCaptureKimiSession);
     } else {
@@ -290,12 +295,13 @@ export async function restartAgent(
         console.error(`[restartAgent] ohmypi prompt delivery failed for ${normalizedId}: ${msg}`);
       }
     } else {
-      const ready = await waitForPromptReady(normalizedId, effectiveHarness, 30);
+      const timeout = getHarnessBehavior(effectiveHarness).readyTimeoutSeconds;
+      const ready = await waitForPromptReady(normalizedId, effectiveHarness, timeout);
       if (!ready) {
-        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within 30s for ${normalizedId}`);
+        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within ${timeout}s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode') {
+      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode' || effectiveHarness === 'muse') {
         // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
         // it must not fall through to the legacy sync sendKeys() branch below,
         // which bypasses the supervisor cascade entirely.
@@ -439,7 +445,8 @@ export async function recoverAgent(
   const recoveryPrompt = generateRecoveryPrompt(state);
 
   // Get provider env for the agent's model (reads latest API key from settings)
-  const providerEnv = state.model ? await getProviderEnvForModel(state.model) : {};
+  const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
+  const providerEnv = state.model ? await getProviderEnvForModel(state.model, recoveryHarness) : {};
 
   // For credential-file providers, ensure apiKeyHelper is configured.
   // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -456,7 +463,6 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
   const harnessLaunch = await prepareHarnessLaunch(recoveryHarness);
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
   saveAgentStateSync(state);
@@ -501,7 +507,7 @@ export async function recoverAgent(
     return { action: 'respawned', state };
   }
 
-  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode') {
+  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode' || recoveryHarness === 'muse') {
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -511,6 +517,8 @@ export async function recoverAgent(
       isPlanning: recoveryRole === 'plan',
       ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
       harness: recoveryHarness,
+      useSupervisor: recoverySupervisorLaunch.useSupervisor,
+      supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
     });
@@ -526,20 +534,24 @@ export async function recoverAgent(
         ...acpProviderEnv,
       },
     }));
+    if (recoveryHarness === 'muse' && !await waitForPromptReady(normalizedId, recoveryHarness, getHarnessBehavior(recoveryHarness).readyTimeoutSeconds)) {
+      await Effect.runPromise(stopAgent(normalizedId));
+      throw new Error(`Muse recovery readiness timed out for ${normalizedId}`);
+    }
     const delivery = await deliverInitialPromptWithRetry(
       normalizedId,
       recoveryPrompt,
-      'recoverAgent:acp-recovery-prompt',
+      `recoverAgent:${recoveryHarness}-recovery-prompt`,
     );
     if (!delivery.ok) {
       await Effect.runPromise(stopAgent(normalizedId));
       throw new Error(
-        `ACP recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
+        `${getHarnessBehavior(recoveryHarness).displayName} recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
       );
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (acp)`);
+    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (${recoveryHarness})`);
     return { action: 'respawned', state };
   }
 
@@ -652,7 +664,7 @@ export async function recoverAgent(
     workingDir: state.workspace,
     changeDir: false,
     setTerminalEnv: true,
-    providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
+    providerExports: (await getProviderExportsForModel(state.model, recoveryHarness)).trimEnd(),
     extraEnvExports: [harnessLaunch.pathExport],
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),

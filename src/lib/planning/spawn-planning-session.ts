@@ -1,3 +1,4 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
 /**
  * Spawn Planning Session — background workspace + agent setup
  *
@@ -401,7 +402,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -703,7 +704,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         extraEnvExports: [harnessLaunch.pathExport],
-        promptFile: (behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui') ? undefined : promptFile,
+        promptFile: (behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') ? undefined : promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
@@ -713,6 +714,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...codexLauncherFields,
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
+        ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },
     );
@@ -755,7 +757,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       });
     }
 
-    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui') {
+    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') {
       const delivery = await deliverInitialPromptWithRetry(
         sessionName,
         initMessage,

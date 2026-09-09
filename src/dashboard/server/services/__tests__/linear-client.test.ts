@@ -116,9 +116,9 @@ describe('LinearClient Effect service', () => {
       expect(mockSdkIssue).toHaveBeenCalledWith(UUID_A);
     });
 
-    it('searches by identifier (e.g. MIN-1)', async () => {
+    it('fetches issue by exact identifier (e.g. MIN-1)', async () => {
       const raw = makeRawIssue({ identifier: 'MIN-1' });
-      mockSdkSearchIssues.mockResolvedValue({ nodes: [raw] });
+      mockSdkIssue.mockResolvedValue(raw);
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
@@ -129,15 +129,35 @@ describe('LinearClient Effect service', () => {
 
       const issue = await runProgram(program);
       expect(issue.identifier).toBe('MIN-1');
-      expect(mockSdkSearchIssues).toHaveBeenCalledWith('MIN-1', { first: 1 });
+      expect(mockSdkIssue).toHaveBeenCalledWith('MIN-1');
+      expect(mockSdkSearchIssues).not.toHaveBeenCalled();
     });
 
-    it('handles search results that expose labels as a property instead of a function', async () => {
+    it('does not accept a fuzzy neighboring identifier', async () => {
+      const neighbor = makeRawIssue({ identifier: 'MIN-1002' });
+      mockSdkIssue.mockResolvedValue(null);
+      mockSdkSearchIssues.mockResolvedValue({ nodes: [neighbor] });
+
+      const { LinearClient, LinearClientLive } = await import('../linear-client.js');
+
+      const program = Effect.gen(function* () {
+        const client = yield* LinearClient;
+        return yield* client.getIssue('MIN-1032');
+      }).pipe(Effect.provide(LinearClientLive));
+
+      const err = await runProgramFail(program);
+      expect((err as any)._tag).toBe('IssueNotFound');
+      expect((err as any).id).toBe('MIN-1032');
+      expect(mockSdkIssue).toHaveBeenCalledWith('MIN-1032');
+      expect(mockSdkSearchIssues).not.toHaveBeenCalled();
+    });
+
+    it('handles issues that expose labels as a property instead of a function', async () => {
       const raw = makeRawIssue({
         identifier: 'MIN-7',
         labels: Promise.resolve({ nodes: [{ id: 'label-1', name: 'bug' }] }),
       });
-      mockSdkSearchIssues.mockResolvedValue({ nodes: [raw] });
+      mockSdkIssue.mockResolvedValue(raw);
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
@@ -166,8 +186,8 @@ describe('LinearClient Effect service', () => {
       expect((err as any).id).toBe(UUID_B);
     });
 
-    it('fails with IssueNotFound when search returns empty', async () => {
-      // mockSdkSearchIssues is already set to return { nodes: [] } in beforeEach
+    it('fails with IssueNotFound when identifier lookup returns null', async () => {
+      // mockSdkIssue is already set to return null in beforeEach
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 

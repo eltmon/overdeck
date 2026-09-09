@@ -16,7 +16,7 @@ type AvailableModel = {
   /** Display name without any harness suffix — pickers compose row labels from it. */
   baseName?: string;
 };
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'opencode' | 'opencode-go', AvailableModel[]>;
+type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', AvailableModel[]>;
 
 function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
   if (modelId.startsWith('kimi-code/')) {
@@ -50,6 +50,7 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
     openrouter: [],
     nous: [],
     dashscope: [],
+    meta: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
@@ -62,6 +63,9 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
     const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
     const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
+      case 'meta':
+        result.meta.push({ ...entry, harness: 'muse', effortLevels: capability.effortLevels });
+        break;
       case 'anthropic':
         result.anthropic.push(annotated);
         break;

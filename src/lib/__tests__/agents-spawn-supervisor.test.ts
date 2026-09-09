@@ -866,3 +866,54 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(existsSync(join(agentDir, 'pty-token'))).toBe(false);
   });
 });
+
+
+describe('Muse lifecycle review regressions', () => {
+  beforeEach(() => {
+    mkdirSync(join(packageRootDir, 'roles'), { recursive: true });
+    for (const role of ['work', 'review']) writeFileSync(join(packageRootDir, 'roles', `${role}.md`), `Act as ${role}.`);
+  });
+  it('rejects a role launch that never reaches the Muse prompt', async () => {
+    writeSupervisorArtifact();
+    waitForPromptReadyMock.mockResolvedValue(false);
+    const { spawnRun } = await import('../agents.js');
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace, model: 'muse-spark-1.3', harness: 'muse', prompt: 'Review this change',
+    })).rejects.toThrow('did not become ready within 60s');
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'muse', 60);
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+    const persisted = JSON.parse(readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'));
+    expect(persisted.status).toBe('starting');
+  });
+
+  it.each([true, false])('recovers native Muse without API keys (ready=%s)', async ready => {
+    writeSupervisorArtifact();
+    waitForPromptReadyMock.mockResolvedValue(ready);
+    const { saveAgentStateSync } = await import('../agents/agent-state.js');
+    const delivery = await import('../agents/delivery.js');
+    const kickoff = vi.spyOn(delivery, 'deliverInitialPromptWithRetry').mockResolvedValue({ ok: true, path: 'supervisor' });
+    const { recoverAgent } = await import('../agents/recovery.js');
+    const { museDataHome } = await import('../runtimes/muse-session.js');
+    const state = baseState({ harness: 'muse', model: 'muse-spark-1.3-contributor', status: 'stopped' });
+    saveAgentStateSync(state);
+    const nativeId = '01a081d0-8263-7782-b2ef-0c7f4e1b948c';
+    const nativeDir = join(museDataHome(state.id), 'muse', 'sessions', '2026', '09', '08', nativeId);
+    mkdirSync(nativeDir, { recursive: true });
+    writeFileSync(join(nativeDir, 'session.jsonl'), '{}\n');
+    const recovery = recoverAgent(state.id);
+    if (ready) await expect(recovery).resolves.toMatchObject({ action: 'respawned', state: { status: 'running' } });
+    else await expect(recovery).rejects.toThrow('Muse recovery readiness timed out');
+    const launcher = readFileSync(join(tmpHome, 'agents', state.id, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain(`resume '${nativeId}'`);
+    expect(launcher).toContain('XDG_DATA_HOME=');
+    expect(launcher).toContain(museDataHome(state.id));
+    expect(launcher).toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('--resume');
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith(state.id, 'muse', 60);
+    if (ready) expect(kickoff).toHaveBeenCalledWith(state.id, expect.any(String), 'recoverAgent:muse-recovery-prompt');
+    else {
+      expect(kickoff).not.toHaveBeenCalled();
+      expect(stopAgentMock).toHaveBeenCalledWith(state.id);
+    }
+  });
+});

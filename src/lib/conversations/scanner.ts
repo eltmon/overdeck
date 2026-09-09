@@ -31,7 +31,7 @@ import { buildCorrelationMapSync, buildLocatorCorrelationMapSync, mergeCorrelati
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
-import { parseAcpSessionMetadata, parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
+import { parseMuseSessionMetadata, parseAcpSessionMetadata, parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +85,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (file.harness === 'codex') {
       return parseCodexSessionMetadata(file.jsonlPath);
     }
+    if (file.harness === 'muse') return parseMuseSessionMetadata(file.jsonlPath);
     if (file.harness === 'acp' || file.harness === 'opencode') {
       return parseAcpSessionMetadata(file.jsonlPath);
     }

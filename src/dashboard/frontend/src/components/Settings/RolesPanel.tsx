@@ -9,7 +9,7 @@ type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 interface WeightedModelRef { model: ModelRef; weight: number; }
 type RoleModelRef = ModelRef | WeightedModelRef[];
-type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
+type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 

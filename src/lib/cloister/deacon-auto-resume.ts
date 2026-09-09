@@ -50,6 +50,7 @@ import type { XBriefItem } from '../xbrief/types.js';
 import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
+import { buildInspectionBlockedNudge, getBlockingMandatoryInspection } from './idle-nudge-inspection.js';
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -542,17 +543,18 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       const plan = readWorkspacePlanSync(state.workspace);
       if (!plan) continue;
       const openTasks = getDispatchableItems(plan, new Set());
-      if (openTasks.length === 0) continue;
+      const blockedInspection = getBlockingMandatoryInspection(plan, state.issueId);
+      if (openTasks.length === 0 && !blockedInspection) continue;
 
       // Build the nudge: tell the agent what's next, do not just ping.
-      const firstTask = readyTaskLine(openTasks[0]!).slice(0, 200);
+      const firstTask = openTasks[0] ? readyTaskLine(openTasks[0]).slice(0, 200) : '';
       // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
       // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
       // agent running with NO original context — only this nudge. Point it at the
       // brief on disk so it can self-recover the full plan/role/decisions/hazards
       // instead of guessing from the bead title alone.
       const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
-      const message = [
+      const message = blockedInspection ? buildInspectionBlockedNudge(state.issueId, blockedInspection) : [
         `Deacon idle-nudge: your tmux is alive but the agent is idle and you have ${openTasks.length} ready task(s) for ${state.issueId}.`,
         ``,
         `Next ready task: ${firstTask}`,
@@ -568,7 +570,9 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
         const { messageAgent } = await import('../agents.js');
         await messageAgent(agentId, message);
         writeFileSync(join(getAgentDir(agentId), '.last-bead-nudge'), String(Date.now()), 'utf-8');
-        const action = `Nudged idle ${agentId} (${state.issueId}) — ${openTasks.length} ready task(s)`;
+        const action = blockedInspection
+          ? `Nudged idle ${agentId} (${state.issueId}) — mandatory inspection ${blockedInspection.status} for ${blockedInspection.item.id}`
+          : `Nudged idle ${agentId} (${state.issueId}) — ${openTasks.length} ready task(s)`;
         actions.push(action);
         logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
       } catch (err: unknown) {
@@ -808,7 +812,8 @@ export async function handleAgentStoppedEvent(
     }
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`);
+      const cpuDetail = memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`;
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}${cpuDetail}`);
       return null;
     }
   }
@@ -925,7 +930,8 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
     }
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates to next patrol`);
+      const cpuDetail = memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`;
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}${cpuDetail}; deferring remaining candidates to next patrol`);
       break;
     }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.

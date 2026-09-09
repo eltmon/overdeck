@@ -1,3 +1,5 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
@@ -196,7 +198,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode'
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -307,6 +309,10 @@ export function shouldUseSupervisorForConversation(
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
+  if (harness === 'muse') {
+    if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
+    return;
+  }
   if (harness === 'acp' || harness === 'opencode') {
     await waitForAcpHostReady(tmuxSession);
     return;
@@ -348,7 +354,7 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode') {
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse') {
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
@@ -590,6 +596,14 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
+  const museSavedSession = harness === 'muse' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
+  const museFields = harness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: model,
+    museEffort: effort,
+    museContextFile: await materializeMuseContext(tmuxSession, cwd),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : undefined;
   let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiCodeEffort?: string; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
@@ -716,6 +730,7 @@ export async function spawnConversationSession(
     !codexFields &&
     !acpFields &&
     !kimiCodeFields &&
+    !museFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
     (!model || getProviderForModelSync(model).name === 'anthropic') &&
@@ -773,15 +788,15 @@ export async function spawnConversationSession(
         baseCommand: runtimeCommand,
         appendSystemPromptFiles: piFields
           ? await piConversationSystemPromptFiles(cwd)
-          : codexFields || acpFields || kimiCodeFields
+          : codexFields || acpFields || kimiCodeFields || museFields
             ? []
             : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
-        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
+        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? museFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: true,
         fileMode: 0o700,
         channelsBridgeMcpConfig,
@@ -962,7 +977,7 @@ export async function handleConversationCreate(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with
         // no owned native identity presented as a healthy conversation.
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -1062,7 +1077,7 @@ export async function handleConversationResume(
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
       // owned native identity presented as a healthy conversation.
-      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
+      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
@@ -1112,7 +1127,7 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
-        if (harness === 'acp' || harness === 'opencode') {
+        if (harness === 'acp' || harness === 'opencode' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
         setConversationHarness(conv.name, harness);
@@ -1124,7 +1139,7 @@ export async function handleConversationRestartAll(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with no
         // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode') await stopConversationRuntime(conv, conv.name);
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

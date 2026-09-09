@@ -12,7 +12,7 @@ import {
   getAnalyticsService,
   trackAnalyticsTask,
 } from './service.js';
-const HARNESSES = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode']);
+const HARNESSES = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse']);
 
 export interface PipelineTelemetryContext {
   harness: Harness;

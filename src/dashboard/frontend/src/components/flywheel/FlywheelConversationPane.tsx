@@ -29,7 +29,7 @@ interface FlywheelRunDetail extends FlywheelRunSummary {
 }
 
 interface FlywheelRoleConfig {
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
   model?: string;
   effort?: 'low' | 'medium' | 'high';
   maxAgents?: number;

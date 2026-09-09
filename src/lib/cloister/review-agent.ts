@@ -69,6 +69,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
@@ -319,8 +320,26 @@ async function spawnReviewRoleForIssuePromise(
   //
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
+  if (opts.force) {
+    const stopped = await Effect.runPromise(
+      killAllReviewerSessions(undefined, opts.issueId).pipe(
+        Effect.catch(() => Effect.succeed({
+          killed: [],
+          failed: [reviewSessionName],
+        })),
+      ),
+    );
+    if (stopped.failed.length > 0) {
+      return {
+        success: false,
+        message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+        error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+      };
+    }
+  }
+
   try {
-    const sessions = await Effect.runPromise(listSessionNames());
+    const sessions = opts.force ? [] : await Effect.runPromise(listSessionNames());
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
 
@@ -438,11 +457,21 @@ async function spawnReviewRoleForIssuePromise(
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      await Effect.runPromise(
+      const stopped = await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
-          Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
+          Effect.catch(() => Effect.succeed({
+            killed: [],
+            failed: [reviewSessionName],
+          })),
         ),
       );
+      if (stopped.failed.length > 0) {
+        return {
+          success: false,
+          message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+          error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -742,7 +771,10 @@ async function killAllReviewerSessionsPromise(
     allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
-    return { killed, failed };
+    return {
+      killed,
+      failed: [`agent-${issueId.toLowerCase()}-review`],
+    };
   }
 
   const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));
@@ -824,7 +856,10 @@ export const spawnReviewRoleForIssue = (
     if (reviewDispatchCoalescer.isInFlight(key)) {
       console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
     }
-    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+    return reviewDispatchCoalescer.run(
+      key,
+      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssuePromise(opts)),
+    );
   });
 
 /**

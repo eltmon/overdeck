@@ -4,6 +4,7 @@ import { getBuiltInDefaultHarness, getProviderEnvSync, PROVIDERS, type ProviderN
 import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 
 const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
+  meta: 'muse',
   anthropic: 'claude-code',
   openai: 'codex',
   google: 'ohmypi',

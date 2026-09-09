@@ -18,6 +18,7 @@ export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   acp: 'kimi',
   opencode: 'opencode',
   'kimi-code': 'kimi',
+  muse: 'muse',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;

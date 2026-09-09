@@ -55,6 +55,7 @@ import {
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
+import { withReviewLifecycleGuardForAgent } from '../review-lifecycle-guard.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -121,8 +122,18 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+type ResumeAgentOptions = { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause };
+type ResumeAgentResult = { success: boolean; messageDelivered?: boolean; error?: string };
+
+export async function resumeAgent(agentId: string, message?: string, opts?: ResumeAgentOptions): Promise<ResumeAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
+  return withReviewLifecycleGuardForAgent(
+    normalizedId,
+    () => resumeAgentWithinLifecycle(normalizedId, message, opts),
+  );
+}
+
+async function resumeAgentWithinLifecycle(normalizedId: string, message?: string, opts?: ResumeAgentOptions): Promise<ResumeAgentResult> {
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
 

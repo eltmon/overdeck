@@ -156,8 +156,8 @@ async function resolveExplicitHarnessFlag(
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', or 'opencode'.\n`);
+  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', or 'muse'.\n`);
     return exitCli(1);
   }
 

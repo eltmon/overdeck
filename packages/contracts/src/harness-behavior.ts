@@ -3,7 +3,7 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
@@ -18,10 +18,11 @@ export type HarnessReadinessKind =
   | "codex-app-server-ready"
   | "acp-host-ready"
   | "kimi-session-signal"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code"
+  | "muse-tui-prompt"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse"
 
 export interface HarnessNativeCommand {
   readonly name: string
@@ -48,7 +49,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
   readonly readyTimeoutSeconds: number
 }
 
@@ -184,6 +185,29 @@ export const OPENCODE_BEHAVIOR: HarnessBehavior = {
   processNames: ["acp-host", "opencode"],
 }
 
+export const MUSE_BEHAVIOR: HarnessBehavior = {
+  displayName: "Muse Code",
+  nativeCommands: [],
+  executableName: "muse",
+  processNames: ["muse", "muse-bin"],
+  launchCommandKind: "muse-tui",
+  deliveryKind: "pty-supervisor",
+  readinessKind: "muse-tui-prompt",
+  transcriptKind: "muse-jsonl",
+  sessionIdSource: "muse-session-log",
+  contextLayerKind: "muse",
+  feedKind: "muse",
+  supportsPtySupervisor: true,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: false,
+  workAgentMode: "muse-tui",
+  readyTimeoutSeconds: 60,
+}
+
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "opencode": OPENCODE_BEHAVIOR,
   "claude-code": CLAUDE_CODE_BEHAVIOR,
@@ -191,6 +215,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   codex: CODEX_BEHAVIOR,
   acp: ACP_BEHAVIOR,
   "kimi-code": KIMI_CODE_BEHAVIOR,
+  muse: MUSE_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
@@ -199,6 +224,7 @@ export function getHarnessBehavior(harness: HarnessName | undefined | null): Har
   if (harness === "opencode") return OPENCODE_BEHAVIOR
   if (harness === "acp") return ACP_BEHAVIOR
   if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
+  if (harness === "muse") return MUSE_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 

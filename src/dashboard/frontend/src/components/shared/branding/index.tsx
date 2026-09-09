@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import type { Harness, Provider } from '../../Settings/types';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
@@ -107,6 +108,7 @@ const OpenCodeHarnessIcon = (props: IconProps) => (
 export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   opencode: { id: 'opencode', label: 'OpenCode Zen', color: '#475569', Icon: OpenCodeHarnessIcon },
   'opencode-go': { id: 'opencode-go', label: 'OpenCode Go', color: '#475569', Icon: OpenCodeHarnessIcon },
+  meta: { id: 'meta', label: 'Meta (Muse)', color: '#0866ff', Icon: Sparkles },
   anthropic: { id: 'anthropic', label: 'Anthropic', color: '#d97757', Icon: AnthropicIcon },
   openai: { id: 'openai', label: 'OpenAI', color: '#10a37f', Icon: OpenAIIcon },
   google: { id: 'google', label: 'Google', color: '#4285f4', Icon: GoogleGeminiIcon },
@@ -121,6 +123,7 @@ export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
 
 export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   opencode: { id: 'opencode', label: 'OpenCode', color: '#475569', Icon: OpenCodeHarnessIcon },
+  muse: { id: 'muse', label: 'Muse Code', color: PROVIDER_BRANDS.meta.color, Icon: Sparkles },
   'claude-code': { id: 'claude-code', label: 'Claude Code', color: PROVIDER_BRANDS.anthropic.color, Icon: AnthropicIcon },
   codex: { id: 'codex', label: 'Codex', color: PROVIDER_BRANDS.openai.color, Icon: OpenAIIcon },
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },

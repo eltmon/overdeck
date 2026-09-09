@@ -139,6 +139,7 @@ export interface ApiSettingsConfig {
       dashscope: boolean;
       opencode?: boolean;
       "opencode-go"?: boolean;
+      meta?: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -298,7 +299,7 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
 
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'opencode', 'opencode-go'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -494,8 +495,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -697,6 +698,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         dashscope: config.enabledProviders.has('dashscope'),
         opencode: config.enabledProviders.has('opencode'),
         'opencode-go': config.enabledProviders.has('opencode-go'),
+        meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
       provider_default_harnesses: builtInProviderHarnesses(),
@@ -939,6 +941,7 @@ async function saveSettingsApiPromiseUnlocked(
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
         opencode: providerConfigForSave('opencode', settings.models.providers.opencode ?? false, settings, currentConfig),
         'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig),
+        meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -1207,8 +1210,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string`);
         }
       }
     }
@@ -1384,6 +1387,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1415,6 +1419,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },

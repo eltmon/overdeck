@@ -103,7 +103,7 @@ export type  ConversationName = typeof ConversationName.Type;
 
 // Includes legacy 'pi' (pre-rename alias for 'ohmypi', see normalizeHarness) so
 // decoding old DB rows never throws; 'pi' is never written by current code.
-export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode']);
+export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse']);
 export type  Harness     = typeof Harness.Type;
 
 export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
@@ -888,7 +888,7 @@ function toMillis(value: Date | string | number = new Date()): number {
 /** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
 export function normalizeHarness(harness: string | null): RuntimeName | null {
   if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
-  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode') return harness;
+  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse') return harness;
   return null;
 }
 

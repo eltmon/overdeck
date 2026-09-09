@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
@@ -60,7 +61,7 @@ type SettingsResponse = {
     plan?: {
       model?: string;
       // PAN-1055: per-role harness override surfaced through Settings → Roles.
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
     };
   };
 };
@@ -134,7 +135,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   useEffect(() => {
     if (harnessOverrideTouched.current) return;
-    if (defaultPlanningHarness === 'ohmypi' || defaultPlanningHarness === 'claude-code' || defaultPlanningHarness === 'codex' || defaultPlanningHarness === 'acp' || defaultPlanningHarness === 'opencode') {
+    if (defaultPlanningHarness && KNOWN_HARNESSES.has(defaultPlanningHarness)) {
       setHarnessOverride(defaultPlanningHarness);
     }
   }, [defaultPlanningHarness]);
@@ -159,6 +160,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     kimi: 'Kimi',
     nous: 'Nous Portal',
     dashscope: 'Alibaba DashScope',
+  meta: 'Meta (Muse)',
     openrouter: 'OpenRouter',
   };
 
@@ -502,12 +504,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   // (PAN-207), and PTY disconnect race conditions.
 
   useEffect(() => {
-    if (!autoStart || autoStartTriggered.current || step !== 'ready') return;
+    if (!autoStart || autoStartTriggered.current || step !== 'ready' || settingsQuery.isPending) return;
+    if (!harnessOverrideTouched.current && defaultPlanningHarness && KNOWN_HARNESSES.has(defaultPlanningHarness) && harnessOverride !== defaultPlanningHarness) return;
     autoStartTriggered.current = true;
     setWatchPlanning(false);
     watchPlanningRef.current = false;
     void startPlanningViaSSE(true);
-  }, [autoStart, step, startPlanningViaSSE]);
+  }, [autoStart, step, startPlanningViaSSE, settingsQuery.isPending, defaultPlanningHarness, harnessOverride]);
 
   const handleStartPlanning = (auto = false) => {
     startPlanningViaSSE(auto);

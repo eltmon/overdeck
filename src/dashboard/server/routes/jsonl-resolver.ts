@@ -1,3 +1,4 @@
+import { resolveMuseSessionPath } from '../../../lib/runtimes/muse-session.js';
 /**
  * JSONL transcript resolver for the Command Deck (PAN-830).
  *
@@ -286,7 +287,7 @@ export async function resolveAgentHarness(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   const recorded = (await readRecordedState(agentId, opts)).harness;
-  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp' || recorded === 'kimi-code' || recorded === 'opencode') {
+  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp' || recorded === 'kimi-code' || recorded === 'opencode' || recorded === 'muse') {
     return recorded;
   }
   // 'claude-code' (or null) is the default that can go stale. Correct it from
@@ -449,6 +450,7 @@ export async function resolveJsonlPath(
   if (behavior.transcriptKind === 'acp-jsonl') {
     return resolveAcpTranscriptPath(agentId, opts);
   }
+  if (behavior.transcriptKind === 'muse-jsonl') return resolveMuseSessionPath(agentId, opts.agentsDirOverride);
   if (behavior.transcriptKind === 'kimi-wire-jsonl') {
     return resolveKimiWirePath(agentId, opts);
   }

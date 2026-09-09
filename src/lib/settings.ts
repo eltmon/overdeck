@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
@@ -43,7 +44,8 @@ export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'q
 export type GrokModel = 'grok-build-0.1';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
-export type ModelId = OpenCodeModelId | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
+export type MuseModel = 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -360,6 +362,9 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
       command: 'claude',
       args: ['--model', getClaudeModelFlagSync(modelId)],
     };
+  }
+  if (modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+    return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.
   // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.

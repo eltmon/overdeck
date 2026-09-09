@@ -104,6 +104,13 @@ export function canUseHarnessSync(
       ? ALLOWED
       : { allowed: false, reason: 'OpenCode Go and Zen model IDs require the OpenCode harness. Select an opencode/* or opencode-go/* model.' };
   }
+  const isMuseModel = providerName === 'meta';
+  if (harness === 'muse' || isMuseModel) {
+    return harness === 'muse' && isMuseModel ? ALLOWED : {
+      allowed: false,
+      reason: 'Muse Code supports Meta Muse models. Select a Muse Spark model with the Muse Code harness.',
+    };
+  }
   // Model-level auth restrictions apply to every harness.
   const modelAuth = canUseModelWithAuthSync(model, authMode)
   if (!modelAuth.allowed) return modelAuth
