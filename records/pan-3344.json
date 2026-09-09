@@ -19,9 +19,11 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T13:25:28.596Z",
+    "updatedAt": "2026-09-09T13:29:50.301Z",
     "lastVerifiedCommit": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
-    "strikeLandingState": "landed",
+    "strikeReadyHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
+    "strikeReadyAt": "2026-09-09T13:29:50.300Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
@@ -69,13 +71,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T13:25:31.697Z"
+        "pricingAsOf": "2026-09-09T13:29:50.332Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T13:25:31.751Z",
+  "updated": "2026-09-09T13:29:54.309Z",
   "harness": "codex"
 }
