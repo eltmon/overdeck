@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T11:26:30.334Z",
-  "updated": "2026-09-09T15:23:29.029Z",
+  "updated": "2026-09-09T15:29:34.470Z",
   "pipeline": {
     "issueId": "PAN-3809",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T15:22:52.767Z",
+    "updatedAt": "2026-09-09T15:29:03.602Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3809 after its harness exited before push.",
     "strikeReadyHead": "5c92e57086f6f1c7c9018e2b35744b5a34806e05",
     "strikeReadyAt": "2026-09-09T14:33:03.715Z",
@@ -42,7 +42,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.001307,
-        "pricingAsOf": "2026-09-09T15:22:52.801Z"
+        "pricingAsOf": "2026-09-09T15:29:03.718Z"
       }
     },
     "merges": [],
