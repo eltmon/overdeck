@@ -12,8 +12,8 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T08:53:21.578Z",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "updatedAt": "2026-09-09T08:53:22.340Z",
+    "mergeNotes": "Stale strike signal: recorded HEAD 76569866f57bb016fed2e309846d0caeafff2104 differs from origin/strike/pan-3344 at 2acc64716829fb0e50b27dc86f90311c9dbf4026",
     "strikeReadyHead": "76569866f57bb016fed2e309846d0caeafff2104",
     "strikeReadyAt": "2026-09-09T07:06:05.013Z",
     "strikeLandingState": "landing",
@@ -42,13 +42,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T08:53:21.643Z"
+        "pricingAsOf": "2026-09-09T08:53:26.472Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T08:53:24.209Z",
+  "updated": "2026-09-09T08:53:26.500Z",
   "harness": "codex"
 }
