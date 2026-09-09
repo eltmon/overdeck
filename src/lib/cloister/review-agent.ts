@@ -320,8 +320,26 @@ async function spawnReviewRoleForIssuePromise(
   //
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
+  if (opts.force) {
+    const stopped = await Effect.runPromise(
+      killAllReviewerSessions(undefined, opts.issueId).pipe(
+        Effect.catch(() => Effect.succeed({
+          killed: [],
+          failed: [reviewSessionName],
+        })),
+      ),
+    );
+    if (stopped.failed.length > 0) {
+      return {
+        success: false,
+        message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+        error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+      };
+    }
+  }
+
   try {
-    const sessions = await Effect.runPromise(listSessionNames());
+    const sessions = opts.force ? [] : await Effect.runPromise(listSessionNames());
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
 
@@ -441,7 +459,10 @@ async function spawnReviewRoleForIssuePromise(
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
       const stopped = await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
-          Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
+          Effect.catch(() => Effect.succeed({
+            killed: [],
+            failed: [reviewSessionName],
+          })),
         ),
       );
       if (stopped.failed.length > 0) {
@@ -750,7 +771,10 @@ async function killAllReviewerSessionsPromise(
     allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
-    return { killed, failed };
+    return {
+      killed,
+      failed: [`agent-${issueId.toLowerCase()}-review`],
+    };
   }
 
   const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));

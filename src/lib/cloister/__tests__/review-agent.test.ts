@@ -245,6 +245,22 @@ describe('spawnReviewRoleForIssue', () => {
     expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
 
+  it('aborts force replacement when live review sessions cannot be enumerated', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.fail(new Error('tmux unavailable')));
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-list-failed',
+      branch: 'feature/pan-1194',
+      force: true,
+    }));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('agent-pan-1194-review');
+    expect(mocks.wipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
   it('keeps a live review session whose run identity matches current HEAD', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
     mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });

@@ -334,7 +334,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
   });
 
   it('serializes polyrepo anchor-drift re-review with active boot recovery', async () => {
-    const issueId = 'PAN-1215-POLY';
+    const issueId = 'PAN-3794';
     const reviewedAnchor = `api@${'a'.repeat(40)} fe@${'b'.repeat(40)}`;
     const currentAnchor = `api@${'c'.repeat(40)} splash@${'d'.repeat(40)}`;
     mockExecHeadSha = currentAnchor;
