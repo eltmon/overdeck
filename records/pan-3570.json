@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T05:23:18.960Z",
-  "updated": "2026-09-09T21:23:29.134Z",
+  "updated": "2026-09-09T21:28:37.653Z",
   "pipeline": {
     "issueId": "PAN-3570",
     "reviewStatus": "pending",
@@ -12,10 +12,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-09-09T08:53:46.497Z",
-    "updatedAt": "2026-09-09T21:23:23.215Z",
+    "updatedAt": "2026-09-09T21:28:31.615Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3570 after its harness exited before push.",
     "strikeReadyHead": "ea8d55e777a3b6e66491d58e4b26ca490cafade0",
-    "strikeReadyAt": "2026-09-09T21:23:23.214Z",
+    "strikeReadyAt": "2026-09-09T21:28:31.614Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
@@ -42,7 +42,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.001242,
-        "pricingAsOf": "2026-09-09T21:23:23.225Z"
+        "pricingAsOf": "2026-09-09T21:28:31.623Z"
       }
     },
     "merges": [],
