@@ -10,6 +10,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import * as self from './conversations.js';
+import { withConversationMessageReceipt } from '../services/conversation-message-receipts.js';
 import {
   backfillConversationModels,
   conversationRuntimeRootPids,
@@ -594,7 +595,8 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await handleConversationMessage(name, body, conversationMessageDependencies);
+        return await withConversationMessageReceipt(name, body, () =>
+          handleConversationMessage(name, body, conversationMessageDependencies));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         // Log the full stack (falls back to message) so a 500's cause is
@@ -603,12 +605,12 @@ const postConversationMessageRoute = HttpRouter.add(
         // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
-            error: 'Message delivery failed — text did not reach the terminal',
-            deliveryFailed: true,
+            error: 'Delivery could not be confirmed. Check the conversation before sending again.',
+            deliveryUnknown: true,
             details: msg,
           }, { status: 504 });
         }
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: 'Delivery could not be confirmed', deliveryUnknown: true }, { status: 500 });
       }
     });
   }),
