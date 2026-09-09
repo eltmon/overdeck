@@ -944,16 +944,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           }
 
           if (result.success) {
-            const observation = await waitForDoneReviewHandoff(
-              dashboardUrl,
-              issueId,
-              reviewRequestedAt,
-            );
+            const observation = await waitForDoneReviewHandoff(dashboardUrl, issueId, reviewRequestedAt);
             if (observation) {
               handoffObserved = true;
-              const owner = observation.kind === 'verification'
-                ? 'verification is running'
-                : 'a review specialist was spawned';
+              const owner = observation.kind === 'verification' ? 'verification is running' : 'a review specialist was spawned';
               console.log(chalk.green(`  ✓ Review & test handoff confirmed — ${owner}`));
             }
           } else if (!result.alreadyMerged) {
@@ -974,16 +968,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
 
       if (!handoffObserved) {
-        throw new Error(
-          `Review handoff was not observed for ${issueId}. Recover with: pan review request ${issueId}`,
-        );
+        throw new Error(`Review handoff was not observed for ${issueId}. Recover with: pan review request ${issueId}`);
       }
     } catch (error: any) {
       const detail = error instanceof Error ? error.message : String(error);
       if (detail.includes('Recover with:')) throw error;
-      throw new Error(
-        `Review handoff failed for ${issueId}: ${detail}. Recover with: pan review request ${issueId}`,
-      );
+      throw new Error(`Review handoff failed for ${issueId}: ${detail}. Recover with: pan review request ${issueId}`);
     }
 
     spinner.succeed(`Work complete: ${issueId}`);
