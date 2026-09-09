@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T14:09:58.248Z",
-  "updated": "2026-09-09T15:32:42.987Z",
+  "updated": "2026-09-09T15:32:55.123Z",
   "pipeline": {
     "issueId": "PAN-3815",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T15:32:38.374Z",
+    "updatedAt": "2026-09-09T15:32:38.847Z",
     "lastVerifiedCommit": "e7da04a5089c009f04325481b593fa153c56027b",
     "strikeLandingState": "landed",
     "strikeRecoveryCount": 0,
@@ -41,7 +41,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.001252,
-        "pricingAsOf": "2026-09-09T15:32:38.721Z"
+        "pricingAsOf": "2026-09-09T15:32:49.015Z"
       }
     },
     "merges": [],
