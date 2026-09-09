@@ -33,6 +33,51 @@ export interface MatrixEntry {
   door: string;
 }
 
+export type BeadsRemovalDisposition = 'RETAIN_AS_TASK' | 'DELETE';
+
+export interface BeadsRemovalMatrixEntry {
+  /** The Beads-backed behavior or affordance that exists before PAN-2648. */
+  surface: string;
+  disposition: BeadsRemovalDisposition;
+  /** Concrete vBRIEF task target for retained behavior, or the deletion reason. */
+  target: string;
+}
+
+/**
+ * PAN-2648 no-loss gate. Every Beads-backed surface named by the PRD has an
+ * explicit vBRIEF task replacement or an intentional deletion disposition.
+ */
+export const BEADS_REMOVAL_NO_LOSS_MATRIX: BeadsRemovalMatrixEntry[] = [
+  { surface: 'bd ready / Beads ready query', disposition: 'RETAIN_AS_TASK', target: 'pan task next via getDispatchableItems()' },
+  { surface: 'pan beads claim', disposition: 'RETAIN_AS_TASK', target: 'pan task claim with ownership and transition guards' },
+  { surface: 'pan beads close', disposition: 'RETAIN_AS_TASK', target: 'pan task done, restricted to the claim owner' },
+  { surface: 'pan beads update --status blocked/in_progress/open', disposition: 'RETAIN_AS_TASK', target: 'pan task block, claim, and unblock' },
+  { surface: 'bd update --claim atomic claim semantics', disposition: 'RETAIN_AS_TASK', target: 'record fs-lock, transition matrix, and task claims' },
+  { surface: 'pan beads create/delete/dep', disposition: 'DELETE', target: 'Planning owns immutable checklist structure; execution cannot alter it' },
+  { surface: 'pan beads sweep/compact/stats/upgrade/doctor/reconcile', disposition: 'DELETE', target: 'The external Beads store and its maintenance surface are removed' },
+  { surface: 'Per-bead commit/push invariant', disposition: 'RETAIN_AS_TASK', target: 'One pushed commit per vBRIEF item' },
+  { surface: 'Conditional per-bead inspection', disposition: 'RETAIN_AS_TASK', target: 'Item metadata and pan inspect --item' },
+  { surface: 'Work prompt task list', disposition: 'RETAIN_AS_TASK', target: 'Merged vBRIEF items and the active slice' },
+  { surface: 'Crash recovery position', disposition: 'RETAIN_AS_TASK', target: 'Merged statuses, task claims, record resume hazards, and stale-claim patrol' },
+  { surface: 'Start has-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Readable implementation-ready vBRIEF gate' },
+  { surface: 'pan done open-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Non-terminal vBRIEF item and acceptance-criterion gate' },
+  { surface: 'Idle open-beads nudge', disposition: 'RETAIN_AS_TASK', target: 'getDispatchableItems() result' },
+  { surface: 'Stuck-remediation ready-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Merged-vBRIEF readiness' },
+  { surface: 'Orphaned completion all-beads-closed gate', disposition: 'RETAIN_AS_TASK', target: 'All checklist items terminal' },
+  { surface: 'Backlog/flywheel issuesWithBeads readiness', disposition: 'RETAIN_AS_TASK', target: 'Planned or implementation-ready vBRIEF presence' },
+  { surface: 'Dashboard /beads list', disposition: 'RETAIN_AS_TASK', target: '/tasks populated from the merged vBRIEF' },
+  { surface: 'Beads rail/tab/dialog/kanban', disposition: 'RETAIN_AS_TASK', target: 'Tasks UI backed by merged vBRIEF data' },
+  { surface: 'Beads rollup/freshness/sync services and events', disposition: 'DELETE', target: 'A local merged vBRIEF needs no synchronization or freshness layer' },
+  { surface: 'Resource hasBeads/beadTotals/beadsPath', disposition: 'RETAIN_AS_TASK', target: 'hasTasks and taskTotals; remove the path/source signal' },
+  { surface: 'Install/prerequisite bd checks', disposition: 'DELETE', target: 'Overdeck no longer installs or requires an external task binary' },
+  { surface: 'Workspace .beads/redirect creation/copy', disposition: 'DELETE', target: 'The record task door needs no workspace redirect' },
+  { surface: 'State migration Beads cutover marker/layout checks', disposition: 'DELETE', target: 'The Beads state layout is abandoned in place' },
+  { surface: 'Teardown export/restore/auto-commit/remote sync', disposition: 'DELETE', target: 'vBRIEF task state is already durable through the issue record door' },
+  { surface: 'Beads skills/rules/AGENTS template section', disposition: 'DELETE', target: 'The task loop moves to work-agent instructions' },
+  { surface: 'docs/BEADS.md and configuration/beads.mdx', disposition: 'DELETE', target: 'vBRIEF task documentation and navigation replace them' },
+  { surface: 'record.beadsMapping field', disposition: 'DELETE', target: 'Remove the typed field while tolerating it in historical records' },
+];
+
 export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── updater.ts ────────────────────────────────────────────────────────────
