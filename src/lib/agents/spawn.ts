@@ -256,7 +256,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
   const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || (shouldRegisterConversation && resolvedHarness === 'kimi-code');
-  const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
+  const shouldDeliverPromptViaAcp = resolvedHarness === 'acp' || resolvedHarness === 'opencode';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
         prompt: options.prompt,

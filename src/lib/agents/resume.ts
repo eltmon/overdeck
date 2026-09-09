@@ -493,7 +493,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] ohmypi prompt delivery failed: ${msg}`);
       }
-    } else if (effectiveHarness === 'acp') {
+    } else if (effectiveHarness === 'acp' || effectiveHarness === 'opencode') {
       const delivery = await deliverInitialPromptWithRetry(
         normalizedId,
         effectiveMessage,

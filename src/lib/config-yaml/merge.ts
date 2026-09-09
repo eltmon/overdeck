@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, or muse`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
 }
 
@@ -396,6 +396,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       } else if (providers.dashscope !== undefined) {
         explicitlyDisabled.add('dashscope');
       }
+    }
+
+    for (const provider of ['opencode', 'opencode-go'] as const) {
+      const raw = config.models?.providers?.[provider];
+      if (raw === undefined) continue;
+      const normalized = normalizeProviderConfig(raw);
+      applyProviderHarness(result, provider, normalized.harness);
+      if (normalized.enabled) result.enabledProviders.add(provider);
+      else explicitlyDisabled.add(provider);
     }
 
     // Merge tmux configuration
