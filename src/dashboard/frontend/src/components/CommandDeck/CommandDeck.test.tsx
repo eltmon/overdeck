@@ -88,6 +88,8 @@ let pipelineMembershipResponse: { ok: boolean; body: unknown } = {
   ok: true,
   body: [],
 };
+let conversationListOverride: Promise<unknown> | undefined;
+let priorityConversation: unknown;
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
   body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -308,7 +310,9 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
           json: async () => pipelineMembershipResponse.body,
         };
       }
+      if (url === '/api/conversations/2669') return { ok: true, json: async () => priorityConversation };
       if (url === '/api/conversations') {
+        if (conversationListOverride) return { ok: true, json: () => conversationListOverride };
         return {
           ok: true,
           json: async () => [
@@ -443,6 +447,8 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     latestStageProps = undefined;
+    conversationListOverride = undefined;
+    priorityConversation = undefined;
     resourceProjectsResponse = undefined;
     registeredProjectsResponse = defaultRegisteredProjects;
     registeredProjectsRequestError = null;
@@ -689,6 +695,22 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       expect(onSelectProject).toHaveBeenCalledWith(expect.anything(), { updateUrl: false }),
     );
     expect(onSelectProject).not.toHaveBeenCalledWith('test-project');
+  });
+
+  it.each(['pending', 'failed'])('opens a direct conversation while the sidebar list is %s', async (state) => {
+    const list = deferred<unknown>();
+    conversationListOverride = state === 'pending' ? list.promise : Promise.reject(new Error('list unavailable'));
+    priorityConversation = {
+      id: 2669, name: 'direct-conv', title: 'Direct history', cwd: '/path/to/test-project',
+      isFavorite: true, pendingInput: { type: 'question' }, archived: true,
+    };
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ convId: '2669', onSelectProject });
+    await waitFor(() => expect(panes('test-project')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paneType: 'agent', conversationId: 'direct-conv' }),
+    ])));
+    expect(onSelectProject).toHaveBeenCalledWith('test-project', { updateUrl: false });
+    expect(fetch).toHaveBeenCalledWith('/api/conversations/2669', expect.anything());
   });
 
   it('returns the created conversation name and opens its agent pane', async () => {

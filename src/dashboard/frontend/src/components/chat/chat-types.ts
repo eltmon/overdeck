@@ -15,6 +15,10 @@ export interface ChatMessage {
   streaming?: boolean;
   sequence?: number;
   acknowledged?: boolean;
+  /** Local send identity and transcript reconciliation metadata. */
+  clientMessageId?: string;
+  echoBaselineIds?: string[];
+  deliveryState?: 'pending' | 'accepted' | 'unknown';
   /** Local-only structured result for a dashboard-intercepted `/pan` command. */
   commandResult?: ComposerCommandResult;
   /** Exact command text that produced commandResult, used for confirmations. */
@@ -31,6 +35,10 @@ export interface FailedMessage {
   error?: string;
   /** False for deterministic rejections (most 4xx) where an identical retry cannot succeed. */
   retryable?: boolean;
+  clientMessageId?: string;
+  echoBaselineIds?: string[];
+  deliveryUnknown?: boolean;
+  deliverAs?: 'steer' | 'follow_up';
 }
 
 export interface WorkLogEntry {

@@ -53,10 +53,10 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
               <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 11-6.219-8.56" />
               </svg>
-              Sending…
+              {message.deliveryState === 'unknown' ? 'Delivery not confirmed' : 'Sending…'}
             </span>
           ) : (
-            formatTimestamp(message.createdAt)
+            message.id.startsWith('optimistic-') ? 'Sent · waiting for transcript' : formatTimestamp(message.createdAt)
           )}
         </span>
       </div>
