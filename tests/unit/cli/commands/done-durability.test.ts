@@ -10,13 +10,26 @@ const mocks = vi.hoisted(() => ({
   emitActivityTtsSync: vi.fn(),
   getAgentStateSync: vi.fn(),
   getReviewStatusSync: vi.fn(),
+  postDoneDashboardJson: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   setReviewStatusSync: vi.fn(),
   shouldSkipTrackerUpdate: vi.fn(),
+  spinnerFail: vi.fn(),
+  spinnerSucceed: vi.fn(),
   updateIssueRecord: vi.fn(),
   updateShadowState: vi.fn(),
+  waitForDoneReviewHandoff: vi.fn(),
   writeFileSync: vi.fn(),
+}));
+
+vi.mock('ora', () => ({
+  default: () => ({
+    text: '',
+    start() { return this; },
+    fail: mocks.spinnerFail,
+    succeed: mocks.spinnerSucceed,
+  }),
 }));
 
 vi.mock('fs', async () => {
@@ -81,6 +94,11 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: mocks.setReviewStatusSync,
 }));
 
+vi.mock('../../../../src/cli/commands/done-dashboard-client.js', () => ({
+  postDoneDashboardJson: mocks.postDoneDashboardJson,
+  waitForDoneReviewHandoff: mocks.waitForDoneReviewHandoff,
+}));
+
 import { doneCommand } from '../../../../src/cli/commands/done.js';
 
 const ISSUE_ID = 'PAN-2840';
@@ -135,5 +153,28 @@ describe('pan done canonical durability boundary', () => {
     expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
     expect(mocks.emitActivityTtsSync).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails with a recovery command when no review handoff owner appears', async () => {
+    mocks.updateIssueRecord.mockReset().mockResolvedValue({});
+    mocks.shouldSkipTrackerUpdate.mockReturnValue(Effect.succeed(true));
+    mocks.updateShadowState.mockReturnValue(Effect.succeed(undefined));
+    mocks.postDoneDashboardJson.mockResolvedValue({ success: true });
+    mocks.waitForDoneReviewHandoff.mockResolvedValue(null);
+    fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+
+    await expect(doneCommand(ISSUE_ID, { force: true })).rejects.toThrow('process.exit:1');
+
+    expect(mocks.waitForDoneReviewHandoff).toHaveBeenCalledWith(
+      expect.any(String),
+      ISSUE_ID,
+      expect.any(String),
+    );
+    expect(mocks.spinnerFail).toHaveBeenCalledWith(
+      `Review handoff was not observed for ${ISSUE_ID}. Recover with: pan review request ${ISSUE_ID}`,
+    );
+    expect(mocks.spinnerSucceed).not.toHaveBeenCalled();
+    expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
+    expect(mocks.emitActivityTtsSync).not.toHaveBeenCalled();
   });
 });
