@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-09T06:47:00.242Z",
-  "updated": "2026-09-09T09:12:44.773Z",
+  "updated": "2026-09-09T09:12:47.329Z",
   "pipeline": {
     "issueId": "PAN-2796",
     "reviewStatus": "pending",
@@ -13,12 +13,13 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T09:12:14.465Z",
+    "updatedAt": "2026-09-09T09:12:16.086Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "mergeNotes": "Stale strike signal: recorded HEAD 44745bff0454c05ece7909bb87a6a67d4e44f2b7 differs from origin/strike/pan-2796 at cd76f52bbf47d6d09274283d794b9ae2a9a13277",
     "strikeReadyHead": "44745bff0454c05ece7909bb87a6a67d4e44f2b7",
     "strikeReadyAt": "2026-09-09T07:55:52.451Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeTransportRetryCount": 1,
     "strikeNextAttemptAt": "2026-09-09T09:04:03.354Z",
     "strikeLandingAttempts": [
@@ -28,6 +29,13 @@
         "mainHead": "b50019378a0478e799ea638657caf75ac6e14a85",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-09-09T09:12:15.285Z",
+        "strikeHead": "44745bff0454c05ece7909bb87a6a67d4e44f2b7",
+        "mainHead": "b50019378a0478e799ea638657caf75ac6e14a85",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 44745bff0454c05ece7909bb87a6a67d4e44f2b7 differs from origin/strike/pan-2796 at cd76f52bbf47d6d09274283d794b9ae2a9a13277"
       }
     ]
   },
@@ -53,7 +61,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0012820000000000002,
-        "pricingAsOf": "2026-09-09T09:12:14.496Z"
+        "pricingAsOf": "2026-09-09T09:12:47.313Z"
       }
     },
     "merges": [],
