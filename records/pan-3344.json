@@ -15,19 +15,14 @@
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "verifying",
-    "mergeStep": "squash-merging",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T13:24:07.169Z",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "updatedAt": "2026-09-09T13:24:10.927Z",
     "lastVerifiedCommit": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
-    "strikeReadyHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
-    "strikeReadyAt": "2026-09-09T12:31:23.745Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "landed",
     "strikeRecoveryCount": 0,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-09-09T12:38:14.107Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-09-09T08:57:57.260Z",
@@ -74,13 +69,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T13:24:34.261Z"
+        "pricingAsOf": "2026-09-09T13:24:40.822Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T13:24:37.077Z",
+  "updated": "2026-09-09T13:24:43.570Z",
   "harness": "codex"
 }
