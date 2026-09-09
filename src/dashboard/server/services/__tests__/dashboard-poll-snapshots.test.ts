@@ -6,6 +6,24 @@ beforeEach(() => { vi.useFakeTimers(); vi.resetModules(); job.mockReset(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('polling worker snapshots', () => {
+  it('shares rolling agent aggregates across list order and invalidates on membership changes', async () => {
+    const { getAgentCostStatsSnapshot: get } = await import('../dashboard-poll-snapshots.js');
+    job.mockResolvedValue([]);
+    await get([]);
+    expect(job).not.toHaveBeenCalled();
+    const nowMs = Date.now();
+    await Promise.all([get(['b', 'a']), get(['a', 'b', 'a'])]);
+    expect(job).toHaveBeenCalledExactlyOnceWith('getAgentCostStats', { agentIds: ['a', 'b'], nowMs });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await get(['a', 'b']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(job).toHaveBeenLastCalledWith('getAgentCostStats', { agentIds: ['a', 'b'], nowMs: nowMs + 15_000 });
+    expect(job).toHaveBeenCalledTimes(2);
+    await get(['c']);
+    expect(job).toHaveBeenCalledTimes(3);
+    expect(job).toHaveBeenLastCalledWith('getAgentCostStats', { agentIds: ['c'], nowMs: nowMs + 15_000 });
+  });
+
   it('shares cost and conversation ledger snapshots across clients for 15 seconds', async () => {
     const { getCostsByIssueSnapshot, getConversationLedgerCostsSnapshot } = await import('../dashboard-poll-snapshots.js');
     job.mockImplementation(async operation => operation === 'getCostsByIssueSnapshot'

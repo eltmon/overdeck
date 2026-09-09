@@ -9,7 +9,7 @@
 import type { CostEvent } from '../costs/events.js';
 import { getOverdeckDatabaseSync } from './infra.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
-
+export { getAgentCostStatsSync, type AgentCostStats } from './cost-agent-stats.js';
 /**
  * Query total memory-extraction cost in USD for an issue within a time window.
  * Mirrors the queryMemoryExtractionCostUsd function from cost-events-db.

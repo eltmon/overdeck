@@ -12,6 +12,23 @@ import {
 const NOW_MS = Date.parse('2026-07-07T12:00:00.000Z');
 
 describe('agent resource stats payload', () => {
+  it('reads one aggregate snapshot for active agents while retaining zero-cost missing rows', async () => {
+    const readCostStats = vi.fn(async () => [['agent-a', {
+      burnUsdPerHour: 2, hypotheticalUsdPerHour: 0.5, totalUsd: 10,
+    }]] as Array<[string, { burnUsdPerHour: number; hypotheticalUsdPerHour: number; totalUsd: number }]>);
+    const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
+      nowMs: NOW_MS,
+      listAgents: () => [agent('agent-a'), agent('agent-b'), { ...agent('stopped'), status: 'stopped' }],
+      listSessionNames: () => Effect.succeed([]),
+      readCostStats,
+    }));
+    expect(readCostStats).toHaveBeenCalledExactlyOnceWith(['agent-a', 'agent-b']);
+    expect(snapshot.agents.map(row => [row.id, row.burnUsdPerHour, row.totalUsd])).toEqual([
+      ['agent-a', 2, 10], ['agent-b', 0, 0],
+    ]);
+    expect(snapshot.hostVitals.agents).toEqual({ burnUsdPerHour: 2, hypotheticalUsdPerHour: 0.5, totalUsd: 10 });
+  });
+
   it('extrapolates recent agent cost events into burn dollars per hour', () => {
     const snapshot = buildAgentStatsSnapshot({
       nowMs: NOW_MS,
