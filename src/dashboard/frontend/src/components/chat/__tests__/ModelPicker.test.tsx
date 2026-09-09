@@ -17,6 +17,9 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; har
     if (url === '/api/settings/available-models') {
       await options.availableModelsGate;
       return new Response(JSON.stringify({
+        meta: [
+          { id: 'muse-spark-1.3', name: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75 },
+        ],
         anthropic: [
           { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
         ],
@@ -52,6 +55,7 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; har
           default_conversation_model: options.defaultConversationModel ?? 'claude-sonnet-4-6',
           provider_harnesses: {},
           provider_default_harnesses: {
+            meta: 'muse',
             anthropic: 'claude-code',
             openai: 'codex',
             google: 'ohmypi',
@@ -120,8 +124,9 @@ describe('chat ModelPicker live harness labels', () => {
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Muse Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(5);
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(6);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 
@@ -138,7 +143,7 @@ describe('chat ModelPicker live harness labels', () => {
 
     await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
 
-    for (const label of ['Anthropic', 'OpenAI', 'Google', 'MiniMax', 'Z.AI', 'Kimi', 'MiMo', 'Nous Portal', 'Alibaba DashScope', 'OpenRouter']) {
+    for (const label of ['Meta (Muse)', 'Anthropic', 'OpenAI', 'Google', 'MiniMax', 'Z.AI', 'Kimi', 'MiMo', 'Nous Portal', 'Alibaba DashScope', 'OpenRouter']) {
       expect(screen.getAllByLabelText(`${label} logo`).length).toBeGreaterThan(0);
     }
   });

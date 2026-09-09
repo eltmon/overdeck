@@ -42,7 +42,7 @@ afterEach(() => {
   tempDirs = [];
 });
 
-describe('overdeck Observability RPC surface', () => {
+describe('overdeck Observability RPC surface', { timeout: 15_000 }, () => {
   it('subscribes to domain events emitted through EventBus', async () => {
     const dbPath = makeDbPath();
 

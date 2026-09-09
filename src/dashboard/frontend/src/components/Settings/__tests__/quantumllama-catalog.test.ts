@@ -11,11 +11,11 @@ describe('QuantumLlama dashboard visibility (PAN-3252)', () => {
     expect(group.name).toBe('QuantumLlama');
 
     const byId = Object.fromEntries(group.models.map((m) => [m.id, m]));
-    expect(byId['ql-reason-70b'].name).toBe('QL Reason 70B');
+    expect(byId['ql-reason-70b'].name).toBe('QL Reason 70B (200K context)');
     expect(byId['ql-reason-70b'].costPer1MTokens).toBe(16);
-    expect(byId['ql-swift-8b'].name).toBe('QL Swift 8B');
+    expect(byId['ql-swift-8b'].name).toBe('QL Swift 8B (128K context)');
     expect(byId['ql-swift-8b'].costPer1MTokens).toBe(4);
-    expect(byId['ql-nano-1b'].name).toBe('QL Nano 1B');
+    expect(byId['ql-nano-1b'].name).toBe('QL Nano 1B (32K context)');
     expect(byId['ql-nano-1b'].costPer1MTokens).toBe(0.8);
   });
 

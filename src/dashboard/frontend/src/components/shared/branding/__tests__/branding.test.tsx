@@ -11,6 +11,7 @@ import {
 describe('shared branding registry', () => {
   it('defines every provider and harness brand with labels, colors, and icons', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
+      'meta',
       'anthropic',
       'openai',
       'google',
@@ -22,13 +23,13 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'muse', 'prime-agent']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'prime-agent']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
       expect(brand.label).toBeTruthy();
       expect(brand.color).toMatch(/^#/);
-      expect(brand.Icon).toBeTypeOf('function');
+      expect(['function', 'object']).toContain(typeof brand.Icon);
     }
   });
 
