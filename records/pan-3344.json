@@ -2,7 +2,7 @@
   "issueId": "PAN-3344",
   "schemaVersion": 2,
   "feedback": [],
-  "model": "",
+  "model": "gpt-5.6-sol",
   "pipeline": {
     "issueId": "PAN-3344",
     "reviewStatus": "pending",
@@ -24,5 +24,6 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-08-04T13:06:47.371Z"
+  "updated": "2026-09-09T05:53:55.011Z",
+  "harness": "codex"
 }
