@@ -12,7 +12,7 @@
     "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T10:41:20.875Z",
+    "updatedAt": "2026-09-09T10:46:24.392Z",
     "mergeNotes": "Stale strike signal: recorded HEAD 76569866f57bb016fed2e309846d0caeafff2104 differs from origin/strike/pan-3344 at 2acc64716829fb0e50b27dc86f90311c9dbf4026",
     "strikeReadyHead": "d7b44d7e4958243711bdbf3b3a1a57ecd61a69d1",
     "strikeReadyAt": "2026-09-09T10:24:47.278Z",
@@ -50,13 +50,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T10:41:58.059Z"
+        "pricingAsOf": "2026-09-09T10:46:24.500Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T10:42:02.450Z",
+  "updated": "2026-09-09T10:46:58.034Z",
   "harness": "codex"
 }
