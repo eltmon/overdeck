@@ -18,3 +18,14 @@ export interface VerificationRunnerOptions {
   /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
   onGateLog?: (line: string) => void;
 }
+
+export const INTERRUPTED_VERIFICATION_NOTE =
+  'The supervised verification worker stopped before recording a result; a fresh terminal verification is required before merge.';
+
+export function requiresFreshTerminalVerification(status: {
+  verificationStatus?: string;
+  verificationNotes?: string;
+}): boolean {
+  return status.verificationStatus === 'running'
+    || status.verificationNotes === INTERRUPTED_VERIFICATION_NOTE;
+}

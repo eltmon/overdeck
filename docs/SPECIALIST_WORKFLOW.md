@@ -571,7 +571,7 @@ Agent runs `pan done` (Bash command)
 
 The verification gate (PAN-174) runs between agent completion and review-agent wake. It executes the `quality_gates` defined in `projects.yaml` (typecheck, lint, test). If any gate fails, feedback is sent to the agent's tmux session and the completion marker is NOT processed, allowing the agent to fix issues and re-signal completion. After 3 consecutive failures, the gate is bypassed to prevent permanent blocking. See `src/lib/cloister/verification-gate.ts`.
 
-Verification runs in a detached supervised worker, not in the dashboard server process. The worker owns the gate process groups, incremental artifact writes, and terminal result under `~/.overdeck/verification-workers/<issue>/`. A dashboard restart preserves a live worker and reconnects through its durable state; boot reconciliation resets only a `running` verification whose recorded worker is no longer alive.
+Verification runs in a supervised worker outside the dashboard service boundary. On Linux, each worker runs in its own transient systemd user scope; other platforms use a detached process group. The worker owns the gate process groups, incremental artifact writes, and terminal result under `~/.overdeck/verification-workers/<issue>/`. A dashboard restart reconnects through durable worker state; merge-time reattachment also requires the exact code HEAD. Boot reconciliation resets a dead worker to `pending`, clears its old commit evidence, and requires a fresh terminal local result before merge.
 
 #### verificationStatus semantics
 

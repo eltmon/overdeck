@@ -22,6 +22,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
+import { requiresFreshTerminalVerification } from '../../../../lib/cloister/verification-types.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -1000,7 +1001,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // that case; any rebase above produced a NEW SHA, whose CI can't be green
     // yet, so post-rebase combinations still verify locally.
     let skipLocalVerification = false;
-    if (primaryForge === 'github' && artifactUrl) {
+    const requireTerminalVerification = requiresFreshTerminalVerification(reviewStatus ?? {});
+    if (primaryForge === 'github' && artifactUrl && !requireTerminalVerification) {
       try {
         const { parsePullRequestRef, getCiCheckRunsStatePromise, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
         if (isGitHubAppConfigured()) {
@@ -1021,6 +1023,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       } catch (ciErr: any) {
         console.warn(`[merge] CI-state check failed (${ciErr.message?.slice(0, 120)}) — falling back to local verification for ${issueId}`);
       }
+    }
+    if (requireTerminalVerification) {
+      console.log(`[merge] ${issueId} has an active or interrupted supervised worker — requiring its terminal local verification result (PAN-3814)`);
     }
 
     if (skipLocalVerification) appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
@@ -1066,6 +1071,18 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         }
       } catch { /* non-fatal */ }
 
+      return { success: false, statusCode: 500, error };
+    }
+    if (requireTerminalVerification && verifyResult.outcome !== 'passed') {
+      const detail = verifyResult.outcome === 'error'
+        ? verifyResult.message
+        : verifyResult.outcome === 'skipped'
+          ? verifyResult.reason
+          : `unexpected ${verifyResult.outcome} outcome`;
+      const error = `Fresh terminal verification required after worker interruption: ${detail}`;
+      console.error(`[merge] ${error}`);
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
+      completePendingOperation(issueId, error);
       return { success: false, statusCode: 500, error };
     }
     console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);

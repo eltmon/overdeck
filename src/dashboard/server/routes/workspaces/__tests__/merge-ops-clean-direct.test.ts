@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitHubPullRequestState } from '../../../../../lib/github-app.js';
+import { INTERRUPTED_VERIFICATION_NOTE } from '../../../../../lib/cloister/verification-types.js';
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/3102';
 const HEAD_SHA = 'a'.repeat(40);
@@ -14,7 +15,11 @@ const mocks = vi.hoisted(() => ({
   mergeReviewArtifact: vi.fn(),
   postMergeLifecycle: vi.fn(),
   recordCiGreenVerificationVerdict: vi.fn(),
-  reviewStatus: {} as Record<string, unknown>,
+  reviewStatus: {} as Record<string, unknown> & {
+    verificationStatus?: string;
+    verificationNotes?: string;
+  },
+  runVerificationForIssue: vi.fn(),
   setReviewStatus: vi.fn(),
 }));
 
@@ -47,6 +52,10 @@ vi.mock('../../../../../lib/cloister/merge-agent.js', () => ({
 vi.mock('../../../../../lib/cloister/ship-log.js', () => ({
   appendShipLog: vi.fn(),
   beginShipLog: vi.fn(),
+}));
+
+vi.mock('../../../../../lib/cloister/verification-runner.js', () => ({
+  runVerificationForIssue: (...args: unknown[]) => mocks.runVerificationForIssue(...args),
 }));
 
 vi.mock('../../../../../lib/github-app.js', () => ({
@@ -86,14 +95,7 @@ vi.mock('../../../../../lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../../lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => ({
-    issueId: 'PAN-3110',
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    verificationStatus: 'passed',
-    mergeStatus: 'pending',
-    readyForMerge: true,
-  })),
+  getReviewStatusSync: vi.fn(() => mocks.reviewStatus),
   markWorkspaceStuck: vi.fn(),
   setReviewStatusSync: vi.fn(),
 }));
@@ -168,7 +170,15 @@ function pullRequestState(overrides: Partial<GitHubPullRequestState> = {}): GitH
 describe('triggerMerge clean PR direct merge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.reviewStatus = {};
+    mocks.reviewStatus = {
+      issueId: 'PAN-3110',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'pending',
+      readyForMerge: true,
+    };
+    mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.ensureAgentReadyForMerge.mockRejectedValue(new Error('rebase flow reached'));
@@ -198,6 +208,25 @@ describe('triggerMerge clean PR direct merge', () => {
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({
       url: PR_URL,
       method: 'squash',
+    }));
+  });
+
+  it('does not merge from CI when an interrupted worker has no fresh terminal result', async () => {
+    mocks.reviewStatus.verificationStatus = 'pending';
+    mocks.reviewStatus.verificationNotes = INTERRUPTED_VERIFICATION_NOTE;
+    mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({
+      outcome: 'error',
+      message: 'replacement worker exited before writing a result',
+    }));
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(mocks.runVerificationForIssue).toHaveBeenCalledOnce();
+    expect(mocks.recordCiGreenVerificationVerdict).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('Fresh terminal verification required'),
     }));
   });
 
