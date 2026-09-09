@@ -32,6 +32,7 @@ import type {
   ResetMarker,
 } from './memory'
 import type { DomainEvent } from './events'
+import { applyIssueDelta } from './issue-delta'
 
 // ─── Read model state shape ──────────────────────────────────────────────────
 
@@ -768,6 +769,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'issues.updated':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'issues.delta':
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        issuesRaw: applyIssueDelta(state.issuesRaw, event.payload),
+      }
 
     case 'issue.statusChanged': {
       const { issueId, status, canonicalStatus, labels } = event.payload

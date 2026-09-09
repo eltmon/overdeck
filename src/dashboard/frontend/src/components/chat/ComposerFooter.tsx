@@ -49,9 +49,9 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 interface ComposerFooterProps {
   conversation: Conversation;
   /** Called with the message text the instant it is sent — use for optimistic display */
-  onSend?: (text: string) => void;
+  onSend?: (text: string, clientMessageId?: string) => void;
   /** Called after the send POST resolves successfully. */
-  onSendAcknowledged?: (text: string) => void;
+  onSendAcknowledged?: (text: string, clientMessageId?: string) => void;
   /** Called when the POST fails — parent preserves the original prompt/command lane. */
   onSendFailed?: (text: string, kind: 'command' | 'prompt', details?: SendFailureDetails) => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
@@ -484,6 +484,7 @@ export function ComposerFooter({
     // Attachments belong to the prompt lane. Portable commands stay in the
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
+    const clientMessageId = crypto.randomUUID();
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -504,13 +505,15 @@ export function ComposerFooter({
       // The `/pan` namespace is intercepted by the dashboard control plane and
       // returns a structured result. It must never appear as an optimistic user
       // prompt or reach the harness transcript.
-      if (!isPortableCommand) onSend?.(composedMessage);
+      if (!isPortableCommand) onSend?.(composedMessage, clientMessageId);
 
       const commandResult = await sendConversationMessage(
         submitConversationName,
         submissionMessage,
         agentId,
         piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+        undefined,
+        { clientMessageId },
       );
       if (commandResult?.kind === 'ui') {
         openComposerUi(
@@ -521,7 +524,7 @@ export function ComposerFooter({
       } else if (commandResult) {
         addCommandResult(submitConversationName, submissionMessage, commandResult);
       } else {
-        onSendAcknowledged?.(submissionMessage);
+        onSendAcknowledged?.(submissionMessage, clientMessageId);
       }
 
       // The send consumed this conversation's attachments — revoke their previews and
@@ -545,7 +548,10 @@ export function ComposerFooter({
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', sendFailureDetails(err));
+      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', {
+        ...sendFailureDetails(err), clientMessageId,
+        deliverAs: piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+      });
     } finally {
       // Clear the originating conversation's sending state regardless of which
       // conversation is now mounted — the send belonged to submitConversationName.

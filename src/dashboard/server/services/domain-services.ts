@@ -44,7 +44,7 @@ export class EventStoreService extends Context.Service<
 
 /** Map a domain event to a detailed activity log entry. Returns null for uninteresting events. */
 function shouldRefreshSessionContext(type: string): boolean {
-  return type === 'issues.snapshot' ||
+  return type === 'issues.snapshot' || type === 'issues.delta' ||
     type.startsWith('agent.') ||
     type.startsWith('review.') ||
     type.startsWith('pipeline.') ||
