@@ -30,6 +30,7 @@ const mockPostMergeLifecycle = vi.fn();
 const mockAppendDomainEventAsync = vi.fn(async () => true);
 const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
 const mockEnqueueProjectResourceRefresh = vi.fn();
+const mockRelayCiFailureFeedback = vi.fn(() => Effect.succeed({ agentMessageSent: false }));
 let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -59,7 +60,8 @@ vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/ci-failure-feedback.js', () => ({
-  relayCiFailureFeedback: () => Effect.succeed({ agentMessageSent: false }),
+  relayCiFailureFeedback: (...args: Parameters<typeof mockRelayCiFailureFeedback>) =>
+    mockRelayCiFailureFeedback(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/merge-agent.js', () => ({
@@ -1120,6 +1122,8 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
     mergeableState: string;
     draft: boolean;
     checksFailed: boolean;
+    headSha: string;
+    headRef: string;
   }> = {}) {
     return Effect.succeed({
       owner: 'test-owner',
@@ -1130,7 +1134,8 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
       mergeable: overrides.mergeable ?? true,
       mergeableState: overrides.mergeableState ?? 'clean',
       draft: overrides.draft ?? false,
-      headSha: 'abc',
+      headSha: overrides.headSha ?? 'abc',
+      headRef: overrides.headRef ?? 'feature/pan-2',
       baseBranch: 'main',
       checksPending: false,
       checksFailed: overrides.checksFailed ?? false,
@@ -1167,15 +1172,57 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
     }));
   });
 
-  it('maps App checksFailed to failing_checks blocker', async () => {
-    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
-    mockGetPullRequestState.mockReturnValue(makeAppPrState({ checksFailed: true }));
+  it('relays a clean-to-failing polling transition with the authoritative PR identity', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+    });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({
+      checksFailed: true,
+      headSha: 'new-head-sha',
+      headRef: 'feature/pan-2',
+    }));
 
     await refreshMergeStateFromGitHub('PAN-2', 'test-owner/test-repo', 42);
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2', expect.objectContaining({
       blockerReasons: expect.arrayContaining([expect.objectContaining({ type: 'failing_checks' })]),
     }));
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-2',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'new-head-sha',
+      headRef: 'feature/pan-2',
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+      source: 'polling_reconciliation',
+    });
+  });
+
+  it('does not relay or rewrite an already-failing polling refresh', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{ type: 'failing_checks', summary: 'Required checks are failing' }],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+    });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({ checksFailed: true }));
+
+    await refreshMergeStateFromGitHub('PAN-2', 'test-owner/test-repo', 42);
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
+  });
+
+  it('clears failing_checks without relaying when polling observes recovery', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{ type: 'failing_checks', summary: 'Required checks are failing' }],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+    });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({ checksFailed: false }));
+
+    await refreshMergeStateFromGitHub('PAN-2', 'test-owner/test-repo', 42);
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2', { blockerReasons: undefined });
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
 
   it('maps App draft to draft_pr blocker', async () => {

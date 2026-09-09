@@ -64,6 +64,7 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   mergeableState: string | null;
   draft: boolean;
   headSha: string;
+  headRef: string;
   baseBranch: string;
   checksPending: boolean;
   checksFailed: boolean;
@@ -523,15 +524,13 @@ async function getCommitCheckState(
     mergeable?: boolean | null;
     mergeable_state?: string | null;
     draft?: boolean;
-    head?: { sha?: string };
+    head?: { sha?: string; ref?: string };
     base?: { ref?: string };
   }>(`/repos/${owner}/${repo}/pulls/${number}`);
-
   const headSha = pull.head?.sha || '';
   const checkState = headSha
     ? await getCommitCheckState(owner, repo, headSha)
     : { pending: false, failed: false };
-
   return {
     owner,
     repo,
@@ -543,6 +542,7 @@ async function getCommitCheckState(
     mergeableState: pull.mergeable_state ?? null,
     draft: pull.draft === true,
     headSha,
+    headRef: pull.head?.ref || '',
     baseBranch: pull.base?.ref || 'main',
     checksPending: checkState.pending,
     checksFailed: checkState.failed,
