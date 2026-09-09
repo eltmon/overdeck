@@ -18,7 +18,7 @@
     }
   ],
   "created": "2026-09-09T11:38:00.909Z",
-  "updated": "2026-09-09T14:25:21.019Z",
+  "updated": "2026-09-09T14:33:20.603Z",
   "pipeline": {
     "issueId": "PAN-3810",
     "reviewStatus": "pending",
@@ -28,12 +28,12 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T14:25:16.661Z",
+    "updatedAt": "2026-09-09T14:33:04.700Z",
     "verificationNotes": "Verification FAILED at test (2904369ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3810-strike/.overdeck/verification-latest.json",
-    "mergeNotes": "Post-rebase verification failed at test",
-    "strikeReadyHead": "2985e32780d4e3a4d9238daf3533656692815982",
-    "strikeReadyAt": "2026-09-09T12:50:11.319Z",
-    "strikeLandingState": "landing",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3810 after its harness exited before push.",
+    "strikeReadyHead": "712ce86ba28e943f26dc90df37208b4efa4ac9e2",
+    "strikeReadyAt": "2026-09-09T14:33:04.699Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
   },
@@ -59,7 +59,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0011970000000000001,
-        "pricingAsOf": "2026-09-09T14:25:17.882Z"
+        "pricingAsOf": "2026-09-09T14:33:04.726Z"
       }
     },
     "merges": [],
