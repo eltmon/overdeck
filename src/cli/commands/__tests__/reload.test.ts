@@ -173,6 +173,7 @@ const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
 const originalRestartInitiator = process.env.OVERDECK_RESTART_INITIATOR;
+const originalIssueId = process.env.OVERDECK_ISSUE_ID;
 const originalHome = process.env.HOME;
 const originalPath = process.env.PATH;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -182,6 +183,8 @@ function restoreEnv(): void {
   else process.env.OVERDECK_AGENT_ID = originalAgentId;
   if (originalRestartInitiator === undefined) delete process.env.OVERDECK_RESTART_INITIATOR;
   else process.env.OVERDECK_RESTART_INITIATOR = originalRestartInitiator;
+  if (originalIssueId === undefined) delete process.env.OVERDECK_ISSUE_ID;
+  else process.env.OVERDECK_ISSUE_ID = originalIssueId;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
   if (originalPath === undefined) delete process.env.PATH;
@@ -196,6 +199,7 @@ describe('reloadCommand', () => {
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
     delete process.env.OVERDECK_RESTART_INITIATOR;
+    delete process.env.OVERDECK_ISSUE_ID;
     process.env.HOME = '/home/test';
     process.env.PATH = '/usr/bin:/bin';
     process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
@@ -814,6 +818,22 @@ describe('reloadCommand', () => {
         .toBeLessThan(mocks.waitForRestartApproval.mock.invocationCallOrder[0]);
       expect(mocks.waitForRestartApproval.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+    });
+
+    it('preserves the post-merge deploy identity when the script delegates to reload', async () => {
+      process.env.OVERDECK_RESTART_INITIATOR = 'merge-step0';
+      process.env.OVERDECK_ISSUE_ID = 'PAN-3329';
+      mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+      mockSpawnExits();
+
+      await reloadCommand({});
+
+      expect(mocks.waitForRestartApproval).toHaveBeenCalledWith({
+        requesterId: 'deploy:1234',
+        kind: 'deploy',
+        reason: 'post-merge deploy for PAN-3329',
+        builtSha: DEFAULT_ORIGIN_MAIN_SHA,
+      });
     });
 
     it('keeps the freshly built deployment but restarts nothing when another approved restart already ran', async () => {
