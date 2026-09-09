@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSpawn = vi.hoisted(() => vi.fn());
 
+vi.mock('../../../../src/dashboard/server/services/dashboard-poll-snapshots.js', () => ({
+  getAgentCostStatsSnapshot: async () => [],
+}));
+
 vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:child_process')>()),
   spawn: mockSpawn,
