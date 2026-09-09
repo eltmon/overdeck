@@ -532,24 +532,26 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T08:38:37.228Z",
+  "updated": "2026-09-09T08:38:39.531Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-09-09T06:31:21.466Z",
-    "updatedAt": "2026-09-09T08:38:37.152Z",
-    "reviewNotes": "All four reviewers completed; the sole finding was unchanged since cycle 8 and is not promotable under the cycle-9 convergence gate.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-09-09T08:38:37.158Z",
+    "reviewNotes": "Verification error: Verification worker 999024 exceeded 3900000ms after CPU admission",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
     "lastVerifiedCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
+    "reviewRequestedAt": "2026-09-09T06:31:21.466Z",
     "reviewSpawnedAt": "2026-09-09T08:26:01.240Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -885,7 +887,7 @@
       },
       "costAtCloseOut": {
         "usd": 165.6364113,
-        "pricingAsOf": "2026-09-09T08:38:37.215Z"
+        "pricingAsOf": "2026-09-09T08:38:39.524Z"
       }
     },
     "merges": [
