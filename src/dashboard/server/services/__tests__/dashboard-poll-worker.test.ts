@@ -15,10 +15,11 @@ import { runDashboardDbJob, workerLane } from '../dashboard-db-task.js';
 // Exercise the actual worker dispatch path, including under Vitest: these
 // expensive polls must never use the test-only synchronous inline resolver.
 describe('polling reads dispatch to database worker', () => {
-  it.each(['getCostsByIssueSnapshot', 'getConversationSearchStats', 'getConversationLedgerCosts'] as const)(
+  it.each(['getCostsByIssueSnapshot', 'getConversationSearchStats', 'getConversationLedgerCosts', 'getAgentCostStats'] as const)(
     'coalesces %s and receives its result from the read worker', async operation => {
       expect(workerLane(operation)).toBe('read');
-      const payload = operation === 'getConversationSearchStats' ? { dbPath: '/fixture/search.db', model: 'small' } : undefined;
+      const payload = operation === 'getConversationSearchStats' ? { dbPath: '/fixture/search.db', model: 'small' }
+        : operation === 'getAgentCostStats' ? { agentIds: ['agent-a'], nowMs: 1000 } : undefined;
       const first = runDashboardDbJob(operation, payload);
       const second = runDashboardDbJob(operation, payload);
       expect(second).toBe(first);

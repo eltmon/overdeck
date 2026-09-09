@@ -2,7 +2,8 @@ import { Effect } from 'effect';
 
 import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import type { CostEvent } from '../../../../lib/costs/events.js';
-import { queryCostEventsSync } from '../../../../lib/overdeck/cost-sync.js';
+import type { AgentCostStats } from '../../../../lib/overdeck/cost-sync.js';
+import { getAgentCostStatsSnapshot } from '../../services/dashboard-poll-snapshots.js';
 import { getRuntimeCensus, panePidsForSession } from '../../../../lib/runtime-census.js';
 const BURN_WINDOW_MS = 30 * 60 * 1000;
 
@@ -28,6 +29,7 @@ export interface AgentStatsOptions {
   sessionRoots: AgentSessionRoot[];
   processes: AgentProcessRecord[];
   costEventsByAgent?: Map<string, AgentCostEvent[]>;
+  costStatsByAgent?: Map<string, AgentCostStats>;
   nowMs?: number;
 }
 
@@ -37,6 +39,7 @@ export interface AgentStatsSnapshotDeps {
   listPanePids?: (sessionName: string) => Effect.Effect<readonly number[], unknown, never>;
   readProcessTable?: () => Promise<AgentProcessRecord[]>;
   queryCostEvents?: (options: { agentId: string; startTs?: string }) => AgentCostEvent[];
+  readCostStats?: (agentIds: string[]) => Promise<Array<[string, AgentCostStats]>>;
   nowMs?: number;
 }
 
@@ -86,7 +89,7 @@ export function buildAgentStatsSnapshot(options: AgentStatsOptions): AgentStatsS
     .map((agent): AgentResourceRow => {
       const root = options.sessionRoots.find((sessionRoot) => sessionRoot.agentId === agent.id);
       const processTotals = root ? processTotalsByRoot.get(root.rootPid) : undefined;
-      const costStats = computeAgentCostStats(
+      const costStats = options.costStatsByAgent?.get(agent.id) ?? computeAgentCostStats(
         options.costEventsByAgent?.get(agent.id) ?? [],
         nowMs,
       );
@@ -156,22 +159,18 @@ export function getAgentStatsSnapshotEffect(
           Effect.catch(() => Effect.succeed([])),
         )
       : [];
-    const costEventsByAgent = new Map<string, AgentCostEvent[]>();
-    const costQuery = deps.queryCostEvents ?? queryCostEventsSync;
-
-    for (const agent of agents) {
-      // One query per agent: computeAgentCostStats derives the burn window from
-      // event timestamps itself, so a second startTs-bounded query was pure
-      // duplicate work — and concatenating it double-counted recent events in
-      // totalUsd/burn (every recent event appeared twice).
-      costEventsByAgent.set(agent.id, costQuery({ agentId: agent.id }));
-    }
+    // Keep injected event readers compatible; production reads only grouped
+    // totals from the worker, never a synchronous event list for each agent.
+    const queryCostEvents = deps.queryCostEvents;
+    const costStatsByAgent = queryCostEvents
+      ? new Map(agents.map(agent => [agent.id, computeAgentCostStats(queryCostEvents({ agentId: agent.id }), nowMs)]))
+      : new Map(yield* Effect.promise(() => (deps.readCostStats ?? getAgentCostStatsSnapshot)(agents.map(agent => agent.id))));
 
     return buildAgentStatsSnapshot({
       agents,
       sessionRoots,
       processes,
-      costEventsByAgent,
+      costStatsByAgent,
       nowMs,
     });
   });
