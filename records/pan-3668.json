@@ -222,6 +222,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-22T09:55:48.759Z"
+    },
+    {
+      "timestamp": "2026-09-09T05:16:14.535Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -487,7 +492,7 @@
     "recordedAt": "2026-09-09T05:16:08.995Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T05:16:09.842Z",
+  "updated": "2026-09-09T05:16:14.589Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -498,7 +503,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T05:16:09.840Z",
+    "updatedAt": "2026-09-09T05:16:14.533Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -514,8 +519,8 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "e580f7159478b8441bed0071557de288a18dabf1",
     "lastVerifiedCommit": "e580f7159478b8441bed0071557de288a18dabf1",
-    "reviewSpawnedAt": "2026-08-19T01:00:31.708Z",
     "reviewRequestedAt": "2026-09-09T05:16:09.840Z",
+    "reviewSpawnedAt": "2026-08-19T01:00:31.708Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/TELEMETRY.md",
@@ -783,15 +788,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 14729997,
-            "output": 15255,
-            "cacheRead": 10999296,
+            "input": 15377773,
+            "output": 16127,
+            "cacheRead": 11581440,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 176355850,
-            "output": 310247,
-            "cacheRead": 169040768,
+            "input": 177954937,
+            "output": 315069,
+            "cacheRead": 170526720,
             "cacheWrite": 0
           }
         },
@@ -814,15 +819,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 14729997,
-          "output": 15255,
-          "cacheRead": 10999296,
+          "input": 15377773,
+          "output": 16127,
+          "cacheRead": 11581440,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 176355850,
-          "output": 310247,
-          "cacheRead": 169040768,
+          "input": 177954937,
+          "output": 315069,
+          "cacheRead": 170526720,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -839,8 +844,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 136.2879073,
-        "pricingAsOf": "2026-09-09T05:09:14.264Z"
+        "usd": 137.7412183,
+        "pricingAsOf": "2026-09-09T05:16:14.559Z"
       }
     },
     "merges": [
