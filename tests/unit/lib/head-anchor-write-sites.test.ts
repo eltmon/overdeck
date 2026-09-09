@@ -69,6 +69,8 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/overdeck/review-status-sync.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: row.last_verified_commit ?? undefined', 'Review cache deserialization.'),
   allow('src/lib/pan-dir/records.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit', 'Durable record serialization of validated status.'),
   allow('src/lib/pan-dir/records.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: status.lastVerifiedCommit', 'Durable record serialization of validated status.'),
+  allow('src/lib/pan-dir/record-update.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Canonical reopen reset clears the prior review evidence anchor.'),
+  allow('src/lib/pan-dir/record-update.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: undefined', 'Canonical reopen reset clears the prior verification evidence anchor.'),
   allow('src/lib/pan-dir/verdict-restore.ts', 'reviewedAtCommit', 'reviewedAtCommit: pipeline.reviewedAtCommit ? rehydrateHeadAnchor(pipeline.reviewedAtCommit) : undefined', 'Explicit durable-record rehydration.'),
   allow('src/lib/pan-dir/verdict-restore.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: pipeline.lastVerifiedCommit ? rehydrateHeadAnchor(pipeline.lastVerifiedCommit) : undefined', 'Explicit durable-record rehydration.'),
   allow('src/lib/reconstruct/reconstruct-cache.ts', 'roleRunHead', 'roleRunHead: state.roleRunHead || undefined', 'Cache reconstruction from durable state.'),
