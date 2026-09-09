@@ -264,7 +264,11 @@ async function runReload(
         // deployment that dies on ERR_MODULE_NOT_FOUND at boot (PAN-3264).
         const serverBootFailure = dashboardServerBootFailure(deployment.serverPath);
         if (serverBootFailure) throw new Error(serverBootFailure);
-        await writeActiveDashboardBundle({ repoRoot, ...deployment });
+        await writeActiveDashboardBundle({
+          repoRoot,
+          deployRoot: deployment.deployRoot,
+          serverPath: deployment.serverPath,
+        });
         try {
           activation = await activateDashboardDeployment(repoRoot, deployment);
         } catch (error) {
@@ -290,10 +294,17 @@ async function runReload(
     // The restart below is voluntary, so it waits for the operator's approval
     // first (PAN-3729) and may find that an approved restart already happened.
     await progress('awaiting-approval');
+    const postMergeIssue = process.env.OVERDECK_RESTART_INITIATOR === 'merge-step0'
+      ? process.env.OVERDECK_ISSUE_ID
+      : undefined;
+    const gateKind = postMergeIssue ? 'deploy' : 'reload';
     const gate = await waitForRestartApproval({
-      requesterId: restartGateRequesterId('reload'),
-      kind: 'reload',
-      reason: 'pan reload — put the freshly built dashboard live',
+      requesterId: restartGateRequesterId(gateKind, postMergeIssue),
+      kind: gateKind,
+      reason: postMergeIssue
+        ? `post-merge deploy for ${postMergeIssue}`
+        : 'pan reload — put the freshly built dashboard live',
+      ...(deployment?.builtSha ? { builtSha: deployment.builtSha } : {}),
     });
     if (!gate.proceed) {
       // Same disposition as a restart that left the old dashboard running: the
