@@ -233,7 +233,18 @@ api_keys:
         governorPsiFullShedAvg10: 1,
         governorPsiCalmReadmitAvg10: 0.05,
         governorPsiCalmWindowMs: 600_000,
+        governorCpuSoftLoadPerCore: 1.5,
+        governorCpuRecoveryLoadPerCore: 1,
       });
+    });
+
+    it('rejects CPU governor recovery at or above the soft threshold', () => {
+      expect(() => mergeConfigs({
+        resources: {
+          governor_cpu_soft_load_per_core: 1.5,
+          governor_cpu_recovery_load_per_core: 1.5,
+        },
+      })).toThrow('recovery_load_per_core must be lower than');
     });
 
     it('normalizes memory governor swap runway config', () => {
