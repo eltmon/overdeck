@@ -8,11 +8,11 @@
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
-    "mergeStatus": "verifying",
+    "mergeStatus": "pending",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T10:58:29.083Z",
+    "updatedAt": "2026-09-09T11:02:03.695Z",
     "strikeReadyHead": "d7b44d7e4958243711bdbf3b3a1a57ecd61a69d1",
     "strikeReadyAt": "2026-09-09T10:24:47.278Z",
     "strikeLandingState": "landing",
@@ -49,13 +49,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T10:58:35.140Z"
+        "pricingAsOf": "2026-09-09T11:02:07.111Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T10:58:38.715Z",
+  "updated": "2026-09-09T11:02:09.257Z",
   "harness": "codex"
 }
