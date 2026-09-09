@@ -204,7 +204,7 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   // global store's full dataset, causing every issue-dependent component to
   // re-render with incomplete data. The full bulk updates arrive via
   // subscribeDomainEvents instead.
-  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+  if (event.type === 'issues.snapshot' || event.type === 'issues.delta' || event.type === 'activity.updated') {
     return null;
   }
 

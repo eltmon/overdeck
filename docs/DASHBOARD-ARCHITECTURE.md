@@ -65,6 +65,10 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   search counters refresh after 60 seconds. Successful values remain usable for at most
   five minutes during refresh failures, with a five-second retry backoff. Search
   configuration, provider availability, and runtime health are still read per request.
+- Agent resource costs use one grouped worker query and a 15-second shared snapshot,
+  invalidated when agent membership changes. Hourly burn remains twice the sum in the
+  last 30 minutes, with the inclusive cutoff and existing currency rounding preserved.
+  Resource polling no longer materializes each agent's full ledger history.
 - `subscribeConversationMessages` resolves transcript paths on the main thread and
   shares worker parse results across subscribers. Codex consumes appended records;
   other full-parser harnesses still parse changed files in the worker. Clients receive
