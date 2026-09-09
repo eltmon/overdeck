@@ -456,9 +456,14 @@ export async function restartApproveCommand(): Promise<void> {
  * process performs the restart this command just approved, so starting a second
  * one here would restart the dashboard twice.
  */
-async function runRestartNowBypass(scope: 'dashboard' | 'full'): Promise<'restart' | 'handed-off'> {
+async function runRestartNowBypass(
+  scope: 'dashboard' | 'full',
+  options: { reloadHandoffOnly?: boolean } = {},
+): Promise<'restart' | 'handed-off' | 'no-handoff'> {
   const requesterId = restartGateRequesterId('restart');
   const lockHolder = await Effect.runPromise(readRestartLockHolder());
+  if (options.reloadHandoffOnly && lockHolder?.caller !== 'pan reload') return 'no-handoff';
+
   await registerRestartGateRequest({
     requesterId,
     kind: 'restart',
@@ -476,6 +481,8 @@ async function runRestartNowBypass(scope: 'dashboard' | 'full'): Promise<'restar
     );
     return 'handed-off';
   }
+
+  if (options.reloadHandoffOnly) return 'no-handoff';
 
   await claimRestartGate(requesterId);
   return 'restart';
@@ -563,6 +570,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
   const restartInitiator = process.env.OVERDECK_AGENT_ID;
+  if (needsRestartLock && restartInitiator && options.now) {
+    // An agent-owned `pan reload` already holds the lock while it waits at the
+    // approval gate. Let `--now` approve that request and step aside before the
+    // deploy-window guard mistakes the reload itself for a competing deploy.
+    if (await runRestartNowBypass(scope, { reloadHandoffOnly: true }) === 'handed-off') return;
+  }
   if (needsRestartLock && restartInitiator) {
     const restartBlock = await agentRestartBlockReason({
       initiator: restartInitiator,

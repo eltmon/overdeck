@@ -162,7 +162,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   // ("fast-summary") is an advanced toggle under the summary intent.
   // ACP transcripts are portable only through summary/handoff adapters; the
   // server rejects an exact-copy fork from an ACP source.
-  const sourceSupportsPlainFork = conversation.harness !== 'acp';
+  const sourceSupportsPlainFork = conversation.harness !== 'acp' && conversation.harness !== 'opencode';
   const initialIntent: ForkIntent =
     initialMode === 'plain' && sourceSupportsPlainFork
       ? 'plain'

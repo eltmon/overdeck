@@ -223,7 +223,7 @@ export function resolveTieredExecutionEnabledForIssue(
 }
 
 function isRuntimeName(value: string): value is RuntimeName {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'muse';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse';
 }
 
 function isDifficulty(value: string): value is XBriefDifficulty {
@@ -256,7 +256,7 @@ function knownModelIds(): Set<string> {
 
 function validateHarness(harness: string, path: string): asserts harness is RuntimeName {
   if (!isRuntimeName(harness)) {
-    throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, acp, kimi-code, or muse`);
+    throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
 }
 

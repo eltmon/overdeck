@@ -1,10 +1,10 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode';
 export type HarnessOverride = Harness | '';
 export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
@@ -20,6 +20,8 @@ export interface ProvidersConfig {
   openrouter: boolean;
   nous: boolean;
   dashscope: boolean;
+  opencode?: boolean;
+  "opencode-go"?: boolean;
   meta?: boolean;
 }
 
@@ -44,7 +46,7 @@ export interface ModelsConfig {
   /** Legacy model-route overrides are accepted only to preserve form round-trips. */
   overrides: Partial<Record<string, ModelId>>;
   provider_harnesses?: Partial<Record<Provider, HarnessOverride>>;
-  provider_default_harnesses?: Record<Provider, Harness>;
+  provider_default_harnesses?: Partial<Record<Provider, Harness>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }

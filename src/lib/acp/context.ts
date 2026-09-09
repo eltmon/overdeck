@@ -13,17 +13,18 @@ const SECTION_SEPARATOR = '\n\n---\n\n';
 export function materializeAcpContextFile(
   agentDir: string,
   workspace: string,
+  harness: 'acp' | 'opencode' = 'acp',
 ): string {
-  const sections = [renderGlobalLayer('acp', isDevMode())];
+  const sections = [renderGlobalLayer(harness, isDevMode())];
   const project = findProjectByPathSync(workspace);
-  if (project) sections.push(renderProjectLayer(project.path, 'acp'));
+  if (project) sections.push(renderProjectLayer(project.path, harness));
   const workspaceFile = resolveWorkspaceContextFile(workspace);
   if (existsSync(workspaceFile)) {
     const workspaceContent = readFileSync(workspaceFile, 'utf8');
     const workspaceOnly = project
       ? workspaceContextWithoutProjectLayer(workspaceContent)
       : workspaceContent;
-    sections.push(renderForHarness(workspaceOnly, 'acp').trim());
+    sections.push(renderForHarness(workspaceOnly, harness).trim());
   }
 
   const content = sections

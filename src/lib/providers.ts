@@ -15,7 +15,7 @@ import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go';
 
 /**
  * Provider configuration
@@ -68,6 +68,16 @@ export function resolveKimiModelForEndpoint(model: string, baseUrl: string): str
 }
 
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
+  opencode: {
+    name: 'opencode', displayName: 'OpenCode Zen', compatibility: 'direct',
+    defaultHarness: 'opencode', models: [], tested: false,
+    description: 'OpenCode Zen models through the persistent OpenCode ACP runtime. Sign in with opencode auth login.',
+  },
+  'opencode-go': {
+    name: 'opencode-go', displayName: 'OpenCode Go', compatibility: 'direct',
+    defaultHarness: 'opencode', models: [], tested: false,
+    description: 'OpenCode Go subscription models through the persistent OpenCode ACP runtime. Sign in with opencode auth login.',
+  },
   meta: {
     name: 'meta', displayName: 'Meta (Muse)', compatibility: 'direct',
     defaultHarness: 'muse',
@@ -420,6 +430,8 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   // PAN-1837: native kimi-code CLI model aliases are namespaced `kimi-code/<alias>`
   // (its own config.toml provider-prefixing, not an OpenRouter id) — carve out
   // before the generic slash-delimited catch-all below.
+  if (modelId.startsWith('opencode/')) return PROVIDERS.opencode;
+  if (modelId.startsWith('opencode-go/')) return PROVIDERS['opencode-go'];
   if (modelId.startsWith('kimi-code/')) {
     return PROVIDERS.kimi;
   }

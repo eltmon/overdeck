@@ -21,7 +21,7 @@ import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
  * needed. Muse Code 1.0.2 also discovers ~/.agents/skills and ~/.claude/skills
  * natively (verified with muse skills list --source user --json).
  */
-export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code', 'muse'] as const;
+export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code', 'opencode', 'muse'] as const;
 
 /** Plan the shared Agent Skills half of the harness fan-out. */
 export function planAgentSkillsSync(

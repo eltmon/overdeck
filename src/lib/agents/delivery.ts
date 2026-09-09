@@ -297,7 +297,7 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
-  const isAcpTarget = state?.harness === 'acp';
+  const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
   if (isAcpTarget && resolvedMethod !== 'auto') {
     throw new Error(
       `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,

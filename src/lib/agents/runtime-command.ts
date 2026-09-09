@@ -87,7 +87,7 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
 
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
   const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'muse') {
+  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'opencode' || behavior.contextLayerKind === 'muse') {
     return [];
   }
 
@@ -223,7 +223,7 @@ export function getAcpLauncherFields(
   _role?: Role,
   effort?: string,
 ): {
-  harness: 'acp';
+  harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -234,12 +234,12 @@ export function getAcpLauncherFields(
   unsetProviderEnv: true;
 } {
   return {
-    harness: 'acp',
+    harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
     acpAgentId: agentId,
     acpProvider: getProviderForModelSync(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
     ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,

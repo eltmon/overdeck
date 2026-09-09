@@ -206,7 +206,7 @@ describe('TieredExecutionSection', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add crew' }));
-    expect(screen.getAllByText('now Claude Haiku 4.5')).toHaveLength(5);
+    expect(screen.getAllByText('now Claude Haiku 4.5 (200K context)')).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'Assign medium to new crew' }));
 
     const next = onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig;
@@ -327,7 +327,7 @@ describe('TieredExecutionSection', () => {
     // summary default action. The button only renders while React's row state is closed.
     expect(removeButton).toBeInTheDocument();
     expect(screen.getByText('Removing 2-model mix — give trivial · simple to:')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Haiku 4.5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Haiku 4.5 (200K context)' }));
 
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
     const next = onSettingsChange.mock.calls[0][0] as SettingsConfig;
@@ -354,8 +354,8 @@ describe('TieredExecutionSection', () => {
       <TieredExecutionSection formData={formData} onSettingsChange={onSettingsChange} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
-    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5 (200K context)' }));
+    expect(screen.getByText('Removing Claude Haiku 4.5 (200K context) — give trivial · simple to:')).toBeTruthy();
 
     rerender(
       <TieredExecutionSection
@@ -371,9 +371,9 @@ describe('TieredExecutionSection', () => {
     );
     onSettingsChange.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Sonnet 5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Sonnet 5 (1M context)' }));
     expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
-    expect(screen.queryByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeNull();
+    expect(screen.queryByText('Removing Claude Haiku 4.5 (200K context) — give trivial · simple to:')).toBeNull();
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
@@ -402,7 +402,7 @@ describe('TieredExecutionSection', () => {
       by_kind: { docs: 'legacy' }, replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5 (200K context)' }));
     expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
@@ -416,7 +416,7 @@ describe('TieredExecutionSection', () => {
       by_kind: {}, replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5 (200K context)' }));
     expect(screen.getByText('This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.')).toBeTruthy();
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
@@ -433,11 +433,11 @@ describe('TieredExecutionSection', () => {
       by_kind: {}, replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    const summary = screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!;
+    const summary = screen.getAllByText('Claude Haiku 4.5 (200K context)').find((element) => element.closest('summary'))!.closest('summary')!;
     const row = summary.closest('details')!;
     fireEvent.click(summary);
     fireEvent.click(within(row).getByRole('button', { name: 'Remove crew' }));
-    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeTruthy();
+    expect(screen.getByText('Removing Claude Haiku 4.5 (200K context) — give trivial · simple to:')).toBeTruthy();
     expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
@@ -568,7 +568,7 @@ describe('TieredExecutionSection', () => {
       />,
     );
 
-    expect(screen.getByText('backend → Claude Haiku 4.5')).toBeTruthy();
+    expect(screen.getByText('backend → Claude Haiku 4.5 (200K context)')).toBeTruthy();
   });
 
   it('normalizes alias-only byKind before an unrelated crew edit', () => {
@@ -581,8 +581,8 @@ describe('TieredExecutionSection', () => {
       replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    expect(screen.getByText('docs → Claude Haiku 4.5')).toBeTruthy();
-    fireEvent.click(screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!);
+    expect(screen.getByText('docs → Claude Haiku 4.5 (200K context)')).toBeTruthy();
+    fireEvent.click(screen.getAllByText('Claude Haiku 4.5 (200K context)').find((element) => element.closest('summary'))!.closest('summary')!);
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-sonnet-5' } });
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.docs).toBe('trivial-simple-medium-complex-expert');
   });
