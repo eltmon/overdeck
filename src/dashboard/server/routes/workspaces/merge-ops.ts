@@ -22,7 +22,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
-import { requiresFreshTerminalVerification } from '../../../../lib/cloister/verification-types.js';
+import { freshTerminalVerificationError, requiresFreshTerminalVerification } from '../../../../lib/cloister/verification-types.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -995,11 +995,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // Step 3: Post-rebase verification gate ensures the rebase remains valid before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
 
-    // PAN-2487: when the tip SHA being merged already has GREEN CI on GitHub,
-    // the local gate suite re-proves what CI already proved on the identical
-    // tree — 10-20 min of redundant wall-clock per merge. Skip local gates in
-    // that case; any rebase above produced a NEW SHA, whose CI can't be green
-    // yet, so post-rebase combinations still verify locally.
+    // PAN-2487: skip redundant local gates when CI is green on this exact tip.
+    // A rebase produces a new SHA and an interrupted worker has no terminal
+    // result, so both cases still require local verification.
     let skipLocalVerification = false;
     const requireTerminalVerification = requiresFreshTerminalVerification(reviewStatus ?? {});
     if (primaryForge === 'github' && artifactUrl && !requireTerminalVerification) {
@@ -1024,24 +1022,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         console.warn(`[merge] CI-state check failed (${ciErr.message?.slice(0, 120)}) — falling back to local verification for ${issueId}`);
       }
     }
-    if (requireTerminalVerification) {
-      console.log(`[merge] ${issueId} has an active or interrupted supervised worker — requiring its terminal local verification result (PAN-3814)`);
-    }
-
     if (skipLocalVerification) appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
     const verifyResult = skipLocalVerification
       ? { outcome: 'passed' as const }
       : await (async () => {
         console.log(`[merge] Running post-rebase verification for ${issueId}...`);
         appendShipLog(issueId, 'Running post-rebase verification (full quality-gate suite)…', 'verifying');
-        const { runVerificationForIssue } = await import(
-          '../../../../lib/cloister/verification-runner.js'
-        );
-        return Effect.runPromise(runVerificationForIssue(
-          issueId,
-          workspacePath,
-          { isRemote: false },
-          'merge-verify',
+        const { runVerificationForIssue } = await import('../../../../lib/cloister/verification-runner.js');
+        return Effect.runPromise(runVerificationForIssue(issueId, workspacePath, { isRemote: false }, 'merge-verify',
           { ...mergeVerificationOptions(request), onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
         ));
       })();
@@ -1073,17 +1061,12 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 
       return { success: false, statusCode: 500, error };
     }
-    if (requireTerminalVerification && verifyResult.outcome !== 'passed') {
-      const detail = verifyResult.outcome === 'error'
-        ? verifyResult.message
-        : verifyResult.outcome === 'skipped'
-          ? verifyResult.reason
-          : `unexpected ${verifyResult.outcome} outcome`;
-      const error = `Fresh terminal verification required after worker interruption: ${detail}`;
-      console.error(`[merge] ${error}`);
-      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
-      completePendingOperation(issueId, error);
-      return { success: false, statusCode: 500, error };
+    const terminalError = freshTerminalVerificationError(reviewStatus ?? {}, verifyResult);
+    if (terminalError) {
+      console.error(`[merge] ${terminalError}`);
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: terminalError, readyForMerge: false });
+      completePendingOperation(issueId, terminalError);
+      return { success: false, statusCode: 500, error: terminalError };
     }
     console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);
 

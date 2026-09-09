@@ -29,3 +29,16 @@ export function requiresFreshTerminalVerification(status: {
   return status.verificationStatus === 'running'
     || status.verificationNotes === INTERRUPTED_VERIFICATION_NOTE;
 }
+
+export function freshTerminalVerificationError(
+  status: { verificationStatus?: string; verificationNotes?: string },
+  outcome: VerificationRunnerOutcome,
+): string | undefined {
+  if (!requiresFreshTerminalVerification(status) || outcome.outcome === 'passed') return undefined;
+  const detail = outcome.outcome === 'error'
+    ? outcome.message
+    : outcome.outcome === 'skipped'
+      ? outcome.reason
+      : `unexpected ${outcome.outcome} outcome`;
+  return `Fresh terminal verification required after worker interruption: ${detail}`;
+}
