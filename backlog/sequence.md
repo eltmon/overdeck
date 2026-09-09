@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
+_Last sequenced: 2026-09-09T15:08:41Z · model: claude-opus-5 · open: 879_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -266,7 +266,7 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 259 | PAN-3137 | XS | high | ok |  |  | UAT generation member titles come from the Flywheel status snapshot, so orchestrator prose replaces issue titles on the promote surface. |
 | 260 | PAN-3751 | M | high | ok |  |  | Post-merge deploy runs a multi-minute build with no dashboard indication — operator reads a silent deploy as a lost notification |
 | 261 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
-| 262 | PAN-3518 | M | high | needs-refinement |  |  | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
+| 262 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 263 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 264 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
 | 265 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
@@ -346,7 +346,7 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 339 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 340 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 341 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 342 | PAN-2351 | XS | high | ok |  |  | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 342 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
 | 343 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 344 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 345 | PAN-1218 | M | high | ok |  |  | Bead inspect: drop Check 3 (compile/lint), restrict to foundation beads, add end-of-batch mode |
@@ -713,7 +713,7 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 706 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 707 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 708 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 709 | PAN-2424 | L | low | ok |  |  | Epic: the Order Book |
+| 709 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 710 | PAN-2406 | M | low | ok |  |  | close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree … |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
 | 712 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
@@ -723,12 +723,12 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 716 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
 | 717 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 718 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 719 | PAN-3011 | M | low | ok |  |  | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 719 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 720 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 721 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 722 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 723 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 724 | PAN-2083 | M | low | ok |  |  | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 724 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 725 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
 | 726 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
 | 727 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
@@ -803,7 +803,7 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 796 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
 | 797 | PAN-772 | M | low | ok |  |  | Unify terminal stack behavior across tmux sessions |
 | 798 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 799 | PAN-769 | M | low | ok |  |  | Track verification/review/test phase churn over time |
+| 799 | PAN-769 | M | low | ok |  | PAN-750 | Track verification/review/test phase churn over time |
 | 800 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
 | 801 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
 | 802 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
@@ -820,7 +820,7 @@ _Last sequenced: 2026-09-09T14:51:52Z · model: claude-opus-5 · open: 879_
 | 813 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
 | 814 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
 | 815 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 816 | PAN-658 | M | low | ok |  |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 816 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
 | 817 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
 | 818 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
 | 819 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
@@ -1214,7 +1214,7 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-09T14:51:52Z",
+  "generatedAt": "2026-09-09T15:08:41Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 879,
@@ -4554,8 +4554,11 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "high",
       "score": 68,
       "condition": "needs-refinement",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-3517"
+      ],
       "why": "Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off.",
+      "rationale": "Re-derived github-ref dependency this pass: the body states it depends on #3517's convoy-scope header on fresh spawns. Rank unchanged - the cross-reference is not new, the prior pass simply missed it.",
       "gate": "auto",
       "planning": "interactive"
     },
@@ -5534,7 +5537,9 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "high",
       "score": 69,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-1166"
+      ],
       "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
       "rationale": "Body updated since the last pass; it remains the security prerequisite that blocks every other Overdeck Anywhere phase, so the rank holds.",
       "gate": "auto",
@@ -5827,6 +5832,7 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "condition": "ok",
       "dependsOn": [],
       "why": "Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up)",
+      "rationale": "Re-derived cross-reference this pass: the body opens 'Follow-up to #1983' and says #1983's code already landed, so it is narrative history, not a blocker - recorded as an informs edge, not dependsOn. Rank unchanged.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -9954,8 +9960,10 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "condition": "ok",
       "dependsOn": [],
       "why": "Epic: the Order Book",
+      "rationale": "Flagged isEpic this pass: the title is 'Epic: the Order Book' and the body is a four-phase container, not directly workable. Its phases are not yet split into child issues, so it carries no contains edges. Operator-owned gate=blocked and planning=skip preserved verbatim; rank unchanged.",
       "gate": "blocked",
-      "planning": "skip"
+      "planning": "skip",
+      "isEpic": true
     },
     {
       "issue": "PAN-2406",
@@ -10077,8 +10085,12 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "low",
       "score": 26,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-1641",
+        "PAN-465"
+      ],
       "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
+      "rationale": "Re-derived github-ref dependencies this pass: the body gates its Ollama path on #1641 and its hosted path on #465. Rank unchanged - both cross-references predate the prior pass.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10137,8 +10149,11 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "low",
       "score": 25,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-1592"
+      ],
       "why": "Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox",
+      "rationale": "Re-derived github-ref dependency this pass: the body names #1592 as the outbox reload-durability prerequisite. Rank unchanged - the cross-reference is not new.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -11038,8 +11053,11 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "low",
       "score": 17,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-750"
+      ],
       "why": "Track verification/review/test phase churn over time",
+      "rationale": "Re-derived github-ref dependency this pass: the body states 'Depends on #750, the main metrics redesign'. Rank unchanged - the cross-reference is not new.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11242,8 +11260,11 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "importance": "low",
       "score": 15,
       "condition": "ok",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-2356"
+      ],
       "why": "Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport",
+      "rationale": "Re-derived github-ref membership and ordering this pass: PAN-2350's phase checklist reads 'Phase 4 - Shared Sessions v0 = #658, built ON the #2356 relay', so it is a child of the Anywhere epic and gated on the relay. Rank unchanged - the cross-reference is not new.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -12879,6 +12900,76 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.55
+    },
+    {
+      "from": "PAN-3517",
+      "to": "PAN-3518",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1641",
+      "to": "PAN-3011",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-465",
+      "to": "PAN-3011",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-1166",
+      "to": "PAN-2351",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1592",
+      "to": "PAN-2083",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-750",
+      "to": "PAN-769",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-1984",
+      "to": "PAN-1988",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-658",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1983",
+      "to": "PAN-1984",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2356",
+      "to": "PAN-658",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
