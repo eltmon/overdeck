@@ -34,6 +34,7 @@ export {
   resolveWorkspaceContextFile,
   piGlobalContextFile,
   codexGlobalContextFile,
+  primeAgentGlobalContextFile,
   GLOBAL_STARTER,
   PROJECT_STARTER,
   globalLayer,

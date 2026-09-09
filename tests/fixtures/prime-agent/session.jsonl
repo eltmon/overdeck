@@ -1,0 +1,7 @@
+{"type":"user","content":"Run the analysis"}
+{"type":"thinking","content":"I should inspect the data first"}
+{"type":"assistant","content":"I will inspect it."}
+{"type":"tool_call","name":"python","arguments":{"code":"print(42)"}}
+{"type":"tool_result","result":"42"}
+{"type":"compaction","summary":"Earlier analysis was compacted."}
+{"type":"error","error":"Python process exited"}

@@ -54,6 +54,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   acp: 'ACP',
   'kimi-code': 'Kimi Code',
   muse: 'Muse Code',
+  'prime-agent': 'Prime Agent',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
@@ -80,7 +81,7 @@ function harnessLabel(harness: Harness): string {
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   if (provider === 'meta') return ['muse'];
-  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
+  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex', 'prime-agent'];
   return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
 }
 

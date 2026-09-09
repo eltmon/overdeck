@@ -12,7 +12,7 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
@@ -22,6 +22,7 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
   { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Standard or Contributor models' },
   { id: 'kimi-code', label: 'Kimi Code', description: 'Moonshot Kimi Code CLI (native, Kimi models only)' },
+  { id: 'prime-agent', label: 'Prime Agent', description: 'Managed persistent Prime RPC session' },
 ];
 
 export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription (Terms of Service). Switch Anthropic to API-key auth, or pick a non-Anthropic model.';

@@ -28,8 +28,10 @@ import {
   type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
+  primeAgentGlobalContextFile,
 } from './context-layers/index.js';
 import { backupFileSync, createBackupTimestamp } from './backup.js';
+import { writeRenderedGlobalContext } from './context-layers/rendered-global.js';
 export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
@@ -565,6 +567,7 @@ export interface ContextLayerSyncResult {
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
+  primeAgentGlobalWritten: boolean;
   firstInjections: ContextFirstInjection[];
   legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
@@ -611,6 +614,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     projectsWritten: [],
     piGlobalWritten: false,
     codexGlobalWritten: false,
+    primeAgentGlobalWritten: false,
     firstInjections: [],
     legacyBeadsCleanups: [],
     errors: [],
@@ -634,30 +638,26 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   try {
     const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
-    const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
-    if (piManaged.trim() !== existingPi.trim()) {
-      mkdirSync(dirname(piGlobalFile), { recursive: true });
-      writeFileSync(piGlobalFile, piManaged.trim() + '\n', 'utf-8');
-      result.piGlobalWritten = true;
-    }
+    result.piGlobalWritten = writeRenderedGlobalContext(piGlobalFile, piManaged);
   } catch (err: any) {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
-  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md
-  // This static file is copied into each agent's CODEX_HOME/AGENTS.md at spawn time
-  // by initCodexHome(), keeping Codex context isolated from the project-root AGENTS.md.
+  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md.
   try {
     const codexManaged = renderGlobalLayer('codex', isDevMode());
     const codexGlobalFile = codexGlobalContextFile();
-    const existingCodex = existsSync(codexGlobalFile) ? readFileSync(codexGlobalFile, 'utf-8') : '';
-    if (codexManaged.trim() !== existingCodex.trim()) {
-      mkdirSync(dirname(codexGlobalFile), { recursive: true });
-      writeFileSync(codexGlobalFile, codexManaged.trim() + '\n', 'utf-8');
-      result.codexGlobalWritten = true;
-    }
+    result.codexGlobalWritten = writeRenderedGlobalContext(codexGlobalFile, codexManaged);
   } catch (err: any) {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
+  }
+
+  try {
+    const managed = renderGlobalLayer('prime-agent', isDevMode());
+    const file = primeAgentGlobalContextFile();
+    result.primeAgentGlobalWritten = writeRenderedGlobalContext(file, managed);
+  } catch (err: any) {
+    result.errors.push(`prime-agent-global: ${err?.message ?? err}`);
   }
 
   // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —

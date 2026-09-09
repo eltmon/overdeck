@@ -37,6 +37,7 @@ function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'codex') return 'Codex';
   if (harness === 'acp') return 'ACP';
   if (harness === 'kimi-code') return 'Kimi Code';
+  if (harness === 'prime-agent') return 'Prime Agent';
   // Unknown future harness — show the raw id rather than a wrong label.
   return harness;
 }

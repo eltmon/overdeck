@@ -66,6 +66,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { isPlanningComplete, readWorkspacePlan } from '../../../lib/xbrief/io.js';
+import { projectRuntimeSession } from '../services/runtime-session-projection.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -270,6 +271,7 @@ export async function fetchActivityDataWithContext(
     roundMetadata?: ReviewerRoundMetadata;
     modelOrigin?: ModelOriginData;
     planningComplete?: boolean;
+    harness?: string; lastActivity?: string; tokenUsage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }; cost?: number;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -339,10 +341,7 @@ export async function fetchActivityDataWithContext(
             : null;
       const agentSnapshot = context.agentSnapshotsById?.get(checkId);
 
-      // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
-
-      // Only expose interactive terminal for work/planning/strike sessions (PAN-821 review)
       const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike';
 
       // Terminal-end signal: endedAt is populated only when the session has
@@ -381,6 +380,7 @@ export async function fetchActivityDataWithContext(
         hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
         planningComplete: sectionType === 'planning' ? planningFinished : undefined,
+        ...projectRuntimeSession(checkId, state.harness ?? 'claude-code'),
       });
     } catch { /* skip malformed state */ }
   }

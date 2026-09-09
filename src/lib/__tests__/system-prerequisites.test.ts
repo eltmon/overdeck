@@ -50,6 +50,19 @@ describe('checkSystemPrerequisites', () => {
     });
   });
 
+  it('routes Prime Agent through its configured harness executable resolver', async () => {
+    const calls: Array<{ command: string; primeAgentHarness: boolean }> = [];
+    const report = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 0.1.0`,
+      async (command, options) => {
+        calls.push({ command, primeAgentHarness: options?.primeAgentHarness === true });
+        return `/resolved/bin/${command}`;
+      },
+    );
+    expect(calls).toContainEqual({ command: 'prime-agent', primeAgentHarness: true });
+    expect(report.checks.find((check) => check.id === 'prime-agent')).toMatchObject({ found: true });
+  });
+
   it('flags missing required tools and keeps optional misses non-blocking', async () => {
     const missingTmuxAndDocker = async (command: string) =>
       command === 'tmux' || command === 'docker' ? null : `/resolved/bin/${command}`;

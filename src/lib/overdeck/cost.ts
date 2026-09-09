@@ -511,7 +511,7 @@ export class CostWriter extends Context.Service<
     readonly record: (event: CostEvent, opts?: { dryRun?: boolean }) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime_agent' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -606,7 +606,7 @@ export const CostWriterLive = Layer.effect(
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
     const reconcile = (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime_agent' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -908,7 +908,7 @@ export const CostApi = HttpApiGroup.make('costs')
   .add(
     HttpApiEndpoint.post('reconcile', '/costs/reconcile', {
       payload: Schema.Struct({
-        source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'acp', 'wal'])),
+        source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'acp', 'prime_agent', 'wal'])),
         dryRun: Schema.optional(Schema.Boolean),
         extraRoots: Schema.optional(Schema.Array(Schema.String)),
       }),

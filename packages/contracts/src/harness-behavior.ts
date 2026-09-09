@@ -3,7 +3,7 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-rpc"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
@@ -11,6 +11,7 @@ export type HarnessDeliveryKind =
   | "codex-app-server-rpc"
   | "acp-host-rpc"
   | "tmux-paste"
+  | "prime-agent-rpc"
 export type HarnessReadinessKind =
   | "claude-session-signal"
   | "ohmypi-ready-file"
@@ -18,11 +19,12 @@ export type HarnessReadinessKind =
   | "codex-app-server-ready"
   | "acp-host-ready"
   | "kimi-session-signal"
+  | "prime-agent-ready"
   | "muse-tui-prompt"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "muse"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl" | "prime-agent-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log" | "prime-agent-session-id"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "muse" | "prime-agent"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse" | "prime_agent"
 
 export interface HarnessNativeCommand {
   readonly name: string
@@ -49,7 +51,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-rpc"
   readonly readyTimeoutSeconds: number
 }
 
@@ -177,6 +179,29 @@ export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 60,
 }
 
+export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
+  displayName: "Prime Agent",
+  nativeCommands: [],
+  executableName: "prime-agent",
+  processNames: ["prime-agent"],
+  launchCommandKind: "prime-agent-rpc",
+  deliveryKind: "prime-agent-rpc",
+  readinessKind: "prime-agent-ready",
+  transcriptKind: "prime-agent-jsonl",
+  sessionIdSource: "prime-agent-session-id",
+  contextLayerKind: "prime-agent",
+  feedKind: "prime_agent",
+  supportsPtySupervisor: false,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: true,
+  workAgentMode: "prime-agent-rpc",
+  readyTimeoutSeconds: 120,
+}
+
 export const MUSE_BEHAVIOR: HarnessBehavior = {
   displayName: "Muse Code",
   nativeCommands: [],
@@ -207,6 +232,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   acp: ACP_BEHAVIOR,
   "kimi-code": KIMI_CODE_BEHAVIOR,
   muse: MUSE_BEHAVIOR,
+  "prime-agent": PRIME_AGENT_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
@@ -215,6 +241,7 @@ export function getHarnessBehavior(harness: HarnessName | undefined | null): Har
   if (harness === "acp") return ACP_BEHAVIOR
   if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
   if (harness === "muse") return MUSE_BEHAVIOR
+  if (harness === "prime-agent") return PRIME_AGENT_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 

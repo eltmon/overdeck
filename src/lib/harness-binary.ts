@@ -18,6 +18,7 @@ export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   acp: 'kimi',
   'kimi-code': 'kimi',
   muse: 'muse',
+  'prime-agent': 'prime-agent',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
@@ -152,6 +153,7 @@ export function harnessBinaryName(harness: RuntimeName): string {
 export function configuredHarnessBinaryPath(harness: RuntimeName): string | undefined {
   if (harness === 'acp') return loadConfigSync().config.acp?.kimi?.binaryPath;
   if (harness === 'kimi-code') return loadConfigSync().config.kimiCode?.binaryPath;
+  if (harness === 'prime-agent') return loadConfigSync().config.primeAgent?.binaryPath;
   return undefined;
 }
 
@@ -188,7 +190,9 @@ export async function requireHarnessBinary(
         ? 'Codex CLI'
         : harness === 'kimi-code'
           ? 'Kimi Code CLI'
-          : 'Kimi Code CLI'; // acp drives the native Kimi Code CLI binary too
+          : harness === 'prime-agent'
+            ? 'Prime Agent'
+            : 'Kimi Code CLI'; // acp drives the native Kimi Code CLI binary too
   if (effectiveOptions.executablePath) {
     throw new Error(
       `${harnessName} configured executable "${effectiveOptions.executablePath}" was not found or is not executable. Fix its configured path, then restart Overdeck. No terminal session was created.`,

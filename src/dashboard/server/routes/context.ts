@@ -76,7 +76,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -443,6 +443,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '',
     previews.muse || '(no rendered context)',
     '',
+    '## Overdeck-controlled Prime Agent bundle',
+    '',
+    previews['prime-agent'] || '(no rendered context)',
+    '',
     '## Runtime-only sections',
     '',
     '- Memory retrieval: injected at agent spawn when enabled; unavailable in this layer editor preview.',
@@ -510,6 +514,7 @@ export async function previewContextLayers(
       acp: previews.acp,
       'kimi-code': previews['kimi-code'],
       muse: previews.muse,
+      'prime-agent': previews['prime-agent'],
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

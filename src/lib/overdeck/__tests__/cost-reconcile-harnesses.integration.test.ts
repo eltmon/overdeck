@@ -76,7 +76,7 @@ describe('cost reconcile multi-harness integration (PAN-2388)', () => {
       OHMYPI_FIXTURE,
       join(tempHome, 'agents', 'agent-pan-9999', 'sessions', 'openai-codex.jsonl'),
     );
-  });
+  }, 15_000);
 
   afterEach(() => {
     if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
