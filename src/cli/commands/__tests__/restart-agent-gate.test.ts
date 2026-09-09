@@ -261,21 +261,41 @@ describe('restartCommand agent deploy-window gate', () => {
     });
 
     it('--now approves and steps aside when another process already holds the restart lock', async () => {
+      process.env.OVERDECK_AGENT_ID = 'flywheel-orchestrator';
       mocks.readRestartLockHolder.mockReturnValue(Effect.succeed({
         pid: 4242,
         ts: Date.now(),
         caller: 'pan reload',
       }));
+      mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
       mocks.approveRestartGate.mockResolvedValue({ approved: true, pendingCount: 2 });
 
       await restartCommand({ dashboard: true, now: true });
 
+      expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
       expect(mocks.approveRestartGate).toHaveBeenCalledTimes(1);
       expect(mocks.claimRestartGate).not.toHaveBeenCalled();
       expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
       expect(mocks.restartDashboard).not.toHaveBeenCalled();
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining('PID 4242 (pan reload)'));
       expect(process.exitCode).toBeUndefined();
+    });
+
+    it('keeps agent restart-window protection for --now when no reload handoff exists', async () => {
+      process.env.OVERDECK_AGENT_ID = 'flywheel-orchestrator';
+      mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
+
+      await restartCommand({ dashboard: true, now: true });
+
+      expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
+        initiator: 'flywheel-orchestrator',
+        force: false,
+      });
+      expect(mocks.registerRestartGateRequest).not.toHaveBeenCalled();
+      expect(mocks.approveRestartGate).not.toHaveBeenCalled();
+      expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
     });
   });
 });
