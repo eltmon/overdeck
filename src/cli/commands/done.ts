@@ -42,7 +42,7 @@ import { compileGlob } from '../../lib/xbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
-import { postDoneDashboardJson } from './done-dashboard-client.js';
+import { postDoneDashboardJson, waitForDoneReviewHandoff } from './done-dashboard-client.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
 import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
@@ -898,38 +898,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
-    spinner.succeed(`Work complete: ${issueId}`);
-    emitActivityEntrySync({
-      source: 'work-agent',
-      level: 'info',
-      message: `${issueId} work complete — entering review pipeline`,
-      issueId,
-    });
-    emitActivityTtsSync({
-      utterance: `Work agent finished ${issueId}, entering review`,
-      priority: 2,
-      issueId,
-      source: 'work-agent',
-      eventType: 'workAgent.finished',
-    });
-    console.log('');
-
-    // Summary
-    console.log(chalk.bold('Summary:'));
-    console.log(`  Issue:   ${chalk.cyan(issueId)}`);
-    if (shadowModeActive) {
-      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
-    } else {
-      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
-    }
-    if (options.comment) {
-      console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
-    }
-    console.log('');
-
-    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
-    console.log('');
-
     // Auto-trigger review & test (respecting circuit breaker)
     try {
       const { getDashboardApiUrlSync } = await import('../../lib/config.js');
@@ -955,7 +923,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // recorded above means even total failure here is recovered by the host's reconcile-on-read;
       // this retry just makes the fast path resilient to a transient restart.
       const MAX_ATTEMPTS = 10;
-      let triggered = false;
+      let handoffObserved = false;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (await checkDashboard()) {
           console.log(chalk.dim(`Auto-triggering review & test${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ''}...`));
@@ -975,11 +943,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
             }
           }
 
-          // The dashboard responded (success OR a real verdict like alreadyReviewed) — this is not a
-          // transient outage, so stop retrying regardless of the verdict.
-          triggered = true;
           if (result.success) {
-            console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
+            const observation = await waitForDoneReviewHandoff(
+              dashboardUrl,
+              issueId,
+              reviewRequestedAt,
+            );
+            if (observation) {
+              handoffObserved = true;
+              const owner = observation.kind === 'verification'
+                ? 'verification is running'
+                : 'a review specialist was spawned';
+              console.log(chalk.green(`  ✓ Review & test handoff confirmed — ${owner}`));
+            }
           } else if (!result.alreadyMerged) {
             console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
             if (result.alreadyReviewed) {
@@ -997,16 +973,49 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       }
 
-      if (!triggered) {
-        console.log(chalk.yellow(`  ⚠ Dashboard unreachable after ${MAX_ATTEMPTS} attempts.`));
-        console.log(chalk.dim(`    Review intent is recorded durably — it will auto-dispatch when the dashboard next reads ${issueId}'s status. No action needed.`));
+      if (!handoffObserved) {
+        throw new Error(
+          `Review handoff was not observed for ${issueId}. Recover with: pan review request ${issueId}`,
+        );
       }
     } catch (error: any) {
-      // Don't fail the done command if auto-review fails
-      console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
+      const detail = error instanceof Error ? error.message : String(error);
+      if (detail.includes('Recover with:')) throw error;
+      throw new Error(
+        `Review handoff failed for ${issueId}: ${detail}. Recover with: pan review request ${issueId}`,
+      );
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    spinner.succeed(`Work complete: ${issueId}`);
+    emitActivityEntrySync({
+      source: 'work-agent',
+      level: 'info',
+      message: `${issueId} work complete — entering review pipeline`,
+      issueId,
+    });
+    emitActivityTtsSync({
+      utterance: `Work agent finished ${issueId}, entering review`,
+      priority: 2,
+      issueId,
+      source: 'work-agent',
+      eventType: 'workAgent.finished',
+    });
+    console.log('');
+
+    console.log(chalk.bold('Summary:'));
+    console.log(`  Issue:   ${chalk.cyan(issueId)}`);
+    if (shadowModeActive) {
+      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
+    } else {
+      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
+    }
+    if (options.comment) {
+      console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
+    }
+    console.log('');
+
+    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
+    console.log('');
 
   } catch (error: any) {
     spinner.fail(error.message);
