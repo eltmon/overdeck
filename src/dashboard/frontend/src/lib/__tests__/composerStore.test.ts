@@ -78,15 +78,14 @@ describe('composerStore retryFailed — a retry never loses the text', () => {
     await useComposerStore.getState().retryFailed(CONV, id, 'hello', 3);
 
     const slice = useComposerStore.getState().byConversation[CONV];
-    // Outbox cleared, text now tracked as optimistic so the stall/compaction net
-    // in ConversationView can recover it if the agent eats it during a compaction.
+    // Outbox cleared; accepted text stays visible until its transcript echo arrives.
     expect(slice.failed).toEqual([]);
     expect(slice.optimistic.map((m) => m.text)).toEqual(['hello']);
     expect(slice.optimisticBaseCount).toBe(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/conversations/${CONV}/message`,
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ message: 'hello' }) }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ message: 'hello', clientMessageId: slice.optimistic[0].clientMessageId, retry: true }) }),
     );
   });
 

@@ -37,6 +37,7 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
+import { usePriorityConversation } from './usePriorityConversation';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -469,11 +470,13 @@ export function CommandDeck({
     return map;
   }, [issues]);
 
-  const { data: conversations = [] } = useQuery({
+  const { data: conversationList = [] } = useQuery({
     queryKey: ['conversations'],
     queryFn: fetchConversations,
     refetchInterval: 10000,
   });
+
+  const { conversations, error: conversationRouteError } = usePriorityConversation(convId, conversationList);
 
   // Partition conversations into project-scoped vs unscoped
   const { projectConversations } = useMemo(() => {
@@ -579,24 +582,11 @@ export function CommandDeck({
 
   // On mount or when convId changes (popstate), apply the deep-link: switch to
   // the conversation's project and open it as an agent tab in that deck.
-  const convDeepLinkRetry = useRef({ id: null as string | null, count: 0 });
   useEffect(() => {
-    if (!convId || conversations.length === 0) return;
+    if (!convId || !registeredProjectsFetched || registeredProjectsError) return;
     if (convId === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
-    if (!conv) {
-      // The deep-link targets a conversation the 10s poll hasn't surfaced yet
-      // (just created). Refresh promptly instead of waiting out the poll —
-      // with a small retry budget so a genuinely-unknown id doesn't loop.
-      if (convDeepLinkRetry.current.id !== convId) convDeepLinkRetry.current = { id: convId, count: 0 };
-      if (convDeepLinkRetry.current.count < 5) {
-        convDeepLinkRetry.current.count += 1;
-        const timer = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['conversations'] }), 700);
-        return () => clearTimeout(timer);
-      }
-      return;
-    }
-    convDeepLinkRetry.current = { id: null, count: 0 };
+    if (!conv) return;
     setSelectedConversation(conv.name);
     setSelectedFeature(null);
     const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
@@ -613,7 +603,7 @@ export function CommandDeck({
     openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
     if (target) onPendingConversationTargetConsumed?.();
     appliedConvId.current = convId;
-  }, [convId, conversations, queryClient, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
@@ -1504,6 +1494,7 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
+          {conversationRouteError && <p role="alert">{conversationRouteError.message}</p>}
           {isProjectValidationPending ? <ProjectPendingState onRetry={() => void refetchRegisteredProjects()} />
           : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
           : showUnknownProject ? (

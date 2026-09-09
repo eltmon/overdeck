@@ -300,11 +300,11 @@ describe('ComposerFooter attachments', () => {
         '/api/conversations/test-conv/message',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ message: '@/tmp/overdeck-paste-uploaded.png\nhello world' }),
+          body: JSON.stringify({ message: '@/tmp/overdeck-paste-uploaded.png\nhello world', clientMessageId: 'image-1' }),
         }),
       );
     });
-    expect(onSend).toHaveBeenCalledWith('@/tmp/overdeck-paste-uploaded.png\nhello world');
+    expect(onSend).toHaveBeenCalledWith('@/tmp/overdeck-paste-uploaded.png\nhello world', 'image-1');
     expect(screen.queryByText('paste.png')).not.toBeInTheDocument();
   });
 
@@ -364,7 +364,7 @@ describe('ComposerFooter attachments', () => {
       '/api/conversations/test-conv/message',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ message: '/pan status' }),
+        body: JSON.stringify({ message: '/pan status', clientMessageId: 'image-1' }),
       }),
     ));
     expect(onSend).not.toHaveBeenCalled();
@@ -672,12 +672,12 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
-    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi'));
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi', 'image-1'));
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/conversations/test-conv/message',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ message: 'hello pi', deliverAs: 'follow_up' }),
+        body: JSON.stringify({ message: 'hello pi', clientMessageId: 'image-1', deliverAs: 'follow_up' }),
       }),
     );
   });
@@ -694,12 +694,12 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
-    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi'));
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi', 'image-1'));
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/conversations/test-conv/message',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ message: 'hello pi' }),
+        body: JSON.stringify({ message: 'hello pi', clientMessageId: 'image-1' }),
       }),
     );
   });
