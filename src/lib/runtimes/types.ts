@@ -41,7 +41,11 @@ export type {
  * by normalizeHarness() on read. normalizeHarness still accepts the raw string
  * 'pi' as input so old rows round-trip safely.
  */
+<<<<<<< HEAD
 export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
+=======
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
 
 /**
  * Legacy harness strings that can still appear in persisted state or older

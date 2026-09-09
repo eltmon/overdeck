@@ -8,7 +8,11 @@ import {
   type CrewEntry,
 } from './tiered-crews';
 
+<<<<<<< HEAD
 const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'];
+=======
+const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse'];
+>>>>>>> origin/main
 
 function ModelSelect({ value, onChange, label = 'Model' }: { value: string; onChange: (value: string) => void; label?: string }) {
   return <label className="space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span><select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground">

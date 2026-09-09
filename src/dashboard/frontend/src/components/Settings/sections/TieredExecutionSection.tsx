@@ -33,7 +33,11 @@ interface EditableCrewState {
 }
 
 const ITEM_KINDS = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
+<<<<<<< HEAD
 const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'];
+=======
+const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse'];
+>>>>>>> origin/main
 const CALLOUTS = ['off', 'notify', 'corroborate'] as const;
 // Defaults must NEVER be a frontier model (fable/opus). The first catalog
 // entries are premium models, and defaulting new crews/the supervisor to

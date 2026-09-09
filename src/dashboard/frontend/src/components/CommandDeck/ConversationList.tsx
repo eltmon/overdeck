@@ -46,7 +46,11 @@ export interface Conversation {
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
+<<<<<<< HEAD
   harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent' | null;
+=======
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
+>>>>>>> origin/main
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
   /** Async fork provisioning status. Null = not a fork or completed. */

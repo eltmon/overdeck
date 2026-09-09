@@ -21,10 +21,17 @@ export type HarnessReadinessKind =
   | "kimi-session-signal"
   | "prime-agent-ready"
   | "muse-tui-prompt"
+<<<<<<< HEAD
 export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl" | "prime-agent-jsonl"
 export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log" | "prime-agent-session-id"
 export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "muse" | "prime-agent"
 export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse" | "prime_agent"
+=======
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse"
+>>>>>>> origin/main
 
 export interface HarnessNativeCommand {
   readonly name: string
@@ -179,6 +186,7 @@ export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 60,
 }
 
+<<<<<<< HEAD
 export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
   displayName: "Prime Agent",
   nativeCommands: [],
@@ -200,6 +208,14 @@ export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
   injectsPromptTimeMemory: true,
   workAgentMode: "prime-agent-rpc",
   readyTimeoutSeconds: 120,
+=======
+export const OPENCODE_BEHAVIOR: HarnessBehavior = {
+  ...ACP_BEHAVIOR,
+  displayName: "OpenCode",
+  contextLayerKind: "opencode",
+  executableName: "opencode",
+  processNames: ["acp-host", "opencode"],
+>>>>>>> origin/main
 }
 
 export const MUSE_BEHAVIOR: HarnessBehavior = {
@@ -226,6 +242,7 @@ export const MUSE_BEHAVIOR: HarnessBehavior = {
 }
 
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
+  "opencode": OPENCODE_BEHAVIOR,
   "claude-code": CLAUDE_CODE_BEHAVIOR,
   ohmypi: OHMYPI_BEHAVIOR,
   codex: CODEX_BEHAVIOR,
@@ -238,6 +255,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
   if (harness === "ohmypi" || harness === "pi") return OHMYPI_BEHAVIOR
   if (harness === "codex") return CODEX_BEHAVIOR
+  if (harness === "opencode") return OPENCODE_BEHAVIOR
   if (harness === "acp") return ACP_BEHAVIOR
   if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
   if (harness === "muse") return MUSE_BEHAVIOR

@@ -2,7 +2,11 @@ import { Schema } from "effect"
 import type { Harness } from "./types"
 
 export const CONTEXT_LAYER_KINDS = ["global", "project", "workspace"] as const
+<<<<<<< HEAD
 export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "muse", "prime-agent"] as const satisfies readonly Harness[]
+=======
+export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse"] as const satisfies readonly Harness[]
+>>>>>>> origin/main
 
 export const ContextLayerKind = Schema.Literals(CONTEXT_LAYER_KINDS)
 export type ContextLayerKind = typeof ContextLayerKind.Type
@@ -96,11 +100,7 @@ export const ContextLayerDraft = Schema.Struct({
 export type ContextLayerDraft = typeof ContextLayerDraft.Type
 
 /**
- * A rendered output file `pan sync` writes a Overdeck-managed region into
- * (e.g. ~/.claude/CLAUDE.md, a project's CLAUDE.md or AGENTS.md). Distinct from
- * the editable *layer source* files — this describes the injection *target* so
- * the dashboard can show the user exactly where context lands and reassure them
- * their own content is preserved.
+ * An Overdeck-owned rendered artifact delivered only to managed sessions.
  */
 export const ContextSyncTarget = Schema.Struct({
   harness: ContextPreviewHarness,
@@ -111,10 +111,9 @@ export const ContextSyncTarget = Schema.Struct({
   /** Resolved absolute path of the target file. */
   path: Schema.String,
   exists: Schema.Boolean,
-  /** True when the file already contains a Overdeck-managed region. */
-  hasManagedRegion: Schema.Boolean,
-  /** True when the file has hand-authored content outside the managed region. */
-  hasUserContent: Schema.Boolean,
+  deliveryChannel: Schema.Literals(["claude-append-system-prompt", "pi-append-system-prompt", "codex-developer-instructions"]),
+  byteCount: Schema.Number,
+  sha256: Schema.optional(Schema.String),
 })
 export type ContextSyncTarget = typeof ContextSyncTarget.Type
 
@@ -123,7 +122,7 @@ export const ContextLayersResponse = Schema.Struct({
   projects: Schema.Array(ContextProjectSummary),
   workspaces: Schema.Array(ContextWorkspaceSummary),
   layers: Schema.Array(ContextEditableLayerRecord),
-  /** Injection targets `pan sync` writes managed regions into. */
+  /** Overdeck-owned artifacts delivered at managed-session launch. */
   targets: Schema.Array(ContextSyncTarget),
 })
 export type ContextLayersResponse = typeof ContextLayersResponse.Type
@@ -141,6 +140,7 @@ export const ContextHarnessPreviews = Schema.Struct({
   codex: Schema.String,
   acp: Schema.String,
   "kimi-code": Schema.String,
+  opencode: Schema.optional(Schema.String),
   muse: Schema.String,
   "prime-agent": Schema.String,
   fullPrompt: Schema.String,

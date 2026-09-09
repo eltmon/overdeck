@@ -20,7 +20,11 @@ const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
+<<<<<<< HEAD
   harness?: RuntimeName;
+=======
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
   effort?: RoleEffort;
   dryRun?: boolean;
 }

@@ -93,7 +93,11 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
+<<<<<<< HEAD
   harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent' | null;
+=======
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
+>>>>>>> origin/main
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
   error?: string;

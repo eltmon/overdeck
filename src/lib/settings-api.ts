@@ -4,6 +4,7 @@
  * Provides API-compatible interface for settings management.
  * Converts between YAML config format and frontend API format.
  */
+export { getAvailableModelsApi } from './settings-model-catalog.js';
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
@@ -136,6 +137,8 @@ export interface ApiSettingsConfig {
       openrouter: boolean;
       nous: boolean;
       dashscope: boolean;
+      opencode?: boolean;
+      "opencode-go"?: boolean;
       meta?: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
@@ -294,27 +297,9 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
-type AvailableModel = {
-  id: ModelId;
-  name: string;
-  costPer1MTokens: number;
-  contextWindow: number;
-  /**
-   * Kimi-only: which harness family this id launches under. `claude-code` ids
-   * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
-   * CLI's catalog (also used by the ACP transport). Conversation pickers use
-   * this to render harness-labeled rows and to send the row's harness at
-   * spawn; config panels can ignore it.
-   */
-  harness?: RuntimeName;
-  /** Effort levels the row's harness actually offers (Kimi rows only today). */
-  effortLevels?: readonly string[];
-  /** Display name without any harness suffix — pickers compose row labels from it. */
-  baseName?: string;
-};
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta', AvailableModel[]>;
+
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -503,15 +488,15 @@ function validateModelRef(
   }
 
   const resolved = resolveModelIdSync(ref);
-  if (!hasModelCapabilitySync(resolved)) {
+  if (!/^opencode(?:-go)?\/[^\s/]+$/.test(resolved) && !hasModelCapabilitySync(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, muse, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -711,6 +696,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
+        opencode: config.enabledProviders.has('opencode'),
+        'opencode-go': config.enabledProviders.has('opencode-go'),
         meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
@@ -952,6 +939,8 @@ async function saveSettingsApiPromiseUnlocked(
         openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
         nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
+        opencode: providerConfigForSave('opencode', settings.models.providers.opencode ?? false, settings, currentConfig),
+        'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig),
         meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
@@ -1221,8 +1210,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, muse, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string`);
         }
       }
     }
@@ -1377,117 +1366,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     errors,
     warnings,
   };
-}
-
-/**
- * Get available models by provider (for model selection UI)
- */
-/**
- * Annotate Kimi entries with the harness their id space belongs to and the
- * effort levels that route actually offers (ground truth:
- * MODEL_CAPABILITIES.effortLevels — the native `kimi` binary's /effort offers
- * low/high/max for kimi-code/* ids; claude-code's /effort offers all five for
- * the bare Anthropic-route ids). `kimi-code/*` ids only launch via the native
- * CLI (kimi-code harness or ACP transport), so the picker-facing `name`
- * carries the "— Kimi Code CLI" marker wherever the row is shown without
- * harness context; bare ids are the claude-code route. Keeps flat config
- * panels honest (two "Kimi K3 (1M)" rows with different validity would be a
- * trap) while conversation pickers compose their own per-row labels from
- * baseName.
- */
-function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
-  if (modelId.startsWith('kimi-code/')) {
-    return {
-      ...entry,
-      name: `${entry.name} — Kimi Code CLI`,
-      baseName: entry.name,
-      harness: 'kimi-code',
-      effortLevels,
-    };
-  }
-  return {
-    ...entry,
-    baseName: entry.name,
-    harness: 'claude-code',
-    effortLevels,
-  };
-}
-
-export function getAvailableModelsApi(): AvailableModelsApi {
-  const result: AvailableModelsApi = {
-    anthropic: [],
-    openai: [],
-    google: [],
-    minimax: [],
-    zai: [],
-    kimi: [],
-    mimo: [],
-    openrouter: [],
-    nous: [],
-    dashscope: [],
-    meta: [],
-  };
-
-  for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Retain historical capabilities, but expose only active selections.
-    if (capability.displayName.includes('(deprecated)')) continue;
-    if (modelId in MODEL_DEPRECATIONS) continue;
-    const contextWindow = capability.contextWindow;
-    const name = capability.displayName.replace(/\s*\(?[\d.]+[KM]\)?$/, '');
-    const contextLabel = contextWindow === 1_048_576 ? '1M' : contextWindow === 262_144 ? '256K' : contextWindow >= 1_000_000 ? `${Number((contextWindow / 1_000_000).toFixed(3))}M` : `${Number((contextWindow / 1000).toFixed(3))}K`;
-    const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
-    const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
-    switch (capability.provider) {
-      case 'meta':
-        result.meta.push({ ...entry, harness: 'muse', effortLevels: capability.effortLevels });
-        break;
-      case 'anthropic':
-        result.anthropic.push(annotated);
-        break;
-      case 'openai':
-        result.openai.push(annotated);
-        break;
-      case 'google':
-        result.google.push(annotated);
-        break;
-      case 'kimi':
-        result.kimi.push(annotated);
-        break;
-      case 'minimax':
-        result.minimax.push(annotated);
-        break;
-      case 'zai':
-        result.zai.push(annotated);
-        break;
-      case 'mimo':
-        result.mimo.push(annotated);
-        break;
-      case 'openrouter':
-        result.openrouter.push(annotated);
-        break;
-      case 'nous':
-        result.nous.push(annotated);
-        break;
-      case 'dashscope':
-        result.dashscope.push(annotated);
-        break;
-    }
-  }
-
-  // Order OpenAI models with latest family first: gpt-6-astra → 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
-  const openaiOrder: Record<string, number> = {
-    'gpt-6-astra': 0,
-    'gpt-5.6-sol': 1, 'gpt-5.6-terra': 2, 'gpt-5.6-luna': 3,
-    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
-    'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
-    'gpt-5.3-codex': 30,
-    'gpt-5.2': 40,
-    'o3': 50, 'o4-mini': 51,
-    'gpt-4o': 60, 'gpt-4o-mini': 61,
-  };
-  result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
-
-  return result;
 }
 
 /**

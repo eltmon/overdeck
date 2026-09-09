@@ -207,7 +207,11 @@ function parseAgentRole(value: string | undefined): ArtifactMetadata['agentRole'
 }
 
 export function parseAgentHarness(value: string | undefined): ArtifactMetadata['agentHarness'] {
+<<<<<<< HEAD
   if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'muse' || value === 'prime-agent' || value === 'user') {
+=======
+  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'user') {
+>>>>>>> origin/main
     return value;
   }
   return null;

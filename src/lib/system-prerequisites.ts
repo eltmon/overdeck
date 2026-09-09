@@ -57,6 +57,16 @@ export interface SetupDiagnosticsReport {
 
 export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
   {
+    id: 'opencode', name: 'OpenCode', required: false,
+    purpose: 'Runs OpenCode agents and conversations with Go and Zen',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'npm install -g opencode-ai@latest',
+      mac: 'brew install anomalyco/tap/opencode',
+      win: 'npm install -g opencode-ai@latest',
+    },
+  },
+  {
     id: 'tmux',
     name: 'tmux',
     required: true,

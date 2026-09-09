@@ -11,6 +11,11 @@ import {
 describe('shared branding registry', () => {
   it('defines every provider and harness brand with labels, colors, and icons', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
+<<<<<<< HEAD
+=======
+      'opencode',
+      'opencode-go',
+>>>>>>> origin/main
       'meta',
       'anthropic',
       'openai',
@@ -23,13 +28,23 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
+<<<<<<< HEAD
     expect(Object.keys(HARNESS_BRANDS)).toEqual(['muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'prime-agent']);
+=======
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code']);
+>>>>>>> origin/main
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
       expect(brand.label).toBeTruthy();
       expect(brand.color).toMatch(/^#/);
+<<<<<<< HEAD
       expect(['function', 'object']).toContain(typeof brand.Icon);
+=======
+      const { container, unmount } = render(<brand.Icon />);
+      expect(container.querySelector('svg')).toBeInTheDocument();
+      unmount();
+>>>>>>> origin/main
     }
   });
 

@@ -6,7 +6,11 @@ export type FlywheelRunId = typeof FlywheelRunId.Type
 export const FlywheelHttpUrl = Schema.String.check(Schema.isPattern(/^https?:\/\/\S+$/i))
 export type FlywheelHttpUrl = typeof FlywheelHttpUrl.Type
 
+<<<<<<< HEAD
 export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "muse", "prime-agent"])
+=======
+export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse"])
+>>>>>>> origin/main
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
   model: string

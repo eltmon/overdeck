@@ -1,22 +1,17 @@
 /**
  * Multi-Tool Skill Sync
  *
- * Writes Overdeck skills to other AI tool formats so skills authored once
- * in .pan/skills/ are available across all configured tools.
+ * Deprecated compatibility surface for the retired `tools.also_sync` option.
  *
  * Configured via `tools.also_sync` in ~/.overdeck/config.yaml and .pan.yaml.
  * Per-project .pan.yaml values are merged additively with global config.
  *
- * Supported targets:
- *   cursor    → .cursor/rules/<skill-name>.mdc
- *   codex     → AGENTS.md (named blocks)
- *   windsurf  → .windsurf/rules/<skill-name>.md
- *   cline     → .clinerules/<skill-name>.md
- *   copilot   → .github/instructions/<skill-name>.instructions.md
- *   aider     → CONVENTIONS.md (named blocks)
+ * PAN-3779 makes every harness-native repository file user-owned. These APIs
+ * remain temporarily so old config and callers do not crash, but they never
+ * create or mutate repository files.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -33,36 +28,6 @@ export interface MultiToolSyncResult {
   errors: string[];
 }
 
-/** Strip YAML frontmatter from a skill markdown file */
-function stripFrontmatter(content: string): string {
-  if (!content.startsWith('---')) return content;
-  const end = content.indexOf('\n---', 4);
-  if (end === -1) return content;
-  return content.slice(end + 4).trimStart();
-}
-
-/** Extract the skill name from frontmatter, or fall back to dir name */
-function extractSkillName(content: string, fallback: string): string {
-  if (!content.startsWith('---')) return fallback;
-  const end = content.indexOf('\n---', 4);
-  if (end === -1) return fallback;
-  const frontmatter = content.slice(4, end);
-  const match = frontmatter.match(/^name:\s*(.+)$/m);
-  return match ? match[1].trim() : fallback;
-}
-
-/** Read main SKILL.md content for a skill directory */
-function readSkillContent(skillDir: string): string | null {
-  const skillMd = join(skillDir, 'SKILL.md');
-  if (!existsSync(skillMd)) {
-    // Fallback: any .md file in root
-    const files = existsSync(skillDir) ? readdirSync(skillDir).filter(f => f.endsWith('.md')) : [];
-    if (files.length === 0) return null;
-    return readFileSync(join(skillDir, files[0]), 'utf-8');
-  }
-  return readFileSync(skillMd, 'utf-8');
-}
-
 /** Collect all skill directories from the given skills root */
 function collectSkillDirs(skillsDir: string): Array<{ name: string; dir: string }> {
   if (!existsSync(skillsDir)) return [];
@@ -71,86 +36,7 @@ function collectSkillDirs(skillsDir: string): Array<{ name: string; dir: string 
     .map(e => ({ name: e.name, dir: join(skillsDir, e.name) }));
 }
 
-/**
- * Update or insert a named block in a file.
- * Blocks are delimited by: <!-- overdeck:<skill-name> start --> ... <!-- overdeck:<skill-name> end -->
- */
-function upsertNamedBlock(filePath: string, blockName: string, content: string): void {
-  const startTag = `<!-- overdeck:${blockName} start -->`;
-  const endTag = `<!-- overdeck:${blockName} end -->`;
-  const block = `${startTag}\n${content}\n${endTag}`;
-
-  let existing = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
-
-  const startIdx = existing.indexOf(startTag);
-  const endIdx = existing.indexOf(endTag);
-
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    // Replace existing block
-    existing = existing.slice(0, startIdx) + block + existing.slice(endIdx + endTag.length);
-  } else {
-    // Append new block
-    if (existing.length > 0 && !existing.endsWith('\n')) existing += '\n';
-    existing += '\n' + block + '\n';
-  }
-
-  writeFileSync(filePath, existing, 'utf-8');
-}
-
-/** Sync a single skill to the cursor target */
-function syncToCursor(projectPath: string, skillName: string, rawContent: string): void {
-  const rulesDir = join(projectPath, '.cursor', 'rules');
-  mkdirSync(rulesDir, { recursive: true });
-  const body = stripFrontmatter(rawContent);
-  // .mdc files: standard markdown, cursor accepts them as context rules
-  writeFileSync(join(rulesDir, `${skillName}.mdc`), body, 'utf-8');
-}
-
-/** Sync a single skill to the windsurf target */
-function syncToWindsurf(projectPath: string, skillName: string, rawContent: string): void {
-  const rulesDir = join(projectPath, '.windsurf', 'rules');
-  mkdirSync(rulesDir, { recursive: true });
-  writeFileSync(join(rulesDir, `${skillName}.md`), stripFrontmatter(rawContent), 'utf-8');
-}
-
-/** Sync a single skill to the cline target */
-function syncToCline(projectPath: string, skillName: string, rawContent: string): void {
-  const rulesDir = join(projectPath, '.clinerules');
-  mkdirSync(rulesDir, { recursive: true });
-  writeFileSync(join(rulesDir, `${skillName}.md`), stripFrontmatter(rawContent), 'utf-8');
-}
-
-/** Sync a single skill to the copilot target */
-function syncToCopilot(projectPath: string, skillName: string, rawContent: string): void {
-  const instructionsDir = join(projectPath, '.github', 'instructions');
-  mkdirSync(instructionsDir, { recursive: true });
-  writeFileSync(
-    join(instructionsDir, `${skillName}.instructions.md`),
-    stripFrontmatter(rawContent),
-    'utf-8',
-  );
-}
-
-/** Sync a single skill to AGENTS.md (codex) as a named block */
-function syncToCodex(projectPath: string, skillName: string, rawContent: string): void {
-  const agentsMd = join(projectPath, 'AGENTS.md');
-  upsertNamedBlock(agentsMd, skillName, `## ${skillName}\n\n${stripFrontmatter(rawContent)}`);
-}
-
-/** Sync a single skill to CONVENTIONS.md (aider) as a named block */
-function syncToAider(projectPath: string, skillName: string, rawContent: string): void {
-  const conventionsMd = join(projectPath, 'CONVENTIONS.md');
-  upsertNamedBlock(conventionsMd, skillName, `## ${skillName}\n\n${stripFrontmatter(rawContent)}`);
-}
-
-const TOOL_WRITERS: Record<AlsoSyncTool, (projectPath: string, name: string, content: string) => void> = {
-  cursor: syncToCursor,
-  windsurf: syncToWindsurf,
-  cline: syncToCline,
-  copilot: syncToCopilot,
-  codex: syncToCodex,
-  aider: syncToAider,
-};
+const RETIRED_TOOLS = new Set<AlsoSyncTool>(['cursor', 'codex', 'windsurf', 'cline', 'copilot', 'aider']);
 
 /**
  * Resolve the merged list of tools to sync.
@@ -166,7 +52,7 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
       const parsed = yaml.load(readFileSync(globalConfig, 'utf-8')) as any;
       const globalTools: string[] = parsed?.tools?.also_sync || [];
       for (const t of globalTools) {
-        if (t in TOOL_WRITERS) tools.add(t as AlsoSyncTool);
+        if (RETIRED_TOOLS.has(t as AlsoSyncTool)) tools.add(t as AlsoSyncTool);
       }
     } catch { /* ignore parse errors */ }
   }
@@ -181,7 +67,7 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
         const parsed = yaml.load(readFileSync(configPath, 'utf-8')) as any;
         const projectTools: string[] = parsed?.tools?.also_sync || [];
         for (const t of projectTools) {
-          if (t in TOOL_WRITERS) tools.add(t as AlsoSyncTool);
+          if (RETIRED_TOOLS.has(t as AlsoSyncTool)) tools.add(t as AlsoSyncTool);
         }
       } catch { /* ignore parse errors */ }
     }
@@ -191,7 +77,8 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
 }
 
 /**
- * Sync skills from a skills directory to all configured tools.
+ * Report skills that would previously have been synced. No repository files
+ * are touched; every entry is returned as skipped.
  *
  * @param skillsDir  Directory containing skill subdirectories
  * @param projectPath  Project root where tool targets live
@@ -204,32 +91,9 @@ export function syncSkillsToToolsSync(
 ): MultiToolSyncResult[] {
   if (tools.length === 0 || !existsSync(skillsDir)) return [];
 
-  const skills = collectSkillDirs(skillsDir);
-  const results: MultiToolSyncResult[] = [];
-
-  for (const tool of tools) {
-    const writer = TOOL_WRITERS[tool];
-    const result: MultiToolSyncResult = { tool, written: [], skipped: [], errors: [] };
-
-    for (const { name, dir } of skills) {
-      try {
-        const rawContent = readSkillContent(dir);
-        if (!rawContent) {
-          result.skipped.push(name);
-          continue;
-        }
-        const displayName = extractSkillName(rawContent, name);
-        writer(projectPath, displayName, rawContent);
-        result.written.push(name);
-      } catch (err: any) {
-        result.errors.push(`${name}: ${err.message}`);
-      }
-    }
-
-    results.push(result);
-  }
-
-  return results;
+  void projectPath;
+  const names = collectSkillDirs(skillsDir).map(({ name }) => name);
+  return tools.map((tool) => ({ tool, written: [], skipped: [...names], errors: [] }));
 }
 
 /**
@@ -289,4 +153,3 @@ export const runMultiToolSync = (projectPath: string): Effect.Effect<MultiToolSy
     try: () => runMultiToolSyncSync(projectPath),
     catch: (cause) => new FsError({ path: projectPath, operation: 'runMultiToolSync', cause }),
   });
-

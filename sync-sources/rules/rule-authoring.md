@@ -22,9 +22,9 @@ bundled rule in the overdeck repo:
 3. **`scope: universal` costs context in every session on every machine** —
    keep it as short as the rule allows. `scope: dev` folds in only on a
    overdeck source checkout; mechanics and tooling detail belong there.
-4. Run `pan sync`, then verify the rule landed in the rendered harness context
-   files: `~/.claude/CLAUDE.md` (managed region), `~/.overdeck/context/pi-global.md`,
-   and `~/.overdeck/context/codex-global.md`.
+4. Run `pan sync`, then verify the rule landed in the Overdeck-owned launch
+   artifacts: `~/.overdeck/context/claude-global.md`, `pi-global.md`, and
+   `codex-global.md`.
 5. Commit and push — bundled rules ship with the package, so an uncommitted
    rule exists only on this machine.
 6. If the rule introduces new canonical terminology, update

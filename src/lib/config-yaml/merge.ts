@@ -51,8 +51,13 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
+<<<<<<< HEAD
   if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse' && harness !== 'prime-agent') {
     throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, muse, or prime-agent`);
+=======
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
+>>>>>>> origin/main
   }
 }
 
@@ -213,6 +218,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorPsiFullShedAvg10: DEFAULT_CONFIG.resources.governorPsiFullShedAvg10,
       governorPsiCalmReadmitAvg10: DEFAULT_CONFIG.resources.governorPsiCalmReadmitAvg10,
       governorPsiCalmWindowMs: DEFAULT_CONFIG.resources.governorPsiCalmWindowMs,
+      governorCpuSoftLoadPerCore: DEFAULT_CONFIG.resources.governorCpuSoftLoadPerCore,
+      governorCpuRecoveryLoadPerCore: DEFAULT_CONFIG.resources.governorCpuRecoveryLoadPerCore,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -397,6 +404,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       } else if (providers.dashscope !== undefined) {
         explicitlyDisabled.add('dashscope');
       }
+    }
+
+    for (const provider of ['opencode', 'opencode-go'] as const) {
+      const raw = config.models?.providers?.[provider];
+      if (raw === undefined) continue;
+      const normalized = normalizeProviderConfig(raw);
+      applyProviderHarness(result, provider, normalized.harness);
+      if (normalized.enabled) result.enabledProviders.add(provider);
+      else explicitlyDisabled.add(provider);
     }
 
     // Merge tmux configuration
@@ -732,6 +748,20 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ) {
         result.resources.governorPsiCalmWindowMs = config.resources.governor_psi_calm_window_ms;
       }
+      if (
+        typeof config.resources.governor_cpu_soft_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_soft_load_per_core)
+        && config.resources.governor_cpu_soft_load_per_core > 0
+      ) {
+        result.resources.governorCpuSoftLoadPerCore = config.resources.governor_cpu_soft_load_per_core;
+      }
+      if (
+        typeof config.resources.governor_cpu_recovery_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_recovery_load_per_core)
+        && config.resources.governor_cpu_recovery_load_per_core >= 0
+      ) {
+        result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
+      }
       // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
       // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
@@ -745,6 +775,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.resources.governorSwapRecoveryFreePercent = Math.min(
           result.resources.governorSwapSoftFreePercent + 10,
           100,
+        );
+      }
+      if (result.resources.governorCpuRecoveryLoadPerCore >= result.resources.governorCpuSoftLoadPerCore) {
+        throw new Error(
+          'config.yaml: resources.governor_cpu_recovery_load_per_core must be lower than '
+          + 'resources.governor_cpu_soft_load_per_core — lower CPU load is healthier',
         );
       }
     }

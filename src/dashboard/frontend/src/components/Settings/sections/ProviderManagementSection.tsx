@@ -52,12 +52,15 @@ const HARNESS_LABELS: Record<Harness, string> = {
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
   acp: 'ACP',
+  opencode: 'OpenCode',
   'kimi-code': 'Kimi Code',
   muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
+  { id: 'opencode', name: 'OpenCode Zen', placeholder: '' },
+  { id: 'opencode-go', name: 'OpenCode Go', placeholder: '' },
   { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
   { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
   { id: 'google', name: 'Google', placeholder: 'AIza...' },
@@ -80,6 +83,7 @@ function harnessLabel(harness: Harness): string {
  * provider would write a config that fails at every spawn.
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
+  if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
   if (provider === 'meta') return ['muse'];
   const shared: Harness[] = ['claude-code', 'ohmypi', 'codex', 'prime-agent'];
   return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
@@ -245,6 +249,7 @@ export function ProviderManagementSection({
         <div className="space-y-1">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';
+            const isOpenCode = provider.id === 'opencode' || provider.id === 'opencode-go';
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
@@ -252,6 +257,7 @@ export function ProviderManagementSection({
             const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
+              if (isOpenCode) return { text: 'OpenCode sign-in', variant: 'neutral' as const };
               if (provider.id === 'meta') return { text: 'Muse login', variant: 'neutral' as const };
               if (isDefault) {
                 if (claudeAuth?.loggedIn) return { text: claudeAuth.subscriptionType ? `${claudeAuth.subscriptionType} plan` : 'Subscription', variant: 'success' as const };
@@ -288,7 +294,7 @@ export function ProviderManagementSection({
                       role="switch"
                       aria-checked={isEnabled}
                       aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${provider.name}`}
-                      className={`w-8 h-4.5 rounded-full relative transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      className={`w-8 h-[18px] rounded-full relative transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                         isEnabled ? 'bg-primary' : 'bg-muted'
                       }`}
                     >
@@ -310,7 +316,9 @@ export function ProviderManagementSection({
 
                 {isExpanded && (
                   <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
-                    {provider.id === 'meta' ? (
+                    {isOpenCode ? (
+                      <p className="text-xs text-muted-foreground">Run <code>opencode auth login</code> on the host and select {provider.name}. Overdeck uses OpenCode’s saved credentials and discovers its available models.</p>
+                    ) : provider.id === 'meta' ? (
                       <p className="text-xs text-muted-foreground">Sign in on the host with <code>muse login</code>, or store an API key with <code>muse auth set --api-key-stdin</code>. Contributor models permit training on prompts and replies.</p>
                     ) : isDefault ? (
                       <div className="space-y-2">
@@ -527,7 +535,7 @@ export function ProviderManagementSection({
                   role="switch"
                   aria-checked={!!formData.models.providers.openrouter}
                   aria-label={`${formData.models.providers.openrouter ? 'Disable' : 'Enable'} OpenRouter`}
-                  className={`w-8 h-4.5 rounded-full relative transition-colors ${
+                  className={`w-8 h-[18px] rounded-full relative transition-colors ${
                     formData.models.providers.openrouter ? 'bg-primary' : 'bg-muted'
                   }`}
                 >

@@ -41,6 +41,8 @@ import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locat
 import { writePtyToken } from '../pty-token.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
+import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
+import { markKimiContextDelivered, prepareKimiMessage } from './kimi-context-envelope.js';
 import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { isPidDead } from '../pan-dir/fs-lock.js';
@@ -312,9 +314,9 @@ export class KimiCaptureLockTimeoutError extends Error {
 }
 
 /** Deterministic, filesystem-safe lock path for a Kimi session bucket. */
-export function kimiCaptureLockPath(bucketKey: string): string {
+export function kimiCaptureLockPath(bucketKey: string, overdeckHome = getOverdeckHome()): string {
   const hash = createHash('sha256').update(bucketKey).digest('hex').slice(0, 24);
-  return join(getOverdeckHome(), 'locks', 'kimi-capture', `${hash}.lock`);
+  return join(overdeckHome, 'locks', 'kimi-capture', `${hash}.lock`);
 }
 
 async function readKimiCaptureLockOwner(lockPath: string): Promise<Partial<KimiCaptureLockOwner>> {
@@ -403,15 +405,62 @@ async function releaseKimiCaptureLock(lockPath: string): Promise<void> {
   await rmAsync(lockPath, { recursive: true, force: true });
 }
 
-export async function withKimiSessionCaptureLock<T>(kimiHome: string, workspace: string, fn: () => Promise<T>): Promise<T> {
+export async function withKimiSessionCaptureLock<T>(
+  kimiHome: string,
+  workspace: string,
+  fn: () => Promise<T>,
+  overdeckHome?: string,
+): Promise<T> {
   const bucketKey = kimiSessionsRoot(kimiHome, workspace);
-  const lockPath = kimiCaptureLockPath(bucketKey);
+  const lockPath = kimiCaptureLockPath(bucketKey, overdeckHome);
   await acquireKimiCaptureLock(lockPath);
   try {
     return await fn();
   } finally {
     await releaseKimiCaptureLock(lockPath);
   }
+}
+
+/**
+ * Launch one managed native Kimi session and persist the identity required by
+ * the first-message context guard before any caller can deliver a prompt.
+ * Fresh launches snapshot and capture a newly-created native session under the
+ * per-workspace lock. Resumes pass `-S` at launcher construction time, reuse
+ * that exact identity, and therefore do not wait for a new directory.
+ */
+export async function launchAndCaptureManagedKimiSession(options: {
+  agentId: string;
+  workspace: string;
+  launch: () => Promise<void>;
+  resumeSessionId?: string;
+  kimiHome?: string;
+  overdeckHome?: string;
+  timeoutMs?: number;
+}): Promise<string> {
+  const kimiHome = options.kimiHome ?? join(homedir(), '.kimi-code');
+  return withKimiSessionCaptureLock(kimiHome, options.workspace, async () => {
+    if (options.resumeSessionId) {
+      await options.launch();
+      writeKimiSessionId(options.agentId, options.resumeSessionId, options.overdeckHome);
+      return options.resumeSessionId;
+    }
+
+    let existingBefore = new Set<string>();
+    try {
+      existingBefore = new Set(await readdirAsync(kimiSessionsRoot(kimiHome, options.workspace)));
+    } catch { /* fresh workspace bucket */ }
+
+    await options.launch();
+    const sessionId = await waitForNewKimiSessionAsync(
+      kimiHome,
+      options.workspace,
+      existingBefore,
+      options.timeoutMs,
+    );
+    if (!sessionId) throw new KimiCodeSpawnTimeout(options.agentId);
+    writeKimiSessionId(options.agentId, sessionId, options.overdeckHome);
+    return sessionId;
+  }, options.overdeckHome);
 }
 
 function delay(ms: number): Promise<void> {
@@ -437,7 +486,11 @@ export interface KimiCodeRuntimeOptions {
   readonly execCommand?: (command: string) => Promise<{ readonly stdout: string }>;
   readonly prepareLaunch?: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>;
   readonly listAgentStates?: () => AgentState[];
-  readonly deliverMessage?: (agentId: string, message: string) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
+  readonly deliverMessage?: (
+    agentId: string,
+    message: string,
+    preparedKimiContext?: import('./kimi-context-envelope.js').PreparedKimiMessage,
+  ) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
   /** Resolves the PTY supervisor script path. Defaults to resolvePtySupervisorScriptPath(). */
   readonly resolveSupervisorScriptPath?: () => string;
   /** Writes the PTY supervisor's auth token for an agent. Defaults to the real writePtyToken(). */
@@ -451,7 +504,11 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   private readonly execCommand: (command: string) => Promise<{ readonly stdout: string }>;
   private readonly prepareLaunch: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>;
   private readonly resolveAgentStates: () => AgentState[];
-  private readonly deliverMessage: (agentId: string, message: string) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
+  private readonly deliverMessage: (
+    agentId: string,
+    message: string,
+    preparedKimiContext?: import('./kimi-context-envelope.js').PreparedKimiMessage,
+  ) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
   private readonly resolveSupervisorScriptPath: () => string;
   private readonly writePtyTokenFor: (agentId: string) => Promise<string>;
 
@@ -461,7 +518,9 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     this.execCommand = options.execCommand ?? (async (command) => execAsync(command));
     this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch('kimi-code'));
     this.resolveAgentStates = options.listAgentStates ?? (() => listAgentStates());
-    this.deliverMessage = options.deliverMessage ?? ((agentId, message) => deliverAgentMessage(agentId, message, 'runtime:kimi-code'));
+    this.deliverMessage = options.deliverMessage ?? ((agentId, message, preparedKimiContext) => (
+      deliverAgentMessage(agentId, message, 'runtime:kimi-code', undefined, { preparedKimiContext })
+    ));
     this.resolveSupervisorScriptPath = options.resolveSupervisorScriptPath ?? resolvePtySupervisorScriptPath;
     this.writePtyTokenFor = options.writePtyTokenFor ?? writePtyToken;
   }
@@ -595,6 +654,8 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       useSupervisor: true,
       supervisorScriptPath,
       unsetProviderEnv: true,
+      kimiContextDelivery: 'initial-message',
+      appendSystemPromptFiles: await claudeSystemPromptFiles(config.workspace, 'kimi-code'),
     });
     const launcherScript = this.agentPath(config.agentId, 'launcher.sh');
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
@@ -607,7 +668,20 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       this.writeSessionId(config.agentId, sessionId);
       this.markSupervisorEnabled(config.agentId);
 
-      if (config.prompt) await this.sendMessage(config.agentId, config.prompt);
+      const initialMessage = await prepareKimiMessage(
+        config.agentId,
+        config.workspace,
+        config.prompt ?? '',
+        { sessionId, overdeckHome: this.home() },
+      );
+      const delivery = await this.deliverMessage(config.agentId, initialMessage.message, initialMessage);
+      if (!delivery.ok) {
+        throw new Error(
+          `Kimi Code agent ${config.agentId}: initial context delivery failed`
+          + (delivery.failure ? ` (${delivery.failure})` : ''),
+        );
+      }
+      markKimiContextDelivered(config.agentId, initialMessage);
 
       return {
         id: config.agentId,

@@ -545,7 +545,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const feGit = join(workspacePath, 'fe', '.git');
         const srcGit = join(workspacePath, 'src', '.git');
         const devcontainer = join(workspacePath, '.devcontainer');
-        const claudeMd = join(workspacePath, 'CLAUDE.md');
+        const overdeckState = join(workspacePath, '.overdeck');
 
         const hasValidStructure =
           existsSync(gitFile) ||
@@ -553,7 +553,7 @@ const getWorkspaceRoute = HttpRouter.add(
           existsSync(feGit) ||
           existsSync(srcGit) ||
           existsSync(devcontainer) ||
-          existsSync(claudeMd);
+          existsSync(overdeckState);
 
         if (!hasValidStructure) {
           const location = getWorkspaceLocation(issueId);

@@ -70,33 +70,37 @@ describe("context dashboard contracts", () => {
         {
           harness: "claude-code",
           layerKind: "global",
-          label: "Claude Code · global",
-          path: "/home/user/.claude/CLAUDE.md",
+          label: "Claude · managed launch",
+          path: "/home/user/.overdeck/context/claude-global.md",
           exists: true,
-          hasManagedRegion: true,
-          hasUserContent: true,
+          deliveryChannel: "claude-append-system-prompt",
+          byteCount: 42,
+          sha256: "abc123",
         },
         {
           harness: "ohmypi",
-          layerKind: "project",
-          projectKey: "overdeck",
-          label: "overdeck · AGENTS.md",
-          path: "/repo/overdeck/AGENTS.md",
+          layerKind: "global",
+          label: "Pi · managed launch",
+          path: "/home/user/.overdeck/context/pi-global.md",
           exists: false,
-          hasManagedRegion: false,
-          hasUserContent: false,
+          deliveryChannel: "pi-append-system-prompt",
+          byteCount: 0,
         },
       ],
     })
 
     expect(parsed.layers.map((layer) => layer.kind)).toEqual(["global", "project", "workspace"])
     expect(parsed.targets.map((target) => target.harness)).toEqual(["claude-code", "ohmypi"])
-    expect(parsed.targets[0].hasUserContent).toBe(true)
+    expect(parsed.targets[0].deliveryChannel).toBe("claude-append-system-prompt")
   })
 
   it("names harness previews with shared harness values and fullPrompt", () => {
     const harnesses: readonly Harness[] = CONTEXT_PREVIEW_HARNESSES
+<<<<<<< HEAD
     expect(harnesses).toEqual(["claude-code", "ohmypi", "codex", "acp", "kimi-code", "muse", "prime-agent"])
+=======
+    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse"])
+>>>>>>> origin/main
 
     const parsed = decodePreviewResponse({
       operation: "preview",
@@ -106,8 +110,13 @@ describe("context dashboard contracts", () => {
         codex: "Codex rendered context",
         acp: "ACP rendered context",
         "kimi-code": "Kimi Code rendered context",
+<<<<<<< HEAD
         muse: "Muse rendered context",
         "prime-agent": "Prime Agent rendered context",
+=======
+        opencode: "OpenCode rendered context",
+        muse: "Muse rendered context",
+>>>>>>> origin/main
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],

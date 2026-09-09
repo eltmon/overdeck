@@ -76,7 +76,11 @@ export interface FlywheelLifecycleOptions {
   briefOverlayContent?: string;
   prompt?: string;
   model?: string;
+<<<<<<< HEAD
   harness?: RuntimeName;
+=======
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;

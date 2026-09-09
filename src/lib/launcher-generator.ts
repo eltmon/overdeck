@@ -1,5 +1,6 @@
 import { museDataHome } from './runtimes/muse-session.js';
 import { Effect } from 'effect';
+import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -16,7 +17,11 @@ import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
+<<<<<<< HEAD
 export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
+=======
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
 
 export interface LauncherConfig {
   role: Role;
@@ -105,6 +110,8 @@ export interface LauncherConfig {
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
   kimiCodeAddDirs?: string[];
+  /** Required proof that managed context will be delivered as Kimi's first user message. */
+  kimiContextDelivery?: 'initial-message';
 
   /** Exact Muse model and saved native UUID; never reuse a Claude session id. */
   museModel?: string;
@@ -173,6 +180,13 @@ export interface LauncherConfig {
   unsetProviderEnv?: boolean;
   cavemanExports?: string;
   overdeckEnv?: { agentId?: string; issueId?: string; sessionType?: string };
+  /**
+   * Stable Overdeck-private state identity for launch/relaunch continuity.
+   * Unlike overdeckEnv.agentId, this does not export workflow identity or
+   * enable git guards; conversation launchers use it solely to retain their
+   * context receipt identity across resume.
+   */
+  managedStateKey?: string;
   unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
@@ -257,6 +271,8 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
  * internally (keeps coupling low, tests simple).
  */
 export function generateLauncherScriptSync(config: LauncherConfig): string {
+  const preparedContext = prepareClaudeContext(config);
+  config = preparedContext.config;
   const lines: string[] = [];
 
   // PAN-3531: omp resolves --model against its bundled catalog plus the user
@@ -346,6 +362,35 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     for (const expr of config.extraEnvExports) {
       lines.push(expr);
     }
+  }
+
+  for (const file of preparedContext.sources) {
+    lines.push(`if [ ! -f ${shellQuote(file)} ] || [ ! -r ${shellQuote(file)} ]; then printf '%s\\n' ${shellQuote(`Required launch context is unreadable: ${file}`)} >&2; exit 1; fi`);
+  }
+  lines.push(...preparedContext.lines);
+
+  // Persist the exact launch-time context composition beside agent state. This
+  // is a receipt, not another instruction source: it records paths/hashes and
+  // delivery channel for audit/debugging across spawn, resume, and recovery.
+  const managedStateKey = config.managedStateKey ?? config.overdeckEnv?.agentId ?? config.sessionId;
+  const receiptKey = managedStateKey;
+  const receiptFiles = [
+    ...preparedContext.sources,
+    ...(config.acpContextFile ? [config.acpContextFile] : []),
+  ];
+  if (receiptKey && receiptFiles.length > 0) {
+    const receiptPath = join(getOverdeckHome(), 'agents', receiptKey, 'context-receipt.json');
+    const receiptChannel = config.harness === 'codex'
+      ? 'developer_instructions'
+      : config.harness === 'ohmypi'
+        ? 'append-system-prompt'
+        : config.harness === 'kimi-code'
+          ? 'initial-message-envelope'
+        : config.harness === 'acp'
+          ? 'acp-initial-context'
+          : 'append-system-prompt-file';
+    const receiptScript = 'const fs=require("fs"),c=require("crypto"),p=require("path");const [out,ch,...files]=process.argv.slice(1);const sources=files.filter(f=>fs.existsSync(f)).map(path=>{const b=fs.readFileSync(path);return{path,bytes:b.length,estimatedTokens:Math.ceil(b.length/4),sha256:c.createHash("sha256").update(b).digest("hex")}});fs.mkdirSync(p.dirname(out),{recursive:true});const t=out+".tmp-"+process.pid;fs.writeFileSync(t,JSON.stringify({version:1,generatedAt:new Date().toISOString(),deliveryChannel:ch,sources},null,2)+"\\n",{mode:384});fs.renameSync(t,out)';
+    lines.push(`node -e ${shellQuote(receiptScript)} ${shellQuote(receiptPath)} ${shellQuote(receiptChannel)} ${receiptFiles.map(shellQuote).join(' ')}`);
   }
 
   // Codex: per-agent CODEX_HOME so each agent has isolated sessions/config
@@ -498,6 +543,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
+      for (const file of systemPromptFiles(config)) {
+        cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
+      }
       const args: string[] = [];
       if (config.resumeSessionId) {
         args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
@@ -706,8 +754,12 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   }
   // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
 
-  for (const file of systemPromptFiles(config)) {
-    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
+  // OMP accepts one append value. Repeating the flag loses earlier layers.
+  const promptSections = systemPromptFiles(config).map(file => `"$(cat -- ${shellQuote(file)})"`);
+  if (config.promptFile) promptSections.push('"$prompt"');
+  else if (config.promptInline) promptSections.push(shellQuote(config.promptInline));
+  if (promptSections.length > 0) {
+    tokens.push('--append-system-prompt', `"$(printf '%s\\n\\n' ${promptSections.join(' ')})"`);
   }
 
   if (config.resumeSessionId) {
@@ -716,12 +768,6 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (config.extraArgs) {
     tokens.push(config.extraArgs);
   }
-  if (config.promptFile) {
-    tokens.push('--append-system-prompt', '"$prompt"');
-  } else if (config.promptInline) {
-    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
-  }
-
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
@@ -812,6 +858,9 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(config.model));
   }
+  if (config.harness === 'opencode' && config.acpEffort) {
+    tokens.push('--effort', shellQuote(config.acpEffort));
+  }
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
@@ -838,6 +887,11 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
 function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (!config.kimiCodeModel) {
     throw new Error('kimi-code launcher requires kimiCodeModel');
+  }
+  if (systemPromptFiles(config).length > 0 && config.kimiContextDelivery !== 'initial-message') {
+    throw new Error(
+      'Managed kimi-code launch blocked: required context must declare the initial-message envelope transport.',
+    );
   }
 
   // Translate here, at the single chokepoint every kimi-code launch passes
@@ -899,7 +953,7 @@ export function buildPiCommand(config: LauncherConfig, useExec: boolean): string
   if (config.piExtensionPath) {
     tokens.push('--extension', shellQuote(config.piExtensionPath));
   }
-  tokens.push('--no-context-files');
+  // Preserve native instruction and skill discovery.
 
   // PAN-1566: deliver Overdeck's injected context (global engineering-rules
   // layer, workspace/briefing) via --append-system-prompt. The pi-extension

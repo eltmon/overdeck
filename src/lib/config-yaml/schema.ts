@@ -379,7 +379,11 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
+<<<<<<< HEAD
   harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
+=======
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -433,6 +437,10 @@ export interface ResourcesConfig {
   governor_psi_calm_readmit_avg10?: number;
   /** PAN-3754: continuous calm-PSI duration required for early re-admission */
   governor_psi_calm_window_ms?: number;
+  /** PAN-3344: hold admissions at or above this one-minute load per core */
+  governor_cpu_soft_load_per_core?: number;
+  /** PAN-3344: re-admit only below this load per core; must be lower than soft */
+  governor_cpu_recovery_load_per_core?: number;
 }
 
 export interface IssuesConfig {
@@ -476,19 +484,10 @@ export interface YamlConfig {
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
-    providers?: {
-      anthropic?: ProviderConfig | boolean;
-      openai?: ProviderConfig | boolean;
-      google?: ProviderConfig | boolean;
-      minimax?: ProviderConfig | boolean;
-      zai?: ProviderConfig | boolean;
-      kimi?: ProviderConfig | boolean;
-      meta?: ProviderConfig | boolean;
-      mimo?: ProviderConfig | boolean;
-      openrouter?: ProviderConfig | boolean;
-      nous?: ProviderConfig | boolean;
-      dashscope?: ProviderConfig | boolean;
-    };
+    providers?: Partial<Record<
+      'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' |
+      'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', ProviderConfig | boolean
+    >>;
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<string, ModelId>>;
@@ -959,6 +958,9 @@ export interface NormalizedConfig {
     governorPsiFullShedAvg10: number;
     governorPsiCalmReadmitAvg10: number;
     governorPsiCalmWindowMs: number;
+    /** PAN-3344: CPU runway thresholds. Lower load is healthier. */
+    governorCpuSoftLoadPerCore: number;
+    governorCpuRecoveryLoadPerCore: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

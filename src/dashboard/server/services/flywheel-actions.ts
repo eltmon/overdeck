@@ -39,7 +39,11 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
+<<<<<<< HEAD
   harness: RuntimeName;
+=======
+  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
   model: string;
   effort: RoleEffort;
   minAgents: number;
@@ -147,7 +151,11 @@ async function createInitialFlywheelStatus(
   startedAt: string,
   cwd: string,
   agentModel: string | undefined,
+<<<<<<< HEAD
   agentHarness: RuntimeName | undefined,
+=======
+  agentHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | undefined,
+>>>>>>> origin/main
   roleConfig: ResolvedFlywheelRoleConfig,
 ): Promise<FlywheelStatus> {
   const ramTotalMb = mb(totalmem());

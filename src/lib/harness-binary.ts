@@ -16,6 +16,7 @@ export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   ohmypi: 'omp',
   codex: 'codex',
   acp: 'kimi',
+  opencode: 'opencode',
   'kimi-code': 'kimi',
   muse: 'muse',
   'prime-agent': 'prime-agent',
@@ -107,6 +108,7 @@ export async function resolveExecutable(
     join(home, '.local', 'bin'),
     join(home, '.claude', 'local'),
     join(home, '.kimi-code', 'bin'),
+    ...(binary === 'opencode' ? [join(home, '.opencode', 'bin')] : []),
     join(home, '.npm-global', 'bin'),
   ];
   const fixedMatch = await firstExecutable(fixedCandidates, binary, accessExecutable);

@@ -1,3 +1,4 @@
+import { getAvailableModelsWithOpenCodeApi } from '../../../lib/settings-model-catalog.js';
 import { jsonResponse } from "../http-helpers.js";
 /**
  * Settings route module — Effect HttpRouter.Layer (PAN-428 B15)
@@ -23,7 +24,6 @@ import {
   saveSettingsApi,
   saveDesignLanguage,
   validateSettingsApi,
-  getAvailableModelsApi,
   getOptimalDefaultsApi,
   getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
@@ -178,8 +178,8 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getAvailableModelsApi()),
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await getAvailableModelsWithOpenCodeApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );

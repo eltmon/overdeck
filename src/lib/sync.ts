@@ -21,17 +21,17 @@ import { planHooksSyncSync, syncHooksSync, type HookItem, type HooksSyncResult }
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
-  renderProjectLayer,
-  applyManagedRegion,
-  hasManagedRegion,
-  cleanLegacyBeadsTargetSync,
-  type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
+<<<<<<< HEAD
   primeAgentGlobalContextFile,
 } from './context-layers/index.js';
 import { backupFileSync, createBackupTimestamp } from './backup.js';
 import { writeRenderedGlobalContext } from './context-layers/rendered-global.js';
+=======
+  claudeGlobalContextFile,
+} from './context-layers/index.js';
+>>>>>>> origin/main
 export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
@@ -551,84 +551,66 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-export interface ContextFirstInjection {
-  file: string;
-  backupPath: string;
-}
-
 export interface ContextLayerSyncResult {
-  /** True when ~/.claude/CLAUDE.md's managed region was written this run. */
-  globalWritten: boolean;
+  /** True when ~/.overdeck/context/claude-global.md was written this run. */
+  claudeGlobalWritten: boolean;
   /** True when global.md did not exist and a starter template was seeded. */
   globalStubCreated: boolean;
-  /** Names of registered projects whose CLAUDE.md/AGENTS.md was written this run. */
-  projectsWritten: string[];
   /** True when ~/.overdeck/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
+<<<<<<< HEAD
   primeAgentGlobalWritten: boolean;
   firstInjections: ContextFirstInjection[];
   legacyBeadsCleanups: LegacyBeadsCleanup[];
+=======
+>>>>>>> origin/main
   errors: string[];
 }
 
 /**
- * Write a managed region into `targetFile`, preserving any hand-authored
- * content outside the markers. Returns true when the file changed. The first
- * time a region is injected into a non-empty file with no existing region, the
- * file is backed up first and recorded in `result.firstInjections`.
+ * Write an Overdeck-owned render artifact when its content changed.
  */
-function writeManagedTargetSync(
+function writeContextArtifactSync(
   targetFile: string,
-  managed: string,
-  result: ContextLayerSyncResult,
-  backupTimestamp: string,
+  content: string,
 ): boolean {
   const existing = existsSync(targetFile) ? readFileSync(targetFile, 'utf-8') : '';
-  const next = applyManagedRegion(existing, managed);
+  const next = content.trim() + '\n';
   if (next === existing) return false;
-  if (existing.trim().length > 0 && !hasManagedRegion(existing)) {
-    const backupPath = backupFileSync(targetFile, backupTimestamp);
-    if (backupPath) result.firstInjections.push({ file: targetFile, backupPath });
-  }
   mkdirSync(dirname(targetFile), { recursive: true });
   writeFileSync(targetFile, next, 'utf-8');
   return true;
 }
 
 /**
- * Render the global and project context layers into harness CLAUDE.md files.
- *
- * PAN-1201: the layered-context half of `pan sync`. The global layer
- * (~/.overdeck/context/global.md + the folded bundled rules) renders into
- * the managed region of ~/.claude/CLAUDE.md; each registered project's
- * `.pan/context/project.md` renders into the managed region of its own
- * CLAUDE.md. Content outside the managed region is preserved untouched, so a
- * hand-authored CLAUDE.md is never clobbered.
+ * Render harness-specific global context into Overdeck-owned artifacts.
+ * Native harness instruction files are user-owned and are never inspected or
+ * changed by this path. Canonical project context is rendered and combined with
+ * workspace context at managed-session launch.
  */
 export function syncContextLayersSync(): ContextLayerSyncResult {
   const result: ContextLayerSyncResult = {
-    globalWritten: false,
+    claudeGlobalWritten: false,
     globalStubCreated: false,
-    projectsWritten: [],
     piGlobalWritten: false,
     codexGlobalWritten: false,
+<<<<<<< HEAD
     primeAgentGlobalWritten: false,
     firstInjections: [],
     legacyBeadsCleanups: [],
+=======
+>>>>>>> origin/main
     errors: [],
   };
-  // One backup dir for every first-injection this run.
-  const backupTimestamp = createBackupTimestamp();
 
-  // Global layer → ~/.claude/CLAUDE.md
+  // Global layer → Overdeck-owned Claude launch artifact.
   result.globalStubCreated = ensureGlobalLayer();
   try {
     const managed = renderGlobalLayer('claude-code', isDevMode());
-    const claudeMd = join(CLAUDE_DIR, 'CLAUDE.md');
-    if (writeManagedTargetSync(claudeMd, managed, result, backupTimestamp)) {
-      result.globalWritten = true;
+    if (writeContextArtifactSync(claudeGlobalContextFile(), managed)) {
+      result.claudeGlobalWritten = true;
     }
   } catch (err: any) {
     result.errors.push(`global: ${err?.message ?? err}`);
@@ -638,20 +620,38 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   try {
     const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
+<<<<<<< HEAD
     result.piGlobalWritten = writeRenderedGlobalContext(piGlobalFile, piManaged);
+=======
+    if (writeContextArtifactSync(piGlobalFile, piManaged)) {
+      result.piGlobalWritten = true;
+    }
+>>>>>>> origin/main
   } catch (err: any) {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
+<<<<<<< HEAD
   // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md.
   try {
     const codexManaged = renderGlobalLayer('codex', isDevMode());
     const codexGlobalFile = codexGlobalContextFile();
     result.codexGlobalWritten = writeRenderedGlobalContext(codexGlobalFile, codexManaged);
+=======
+  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md
+  // This artifact is passed as developer instructions when Overdeck launches Codex.
+  try {
+    const codexManaged = renderGlobalLayer('codex', isDevMode());
+    const codexGlobalFile = codexGlobalContextFile();
+    if (writeContextArtifactSync(codexGlobalFile, codexManaged)) {
+      result.codexGlobalWritten = true;
+    }
+>>>>>>> origin/main
   } catch (err: any) {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
+<<<<<<< HEAD
   try {
     const managed = renderGlobalLayer('prime-agent', isDevMode());
     const file = primeAgentGlobalContextFile();
@@ -689,6 +689,8 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     }
   }
 
+=======
+>>>>>>> origin/main
   return result;
 }
 

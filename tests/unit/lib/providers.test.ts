@@ -15,6 +15,8 @@ const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   openrouter: 'ohmypi',
   nous: 'ohmypi',
   dashscope: 'ohmypi',
+      opencode: 'opencode',
+      'opencode-go': 'opencode',
   xai: 'ohmypi',
   groq: 'ohmypi',
   cerebras: 'ohmypi',

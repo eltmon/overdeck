@@ -1,3 +1,4 @@
+import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, realpathSync, rmSync, unlinkSync } from 'fs';
 import { join, dirname, basename, resolve } from 'path';
 import { homedir } from 'os';
@@ -42,6 +43,8 @@ import {
   renderDevcontainerSync,
   processTemplatesSync,
 } from '../workspace/devcontainer-renderer.js';
+
+export { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 
 const execAsync = promisify(exec);
 
@@ -633,16 +636,24 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
     // Process template files
+    const configuredTemplates = workspaceConfig.agent.templates;
+    const discoveredTemplates = configuredTemplates === undefined
+      ? readdirSync(templateDir)
+        .filter((source) => source.endsWith('.template'))
+        .map((source) => ({ source, target: source.slice(0, -'.template'.length) }))
+      : configuredTemplates;
+    const safeTemplates = discoveredTemplates.filter(({ target }) => !isHarnessNativeTarget(target));
     const templateSteps = processTemplatesSync(
       templateDir,
       workspacePath,
       placeholders,
-      workspaceConfig.agent.templates
+      safeTemplates,
     );
     result.steps.push(...templateSteps);
 
     // Copy .claude/ directories from project template (copy_dirs replaces legacy symlinks)
-    const dirsToSync = workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks;
+    const dirsToSync = (workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks)
+      ?.filter((dir) => !isHarnessNativeTarget(dir));
     if (dirsToSync) {
       const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync, placeholders);
       result.steps.push(...copySteps);

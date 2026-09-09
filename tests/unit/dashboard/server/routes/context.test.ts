@@ -142,8 +142,6 @@ describe('dashboard context routes helpers', () => {
       projectKey: 'pan',
       workspacePath,
     }, assembleWorkspaceContext({
-      projectRoot: projectPath,
-      harness: 'claude-code',
       issueId: 'PAN-1201',
       workspacePath,
       branch: 'feature/pan-1201',

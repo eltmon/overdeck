@@ -97,7 +97,14 @@ export function canUseHarnessSync(
   model: string,
   authMode: AuthMode | undefined,
 ): HarnessPolicyDecision {
-  const isMuseModel = getProviderForModelSync(model).name === 'meta';
+  const providerName = getProviderForModelSync(model).name;
+  const isOpenCodeProvider = providerName === 'opencode' || providerName === 'opencode-go';
+  if (harness === 'opencode' || isOpenCodeProvider) {
+    return harness === 'opencode' && isOpenCodeProvider
+      ? ALLOWED
+      : { allowed: false, reason: 'OpenCode Go and Zen model IDs require the OpenCode harness. Select an opencode/* or opencode-go/* model.' };
+  }
+  const isMuseModel = providerName === 'meta';
   if (harness === 'muse' || isMuseModel) {
     return harness === 'muse' && isMuseModel ? ALLOWED : {
       allowed: false,

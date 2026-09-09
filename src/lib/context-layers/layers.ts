@@ -99,6 +99,11 @@ export function piGlobalContextFile(): string {
   return join(getOverdeckHome(), 'context', 'pi-global.md');
 }
 
+/** `~/.overdeck/context/claude-global.md` — launch-time global context for managed Claude sessions. */
+export function claudeGlobalContextFile(): string {
+  return join(getOverdeckHome(), 'context', 'claude-global.md');
+}
+
 /** `~/.overdeck/context/codex-global.md` — the rendered global layer for Codex. */
 export function codexGlobalContextFile(): string {
   return join(getOverdeckHome(), 'context', 'codex-global.md');

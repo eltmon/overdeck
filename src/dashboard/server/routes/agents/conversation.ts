@@ -137,7 +137,7 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
       return { ...result, streaming: false };
     }
 
-    if (harness === 'acp') {
+    if (harness === 'acp' || harness === 'opencode') {
       const sessionFile = await resolveAcpTranscriptPath(id);
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
       const result = await parseAcpConversationMessages(sessionFile);

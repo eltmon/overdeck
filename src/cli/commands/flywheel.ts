@@ -95,7 +95,11 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
+<<<<<<< HEAD
   harness: RuntimeName;
+=======
+  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+>>>>>>> origin/main
   model: string;
   effort: RoleEffort;
   minAgents: number;

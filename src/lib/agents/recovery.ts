@@ -95,7 +95,7 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
     const path = resolveMuseSessionPathSync(agentId);
     return path ? museSessionId(path) : undefined;
   }
-  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') return undefined;
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
@@ -301,7 +301,7 @@ export async function restartAgent(
         throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within ${timeout}s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'muse') {
+      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode' || effectiveHarness === 'muse') {
         // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
         // it must not fall through to the legacy sync sendKeys() branch below,
         // which bypasses the supervisor cascade entirely.
@@ -507,7 +507,7 @@ export async function recoverAgent(
     return { action: 'respawned', state };
   }
 
-  if (recoveryHarness === 'acp' || recoveryHarness === 'muse') {
+  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode' || recoveryHarness === 'muse') {
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,

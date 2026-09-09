@@ -112,7 +112,8 @@ export async function applyBootReconciliationDecision(
     }
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(`applyBootReconciliationDecision: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates`);
+      const cpuDetail = memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`;
+      logDeaconEventSync(`applyBootReconciliationDecision: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}${cpuDetail}; deferring remaining candidates`);
       const deferredAgents = candidates.slice(index);
       deferred += deferredAgents.length;
       outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-memory'));

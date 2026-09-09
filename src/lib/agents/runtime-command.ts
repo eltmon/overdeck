@@ -12,8 +12,12 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
+<<<<<<< HEAD
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
+=======
+import { getClaudeAuthStatus } from '../claude-auth.js';
+>>>>>>> origin/main
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
@@ -90,42 +94,7 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
   await renameAsync(tmp, launcherScript);
 }
 
-export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
-  const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'muse') {
-    return [];
-  }
-
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(workspace);
-  try {
-    await statAsync(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNodeNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  return files;
-}
+export { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 
 function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
@@ -228,7 +197,7 @@ export function getAcpLauncherFields(
   _role?: Role,
   effort?: string,
 ): {
-  harness: 'acp';
+  harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -239,12 +208,12 @@ export function getAcpLauncherFields(
   unsetProviderEnv: true;
 } {
   return {
-    harness: 'acp',
+    harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
     acpAgentId: agentId,
     acpProvider: getProviderForModelSync(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
     ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
@@ -258,6 +227,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   kimiCodeEffort?: string;
   model: string;
   unsetProviderEnv: true;
+  kimiContextDelivery: 'initial-message';
 } {
   const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
@@ -267,6 +237,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
     ...(effort ? { kimiCodeEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
+    kimiContextDelivery: 'initial-message',
   };
 }
 
@@ -278,7 +249,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
   // Match conversation permissions and pre-trust the workspace to avoid onboarding prompts.
   const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
@@ -895,7 +866,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   mkdirSync(dir, { recursive: true });
   const stem = basename(definitionPath).replace(/\.md$/, '');
   const outPath = join(dir, `${stem}.md`);
-  writeFileSync(outPath, body);
+  writeFileSync(outPath, `Source: ${abs}\n\n${body}`);
 
   const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
 

@@ -47,6 +47,7 @@ import {
   contextDiffCommand,
   contextValidateCommand,
   contextMigrateCommand,
+  contextDetachCommand,
   contextLayersHelp,
 } from './commands/context-layers.js';
 import { restoreCommand } from './commands/restore.js';
@@ -210,7 +211,7 @@ program
 
 program
   .command('sync')
-  .description('Sync skills/agents to ~/.claude/ and render the context layers')
+  .description('Sync skills and render managed launch context')
   .option('--dry-run', 'Show what would be synced')
   .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
@@ -238,7 +239,7 @@ context
 
 context
   .command('sync')
-  .description('Render the context layers into harness CLAUDE.md files')
+  .description('Refresh Overdeck-managed session context artifacts')
   .action(contextSyncCommand);
 
 context
@@ -257,6 +258,13 @@ context
   .description('One-shot migration from the deprecated sync.devroot model')
   .option('--yes', 'Register every discovered project without prompting')
   .action(contextMigrateCommand);
+
+context
+  .command('detach')
+  .description('Explicitly remove historical Overdeck managed regions from native instruction files')
+  .option('--dry-run', 'Preview exact files and managed blocks without changing anything')
+  .option('--apply', 'Back up each file and remove only an unambiguous managed block')
+  .action(contextDetachCommand);
 
 context.action(contextLayersHelp);
 
@@ -366,7 +374,11 @@ const planCmd = program
   .option('--auto-start', '[deprecated: use pan start <id>] After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
+<<<<<<< HEAD
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | muse | prime-agent (defaults to role/provider settings)')
+=======
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+>>>>>>> origin/main
   .option('--effort <level>', 'Planning effort: low | medium | high')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
@@ -511,7 +523,11 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Work model to use and persist for later respawns (defaults to Cloister config)').option('--swarm <mode>', 'Per-issue swarm policy: off | auto | always').option('--review-mode <mode>', 'Per-issue review mode: quick | full | none').option('--review-model <model>', 'Per-issue review model override')
+<<<<<<< HEAD
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | muse | prime-agent (defaults to role/provider settings)')
+=======
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+>>>>>>> origin/main
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
   .option('--dry-run', 'Show what would be created')
@@ -532,7 +548,11 @@ program
   .command('strike <ids...>')
   .description('Spawn strike agent(s) — implement and push a strike branch for Deacon to land through the verified merge door. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
+<<<<<<< HEAD
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | muse | prime-agent (defaults to role/provider settings)')
+=======
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+>>>>>>> origin/main
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
@@ -663,8 +683,8 @@ program
     }
     console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
-    // Startup context sync (skills, agents, hooks, MCP config, rendered
-    // ~/.claude/CLAUDE.md + per-project CLAUDE.md) is DEFERRED to run in the
+    // Startup sync (skills, agents, hooks, MCP config, and Overdeck-owned
+    // launch context artifacts) is DEFERRED to run in the
     // background AFTER the dashboard is listening — see startPostLaunchSidecars
     // below. Running it here cost ~22s on every `overdeck up`, blocking the
     // server from even spawning, and the dashboard does not depend on synced

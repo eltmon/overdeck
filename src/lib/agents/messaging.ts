@@ -133,7 +133,7 @@ const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-m
 export function resolveAgentDeliveryMethod(
   state: Pick<AgentState, 'harness' | 'deliveryMethod'> | null | undefined,
 ): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
-  if (state?.harness === 'acp') return 'auto';
+  if (state?.harness === 'acp' || state?.harness === 'opencode') return 'auto';
   return resilientDeliveryMethod(state?.deliveryMethod);
 }
 
@@ -409,6 +409,12 @@ export async function messageAgent(
         fallbackHarness,
       ),
       appendSystemPromptFiles: await claudeSystemPromptFiles(agentState.workspace, fallbackHarness),
+      managedStateKey: normalizedId,
+      overdeckEnv: {
+        agentId: normalizedId,
+        issueId: agentState.issueId,
+        sessionType: resumeRole,
+      },
       useSupervisor: fallbackSupervisorLaunch.useSupervisor,
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
