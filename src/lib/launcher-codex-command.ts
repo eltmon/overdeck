@@ -15,6 +15,7 @@ import { shellQuote } from './shell-quote.js';
 /** The LauncherConfig subset the Codex command shapes read. */
 export interface CodexCommandConfig {
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   codexSandboxMode?: string;
   resumeSessionId?: string;
   model?: string;
@@ -111,7 +112,7 @@ function computeCodexCommandTokens(
 
   if (codexMode === 'app-server') {
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
-    const tokens: string[] = ['node', shellQuote(hostPath)];
+    const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort ?? 'high')];
     if (config.model) {
       tokens.push('--model', shellQuoteModelIdSync(config.model));
     }

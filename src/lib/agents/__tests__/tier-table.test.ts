@@ -368,7 +368,7 @@ describe('distribution validation is idempotent across save/load round-trips (PA
       },
     } as never);
     const second = validateTieredExecutionConfig(first as never);
-    expect(second.tiers.standard!.model).toBe('gpt-5.5');
+    expect(second.tiers.standard!.model).toBe('gpt-5.6-sol');
     expect(second.tiers.standard!.distribution).toHaveLength(2);
   });
 

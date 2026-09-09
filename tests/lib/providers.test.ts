@@ -28,10 +28,10 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
       KIMI_API_KEY: 'sk-kimi-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'k3[1m]',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'k3',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2.7-code',
-      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2.7-code',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2.7-code',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'k3-256k',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-for-coding',
+      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-for-coding',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-for-coding',
     });
   });
 

@@ -367,17 +367,29 @@ export async function handleConversationThinkingLevel(
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
+  if (harness !== 'codex' && harness !== 'acp' && !isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is supported for Codex, ACP, and Pi conversations' }, { status: 400 });
   }
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
   }
 
-  const level = parseThinkingLevel(body['level']);
+  const level = harness === 'codex' || harness === 'acp'
+    ? (typeof body['level'] === 'string' && ['low', 'medium', 'high', 'xhigh', 'max'].includes(body['level']) ? body['level'] : null)
+    : parseThinkingLevel(body['level']);
   if (!level) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
 
-  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
+  if (harness === 'acp') {
+    const result = await postCodexAppServerOp<{ effort: string }>(conv.tmuxSession, { op: 'set-effort', effort: level }, 'acp');
+    setConversationEffort(name, result.effort);
+    return jsonResponse({ ok: true, effort: result.effort });
+  }
+  if (harness === 'codex') {
+    // Use the live socket, not a mutable global transport preference.
+    await postCodexAppServerOp(conv.tmuxSession, { op: 'set-effort', effort: level });
+  } else {
+    await sendConversationControlCommand(conv, { type: 'set_thinking_level', level: level as ThinkingLevel });
+  }
   setConversationEffort(name, level);
   const updated = getConversationByName(name) ?? conv;
   return jsonResponse({ ok: true, effort: updated.effort ?? level });
@@ -516,9 +528,9 @@ function formatAppServerApprovalQuestion(request: CodexAppServerPendingRequest):
   return `Codex requests approval for ${request.method}`;
 }
 
-async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>): Promise<T> {
-  const socketPath = join(getOverdeckHome(), 'sockets', `appserver-${tmuxSession}.sock`);
-  const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, 'appserver-token');
+async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | 'acp' = 'appserver'): Promise<T> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `${transport}-${tmuxSession}.sock`);
+  const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, `${transport}-token`);
   if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${tmuxSession}`);
   if (!existsSync(tokenPath)) throw new Error(`app-server token missing for ${tmuxSession}`);
   const token = readFileSync(tokenPath, 'utf-8').trim();

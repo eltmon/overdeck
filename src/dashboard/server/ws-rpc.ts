@@ -1,3 +1,4 @@
+import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -41,7 +42,8 @@ import { readFileAtPathEffect, writeFileAtPathEffect } from './services/file-at-
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
-import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
+import { listCodexSubagents, resolveCodexSubagentTranscript } from './services/conversation/codex-subagents.js';
+import { startSubagentListPolling, subagentTranscriptPath, type SubagentListPoller } from './services/conversation/subagents.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,10 +115,13 @@ export function streamResolvedFullParseSnapshots(
   // null ONLY when no transcript exists on disk (a resumed conversation already
   // has its file), so emitting an empty snapshot here never blanks real history.
   unresolvedMeansEmpty = false,
+  discoverSubagents = false,
 ): Stream.Stream<ConversationEvent, PanRpcError> {
   return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
     Effect.acquireRelease(
       Effect.promise(async () => {
+        let subagentPoller: SubagentListPoller | null = null;
+        let latestWorkLog: ParseResult['workLog'] = [];
         let stopped = false;
         let resolving = false;
         let discoveryTimer: ReturnType<typeof setInterval> | null = null;
@@ -157,6 +162,8 @@ export function streamResolvedFullParseSnapshots(
           parsing = true;
           try {
             const result = await parse(sessionFile);
+            if (stopped) return;
+            latestWorkLog = result.workLog;
             if (result.messages.length > 0 && !hasContent) {
               // Real content arrived — lock onto this file and stop polling.
               hasContent = true;
@@ -175,6 +182,15 @@ export function streamResolvedFullParseSnapshots(
                   : undefined,
               contextUsage: contextUsageFromParseResult(result, model),
             });
+            if (discoverSubagents) {
+              if (subagentPoller) await subagentPoller.refresh();
+              else {
+                const file = sessionFile;
+                subagentPoller = await startSubagentListPolling(file, () => new Set(), offer,
+                  () => listCodexSubagents(file, latestWorkLog));
+                if (stopped) subagentPoller.stop();
+              }
+            }
           } catch {
             // Transient parse failure (read during a write) — the next change
             // event re-parses cleanly.
@@ -222,6 +238,8 @@ export function streamResolvedFullParseSnapshots(
               // First resolution, or a newer transcript appeared — point the
               // watcher at it and re-parse.
               if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
+              subagentPoller?.stop();
+              subagentPoller = null;
               sessionFile = resolved;
               await emit();
               if (!stopped) watchFile(resolved);
@@ -245,6 +263,7 @@ export function streamResolvedFullParseSnapshots(
         return {
           stop: () => {
             stopped = true;
+            subagentPoller?.stop();
             if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
             if (debounce) { clearTimeout(debounce); debounce = null; }
             if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
@@ -264,6 +283,7 @@ export function streamHarnessFullParseSnapshots(
   model: string | null,
   unresolvedMeansEmpty = false,
   workspace: string | null = null,
+  agentId?: string,
 ): FullParseSnapshotStream | null {
   const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
   const streamResolved = (
@@ -277,13 +297,21 @@ export function streamHarnessFullParseSnapshots(
       () => resolvePiSessionPath(sessionName),
       file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: harness === 'pi' ? 'pi' : 'ohmypi' }),
     );
-    case 'codex-rollout-jsonl': return streamResolved(
-      () => resolveCodexRolloutPath(sessionName),
+    case 'codex-rollout-jsonl': return streamResolvedFullParseSnapshots(
+      async () => {
+        const parent = await resolveCodexRolloutPath(sessionName);
+        return parent && agentId !== undefined ? resolveCodexSubagentTranscript(parent, agentId) : parent;
+      },
       file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'codex' }),
+      model, unresolvedMeansEmpty, agentId === undefined,
     );
     case 'acp-jsonl': return streamResolved(
       () => resolveAcpTranscriptPath(sessionName),
       file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'acp' }),
+    );
+    case 'muse-jsonl': return streamResolved(
+      () => resolveMuseSessionPath(sessionName),
+      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'muse' }),
     );
     case 'kimi-wire-jsonl': return streamResolved(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
@@ -825,7 +853,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null);
+              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null, false, null, input.agentId);
               if (stream) return stream;
               return conversationDiscoveringStream();
             }
@@ -834,7 +862,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null);
+            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null, input.agentId);
             if (stream) return stream;
 
             if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {

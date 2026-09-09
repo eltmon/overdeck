@@ -283,6 +283,7 @@ describe('KimiCodeRuntimeSync', () => {
       workspace,
       model: 'k3',
       runtime: 'kimi-code',
+      effort: 'low',
       env: { EXTRA: 'value' },
     });
 
@@ -307,6 +308,7 @@ describe('KimiCodeRuntimeSync', () => {
     // kimi-code/k3-256k. The agent record above keeps the operator's own 'k3'.
     expect(launcherContent).toMatch(/kimi -m 'kimi-code\/k3-256k' --yolo/);
     expect(launcherContent).toContain('unset ANTHROPIC_BASE_URL');
+    expect(launcherContent).toContain("export KIMI_MODEL_THINKING_EFFORT='low'");
     expect(launcherContent).toContain("node '/dist/pty-supervisor.js'");
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');

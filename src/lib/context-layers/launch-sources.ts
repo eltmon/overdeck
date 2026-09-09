@@ -10,7 +10,7 @@ import { materializeSharedManagedLaunchContext } from './materialize.js';
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
   const effectiveHarness = harness ?? 'claude-code';
   const behavior = getHarnessBehavior(effectiveHarness);
-  if (behavior.contextLayerKind === 'acp') {
+  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'muse') {
     return [];
   }
 

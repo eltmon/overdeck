@@ -11,9 +11,9 @@ import {
 } from '../../lib/contextApi';
 
 type SelectedLayerKind = ContextLayerTarget['kind'];
-type PreviewTab = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'fullPrompt';
+type PreviewTab = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'fullPrompt';
 const scopeDescription = { global: 'Every project on this machine', project: 'One project, including its workspaces', workspace: 'One issue workspace' };
-const previewOptions: [PreviewTab, string][] = [['claude-code', 'Claude Code'], ['codex', 'Codex'], ['ohmypi', 'oh-my-pi'], ['kimi-code', 'Kimi Code'], ['acp', 'ACP'], ['fullPrompt', 'All harnesses']];
+const previewOptions: [PreviewTab, string][] = [['claude-code', 'Claude Code'], ['codex', 'Codex'], ['ohmypi', 'oh-my-pi'], ['kimi-code', 'Kimi Code'], ['acp', 'ACP'], ['muse', 'Muse'], ['fullPrompt', 'All harnesses']];
 
 function targetKey(target: ContextLayerTarget): string {
   switch (target.kind) {

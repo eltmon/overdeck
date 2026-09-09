@@ -86,6 +86,7 @@ function makeAcpHostRuntime(): AcpHostRuntime {
     prompt: () => Effect.succeed({ stopReason: 'end_turn' as const }),
     cancel: Effect.void,
     setModel: () => Effect.void,
+    setConfigOption: () => Effect.succeed({ configOptions: [] }),
   };
 }
 

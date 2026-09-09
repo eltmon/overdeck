@@ -148,7 +148,9 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Order matters - check more specific patterns first
 
     // Fable models (Mythos-class flagship)
-    if (model.includes('fable-5') || model.includes('fable.5') || model.includes('fable')) {
+    if (model.includes('fable-5-1') || model.includes('fable-5.1')) {
+      normalizedModel = 'claude-fable-5-1';
+    } else if (model.includes('fable-5') || model.includes('fable.5') || model.includes('fable')) {
       normalizedModel = 'claude-fable-5';
     }
 

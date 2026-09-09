@@ -73,6 +73,10 @@ function isPiConversation(conversation: Conversation): boolean {
 }
 
 function resolveComposerEffort(conversation: Conversation): EffortLevel {
+  if (conversation.harness === 'kimi-code' || conversation.harness === 'acp') {
+    if (conversation.effort === 'medium') return 'high';
+    if (conversation.effort === 'xhigh') return 'max';
+  }
   switch (conversation.effort) {
     case 'low':
     case 'medium':
@@ -134,6 +138,7 @@ export function ComposerFooter({
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(resolvedConversationEffort);
+  const [effortVerified, setEffortVerified] = useState(Boolean(conversation.effort));
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending attachments, and their upload pump live in the module-level
@@ -164,7 +169,8 @@ export function ComposerFooter({
 
   useEffect(() => {
     setEffort(resolvedConversationEffort);
-  }, [conversation.name, resolvedConversationEffort]);
+    setEffortVerified(Boolean(conversation.effort));
+  }, [conversation.name, conversation.effort, resolvedConversationEffort]);
 
   const piConversation = isPiConversation(conversation);
   const isDisabled = !conversation.sessionAlive || sending;
@@ -264,7 +270,7 @@ export function ComposerFooter({
   const handleEffortChange = useCallback((nextEffort: EffortLevel) => {
     const previousEffort = effort;
     setEffort(nextEffort);
-    if (!piConversation || agentId || !conversation.sessionAlive) return;
+    if ((!piConversation && harness !== 'codex' && harness !== 'acp') || agentId || !conversation.sessionAlive) return;
     void (async () => {
       const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/thinking-level`, {
         method: 'POST',
@@ -276,11 +282,14 @@ export function ComposerFooter({
         const body = await res.text().catch(() => '');
         throw new Error(`Failed to set thinking level (${res.status})${body ? `: ${body}` : ''}`);
       }
+      const acknowledged = await res.json() as { effort?: EffortLevel };
+      setEffort(acknowledged.effort ?? nextEffort);
+      setEffortVerified(true);
     })().catch((err: unknown) => {
       console.error('[ComposerFooter] Failed to set thinking level:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to set thinking level');
     });
-  }, [agentId, conversation.name, conversation.sessionAlive, effort, piConversation]);
+  }, [agentId, conversation.name, conversation.sessionAlive, effort, harness, piConversation]);
 
   const handleCompact = useCallback(() => {
     if (!piConversation || agentId || compactPending) return;
@@ -697,7 +706,7 @@ export function ComposerFooter({
             </span>
           )}
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker unverified={!effortVerified && Boolean(conversation.sessionAlive || conversation.claudeSessionId)} title={(!piConversation && harness !== 'codex' && harness !== 'acp') ? 'Change effort in the native terminal for this session.' : 'Changes apply to subsequent turns after runtime acceptance.'} value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive || Boolean(agentId) || (!piConversation && harness !== 'codex' && harness !== 'acp')} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {piConversation && !agentId && (
             <>

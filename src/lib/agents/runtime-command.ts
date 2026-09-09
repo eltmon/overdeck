@@ -28,6 +28,7 @@ import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
+import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -109,7 +110,7 @@ export async function hasAgentRuntimeInSubtree(rootPid: string, harness: Runtime
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (expectedProcessNames.has(name)) return true;
+      if (expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'))) return true;
     } catch {
       continue;
     }
@@ -141,12 +142,7 @@ export async function getPiLauncherFields(agentId: string, model: string): Promi
       `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
     );
   }
-  // PAN-1048 review feedback 006 (S1): thread the resolved role/workhorse model
-  // through to buildPiCommand. The Pi launcher branch ignores baseCommand and
-  // rebuilds from scratch starting with the literal `pi`, so the only way to
-  // surface --model is via the launcher config's `model` field. Without this,
-  // a Pi-backed role silently fell back to Pi's default model and ignored the
-  // configured workhorse model entirely.
+  // The launcher rebuilds the command, so it must receive the selected model explicitly.
   return {
     harness: 'ohmypi',
     piExtensionPath,
@@ -156,8 +152,9 @@ export async function getPiLauncherFields(agentId: string, model: string): Promi
   };
 }
 
-export async function getOhmypiLauncherFields(agentId: string, model: string): Promise<{
+export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{
   harness: 'ohmypi';
+  piEffort: string;
   piExtensionPath: string;
   piFifoPath: string;
   piSessionDir: string;
@@ -173,6 +170,7 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
   }
   return {
     harness: 'ohmypi',
+    piEffort: effort ?? 'high',
     piExtensionPath: ohmypiExtensionPath,
     piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
@@ -186,6 +184,7 @@ export function getAcpLauncherFields(
   workspace: string,
   binaryPath: string,
   _role?: Role,
+  effort?: string,
 ): {
   harness: 'acp';
   acpAgentId: string;
@@ -193,6 +192,7 @@ export function getAcpLauncherFields(
   acpWorkspace: string;
   acpBinaryPath: string;
   acpContextFile: string;
+  acpEffort?: string;
   model: string;
   unsetProviderEnv: true;
 } {
@@ -203,15 +203,17 @@ export function getAcpLauncherFields(
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
     acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
   };
 }
 
-export function getKimiCodeLauncherFields(model: string): {
+export function getKimiCodeLauncherFields(model: string, effort?: string): {
   harness: 'kimi-code';
   kimiCodeModel: string;
   kimiCodeYolo: true;
+  kimiCodeEffort?: string;
   model: string;
   unsetProviderEnv: true;
   kimiContextDelivery: 'initial-message';
@@ -221,28 +223,24 @@ export function getKimiCodeLauncherFields(model: string): {
     harness: 'kimi-code',
     kimiCodeModel,
     kimiCodeYolo: true,
+    ...(effort ? { kimiCodeEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
     kimiContextDelivery: 'initial-message',
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
+  codexEffort: string;
   codexHome: string;
   codexSessionDir: string;
   model: string;
 } {
   const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
-  // PAN-1803: codex work agents must inherit the user's configured codex
-  // permission level (Settings → Permissions → Codex) and pre-trust the
-  // workspace, EXACTLY like the conversation path
-  // (routes/conversations.ts). Without trustedDir, codex shows its first-run
-  // folder-trust / "load project-local config?" wizard and blocks the pane.
-  // Without the permission mapping, work agents ignore the Settings choice
-  // and run hardcoded never+workspace-write.
+  // Match conversation permissions and pre-trust the workspace to avoid onboarding prompts.
   const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
   const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
   const sandboxMode =
@@ -252,6 +250,8 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
   initCodexHome(codexHome, {
     trustedDir: workspacePath,
+    model,
+    effort,
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
@@ -260,6 +260,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   return {
     harness: 'codex',
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
+    codexEffort: effort ?? 'high',
     codexHome,
     codexSessionDir: join(codexHome, 'sessions'),
     model,
@@ -558,6 +559,7 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (readinessKind === 'muse-tui-prompt') return waitForMuseTuiReady(agentId, timeoutSec);
   if (readinessKind === 'kimi-session-signal') return waitForKimiCodeTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
@@ -708,8 +710,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
  * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
- * short-circuits to a
- * `omp --mode rpc --model <model>` line; the launcher generator then layers
+ * returns `omp --mode rpc --model <model>`; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
  * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
@@ -723,7 +724,7 @@ export async function getAgentRuntimeBaseCommand(
   effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(validatedModel);
+  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
@@ -736,6 +737,7 @@ export async function getAgentRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -914,7 +916,7 @@ export async function getRoleRuntimeBaseCommand(
   effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(validatedModel);
+  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
@@ -929,6 +931,7 @@ export async function getRoleRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -978,4 +981,15 @@ export async function getRoleRuntimeBaseCommand(
   }
 
   return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+}
+
+async function waitForMuseTuiReady(agentId: string, timeoutSec: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
+    const pane = await Effect.runPromise(capturePane(agentId, 80));
+    if (/^\s*⟩\s/m.test(pane) && /(?:muse-spark|Muse Code)/.test(pane)) return true;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return false;
 }

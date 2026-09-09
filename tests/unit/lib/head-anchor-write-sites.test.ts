@@ -76,6 +76,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/reconstruct/reconstruct-cache.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: pipeline.lastVerifiedCommit', 'Cache reconstruction from durable state.'),
   allow('src/lib/reconstruct/reconstruct-cache.ts', 'roleRunHead', 'roleRunHead: agent.roleRunHead ?? undefined', 'Cache reconstruction from agent storage.'),
   allow('src/lib/reopen.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit reopen clear.'),
+  allow('src/lib/reopen.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: undefined', 'Explicit reopen clear starts a fresh verification cycle.'),
   allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit work-start clear.'),
   allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit as HeadAnchor | undefined', 'Verdict-preservation adapter supplies a branded review anchor.'),
   allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: anchor', 'Verdict-preservation adapter advances a proven-benign review anchor.'),

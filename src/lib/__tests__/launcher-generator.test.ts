@@ -1399,7 +1399,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '.+\/dist\/codex-app-server-host\.js'$/m);
+    expect(script).toMatch(/^node '.+\/dist\/codex-app-server-host\.js' --effort 'high'$/m);
     expect(script).not.toMatch(/pty-supervisor/);
     expect(script).not.toMatch(/codex exec/);
     expect(script).not.toMatch(/ -m /);
@@ -1413,7 +1413,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'app-server',
       resumeSessionId: '019ee5e7-thread-abc',
     });
-    expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --resume '019ee5e7-thread-abc'$/m);
+    expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc'$/m);
   });
 
   it('acp mode launches the authenticated host in an isolated provider environment', () => {

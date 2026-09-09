@@ -92,7 +92,7 @@ vi.mock('../model-capabilities.js', () => ({
   getModelEffortLevelsSync: (modelId: string) => (({
     'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
     'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
-    'claude-sonnet-4-6': ['low', 'medium', 'high'],
+    'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
   }) as Record<string, readonly string[]>)[mockResolveModelId(modelId)],
 }));
 
@@ -288,6 +288,7 @@ describe('loadSettingsApi', () => {
       openrouter: 'ohmypi',
       nous: 'ohmypi',
       dashscope: 'ohmypi',
+      meta: 'muse',
     });
   });
 
@@ -911,7 +912,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, muse, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');
@@ -952,14 +953,14 @@ describe('validateSettingsApi', () => {
       ...validSettings,
       roles: {
         ...validSettings.roles,
-        // workhorse:mid resolves to claude-sonnet-4-6, which supports low/medium/high only.
+        // workhorse:mid resolves to claude-sonnet-4-6, which supports low/medium/high/max.
         test: { model: 'workhorse:mid', effort: 'xhigh' },
       },
     });
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain(
-      "roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high)",
+      "roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high, max)",
     );
   });
 
@@ -1151,10 +1152,10 @@ describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness
     vi.resetModules();
     vi.doMock('../model-capabilities.js', () => ({
       MODEL_CAPABILITIES: {
-        'k3': { provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-        'k3[1m]': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-        'kimi-code/k3': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'] },
-        'kimi-code/kimi-for-coding': { provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'] },
+        'k3': { provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'k3[1m]': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'kimi-code/k3': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, contextWindow: 1048576, effortLevels: ['low', 'high', 'max'] },
+        'kimi-code/kimi-for-coding': { provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, contextWindow: 262144, effortLevels: ['low', 'high', 'max'] },
         'gpt-5.5': { provider: 'openai', displayName: 'GPT-5.5', costPer1MTokens: 1 },
       },
       MODEL_DEPRECATIONS: {},
@@ -1171,22 +1172,22 @@ describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness
 
     const bare = kimi.find((m) => m.id === 'k3[1m]');
     expect(bare).toMatchObject({
-      name: 'Kimi K3 (1M)',
-      baseName: 'Kimi K3 (1M)',
+      name: 'Kimi K3 (1M context)',
+      baseName: 'Kimi K3 (1M context)',
       harness: 'claude-code',
       effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     });
 
     const native = kimi.find((m) => m.id === 'kimi-code/k3');
     expect(native).toMatchObject({
-      name: 'Kimi K3 (1M) — Kimi Code CLI',
-      baseName: 'Kimi K3 (1M)',
+      name: 'Kimi K3 (1M context) — Kimi Code CLI',
+      baseName: 'Kimi K3 (1M context)',
       harness: 'kimi-code',
       effortLevels: ['low', 'high', 'max'],
     });
 
     const coding = kimi.find((m) => m.id === 'kimi-code/kimi-for-coding');
-    expect(coding?.name).toBe('Kimi K2.7 Coding — Kimi Code CLI');
+    expect(coding?.name).toBe('Kimi K2.7 Coding (256K context) — Kimi Code CLI');
     expect(coding?.harness).toBe('kimi-code');
 
     // No entry may carry the retired "(native)" marker.

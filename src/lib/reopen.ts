@@ -31,10 +31,12 @@ export interface ReopenResult {
 export interface ReopenOptions {
   reason?: string;
   trackerContext?: string;
-}async function reopenWorkspaceStatePromise(
+}
+
+async function reopenWorkspaceStatePromise(
   issueId: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  workspacePath: string,
+  workspacePath: string | null,
   options: ReopenOptions = {}
 ): Promise<ReopenResult> {
   const result: ReopenResult = {
@@ -59,6 +61,15 @@ export interface ReopenOptions {
     result.previousMergeStatus = existing.mergeStatus ?? null;
   }
 
+  const resolved = resolveProjectFromIssueSync(issueId);
+  if (resolved) {
+    // Clear the terminal close-out marker before publishing the fresh status.
+    // Otherwise this record write can become newer than the reset and restore
+    // its old verdicts during the next canonical read.
+    const project = getProjectSync(resolved.projectKey);
+    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
+  }
+
   setReviewStatusSync(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
@@ -66,29 +77,41 @@ export interface ReopenOptions {
     mergeStatus: 'pending',
     reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
     testNotes: undefined,
+    verificationNotes: undefined,
+    verificationCycleCount: 0,
     mergeNotes: undefined,
     readyForMerge: false,
     prUrl: existing?.prUrl,
     autoRequeueCount: 0,
+    reviewRetryCount: 0,
+    testRetryCount: 0,
+    mergeRetryCount: 0,
+    recoveryStartedAt: undefined,
+    reviewRequestedAt: undefined,
+    reviewSpawnedAt: undefined,
+    conflictResolutionDispatchedAt: undefined,
+    blockerReasons: undefined,
+    mergeStep: undefined,
+    retiredAt: undefined,
     // PAN-653: clear stuck state so Deacon resumes processing this issue.
-    // reviewedAtCommit is cleared so the next approve cycle records the new commit SHA.
     stuck: undefined,
     stuckReason: undefined,
     stuckAt: undefined,
     stuckDetails: undefined,
+    // Start a new evidence cycle while retaining status history and prior
+    // strike-landing attempts.
     reviewedAtCommit: undefined,
+    lastVerifiedCommit: undefined,
+    strikeReadyHead: undefined,
+    strikeReadyAt: undefined,
+    strikeLandingState: undefined,
+    strikeRecoveryCount: 0,
+    strikeTransportRetryCount: undefined,
+    strikeNextAttemptAt: undefined,
   });
   result.specialistStatesReset = true;
 
   // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (resolved) {
-    // Clear the terminal close-out marker: status writes deliberately preserve
-    // closedOut (records.ts), so without this a reopened issue stays invisible
-    // to review dispatch and the dashboard forever (MIN-850, 2026-07-24).
-    const project = getProjectSync(resolved.projectKey);
-    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
-  }
   if (resolved) {
     try {
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
@@ -131,7 +154,7 @@ export class ReopenError extends Data.TaggedError('ReopenError')<{
 /** Effect variant of `reopenWorkspaceState`. */
 export const reopenWorkspaceState = (
   issueId: string,
-  workspacePath: string,
+  workspacePath: string | null,
   options: ReopenOptions = {},
 ): Effect.Effect<ReopenResult, ReopenError> =>
   Effect.tryPromise({
@@ -143,4 +166,3 @@ export const reopenWorkspaceState = (
         cause,
       }),
   });
-

@@ -1,3 +1,5 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
@@ -50,6 +52,7 @@ import {
   getOhmypiLauncherFields,
   getProviderAuthMode,
   getRoleRuntimeBaseCommand,
+  roleAgentDefinitionPath,
   waitForPromptReady,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
@@ -254,7 +257,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
-  const shouldDeliverPromptViaKimiCode = resolvedHarness === 'kimi-code';
+  const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -296,10 +299,10 @@ async function spawnRunWithoutConsentClaim(
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'ohmypi'
-    ? await getOhmypiLauncherFields(agentId, selectedModel)
+    ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(
@@ -308,14 +311,21 @@ async function spawnRunWithoutConsentClaim(
         workspace,
         harnessLaunch.binaryPath,
         role,
+        options.effort,
       )
     : {};
-  // PAN-1837 review fix: role runs (review/test/ship/plan/flywheel) reached
-  // this launcher path without a Kimi field spread, so buildKimiCodeCommand()
-  // threw 'kimi-code launcher requires kimiCodeModel' before a session could
-  // even be created.
+  const museSavedSession = resolvedHarness === 'muse' && options.resumeSessionId
+    ? await resolveMuseSessionPath(agentId) : null;
+  const museLauncherFields = resolvedHarness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: selectedModel,
+    museEffort: options.effort,
+    museContextFile: await materializeMuseContext(agentId, workspace, roleAgentDefinitionPath(role)),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : {};
+  // Kimi launchers require their model and effort fields even for specialist roles.
   const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
-    ? getKimiCodeLauncherFields(selectedModel)
+    ? getKimiCodeLauncherFields(selectedModel, options.effort)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -403,6 +413,7 @@ async function spawnRunWithoutConsentClaim(
     ...codexLauncherFields,
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
+    ...museLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -521,7 +532,8 @@ async function spawnRunWithoutConsentClaim(
         // not a tmux pane-scrape. No dependency on permission-mode footer text.
         // Kimi Code's own readiness (readinessKind 'kimi-session-signal') is a
         // pane-scan, not a hook file — waitForPromptReady dispatches correctly.
-        const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
+        const timeout = getHarnessBehavior(resolvedHarness).readyTimeoutSeconds;
+        const ready = await waitForPromptReady(agentId, resolvedHarness, timeout);
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           try {
@@ -534,12 +546,8 @@ async function spawnRunWithoutConsentClaim(
             throw error;
           }
         } else {
-          const message = `${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`;
-          console.error(`[${agentId}] ${message}`);
-          if (resolvedHarness === 'kimi-code') {
-            await Effect.runPromise(stopAgent(agentId)).catch(() => {});
-            throw new Error(`Agent ${agentId} managed context delivery failed: ${message}`);
-          }
+          if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+          throw new Error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within ${timeout}s`);
         }
       }
     }

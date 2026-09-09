@@ -20,6 +20,8 @@ export type WorkerState = {
 
 const POLL_MS = 250;
 const MAX_RUN_MS = 65 * 60 * 1000;
+const WORKER_EXIT_POLL_MS = 50;
+const WORKER_EXIT_GRACE_MS = 1_000;
 
 function safeIssueId(issueId: string): string {
   return issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -46,18 +48,23 @@ function isProcessAlive(pid: number): boolean {
  * Kill an expired worker and its gate children. The worker is spawned
  * detached, so it leads its own process group — signal the group first so a
  * mid-gate `npm`/`bun` child dies with it, falling back to the bare pid.
- * Best-effort and async; callers never block on the outcome.
+ * Wait for the worker to exit before returning so timeout recovery cannot
+ * overlap a fresh verification run with the expired worker.
  */
-async function killWorkerProcessGroup(pid: number): Promise<void> {
+async function killWorkerProcessGroup(pid: number): Promise<boolean> {
   for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
     try {
       process.kill(-pid, signal);
     } catch {
       try { process.kill(pid, signal); } catch { /* already gone */ }
     }
-    if (!isProcessAlive(pid)) return;
-    await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
+    const deadline = Date.now() + WORKER_EXIT_GRACE_MS;
+    while (isProcessAlive(pid) && Date.now() < deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, WORKER_EXIT_POLL_MS));
+    }
+    if (!isProcessAlive(pid)) return true;
   }
+  return false;
 }
 
 export function readVerificationWorkerState(issueId: string): WorkerState | null {
@@ -99,7 +106,7 @@ function writeJsonAtomic(path: string, value: unknown): void {
 }
 
 export function verificationWorkerDeadline(state: WorkerState): number | null {
-  if (!state.admittedAt) return null;
+  if (state.phase !== 'running' || !state.admittedAt) return null;
   const admittedAt = Date.parse(state.admittedAt);
   return Number.isFinite(admittedAt) ? admittedAt + MAX_RUN_MS : null;
 }
@@ -118,7 +125,7 @@ export function markVerificationWorkerAdmissionPhase(
   writeJsonAtomic(statePath(issueId), {
     ...state,
     phase: update.phase,
-    admittedAt: state.admittedAt ?? update.admittedAt ?? null,
+    admittedAt: update.phase === 'running' ? update.admittedAt ?? null : null,
     currentGate: update.gateName,
     currentAttempt: update.attempt,
   });
@@ -139,7 +146,7 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
       // Leaving it alive stranded PAN-3668 on 2026-08-13: every later attempt
       // re-joined the zombie registration and instantly re-failed on the same
       // deadline, and no fresh worker ever started.
-      void killWorkerProcessGroup(state.pid);
+      await killWorkerProcessGroup(state.pid);
       return { outcome: 'error', message: `Verification worker ${state.pid} exceeded ${MAX_RUN_MS}ms after CPU admission` };
     }
     await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
@@ -164,7 +171,12 @@ export async function runSupervisedVerification(
       return waitForResult(existing);
     }
     console.warn(`[${logPrefix}] Verification worker ${existing.pid} for ${issueId} is past its deadline — killing it and starting fresh`);
-    await killWorkerProcessGroup(existing.pid);
+    if (!await killWorkerProcessGroup(existing.pid)) {
+      return {
+        outcome: 'error',
+        message: `Verification worker ${existing.pid} is past its deadline but still alive; refusing to start an overlapping worker`,
+      };
+    }
   }
 
   const dir = workerDir(issueId);

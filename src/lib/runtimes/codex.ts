@@ -297,6 +297,8 @@ export class CodexSpawnTimeout extends Error {
  */
 export interface InitCodexHomeOpts {
   trustedDir?: string
+  model?: string
+  effort?: string
   approvalPolicy?: string
   sandboxMode?: string
   approvalsReviewer?: string
@@ -327,9 +329,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   }
 
   const configPath = join(codexHomeDir, 'config.toml')
-  // Always (re)write config.toml so permission-mode changes take effect on
-  // resume. The file is Overdeck-managed ("do not edit manually") and
-  // contains no user state — only launch-time settings.
+  // Rewrite managed launch settings on resume so permission, effort, and context changes apply.
   {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
     // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a
@@ -342,6 +342,8 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       '# model/provider set at launch via -m flag',
       '',
       `approval_policy = "${opts.approvalPolicy ?? 'never'}"`,
+      `model_reasoning_effort = ${JSON.stringify(opts.effort ?? 'high')}`,
+      ...((opts.model === 'gpt-6-astra' || opts.model?.startsWith('gpt-5.6-')) ? [`model_context_window = ${opts.model.endsWith('[372k]') ? 372_000 : 272_000}`] : []),
     ]
     if (opts.sandboxMode) {
       lines.push(`sandbox_mode = "${opts.sandboxMode}"`)

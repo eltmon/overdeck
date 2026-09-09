@@ -1,10 +1,11 @@
 import { Effect } from 'effect';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-09-07)
   | 'gpt-6-astra'
@@ -32,17 +33,19 @@ export type OpenAIModel =
   | 'o3-deep-research'
   | 'gpt-4o'
   | 'gpt-4o-mini';
-export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+export type GoogleModel = 'gemini-3.8-flash' | 'gemini-3.5-flash-lite' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type KimiModel = 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2'
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
-export type ZAIModel = 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
+export type ZAIModel = 'glm-5.3' | 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
-export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
+export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
+export type MuseModel = 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
+
+export type ModelId = MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -255,6 +258,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   quantumllama: QuantumLlamaModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
+    'claude-fable-5-1',
     'claude-fable-5',
     'claude-opus-5',
     'claude-opus-4-8',
@@ -266,11 +270,11 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2']
+    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview']
+    ? ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview']
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
@@ -278,7 +282,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
-    ? ['minimax-m2.7', 'minimax-m2.7-highspeed']
+    ? ['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
   const mimoModels: MimoModel[] = settings.api_keys.mimo
@@ -290,7 +294,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const dashscopeModels: DashScopeModel[] = settings.api_keys.dashscope
-    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']
+    ? ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']
     : [];
 
   const xaiModels: GrokModel[] = settings.api_keys.xai
@@ -331,6 +335,7 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
     // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
     // API model ID through to `--model`.
+    'claude-fable-5-1': 'claude-fable-5-1',
     'claude-fable-5': 'claude-fable-5',
     // Pass the full API ID through: the CLI's short `opus` alias may still
     // resolve to Opus 4.8 depending on installed Claude Code version.
@@ -357,6 +362,9 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
       command: 'claude',
       args: ['--model', getClaudeModelFlagSync(modelId)],
     };
+  }
+  if (modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+    return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.
   // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.

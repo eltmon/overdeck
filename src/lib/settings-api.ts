@@ -136,6 +136,7 @@ export interface ApiSettingsConfig {
       openrouter: boolean;
       nous: boolean;
       dashscope: boolean;
+      meta?: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -297,6 +298,7 @@ type AvailableModel = {
   id: ModelId;
   name: string;
   costPer1MTokens: number;
+  contextWindow: number;
   /**
    * Kimi-only: which harness family this id launches under. `claude-code` ids
    * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
@@ -310,9 +312,9 @@ type AvailableModel = {
   /** Display name without any harness suffix — pickers compose row labels from it. */
   baseName?: string;
 };
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
+type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -508,8 +510,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, muse, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -591,7 +593,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
                 const supported = getModelEffortLevelsSync(resolvedModel);
-                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                   );
@@ -602,7 +604,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
               const supported = getModelEffortLevelsSync(resolvedModel);
-              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                 );
@@ -709,6 +711,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
+        meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
       provider_default_harnesses: builtInProviderHarnesses(),
@@ -949,6 +952,7 @@ async function saveSettingsApiPromiseUnlocked(
         openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
         nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
+        meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -1217,8 +1221,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'muse') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, muse, or empty string`);
         }
       }
     }
@@ -1421,19 +1425,22 @@ export function getAvailableModelsApi(): AvailableModelsApi {
     openrouter: [],
     nous: [],
     dashscope: [],
+    meta: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Skip deprecated models — they should not appear in user-facing pickers.
-    // MODEL_DEPRECATIONS is the single source of truth for "this model has
-    // been retired and remapped to a current one"; capability entries are kept
-    // for back-compat (cost/capability lookups for old configs and historical
-    // conversations), but they must not surface in dropdowns.
+    // Retain historical capabilities, but expose only active selections.
     if (capability.displayName.includes('(deprecated)')) continue;
     if (modelId in MODEL_DEPRECATIONS) continue;
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const contextWindow = capability.contextWindow;
+    const name = capability.displayName.replace(/\s*\(?[\d.]+[KM]\)?$/, '');
+    const contextLabel = contextWindow === 1_048_576 ? '1M' : contextWindow === 262_144 ? '256K' : contextWindow >= 1_000_000 ? `${Number((contextWindow / 1_000_000).toFixed(3))}M` : `${Number((contextWindow / 1000).toFixed(3))}K`;
+    const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
     const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
+      case 'meta':
+        result.meta.push({ ...entry, harness: 'muse', effortLevels: capability.effortLevels });
+        break;
       case 'anthropic':
         result.anthropic.push(annotated);
         break;
@@ -1502,6 +1509,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1533,6 +1541,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },

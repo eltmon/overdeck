@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  reportComposerReloadProgress: vi.fn(async () => undefined),
   acquireRestartLock: vi.fn(),
   readRestartLockHolder: vi.fn(),
   readPlatformConfig: vi.fn(),
@@ -33,6 +34,8 @@ const mocks = vi.hoisted(() => ({
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
 }));
+
+vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
 // Without mocking this, the test outcome depends on whether the host happens to
@@ -170,6 +173,7 @@ const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
 const originalRestartInitiator = process.env.OVERDECK_RESTART_INITIATOR;
+const originalIssueId = process.env.OVERDECK_ISSUE_ID;
 const originalHome = process.env.HOME;
 const originalPath = process.env.PATH;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -179,6 +183,8 @@ function restoreEnv(): void {
   else process.env.OVERDECK_AGENT_ID = originalAgentId;
   if (originalRestartInitiator === undefined) delete process.env.OVERDECK_RESTART_INITIATOR;
   else process.env.OVERDECK_RESTART_INITIATOR = originalRestartInitiator;
+  if (originalIssueId === undefined) delete process.env.OVERDECK_ISSUE_ID;
+  else process.env.OVERDECK_ISSUE_ID = originalIssueId;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
   if (originalPath === undefined) delete process.env.PATH;
@@ -193,6 +199,7 @@ describe('reloadCommand', () => {
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
     delete process.env.OVERDECK_RESTART_INITIATOR;
+    delete process.env.OVERDECK_ISSUE_ID;
     process.env.HOME = '/home/test';
     process.env.PATH = '/usr/bin:/bin';
     process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
@@ -787,6 +794,8 @@ describe('reloadCommand', () => {
 
   describe('restart-approval gate (PAN-3729)', () => {
     it('builds first, then waits for approval before restarting', async () => {
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_ACTIVITY', 'reload-42');
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_LOG', '/tmp/reload-42.log');
       mocks.statSync
         .mockReturnValueOnce({ mtimeMs: 1000 })
         .mockReturnValueOnce({ mtimeMs: 2000 });
@@ -798,11 +807,33 @@ describe('reloadCommand', () => {
         kind: 'reload',
         requesterId: 'reload:1234',
       }));
+      expect(mocks.reportComposerReloadProgress.mock.calls.map(([phase]) => phase))
+        .toEqual(['building', 'awaiting-approval', 'restarting', 'completed']);
+      expect(mocks.reportComposerReloadProgress).toHaveBeenLastCalledWith('completed', 'reload-42', '/tmp/reload-42.log');
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY).toBeUndefined();
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_LOG).toBeUndefined();
+      vi.unstubAllEnvs();
       // The build is ungated; only the restart waits.
       expect(mocks.spawn.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.waitForRestartApproval.mock.invocationCallOrder[0]);
       expect(mocks.waitForRestartApproval.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+    });
+
+    it('preserves the post-merge deploy identity when the script delegates to reload', async () => {
+      process.env.OVERDECK_RESTART_INITIATOR = 'merge-step0';
+      process.env.OVERDECK_ISSUE_ID = 'PAN-3329';
+      mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+      mockSpawnExits();
+
+      await reloadCommand({});
+
+      expect(mocks.waitForRestartApproval).toHaveBeenCalledWith({
+        requesterId: 'deploy:1234',
+        kind: 'deploy',
+        reason: 'post-merge deploy for PAN-3329',
+        builtSha: DEFAULT_ORIGIN_MAIN_SHA,
+      });
     });
 
     it('keeps the freshly built deployment but restarts nothing when another approved restart already ran', async () => {

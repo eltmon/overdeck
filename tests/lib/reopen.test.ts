@@ -112,6 +112,9 @@ afterEach(() => {
 // ── Import under test (after mocks) ─────────────────────────────────────────
 
 import { reopenWorkspaceState } from '../../src/lib/reopen.js';
+import { strikeReadyCommand } from '../../src/cli/commands/strike-ready.js';
+import { patrolStrikeLandings, type StrikeLandingDeps } from '../../src/lib/cloister/deacon-strike-landing.js';
+import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync } from '../../src/lib/review-status.js';
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -428,6 +431,125 @@ describe('reopenWorkspaceState', () => {
       expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
 
       rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it('reopens a merged strike without a feature workspace and lets Deacon claim its new ready head', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      seedRecord(projectRoot, 'PAN-905');
+      projectStub = { projectPath: projectRoot, projectKey: 'fixture-project' };
+
+      seedStatus({
+        'PAN-905': {
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          verificationStatus: 'passed',
+          mergeStatus: 'merged',
+          readyForMerge: false,
+        },
+      });
+      const priorHead = 'a'.repeat(40);
+      const newHead = 'b'.repeat(40);
+      const priorAttempts = JSON.stringify([{
+        timestamp: '2026-08-01T00:00:00.000Z',
+        strikeHead: priorHead,
+        mainHead: 'c'.repeat(40),
+        outcome: 'merged',
+        detail: 'Prior strike landed',
+      }]);
+      const recordPath = join(projectRoot, '.pan', 'records', 'pan-905.json');
+      const record = JSON.parse(readFileSync(recordPath, 'utf-8'));
+      record.pipeline = {
+        issueId: 'PAN-905',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+        closedOut: true,
+        closedOutAt: '2026-08-01T00:00:00.000Z',
+        strikeReadyHead: priorHead,
+        strikeReadyAt: '2026-08-01T00:00:00.000Z',
+        strikeLandingState: 'landed',
+        strikeRecoveryCount: 2,
+        strikeTransportRetryCount: 3,
+        strikeNextAttemptAt: '2026-08-02T00:00:00.000Z',
+        strikeLandingAttempts: JSON.parse(priorAttempts),
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      };
+      writeFileSync(recordPath, JSON.stringify(record), 'utf-8');
+      odb.raw().prepare(`
+        UPDATE review_status
+        SET strike_ready_head = ?, strike_ready_at = ?, strike_landing_state = 'landed',
+            strike_recovery_count = 2, strike_transport_retry_count = 3,
+            strike_next_attempt_at = ?, strike_landing_attempts = ?
+        WHERE issue_id = 'PAN-905'
+      `).run(priorHead, Date.parse('2026-08-01T00:00:00.000Z'), Date.parse('2026-08-02T00:00:00.000Z'), priorAttempts);
+
+      const result = await Effect.runPromise(reopenWorkspaceState('PAN-905', null));
+      expect(result.specialistStatesReset).toBe(true);
+      expect(existsSync(join(projectRoot, 'workspaces', 'feature-pan-905'))).toBe(false);
+
+      const reopened = getReviewStatusSync('PAN-905')!;
+      expect(reopened).toMatchObject({
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        strikeRecoveryCount: 0,
+      });
+      expect(reopened.strikeReadyHead).toBeUndefined();
+      expect(reopened.strikeReadyAt).toBeUndefined();
+      expect(reopened.strikeLandingState).toBeUndefined();
+      expect(reopened.strikeTransportRetryCount).toBeUndefined();
+      expect(reopened.strikeNextAttemptAt).toBeUndefined();
+      expect(reopened.strikeLandingAttempts).toEqual(JSON.parse(priorAttempts));
+
+      const strikeWorkspace = join(projectRoot, 'workspaces', 'feature-pan-905-strike');
+      const git = vi.fn(async (args: string[]) => {
+        const command = args.join(' ');
+        if (command === 'rev-parse --show-toplevel') return strikeWorkspace;
+        if (command === 'branch --show-current') return 'strike/pan-905';
+        if (command === 'worktree list --porcelain') {
+          return `worktree ${strikeWorkspace}\nHEAD ${newHead}\nbranch refs/heads/strike/pan-905\n`;
+        }
+        if (command === 'status --porcelain' || command === 'fetch origin strike/pan-905') return '';
+        if (command === 'rev-parse HEAD' || command === 'rev-parse origin/strike/pan-905') return newHead;
+        throw new Error(`Unexpected git invocation: ${command}`);
+      });
+      await strikeReadyCommand('PAN-905', {
+        cwd: strikeWorkspace,
+        resolveProject: () => ({ projectPath: projectRoot, projectKey: 'fixture-project' }) as never,
+        git,
+      });
+
+      const scheduled: Promise<void>[] = [];
+      const mergeIssue = vi.fn().mockResolvedValue({ success: true, mergeStatus: 'queued' });
+      const actions = await patrolStrikeLandings({
+        loadStatuses: () => loadReviewStatuses(),
+        getStatus: getReviewStatusSync,
+        setStatus: setReviewStatusSync,
+        resolveProject: () => ({ projectPath: projectRoot, projectKey: 'fixture-project' }) as never,
+        mergeIssue,
+        getMainHead: vi.fn().mockResolvedValue('c'.repeat(40)),
+        deliverRecovery: vi.fn(),
+        writeFeedback: vi.fn(),
+        needsYou: vi.fn(),
+        now: () => '2026-08-03T00:00:00.000Z',
+        schedule: (_key, work) => scheduled.push(work()),
+        isScheduled: () => false,
+        isPersistentlyOwned: () => false,
+        listProjects: vi.fn().mockResolvedValue([]),
+        git: vi.fn(),
+        isStrikeAgentAlive: vi.fn().mockResolvedValue(false),
+      } satisfies StrikeLandingDeps);
+      await Promise.all(scheduled);
+
+      expect(actions).toEqual([`[strike-landing] claimed PAN-905 at ${newHead}`]);
+      expect(mergeIssue).toHaveBeenCalledWith('PAN-905', expect.objectContaining({ markerHead: newHead }));
+      expect(getReviewStatusSync('PAN-905')?.strikeLandingState).toBe('landing');
+
       rmSync(projectRoot, { recursive: true, force: true });
     });
 

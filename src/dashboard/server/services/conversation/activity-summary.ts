@@ -1,3 +1,4 @@
+import { parseMuseConversationMessages } from '../muse-conversation-parser.js';
 import { stat } from 'node:fs/promises';
 import { getHarnessBehavior } from '../../../../lib/runtimes/behavior.js';
 import { projectAcpConversationActivity } from '../acp-conversation-parser.js';
@@ -72,6 +73,7 @@ export async function summarizeConversationActivity(
 
   const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
     : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
+    : behavior.transcriptKind === 'muse-jsonl' ? await parseMuseConversationMessages(sessionFile)
     : behavior.transcriptKind === 'kimi-wire-jsonl' ? await parseKimiConversationMessages(sessionFile)
     : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
