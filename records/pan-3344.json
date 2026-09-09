@@ -64,6 +64,13 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T11:08:01.083Z",
-  "harness": "codex"
+  "updated": "2026-09-09T11:11:33.618Z",
+  "harness": "codex",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-09-09T11:11:33.618Z"
+    }
+  ]
 }
