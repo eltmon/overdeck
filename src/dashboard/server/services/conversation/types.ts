@@ -1,6 +1,8 @@
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
 
 export interface ParseResult {
+  /** Worker-local accumulator generation; changes when a transcript is rebuilt. */
+  transcriptGeneration?: number;
   messages: ChatMessage[];
   workLog: WorkLogEntry[];
   /** Byte offset after the last parsed line — pass back for incremental reads. */
