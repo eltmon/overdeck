@@ -110,6 +110,54 @@ describe('workspace verdict fallback (PAN-2583)', () => {
     expect(result?.durable.prUrl).toBe('https://example.com/pr/1');
   });
 
+  it('ignores terminal fallback evidence from before the latest reopen', () => {
+    state.pipeline = {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      reopenedAt: '2026-09-09T07:54:11.092Z',
+      updatedAt: '2026-09-09T07:54:11.114Z',
+    };
+    writeFallback('2099-01-01T00:00:00.000Z', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      reopenedAt: '2026-08-01T00:00:00.000Z',
+    });
+
+    const result = readJournalStatusSync(ISSUE);
+    expect(result?.durable).toMatchObject({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+    });
+  });
+
+  it('accepts terminal fallback evidence carrying the current reopen cycle', () => {
+    const reopenedAt = '2026-09-09T07:54:11.092Z';
+    state.pipeline = {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      reopenedAt,
+      updatedAt: '2026-09-09T07:54:11.114Z',
+    };
+    writeFallback('2026-09-09T08:00:00.000Z', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      reopenedAt,
+    });
+
+    const result = readJournalStatusSync(ISSUE);
+    expect(result?.durable).toMatchObject({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      reopenedAt,
+    });
+  });
+
   it('applies explicit strike transport clears from a newer fallback', () => {
     state.pipeline = {
       reviewStatus: 'reviewing',

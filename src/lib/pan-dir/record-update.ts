@@ -118,6 +118,40 @@ export function updateIssueRecordForWorkspace(
 
 export type IssueRecordMutator = (record: PanIssueRecord) => PanIssueRecord | void | Promise<PanIssueRecord | void>;
 
+/** Establish a new pipeline evidence cycle before any cache or fallback can be read. */
+export function resetRecordPipelineForReopenSync(
+  project: ProjectConfig,
+  issueId: string,
+  reopenedAt = new Date().toISOString(),
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.pipeline = {
+    ...record.pipeline,
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    verificationStatus: 'pending',
+    mergeStatus: 'pending',
+    readyForMerge: false,
+    closedOut: undefined,
+    closedOutAt: undefined,
+    reopenedAt,
+    updatedAt: reopenedAt,
+    reviewRequestedAt: undefined,
+    reviewSpawnedAt: undefined,
+    reviewedAtCommit: undefined,
+    lastVerifiedCommit: undefined,
+    mergeStep: undefined,
+    strikeReadyHead: undefined,
+    strikeReadyAt: undefined,
+    strikeLandingState: undefined,
+    strikeRecoveryCount: 0,
+    strikeTransportRetryCount: undefined,
+    strikeNextAttemptAt: undefined,
+  };
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
 /**
  * Clear the terminal close-out marker so a reopened issue re-enters the pipeline (sync).
  * Ordinary status writes deliberately preserve closedOut (projectPipeline in records.ts),

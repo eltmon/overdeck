@@ -34,6 +34,8 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   mergeNotes?: string;
   releaseNotes?: string;
   updatedAt: string;
+  /** Durable boundary that separates the current pipeline run from pre-reopen evidence. */
+  reopenedAt?: string;
   readyForMerge: boolean;
   /** Terminal marker for a closed/stale PR record; cleared only by fresh work or a new PR. */
   retiredAt?: string;

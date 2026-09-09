@@ -6,7 +6,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { pickNewerPipeline } from '../../../../src/lib/pan-dir/records.js';
-import { pipelineCoversFallbackVerdicts } from '../../../../src/lib/pan-dir/pipeline-verdict-merge.js';
+import {
+  pipelineCoversFallbackVerdicts,
+  staleVerdictSnapshotAgainstLiveCycle,
+} from '../../../../src/lib/pan-dir/pipeline-verdict-merge.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/records.js';
 
 function pipeline(overrides: Partial<PanIssuePipelineRecord>): PanIssuePipelineRecord {
@@ -89,6 +92,26 @@ describe('pickNewerPipeline verdict-awareness (PAN-3092)', () => {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: '2026-07-27T04:00:00.000Z',
       updatedAt: '2026-07-27T04:00:01.000Z',
+    });
+
+    expect(pickNewerPipeline(rebuilt, fresh)).toBe(fresh);
+  });
+
+  it('lets reopen retire a delayed terminal write from the previous pipeline cycle', () => {
+    const reopenedAt = '2026-09-09T07:54:11.092Z';
+    const rebuilt = pipeline({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      reopenedAt,
+      updatedAt: '2026-09-09T07:52:13.898Z',
+    });
+    const fresh = pipeline({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      reopenedAt,
+      updatedAt: '2026-09-09T07:54:11.114Z',
     });
 
     expect(pickNewerPipeline(rebuilt, fresh)).toBe(fresh);
@@ -228,6 +251,24 @@ describe('pipelineCoversFallbackVerdicts (PAN-3092)', () => {
     ).toBe(true);
   });
 
+  it('reports a pre-reopen fallback covered by the new pipeline cycle', () => {
+    const journal = pipeline({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      reopenedAt: '2026-09-09T07:54:11.092Z',
+      updatedAt: '2026-09-09T07:54:11.114Z',
+    });
+    expect(
+      pipelineCoversFallbackVerdicts(
+        journal,
+        fallback(
+          { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged' },
+          '2026-09-09T07:52:13.898Z',
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it('reports covered when the fallback holds no terminal verdict at all', () => {
     const journal = pipeline({ reviewStatus: 'reviewing', updatedAt: '2026-07-27T00:09:41.000Z' });
     expect(
@@ -247,5 +288,27 @@ describe('pipelineCoversFallbackVerdicts (PAN-3092)', () => {
         fallback({ reviewStatus: 'passed', testStatus: 'passed' }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('staleVerdictSnapshotAgainstLiveCycle reopen boundary (PAN-3795)', () => {
+  it('classifies terminal evidence written before reopenedAt as stale', () => {
+    const stale = staleVerdictSnapshotAgainstLiveCycle(
+      pipeline({
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        reopenedAt: '2026-09-09T07:54:11.092Z',
+        updatedAt: '2026-09-09T07:54:11.114Z',
+      }) as unknown as Record<string, unknown>,
+      pipeline({
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        updatedAt: '2026-09-09T07:52:13.898Z',
+      }) as unknown as Record<string, unknown>,
+    );
+
+    expect(stale?.liveCycle).toBe(Date.parse('2026-09-09T07:54:11.092Z'));
+    expect(stale?.snapshotCycle).toBe(Date.parse('2026-09-09T07:52:13.898Z'));
   });
 });

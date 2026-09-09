@@ -15,7 +15,7 @@ import { Data, Effect } from 'effect';
 import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
-import { clearRecordPipelineClosedOutSync } from './pan-dir/record-update.js';
+import { resetRecordPipelineForReopenSync } from './pan-dir/record-update.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -63,11 +63,11 @@ async function reopenWorkspaceStatePromise(
 
   const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved) {
-    // Clear the terminal close-out marker before publishing the fresh status.
-    // Otherwise this record write can become newer than the reset and restore
-    // its old verdicts during the next canonical read.
+    // Establish the new evidence cycle in the durable record before publishing
+    // the cache reset. This makes every pre-reopen journal/fallback generation
+    // stale even when it lands after reopen while waiting on the record lock.
     const project = getProjectSync(resolved.projectKey);
-    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
+    if (project) resetRecordPipelineForReopenSync(project, issueId.toUpperCase());
   }
 
   setReviewStatusSync(issueId, {

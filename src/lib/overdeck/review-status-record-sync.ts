@@ -145,6 +145,7 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
     inspectNotes: pipeline.inspectNotes ?? status.inspectNotes,
     verificationNotes: pipeline.verificationNotes ?? status.verificationNotes,
     scopeDrift: pipeline.scopeDrift ?? status.scopeDrift,
+    reopenedAt: pipeline.reopenedAt ?? status.reopenedAt,
     // PAN-1988 auto-heal: the durable review-request intent is journal-only — overlay it on every
     // read so the merge base preserves it through partial updates and the dispatch reconcile sees it.
     reviewRequestedAt: pipeline.reviewRequestedAt ?? status.reviewRequestedAt,
@@ -202,6 +203,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     strikeTransportRetryCount: p.strikeTransportRetryCount,
     strikeNextAttemptAt: p.strikeNextAttemptAt,
     strikeLandingAttempts: p.strikeLandingAttempts,
+    reopenedAt: p.reopenedAt,
     closedOut: p.closedOut,
     closedOutAt: p.closedOutAt,
   };

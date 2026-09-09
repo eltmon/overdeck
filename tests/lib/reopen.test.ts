@@ -115,6 +115,7 @@ import { reopenWorkspaceState } from '../../src/lib/reopen.js';
 import { strikeReadyCommand } from '../../src/cli/commands/strike-ready.js';
 import { patrolStrikeLandings, type StrikeLandingDeps } from '../../src/lib/cloister/deacon-strike-landing.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync } from '../../src/lib/review-status.js';
+import { pickNewerPipeline, projectPipeline } from '../../src/lib/pan-dir/records.js';
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -378,7 +379,7 @@ describe('reopenWorkspaceState', () => {
 
       const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
       expect(updated.pipeline.closedOut).toBeUndefined();
-      expect(updated.pipeline.mergeStatus).toBeUndefined();
+      expect(updated.pipeline.mergeStatus).toBe('pending');
       expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
 
       rmSync(wsDir, { recursive: true, force: true });
@@ -427,7 +428,7 @@ describe('reopenWorkspaceState', () => {
       await Effect.runPromise(reopenWorkspaceState('PAN-904', wsDir));
 
       const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
-      expect(updated.pipeline.mergeStatus).toBeUndefined();
+      expect(updated.pipeline.mergeStatus).toBe('pending');
       expect(updated.pipeline.reopenedAt).toBeTypeOf('string');
 
       rmSync(wsDir, { recursive: true, force: true });
@@ -489,6 +490,26 @@ describe('reopenWorkspaceState', () => {
       const result = await Effect.runPromise(reopenWorkspaceState('PAN-905', null));
       expect(result.specialistStatesReset).toBe(true);
       expect(existsSync(join(projectRoot, 'workspaces', 'feature-pan-905'))).toBe(false);
+
+      // Simulate a delayed pre-reopen journal write racing with a later
+      // bookkeeping restamp of the new record. The verdict-aware whole-record
+      // merge is the exact canonical write-door operation used in production.
+      const reopenedRecord = JSON.parse(readFileSync(recordPath, 'utf-8'));
+      const freshPipeline = {
+        ...reopenedRecord.pipeline,
+        updatedAt: '2099-01-01T00:00:00.000Z',
+      };
+      const delayedPipeline = projectPipeline('PAN-905', {
+        issueId: 'PAN-905',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      }, freshPipeline);
+      reopenedRecord.pipeline = pickNewerPipeline(delayedPipeline, freshPipeline);
+      writeFileSync(recordPath, JSON.stringify(reopenedRecord), 'utf-8');
 
       const reopened = getReviewStatusSync('PAN-905')!;
       expect(reopened).toMatchObject({

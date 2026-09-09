@@ -76,6 +76,19 @@ function reviewCycleMs(pipeline: PipelineFields): number | undefined {
   return Math.max(spawned, requested);
 }
 
+function maxDefined(...values: Array<number | undefined>): number | undefined {
+  const defined = values.filter((value): value is number => value !== undefined);
+  return defined.length > 0 ? Math.max(...defined) : undefined;
+}
+
+function reopenedCycleMs(pipeline: PipelineFields): number | undefined {
+  return cycleMs(pipeline.reopenedAt);
+}
+
+function snapshotCycleMs(pipeline: PipelineFields): number | undefined {
+  return maxDefined(reopenedCycleMs(pipeline), reviewCycleMs(pipeline));
+}
+
 function carriesTerminalVerdict(pipeline: PipelineFields): boolean {
   return GATE_NAMES.some((gate) => isTerminal(gate, pipeline[gate]));
 }
@@ -96,6 +109,41 @@ export function staleVerdictSnapshotAgainstLiveCycle(
   live: PipelineFields,
   snapshot: PipelineFields,
 ): StaleVerdictSnapshot | null {
+  const liveReopened = reopenedCycleMs(live);
+  const snapshotCycleForReopen = snapshotCycleMs(snapshot);
+  const snapshotUpdatedAt = cycleMs(snapshot.updatedAt);
+  if (
+    liveReopened !== undefined
+    && carriesTerminalVerdict(snapshot)
+    && (
+      (snapshotUpdatedAt !== undefined && snapshotUpdatedAt < liveReopened)
+      || snapshotCycleForReopen === undefined
+      || snapshotCycleForReopen < liveReopened
+    )
+  ) {
+    return {
+      liveCycle: liveReopened,
+      snapshotCycle: snapshotCycleForReopen
+        ?? (snapshotUpdatedAt !== undefined && snapshotUpdatedAt < liveReopened
+          ? snapshotUpdatedAt
+          : undefined),
+      liveHead: typeof live.prHeadSha === 'string'
+        ? live.prHeadSha
+        : typeof live.lastVerifiedCommit === 'string'
+          ? live.lastVerifiedCommit
+          : typeof live.reviewedAtCommit === 'string'
+            ? live.reviewedAtCommit
+            : undefined,
+      snapshotHead: typeof snapshot.reviewedAtCommit === 'string'
+        ? snapshot.reviewedAtCommit
+        : typeof snapshot.lastVerifiedCommit === 'string'
+          ? snapshot.lastVerifiedCommit
+          : typeof snapshot.prHeadSha === 'string'
+            ? snapshot.prHeadSha
+            : undefined,
+    };
+  }
+
   const liveReviewStatus = live.reviewStatus;
   const liveSpawned = cycleMs(live.reviewSpawnedAt);
   const liveRequested = cycleMs(live.reviewRequestedAt);
@@ -153,6 +201,11 @@ export function mergePipelineVerdictAware(
 ): PanIssuePipelineRecord {
   if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
   if (!(rebuilt.updatedAt < fresh.updatedAt)) return rebuilt;
+
+  // Reopen is a hard evidence boundary. A delayed whole-record write from the
+  // previous run must not regain terminal verdicts merely because the normal
+  // same-cycle merge preserves terminal gates.
+  if (staleVerdictSnapshotAgainstLiveCycle(fields(fresh), fields(rebuilt))) return fresh;
 
   const rebuiltCycle = reviewCycleMs(fields(rebuilt));
   const freshCycle = reviewCycleMs(fields(fresh));
@@ -212,6 +265,8 @@ export function pipelineCoversFallbackVerdicts(
   journal: PanIssuePipelineRecord,
   fallback: { updatedAt: string; pipeline: PipelineFields },
 ): boolean {
+  if (staleVerdictSnapshotAgainstLiveCycle(fields(journal), fallback.pipeline)) return true;
+
   const journalCycle = reviewCycleMs(fields(journal));
   const fallbackCycle = reviewCycleMs(fallback.pipeline);
   const fallbackWrittenMs = cycleMs(fallback.updatedAt);
@@ -255,6 +310,8 @@ export function findFallbackVerdictConflicts(
   journal: PanIssuePipelineRecord,
   fallback: { updatedAt: string; pipeline: PipelineFields },
 ): VerdictConflict[] {
+  if (staleVerdictSnapshotAgainstLiveCycle(fields(journal), fallback.pipeline)) return [];
+
   const journalCycle = reviewCycleMs(fields(journal));
   const fallbackCycle = reviewCycleMs(fallback.pipeline);
   const fallbackWrittenMs = cycleMs(fallback.updatedAt);
