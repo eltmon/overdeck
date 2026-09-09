@@ -532,10 +532,10 @@
     "recordedAt": "2026-09-09T06:28:10.988Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-09T08:26:09.279Z",
+  "updated": "2026-09-09T08:38:37.228Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -544,12 +544,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-09T06:31:21.466Z",
-    "updatedAt": "2026-09-09T08:26:01.241Z",
-    "reviewNotes": "Verification error: Verification worker 999024 exceeded 3900000ms after CPU admission",
+    "updatedAt": "2026-09-09T08:38:37.152Z",
+    "reviewNotes": "All four reviewers completed; the sole finding was unchanged since cycle 8 and is not promotable under the cycle-9 convergence gate.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
-    "reviewedAtCommit": "e580f7159478b8441bed0071557de288a18dabf1",
+    "reviewedAtCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
     "lastVerifiedCommit": "07f77ef7e64c8c2d6dd163054a137d856b8687a4",
-    "reviewRequestedAt": "2026-09-09T06:31:21.466Z",
     "reviewSpawnedAt": "2026-09-09T08:26:01.240Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -834,16 +834,16 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 202164636,
-            "output": 354848,
-            "cacheRead": 194446848,
+            "input": 214047121,
+            "output": 392134,
+            "cacheRead": 204945024,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 30839,
-            "output": 1380,
+            "input": 34980,
+            "output": 1490,
             "cacheRead": 3,
             "cacheWrite": 0
           }
@@ -865,14 +865,14 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 202164636,
-          "output": 354848,
-          "cacheRead": 194446848,
+          "input": 214047121,
+          "output": 392134,
+          "cacheRead": 204945024,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 30839,
-          "output": 1380,
+          "input": 34980,
+          "output": 1490,
           "cacheRead": 3,
           "cacheWrite": 0
         },
@@ -884,8 +884,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 152.3425073,
-        "pricingAsOf": "2026-09-09T08:26:01.351Z"
+        "usd": 165.6364113,
+        "pricingAsOf": "2026-09-09T08:38:37.215Z"
       }
     },
     "merges": [
