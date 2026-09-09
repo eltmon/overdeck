@@ -414,6 +414,53 @@ function readyTaskLine(item: XBriefItem): string {
   return `${item.id} ${item.title}`.trim();
 }
 
+const BLOCKING_INSPECTION_STATUSES = new Set(['failed', 'blocked', 'error', 'inspecting']);
+
+function getBlockingMandatoryInspection(
+  plan: ReturnType<typeof readWorkspacePlanSync>,
+  issueId: string,
+): { item: XBriefItem; status: string; notes?: string } | null {
+  if (!plan) return null;
+  const inspection = getReviewStatusSync(issueId);
+  const status = inspection?.inspectStatus as string | undefined;
+  if (!status || !BLOCKING_INSPECTION_STATUSES.has(status) || !inspection?.inspectBeadId) return null;
+
+  const item = plan.plan.items.find(candidate => candidate.id === inspection.inspectBeadId);
+  if (item?.status !== 'completed' || item.metadata?.requiresInspection !== true) return null;
+
+  return { item, status, notes: inspection.inspectNotes };
+}
+
+function buildInspectionBlockedNudge(
+  issueId: string,
+  inspection: { item: XBriefItem; status: string; notes?: string },
+): string {
+  const lines = [
+    `Deacon idle-nudge: mandatory inspection blocks further task advancement for ${issueId}.`,
+    '',
+    `Inspection item: ${readyTaskLine(inspection.item)}`,
+    `Inspection status: ${inspection.status}`,
+    `Actionable inspection notes: ${inspection.notes?.trim() || 'No inspection notes were recorded.'}`,
+    '',
+  ];
+
+  if (inspection.status === 'failed' || inspection.status === 'blocked') {
+    lines.push(
+      `You must fix ${inspection.item.id}, commit and push the correction, then re-run \`pan inspect ${issueId} --item ${inspection.item.id}\`. Do not claim or implement another task until inspection passes.`,
+    );
+  } else if (inspection.status === 'error') {
+    lines.push(
+      `Resolve or report the inspection infrastructure failure, then re-run \`pan inspect ${issueId} --item ${inspection.item.id}\`; do not advance to another task until inspection passes.`,
+    );
+  } else {
+    lines.push(
+      `Wait for the inspection verdict for ${inspection.item.id}; do not advance to another task until inspection passes.`,
+    );
+  }
+
+  return lines.join('\n');
+}
+
 export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -542,17 +589,18 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       const plan = readWorkspacePlanSync(state.workspace);
       if (!plan) continue;
       const openTasks = getDispatchableItems(plan, new Set());
-      if (openTasks.length === 0) continue;
+      const blockedInspection = getBlockingMandatoryInspection(plan, state.issueId);
+      if (openTasks.length === 0 && !blockedInspection) continue;
 
       // Build the nudge: tell the agent what's next, do not just ping.
-      const firstTask = readyTaskLine(openTasks[0]!).slice(0, 200);
+      const firstTask = openTasks[0] ? readyTaskLine(openTasks[0]).slice(0, 200) : '';
       // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
       // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
       // agent running with NO original context — only this nudge. Point it at the
       // brief on disk so it can self-recover the full plan/role/decisions/hazards
       // instead of guessing from the bead title alone.
       const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
-      const message = [
+      const message = blockedInspection ? buildInspectionBlockedNudge(state.issueId, blockedInspection) : [
         `Deacon idle-nudge: your tmux is alive but the agent is idle and you have ${openTasks.length} ready task(s) for ${state.issueId}.`,
         ``,
         `Next ready task: ${firstTask}`,
@@ -568,7 +616,9 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
         const { messageAgent } = await import('../agents.js');
         await messageAgent(agentId, message);
         writeFileSync(join(getAgentDir(agentId), '.last-bead-nudge'), String(Date.now()), 'utf-8');
-        const action = `Nudged idle ${agentId} (${state.issueId}) — ${openTasks.length} ready task(s)`;
+        const action = blockedInspection
+          ? `Nudged idle ${agentId} (${state.issueId}) — mandatory inspection ${blockedInspection.status} for ${blockedInspection.item.id}`
+          : `Nudged idle ${agentId} (${state.issueId}) — ${openTasks.length} ready task(s)`;
         actions.push(action);
         logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
       } catch (err: unknown) {
