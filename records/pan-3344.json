@@ -19,7 +19,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T14:34:26.680Z",
+    "updatedAt": "2026-09-09T15:36:06.488Z",
     "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
     "strikeReadyHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
@@ -48,7 +48,9 @@
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-09-09T15:36:06.488Z"
   },
   "closeOut": {
     "usage": {
@@ -76,9 +78,90 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-09-09T15:36:06.506Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3801 MERGED at 2026-09-09T13:24:09Z",
+          "status": "pass",
+          "mergedAt": "2026-09-09T13:24:09Z",
+          "mergeCommit": "7346a85bec034888cc8313d731d2a97b0d0dd149"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "required checks concluded successfully on 7346a85bec034888cc8313d731d2a97b0d0dd149: test, lint, build (22), guard",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 350c1325 contains merge 7346a85b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3344 not merged to main; Cleaned 8 agent state directories (4 transcript files preserved); Preserved local branch strike/pan-3344 — not merged to main; Preserved remote branch strike/pan-3344 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-3344, planning-pan-3344, strike-pan-3344; No specialist registry entries for PAN-3344"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T14:34:26.715Z",
+  "updated": "2026-09-09T15:36:06.516Z",
   "harness": "codex"
 }
