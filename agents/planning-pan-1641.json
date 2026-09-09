@@ -31,7 +31,12 @@
       "reason": "rotation"
     }
   ],
-  "lifecycle": [],
+  "lifecycle": [
+    {
+      "at": "2026-09-09T14:27:28.259Z",
+      "event": "stopped"
+    }
+  ],
   "archiveRef": null,
   "recovered": false
 }
