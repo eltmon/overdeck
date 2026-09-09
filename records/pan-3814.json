@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3814",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-09T15:52Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-09-09T15:52:54.027Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 1,
@@ -11,7 +18,7 @@
     }
   ],
   "created": "2026-09-09T13:35:30.301Z",
-  "updated": "2026-09-09T15:52:54.027Z",
+  "updated": "2026-09-09T15:53:33.981Z",
   "pipeline": {
     "issueId": "PAN-3814",
     "reviewStatus": "pending",
@@ -21,7 +28,7 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T15:47:16.399Z",
+    "updatedAt": "2026-09-09T15:52:53.997Z",
     "mergeNotes": "GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.",
     "lastVerifiedCommit": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
     "strikeReadyHead": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
@@ -52,19 +59,12 @@
       },
       "costAtCloseOut": {
         "usd": 0.0011920000000000001,
-        "pricingAsOf": "2026-09-09T15:47:46.640Z"
+        "pricingAsOf": "2026-09-09T15:53:23.584Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-09-09T15:52Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-09-09T15:52:54.027Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
