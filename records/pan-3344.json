@@ -14,16 +14,18 @@
     "issueId": "PAN-3344",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T12:32:12.448Z",
+    "updatedAt": "2026-09-09T12:37:14.121Z",
     "strikeReadyHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
     "strikeReadyAt": "2026-09-09T12:31:23.745Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-09-09T12:38:14.107Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-09-09T08:57:57.260Z",
@@ -38,6 +40,13 @@
         "mainHead": "fde0d5d69185145032153c2d48477ad66a428a35",
         "outcome": "failed",
         "detail": "Stale strike signal: recorded HEAD d7b44d7e4958243711bdbf3b3a1a57ecd61a69d1 differs from origin/strike/pan-3344 at dca3ecca4337a01dadc3ace017afb3cd92876d11"
+      },
+      {
+        "timestamp": "2026-09-09T12:37:14.107Z",
+        "strikeHead": "9f59bc63db2b0f00ff1d58da1ef6a6dfe9c8ab8c",
+        "mainHead": "0f05e0ef34837044d7041d839e149235861f6832",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -63,13 +72,13 @@
       },
       "costAtCloseOut": {
         "usd": 0.001287,
-        "pricingAsOf": "2026-09-09T12:32:53.227Z"
+        "pricingAsOf": "2026-09-09T12:37:14.123Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-08-04T13:06:47.371Z",
-  "updated": "2026-09-09T12:32:53.236Z",
+  "updated": "2026-09-09T12:37:51.335Z",
   "harness": "codex"
 }
