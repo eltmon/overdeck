@@ -1,6 +1,6 @@
 import { homedir } from 'os';
 import { basename, join, sep } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 
 // Overdeck home directory (can be overridden for testing)
 export const OVERDECK_HOME = process.env.OVERDECK_HOME || getCanonicalOverdeckHome();
@@ -54,8 +54,24 @@ export const CERTS_DIR = join(OVERDECK_HOME, 'certs');
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
 export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 
-// Harness skill homes. Claude Code still uses its vendor-specific directory;
-// Codex, Pi, and Oh My Pi discover the Agent Skills standard directory.
+// Harness assets owned by Overdeck. Normal install/sync/up flows must never
+// populate vendor-global homes such as ~/.claude, ~/.agents, or ~/.codex.
+// Managed launchers consume these private homes explicitly.
+export const HARNESS_HOME = join(OVERDECK_HOME, 'harnesses');
+export const OVERDECK_CLAUDE_HOME = join(HARNESS_HOME, 'claude');
+export const OVERDECK_AGENT_SKILLS_DIR = join(HARNESS_HOME, 'agent-skills');
+
+/** Dynamic variants for tests and callers that override OVERDECK_HOME. */
+export function getOverdeckClaudeHome(): string {
+  return join(getOverdeckHome(), 'harnesses', 'claude');
+}
+
+export function getOverdeckAgentSkillsDir(): string {
+  return join(getOverdeckHome(), 'harnesses', 'agent-skills');
+}
+
+// Vendor-global homes are retained only for read-only diagnostics and explicit
+// opt-in migrations. They are never normal sync targets.
 export const CLAUDE_DIR = join(homedir(), '.claude');
 export const AGENT_SKILLS_DIR = join(homedir(), '.agents', 'skills');
 
@@ -67,16 +83,15 @@ export const LEGACY_RUNTIME_DIRS = {
   opencode: join(homedir(), '.opencode'),
 } as const;
 
-// Sync target (Claude Code only)
+// Private sync target used by Overdeck-managed Claude launches.
 export const SYNC_TARGET = {
-  skills: join(CLAUDE_DIR, 'skills'),
-  commands: join(CLAUDE_DIR, 'commands'),
-  agents: join(CLAUDE_DIR, 'agents'),
+  skills: join(OVERDECK_CLAUDE_HOME, 'skills'),
+  commands: join(OVERDECK_CLAUDE_HOME, 'commands'),
+  agents: join(OVERDECK_CLAUDE_HOME, 'agents'),
 } as const;
 
 // Templates directory (in user's ~/.overdeck)
 export const TEMPLATES_DIR = join(OVERDECK_HOME, 'templates');
-export const CLAUDE_MD_TEMPLATES = join(TEMPLATES_DIR, 'claude-md', 'sections');
 
 // Source templates directory (bundled with the package)
 // This is resolved at runtime from the package root
@@ -354,6 +369,38 @@ export function encodeClaudeProjectDir(cwdPath: string): string {
   return cwdPath.replace(/[^a-zA-Z0-9-]/g, '-');
 }
 
+/** Per-agent private Claude transcript root used by Overdeck-managed launches. */
+export function managedClaudeProjectsRoot(agentId: string): string {
+  return join(getOverdeckHome(), 'agents', agentId, 'claude-home', 'projects');
+}
+
+/** Native Claude transcript root, retained strictly as a legacy/manual fallback. */
+export function nativeClaudeProjectsRoot(): string {
+  return join(homedir(), '.claude', 'projects');
+}
+
+/** Agent-specific managed root first, native legacy/manual root last. */
+export function claudeProjectsRootsForAgent(agentId: string): string[] {
+  if (process.env.CLAUDE_PROJECTS_DIR) return [process.env.CLAUDE_PROJECTS_DIR];
+  return [managedClaudeProjectsRoot(agentId), nativeClaudeProjectsRoot()];
+}
+
+/** Managed transcript roots first, native legacy/manual Claude root last. */
+export function claudeProjectsRoots(): string[] {
+  if (process.env.CLAUDE_PROJECTS_DIR) return [process.env.CLAUDE_PROJECTS_DIR];
+  const roots: string[] = [];
+  const agentsRoot = join(getOverdeckHome(), 'agents');
+  try {
+    for (const entry of readdirSync(agentsRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!entry.isDirectory()) continue;
+      const root = join(agentsRoot, entry.name, 'claude-home', 'projects');
+      if (existsSync(root)) roots.push(root);
+    }
+  } catch { /* no managed agents yet */ }
+  roots.push(nativeClaudeProjectsRoot());
+  return roots;
+}
+
 /**
  * Compute the deterministic JSONL session file path from cwd + session UUID.
  *
@@ -362,6 +409,17 @@ export function encodeClaudeProjectDir(cwdPath: string): string {
  */
 export function sessionFilePath(cwd: string, sessionId: string): string {
   const encodedCwd = encodeClaudeProjectDir(cwd);
+  // Managed Claude sessions persist below an Overdeck-owned per-agent home.
+  // Resolve those first; native ~/.claude remains a read-only fallback for
+  // sessions created before PAN-3779 or outside Overdeck.
+  try {
+    for (const root of claudeProjectsRoots()) {
+      const candidate = join(root, encodedCwd, `${sessionId}.jsonl`);
+      if (existsSync(candidate)) return candidate;
+    }
+  } catch {
+    // Missing/unreadable private state falls back to the native legacy root.
+  }
   return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
 }
 
@@ -391,7 +449,6 @@ export const INIT_DIRS = [
   COSTS_DIR,
   HEARTBEATS_DIR,
   TEMPLATES_DIR,
-  CLAUDE_MD_TEMPLATES,
   CERTS_DIR,
   CACHE_AGENTS_DIR,
   CACHE_RULES_DIR,

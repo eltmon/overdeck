@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NormalizedConversationSearchConfig } from '../../../../lib/config-yaml.js';
@@ -73,6 +73,66 @@ describe('conversation search watcher', () => {
 
     expect(indexFile).toHaveBeenCalledTimes(1);
     expect(indexFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl', config: config() }));
+  });
+
+  it('subscribes to the stable agents parent before a managed Claude home exists', async () => {
+    const overdeckHome = mkdtempSync(join(tmpdir(), 'overdeck-watch-before-agent-'));
+    const agentsRoot = join(overdeckHome, 'agents');
+    mkdirSync(agentsRoot, { recursive: true });
+    vi.stubEnv('OVERDECK_HOME', overdeckHome);
+    const fakeWatcher = new FakeWatcher();
+    const watchFactory = vi.fn(() => fakeWatcher);
+    const indexFile = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false }));
+    const removeFile = vi.fn(async () => undefined);
+    const watcher = new ConversationSearchWatcher({
+      config: config(),
+      debounceMs: 25,
+      watchFactory,
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false })),
+      indexFile,
+      removeFile,
+      log: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    try {
+      watcher.start();
+      expect(watchFactory).toHaveBeenCalledWith(
+        expect.arrayContaining([agentsRoot]),
+        expect.any(Object),
+      );
+
+      const transcript = join(agentsRoot, 'agent-new', 'claude-home', 'projects', '-workspace', 'session-new.jsonl');
+      mkdirSync(dirname(transcript), { recursive: true });
+      writeFileSync(transcript, '{}\n');
+      fakeWatcher.emit('add', transcript);
+      const watchedRoots = watchFactory.mock.calls[0]![0] as string[];
+      const nativeRoot = watchedRoots.find(root => root !== agentsRoot)!;
+      const nativeTranscript = join(nativeRoot, '-workspace', 'session-native.jsonl');
+      fakeWatcher.emit('add', nativeTranscript);
+
+      const rejected = [
+        join(agentsRoot, 'agent-new', 'activity.jsonl'),
+        join(agentsRoot, 'agent-new', 'pending-events.jsonl'),
+        join(agentsRoot, 'agent-new', 'appserver-events.jsonl'),
+        join(agentsRoot, 'agent-new', 'codex-home-v2', 'sessions', 'rollout.jsonl'),
+        join(agentsRoot, 'agent-new', 'pi-session', 'session.jsonl'),
+        join(agentsRoot, 'agent-new', 'acp-session.jsonl'),
+      ];
+      for (const filePath of rejected) {
+        fakeWatcher.emit('add', filePath);
+        fakeWatcher.emit('unlink', filePath);
+      }
+      await vi.advanceTimersByTimeAsync(25);
+      await Promise.resolve();
+
+      expect(indexFile).toHaveBeenCalledTimes(2);
+      expect(indexFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: transcript }));
+      expect(indexFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: nativeTranscript }));
+      expect(removeFile).not.toHaveBeenCalled();
+    } finally {
+      await watcher.stop();
+      rmSync(overdeckHome, { recursive: true, force: true });
+    }
   });
 
   it('coalesces changes for a file while an index call is already in flight', async () => {

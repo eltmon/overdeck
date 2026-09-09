@@ -32,6 +32,7 @@ import {
   kimiCaptureLockPath,
   kimiSessionsRoot,
   kimiWorkDirKey,
+  launchAndCaptureManagedKimiSession,
   KimiCodeRuntimeSync,
   waitForNewKimiSessionAsync,
   withKimiSessionCaptureLock,
@@ -107,6 +108,53 @@ describe('findKimiWirePath / findLatestKimiSession', () => {
   it('returns null when the bucket does not exist', () => {
     const kimiHome = makeHome();
     expect(findLatestKimiSession(kimiHome, '/tmp/never-launched')).toBeNull();
+  });
+});
+
+describe('launchAndCaptureManagedKimiSession', () => {
+  it('captures and persists a fresh native identity before launch delivery can continue', async () => {
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    const workspace = '/tmp/kimi-managed-fresh';
+    const agentId = 'agent-kimi-managed-fresh';
+    mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
+
+    const sessionId = await launchAndCaptureManagedKimiSession({
+      agentId,
+      workspace,
+      kimiHome,
+      overdeckHome,
+      timeoutMs: 1_000,
+      launch: async () => { writeWireFixture(kimiHome, workspace, 'session-managed-fresh'); },
+    });
+
+    expect(sessionId).toBe('session-managed-fresh');
+    expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
+      .toBe('session-managed-fresh');
+  });
+
+  it('persists the exact -S resume identity without waiting for a new session directory', async () => {
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    const workspace = '/tmp/kimi-managed-resume';
+    const agentId = 'agent-kimi-managed-resume';
+    mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
+    const launch = vi.fn(async () => undefined);
+
+    const sessionId = await launchAndCaptureManagedKimiSession({
+      agentId,
+      workspace,
+      kimiHome,
+      overdeckHome,
+      resumeSessionId: 'session-existing-resume',
+      launch,
+    });
+
+    expect(sessionId).toBe('session-existing-resume');
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
+      .toBe('session-existing-resume');
+    expect(existsSync(kimiSessionsRoot(kimiHome, workspace))).toBe(false);
   });
 });
 
@@ -217,6 +265,7 @@ describe('KimiCodeRuntimeSync', () => {
     });
     agentStateMocks.getAgentStateSync.mockReturnValue({ id: 'agent-kimi-spawn', workspace });
 
+    const deliverMessage = vi.fn(async () => ({ ok: true }));
     const runtime = new KimiCodeRuntimeSync({
       overdeckHome,
       kimiHome,
@@ -224,7 +273,7 @@ describe('KimiCodeRuntimeSync', () => {
         binaryPath: '/home/eltmon/.kimi-code/bin/kimi',
         pathExport: 'export PATH=\'/home/eltmon/.kimi-code/bin\':"$PATH"',
       }),
-      deliverMessage: vi.fn(async () => ({ ok: true })),
+      deliverMessage,
       resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
       writePtyTokenFor,
     });
@@ -262,6 +311,12 @@ describe('KimiCodeRuntimeSync', () => {
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');
     expect(persistedId).toBe('session_fresh');
+    expect(deliverMessage).toHaveBeenCalledTimes(1);
+    expect(deliverMessage).toHaveBeenCalledWith(
+      'agent-kimi-spawn',
+      expect.stringContaining('<overdeck-managed-context version="1">'),
+      expect.objectContaining({ sessionId: 'session_fresh', contextIncluded: true }),
+    );
 
     // FIX 3 (inspection finding): the PTY supervisor tier of deliverAgentMessage
     // requires a readable pty-token file — spawnAgent must write it, and write
@@ -305,11 +360,11 @@ describe('KimiCodeRuntimeSync', () => {
     const rejection = expect(spawn).rejects.toThrow(
       'did not write a new session under its workDirKey bucket',
     );
-    await vi.advanceTimersByTimeAsync(60_000);
+    await drainFakeTimersUntilSettled(spawn, 250);
 
     await rejection;
     expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-kimi-timeout');
-  });
+  }, 30_000);
 
   it('sendMessage delegates to deliverAgentMessage and throws on failure (AC3)', async () => {
     const deliverMessage = vi.fn(async (_agentId: string, _message: string) => ({ ok: true }));

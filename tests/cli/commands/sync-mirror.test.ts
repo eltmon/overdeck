@@ -18,7 +18,7 @@ const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents:
 const emptySyncResult = { created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [] };
 const mockExecuteSync = vi.fn().mockReturnValue(emptySyncResult);
 const mockExecuteAgentSkillsSync = vi.fn().mockReturnValue(emptySyncResult);
-const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
+const mockSyncContextLayers = vi.fn().mockReturnValue({ claudeGlobalWritten: false, globalStubCreated: false, piGlobalWritten: false, codexGlobalWritten: false, errors: [] });
 const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0, total: 0 }, agents: { copied: 0, total: 0 }, rules: { copied: 0, total: 0 }, pruned: [], keptModified: [] });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
@@ -135,6 +135,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_SOURCES: { root: '/tmp/sync-sources', gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
   SKILLS_DIR: '/tmp/pan-skills',
   AGENT_SKILLS_DIR: '/tmp/agent-skills',
+  getOverdeckClaudeHome: () => '/tmp/overdeck/harnesses/claude',
   isDevMode: vi.fn().mockReturnValue(false),
   AGENTS_DIR: '/tmp/agents',
   // PAN-3327: sync reports which tree it distributes from, so it asks whether
@@ -177,7 +178,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       pruned: [],
       keptModified: [],
     });
-    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
+    mockSyncContextLayers.mockReturnValue({ claudeGlobalWritten: false, globalStubCreated: false, piGlobalWritten: false, codexGlobalWritten: false, errors: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
     mockProvisionClaudeHooks.mockResolvedValue({
@@ -190,10 +191,10 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockExecSync.mockReturnValue(Buffer.from(''));
   });
 
-  it('mirrors project skills from the current working directory', async () => {
+  it('does not mirror skills into the current repository', async () => {
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
-    expect(mockMirrorProjectSkills).toHaveBeenCalledWith(process.cwd());
+    expect(mockMirrorProjectSkills).not.toHaveBeenCalled();
   });
 
   it('renders the layered context into harness CLAUDE.md files', async () => {
@@ -223,7 +224,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     consoleSpy.mockRestore();
   });
 
-  it('logs skill mirror results when files are added or updated', async () => {
+  it('does not log repository skill mirror results', async () => {
     mockMirrorProjectSkills.mockReturnValue({ added: ['new-skill'], updated: ['existing-skill'], removed: [] });
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -233,9 +234,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     const mirrorLog = consoleSpy.mock.calls.find(
       ([msg]) => typeof msg === 'string' && msg.includes('Skills mirror'),
     );
-    expect(mirrorLog).toBeDefined();
-    expect(mirrorLog![0]).toContain('1 added');
-    expect(mirrorLog![0]).toContain('1 updated');
+    expect(mirrorLog).toBeUndefined();
     consoleSpy.mockRestore();
   });
 
@@ -277,7 +276,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     )).toBe(true);
     expect(mockSpinnerSucceed.mock.calls.some(
       ([message]) => typeof message === 'string'
-        && message.includes('Synced 0 Claude items')
+        && message.includes('Synced 0 private Claude items')
         && message.includes('pruned 2 stale'),
     )).toBe(true);
   });
@@ -299,7 +298,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     const output = consoleSpy.mock.calls.flatMap((args) => args).join('\n');
     expect(output).toContain('Kept user-modified stale file(s):');
     expect(output).toContain('skills/custom/SKILL.md');
-    expect(output).toContain('~/.agents/skills/agent-custom/SKILL.md');
+    expect(output).toContain('harnesses/agent-skills/skills/agent-custom/SKILL.md');
     consoleSpy.mockRestore();
   });
 
@@ -343,6 +342,6 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
 
     expect(mockStartupSyncNeeded).not.toHaveBeenCalled();
     expect(mockRefreshCache).toHaveBeenCalledTimes(1);
-    expect(mockMirrorProjectSkills).toHaveBeenCalledWith(process.cwd());
+    expect(mockMirrorProjectSkills).not.toHaveBeenCalled();
   });
 });

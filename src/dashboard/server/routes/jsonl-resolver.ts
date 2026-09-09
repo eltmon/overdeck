@@ -87,6 +87,19 @@ function behaviorForHarness(harness: string | null | undefined) {
   return getHarnessBehavior(harness as HarnessName | null | undefined);
 }
 
+/** Agent-private transcript root first; native Claude remains read-only fallback. */
+function claudeProjectsRootsForAgent(
+  agentId: string,
+  opts: ResolveJsonlPathOptions,
+): string[] {
+  if (opts.claudeProjectsDirOverride) return [opts.claudeProjectsDirOverride];
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  return [
+    join(agentsRoot, agentId, 'claude-home', 'projects'),
+    join(homedir(), '.claude', 'projects'),
+  ];
+}
+
 /**
  * Pick the candidate UUID whose JSONL transcript has the most recent mtime.
  *
@@ -107,7 +120,7 @@ async function pickFreshestSessionId(
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0]!;
 
-  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
+  const projectsRoots = claudeProjectsRootsForAgent(agentId, opts);
 
   // Fast path: derive the agent's workspace and look only in the matching
   // project dir. Avoids fanning out across every Claude project.
@@ -115,23 +128,27 @@ async function pickFreshestSessionId(
   try {
     const workspace = await Effect.runPromise(getAgentWorkspace(agentId));
     if (workspace) {
-      const projectDir = join(projectsRoot, encodeClaudeProjectDir(workspace));
-      candidatePaths = candidates.map((id) => ({ id, path: join(projectDir, `${id}.jsonl`) }));
+      candidatePaths = projectsRoots.flatMap((projectsRoot) => {
+        const projectDir = join(projectsRoot, encodeClaudeProjectDir(workspace));
+        return candidates.map((id) => ({ id, path: join(projectDir, `${id}.jsonl`) }));
+      });
     }
   } catch { /* non-fatal — fall back to project-dir scan */ }
 
   // Slow path: scan all project dirs (specialist agents, multi-workspace cases).
   if (candidatePaths.length === 0) {
-    try {
-      const dirs = await readdir(projectsRoot);
-      const SAFE_DIR = /^[a-zA-Z0-9_.-]+$/;
-      for (const id of candidates) {
-        for (const dir of dirs) {
-          if (!SAFE_DIR.test(dir)) continue;
-          candidatePaths.push({ id, path: join(projectsRoot, dir, `${id}.jsonl`) });
+    for (const projectsRoot of projectsRoots) {
+      try {
+        const dirs = await readdir(projectsRoot);
+        const SAFE_DIR = /^[a-zA-Z0-9_.-]+$/;
+        for (const id of candidates) {
+          for (const dir of dirs) {
+            if (!SAFE_DIR.test(dir)) continue;
+            candidatePaths.push({ id, path: join(projectsRoot, dir, `${id}.jsonl`) });
+          }
         }
-      }
-    } catch { /* fall through to no-mtime path */ }
+      } catch { /* try the next managed/native root */ }
+    }
   }
 
   // Stat each candidate path; pick the (id, mtime) with the newest mtime.
@@ -314,8 +331,11 @@ async function agentHasClaudeTranscript(
   if (!sessionId) return false;
   const workspace = (await readRecordedState(agentId, opts)).workspace;
   if (!workspace) return false;
-  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
-  return pathExists(join(projectsRoot, encodeClaudeProjectDir(workspace), `${sessionId}.jsonl`));
+  const encoded = encodeClaudeProjectDir(workspace);
+  for (const projectsRoot of claudeProjectsRootsForAgent(agentId, opts)) {
+    if (await pathExists(join(projectsRoot, encoded, `${sessionId}.jsonl`))) return true;
+  }
+  return false;
 }
 
 /**
@@ -467,18 +487,21 @@ export async function resolveJsonlPath(
 
   const recordedWorkspace = (await readRecordedState(agentId, opts)).workspace;
   const effectiveWorkspacePath = recordedWorkspace ?? workspacePath;
-  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
   const encodedDir = encodeClaudeProjectDir(effectiveWorkspacePath);
-  const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) {
-    logTranscriptResolution(
-      agentId,
-      `resolved:${jsonlPath}`,
-      `resolved harness=${harness ?? 'claude-code'} sessionId=${claudeSessionId} path=${jsonlPath}`,
-      opts,
-    );
-    return jsonlPath;
+  const candidatePaths = claudeProjectsRootsForAgent(agentId, opts)
+    .map((projectsRoot) => join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`));
+  for (const jsonlPath of candidatePaths) {
+    if (await pathExists(jsonlPath)) {
+      logTranscriptResolution(
+        agentId,
+        `resolved:${jsonlPath}`,
+        `resolved harness=${harness ?? 'claude-code'} sessionId=${claudeSessionId} path=${jsonlPath}`,
+        opts,
+      );
+      return jsonlPath;
+    }
   }
+  const jsonlPath = candidatePaths[0]!;
   logTranscriptResolution(
     agentId,
     `missing-jsonl:${jsonlPath}`,

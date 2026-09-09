@@ -47,6 +47,7 @@ import { sessionExists, killSession, createSession, listSessionsSync, getManaged
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
+import { claudeSystemPromptFiles } from '../agents/runtime-command.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
@@ -365,6 +366,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       setTerminalEnv: true,
       extraEnvExports: [harnessLaunch.pathExport],
       trapHup: true,
+      appendSystemPromptFiles: await claudeSystemPromptFiles(config.workspace, 'ohmypi'),
     })
 
     const launcherPath = join(dir, 'ohmypi-launcher.sh')

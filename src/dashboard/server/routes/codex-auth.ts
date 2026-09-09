@@ -6,7 +6,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { checkCodexAuthStatus, importNativeCodexAuthToManagedSync } from '../../../lib/codex-auth.js';
 import { listAgentStates } from '../../../lib/agents/queries.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
@@ -188,6 +188,9 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       }
 
       const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
+      // This is an explicit operator-triggered login flow: import the newly
+      // written native credential into Overdeck's private shared refresh chain.
+      importNativeCodexAuthToManagedSync();
       const bridged = yield* bridgeCodexAuthToCliproxy();
       const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
       const refreshedCredential = bridged && (

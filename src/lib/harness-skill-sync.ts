@@ -1,6 +1,6 @@
 import { copyFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { AGENT_SKILLS_DIR, SKILLS_DIR } from './paths.js';
+import { getOverdeckAgentSkillsDir, SKILLS_DIR } from './paths.js';
 import {
   collectSourceFilesSync,
   compareFileToManifest,
@@ -13,18 +13,14 @@ import {
 import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
 
 /**
- * Every harness whose native skill discovery is supplied by `pan sync`.
- *
- * kimi-code (PAN-1837): confirmed on the shared ~/.agents/skills discovery
- * path — the wi-fixture capture's system prompt listed the same skill
- * catalog Overdeck syncs there, so no second ~/.kimi-code/skills target is
- * needed.
+ * Harnesses whose managed Overdeck launch can consume the private skill tree.
+ * Nothing is distributed into the user's native harness homes.
  */
 export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code'] as const;
 
 /** Plan the shared Agent Skills half of the harness fan-out. */
 export function planAgentSkillsSync(
-  targetSkillsDir: string = AGENT_SKILLS_DIR,
+  targetSkillsDir: string = getOverdeckAgentSkillsDir(),
   sourceSkillsDir: string = SKILLS_DIR,
 ): SyncItem[] {
   const manifest = readManifestSync(join(dirname(targetSkillsDir), '.overdeck-manifest.json'));
@@ -42,10 +38,10 @@ export function planAgentSkillsSync(
   });
 }
 
-/** Copy complete skill bundles into the standard directory shared by Codex, Pi, and Oh My Pi. */
+/** Copy complete skill bundles into Overdeck's private harness skill tree. */
 export function executeAgentSkillsSync(
   options: SyncOptions = {},
-  targetSkillsDir: string = AGENT_SKILLS_DIR,
+  targetSkillsDir: string = getOverdeckAgentSkillsDir(),
   sourceSkillsDir: string = SKILLS_DIR,
 ): SyncResult {
   const result: SyncResult = {

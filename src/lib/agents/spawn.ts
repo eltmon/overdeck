@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { mkdir, readdir as readdirAsync, writeFile, writeFile as writeFileAsync } from 'fs/promises';
+import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
-import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn, setConversationClaudeSessionId } from '../overdeck/conversations.js';
 import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -91,6 +91,8 @@ import {
 } from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
+import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
+import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
@@ -252,7 +254,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
-  const shouldDeliverPromptViaKimiCode = shouldRegisterConversation && resolvedHarness === 'kimi-code';
+  const shouldDeliverPromptViaKimiCode = resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -330,9 +332,11 @@ async function spawnRunWithoutConsentClaim(
   if (shouldRegisterConversation) {
     // Claude-style harnesses own their session id at launcher construction time.
     // ACP creates its session during host startup and persists acp-session-id itself.
-    rawSessionId = isAcp ? options.resumeSessionId : (options.resumeSessionId ?? randomUUID());
+    rawSessionId = (isAcp || resolvedHarness === 'kimi-code')
+      ? options.resumeSessionId
+      : (options.resumeSessionId ?? randomUUID());
 
-    if (!isAcp && rawSessionId) {
+    if (!isAcp && resolvedHarness !== 'kimi-code' && rawSessionId) {
       // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
       // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
       try {
@@ -415,7 +419,7 @@ async function spawnRunWithoutConsentClaim(
   // only observes the session-start signal from THIS launch.
   clearReadySignal(agentId);
 
-  await Effect.runPromise(createSession(agentId, workspace, claudeCmd, {
+  const launchRoleSession = () => Effect.runPromise(createSession(agentId, workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV,
       TERM: 'xterm-256color',
@@ -429,6 +433,23 @@ async function spawnRunWithoutConsentClaim(
       ...providerEnv,
     },
   }));
+  if (resolvedHarness === 'kimi-code') {
+    try {
+      rawSessionId = await launchAndCaptureManagedKimiSession({
+        agentId,
+        workspace,
+        launch: launchRoleSession,
+        resumeSessionId: options.resumeSessionId,
+      });
+      if (shouldRegisterConversation) setConversationClaudeSessionId(agentId, rawSessionId);
+    } catch (error) {
+      const { killSession } = await import('../tmux.js');
+      await Effect.runPromise(killSession(agentId)).catch(() => {});
+      throw error;
+    }
+  } else {
+    await launchRoleSession();
+  }
   if (shouldRegisterConversation) {
     await saveAgentRuntimeState(agentId, {
       claudeSessionId: rawSessionId,
@@ -441,7 +462,7 @@ async function spawnRunWithoutConsentClaim(
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
-  if (prompt) {
+  if (prompt || resolvedHarness === 'kimi-code') {
     if (shouldDeliverPromptViaAcp) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
@@ -475,6 +496,19 @@ async function spawnRunWithoutConsentClaim(
     } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui || shouldDeliverPromptViaKimiCode) {
       if (tracksKickoffDelivery) {
         const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnRun:initial-prompt');
+        await requireManagedKimiDelivery({
+          agentId,
+          role,
+          harness: resolvedHarness,
+          delivery,
+          onFailure: async () => {
+            if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+              await recordStartupSessionExit(state, issueId, role);
+            }
+            await recordKickoffDeliveryFailure(state, issueId, role);
+            await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+          },
+        });
         if (delivery.ok) {
           state.kickoffDelivered = true;
           await Effect.runPromise(saveAgentState(state));
@@ -490,9 +524,22 @@ async function spawnRunWithoutConsentClaim(
         const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
-          await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+          try {
+            const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+            if (resolvedHarness === 'kimi-code' && !delivery.ok) {
+              throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
+            }
+          } catch (error) {
+            if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+            throw error;
+          }
         } else {
-          console.error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`);
+          const message = `${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`;
+          console.error(`[${agentId}] ${message}`);
+          if (resolvedHarness === 'kimi-code') {
+            await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+            throw new Error(`Agent ${agentId} managed context delivery failed: ${message}`);
+          }
         }
       }
     }
@@ -823,34 +870,7 @@ async function spawnAgentWithoutConsentClaim(
 
   clearReadySignal(agentId);
 
-  // PAN-1837: Kimi generates its own session id and cannot be told one via a
-  // launch flag (D2/erratum E1) — it must be captured post-launch as whatever
-  // new directory appears under the workspace's session bucket. Snapshot the
-  // bucket's current contents BEFORE the tmux session exists so the capture
-  // below can diff against it instead of guessing from mtime alone, which
-  // would misfire on a workspace that already has prior kimi sessions
-  // (retries/resumes).
-  //
-  // PAN-1837 review fix: snapshot, launch, and capture/persist all run inside
-  // withKimiSessionCaptureLock — a review cycle 6 finding is that awaiting
-  // the capture (as restartAgent's own fix already did) is not sufficient on
-  // its own: it only guarantees *some* new same-cwd directory was observed,
-  // not that it's THIS launch's directory. Only the per-workDirKey mutex,
-  // held across the whole snapshot -> createSession -> capture span, stops a
-  // concurrent same-cwd Kimi launch (another work agent, a restart, a
-  // recovery, or a conversation) from claiming this session or vice versa.
-  const launchAndCaptureKimiSession = async (): Promise<void> => {
-    let kimiExistingSessionsBefore: Set<string> | undefined;
-    if (resolvedHarness === 'kimi-code') {
-      try {
-        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), options.workspace)));
-      } catch {
-        kimiExistingSessionsBefore = new Set();
-      }
-    }
-
-    await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
+  const launchWorkSession = () => Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
       env: {
         ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
         TERM: 'xterm-256color',
@@ -865,38 +885,19 @@ async function spawnAgentWithoutConsentClaim(
       }
     }));
 
-    if (kimiExistingSessionsBefore) {
-      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-      const sessionId = await waitForNewKimiSessionAsync(
-        join(homedir(), '.kimi-code'),
-        options.workspace,
-        kimiExistingSessionsBefore,
-      );
-      if (sessionId) {
-        writeKimiSessionId(agentId, sessionId);
-      } else {
-        // PAN-1837 review fix: fail closed like restartAgent — a missing
-        // capture would otherwise leave a running, unowned Kimi session whose
-        // transcript lookup falls back to newest-session-by-mtime, which
-        // cannot establish ownership in a shared cwd bucket and can display a
-        // different session's transcript/cost under this agent.
-        throw new Error(
-          `kimi-code session capture timed out for ${agentId} — no new session directory appeared under the workspace bucket`,
-        );
-      }
-    }
-  };
-
   if (resolvedHarness === 'kimi-code') {
-    const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
     try {
-      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), options.workspace, launchAndCaptureKimiSession);
+      await launchAndCaptureManagedKimiSession({
+        agentId,
+        workspace: options.workspace,
+        launch: launchWorkSession,
+      });
     } catch (err) {
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
       throw err;
     }
   } else {
-    await launchAndCaptureKimiSession();
+    await launchWorkSession();
   }
   await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
@@ -949,11 +950,26 @@ async function spawnAgentWithoutConsentClaim(
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-  } else if (prompt) {
+  } else if (prompt || resolvedHarness === 'kimi-code') {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
     const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
+    await requireManagedKimiDelivery({
+      agentId,
+      role,
+      harness: resolvedHarness,
+      delivery,
+      onFailure: async () => {
+        if (tracksKickoffDelivery) {
+          if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+            await recordStartupSessionExit(state, options.issueId, role);
+          }
+          await recordKickoffDeliveryFailure(state, options.issueId, role);
+        }
+        await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+      },
+    });
     if (delivery.ok) {
       if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
@@ -979,7 +995,7 @@ async function spawnAgentWithoutConsentClaim(
     && loadConfigSync().config.codex?.transport === 'tui'
     && getHarnessBehavior(resolvedHarness).readinessKind === 'codex-tui-prompt'
   ) {
-    const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+    const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
     void (async () => {
       try {
         const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =

@@ -31,7 +31,9 @@ The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The 
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
-Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
+Managed Codex sessions use an isolated `CODEX_HOME`. Overdeck passes its
+rendered context as Codex developer instructions instead of creating an
+`AGENTS.md` copy; user-authored native files remain under Codex's discovery.
 
 ## Supported harnesses
 
@@ -94,9 +96,8 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
   (`src/lib/cost-parsers/codex-parser.ts`).
-- Native AGENTS.md and Claude-Code-compatible skills; `pan sync` prepares the
-  global context and skill sources, then each isolated Codex home receives an
-  additive copy of the synced skill directories during initialization.
+- Native `AGENTS.md` remains user-owned. Overdeck supplies its own global and
+  workspace context through the launch/app-server developer-instructions field.
 - Role-declared MCP servers, such as Playwright for the `test` role, are
   provisioned as `[mcp_servers.<name>]` entries in the per-agent Codex config
   so browser UAT can run on Codex.
@@ -304,7 +305,13 @@ Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 `kimi-session-id` file (captured post-launch, since Kimi generates its own
 session id and it cannot be preset) enables transcript resolution
 (`resolveKimiWirePath` in `src/dashboard/server/routes/jsonl-resolver.ts`) and
-cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
+cost parsing (`src/lib/cost-parsers/kimi-parser.ts`). Because the native CLI
+does not expose a launch-only system-prompt flag, Overdeck sends its managed
+launch context once as the first user message after that session id is
+captured. Hard delimiters put managed context first and preserve the original
+operator task afterward. A per-session receipt under
+`~/.overdeck/agents/<agentId>/` prevents resume, recovery, and follow-up paths
+from sending the context again.
 
 ## Installing oh-my-pi
 
@@ -449,6 +456,28 @@ into the Claude Code subscription, Overdeck ignores any `ANTHROPIC_API_KEY` in
 the environment. Set one or the other, not both.
 
 ## Troubleshooting
+
+### Managed harness state is private to Overdeck
+
+Local managed launches use per-launch configuration snapshots under
+`~/.overdeck/agents/<id>/` and shared refresh-safe credentials under
+`~/.overdeck/credentials/`. Native user homes (`~/.claude`, `~/.codex`,
+`~/.agents`, `~/.omp`, and `~/.pi`) are read-only import/fallback sources during
+ordinary install, sync, spawn, resume, and recovery. Repository instruction
+files remain in place and are discovered by the harness; Overdeck's own layers
+travel through launch flags/developer instructions and are recorded in the
+agent's `context-receipt.json`.
+
+The one exception is remote Fly VM provisioning. Those VM user homes are
+created and owned by Overdeck and are used only through Overdeck-managed remote
+sessions, so provisioning may populate harness-native paths inside that remote
+VM. This exception does not apply to the operator's host or project repos.
+
+The native Kimi CLI exposes no supported launch-only system-prompt flag.
+Overdeck therefore uses the explicit first-user-message envelope described
+above; it never mirrors managed context into `AGENTS.md` or another native
+instruction file. If the session id or required context artifact cannot be
+resolved, the managed delivery fails closed instead of starting context-free.
 
 ### "omp not on PATH" or wrong version
 

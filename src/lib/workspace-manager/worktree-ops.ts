@@ -1,6 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
-import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { TemplatePlaceholders, replacePlaceholdersSync } from '../workspace-config.js';
@@ -401,40 +400,7 @@ export function copyProjectTemplateDirs(
  * key checked by both the bypass-mode dialog and the headless --bg gate.
  */
 export function preTrustDirectorySync(dirPath: string): void {
-  const claudeJsonPath = join(homedir(), '.claude.json');
-  if (!existsSync(claudeJsonPath)) return;
-
-  const data = JSON.parse(readFileSync(claudeJsonPath, 'utf8'));
-  let dirty = false;
-
-  if (data.bypassPermissionsModeAccepted !== true) {
-    data.bypassPermissionsModeAccepted = true;
-    dirty = true;
-  }
-
-  if (!data.projects) data.projects = {};
-
-  if (data.projects[dirPath]) {
-    if (!data.projects[dirPath].hasTrustDialogAccepted) {
-      data.projects[dirPath].hasTrustDialogAccepted = true;
-      dirty = true;
-    }
-  } else {
-    data.projects[dirPath] = {
-      allowedTools: [],
-      mcpContextUris: [],
-      mcpServers: {},
-      enabledMcpjsonServers: [],
-      disabledMcpjsonServers: [],
-      hasTrustDialogAccepted: true,
-      projectOnboardingSeenCount: 0,
-      hasClaudeMdExternalIncludesApproved: false,
-      hasClaudeMdExternalIncludesWarningShown: false,
-    };
-    dirty = true;
-  }
-
-  if (dirty) {
-    writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
-  }
+  // Retained as a compatibility no-op. Overdeck no longer mutates the user's
+  // global ~/.claude.json; managed launch settings are private and explicit.
+  void dirPath;
 }

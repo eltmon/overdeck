@@ -83,6 +83,7 @@ describe('Claude session reconstruction fallback', () => {
   });
 
   it('uses the freshest agents-plane session that has a local transcript', () => {
+    const transcriptExists = vi.fn((_workspace: string, sessionId: string) => sessionId === 'newer-session');
     const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
       readAgentPlaneRecord: () => ({
         version: 1,
@@ -100,7 +101,7 @@ describe('Claude session reconstruction fallback', () => {
         archiveRef: null,
         recovered: false,
       }),
-      transcriptExists: (_workspace, sessionId) => sessionId === 'newer-session',
+      transcriptExists,
     }));
 
     expect(result).toEqual({
@@ -108,6 +109,7 @@ describe('Claude session reconstruction fallback', () => {
       checked: ['durable agents plane'],
       needsPointerRepair: true,
     });
+    expect(transcriptExists).toHaveBeenCalledWith(agentState.workspace, 'newer-session', agentState.id);
   });
 
   it('uses the latest event-store session when its transcript exists', () => {

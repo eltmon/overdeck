@@ -57,7 +57,6 @@ export type HookType = keyof NonNullable<ClaudeSettings['hooks']>;
 export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
   'pre-tool-hook',
-  'ask-user-question-hook',
   'linear-mcp-auth-hook',
   'auto-approve-hook',
   'heartbeat-hook',
@@ -66,7 +65,6 @@ export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'specialist-stop-hook',
   'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
   'session-start-hook',          // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
-  'user-prompt-submit-hook',     // UserPromptSubmit — clears waiting state, records message_received, restarts spinner
   'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator
   'post-compact-hook',           // PostCompact — emits activity=idle to clear compacting state
   'record-cost-event.js',
@@ -97,7 +95,6 @@ export const OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
   { hookType: 'PreToolUse', scriptName: 'auto-approve-hook' },
   { hookType: 'PreToolUse', scriptName: 'gh-issue-trailer-hook', matcher: 'Bash' },
   { hookType: 'PreToolUse', scriptName: 'tmux-send-keys-guard', matcher: 'Bash' },
-  { hookType: 'PreToolUse', scriptName: 'ask-user-question-hook', matcher: 'AskUserQuestion' },
   { hookType: 'PostToolUse', scriptName: 'heartbeat-hook' },
   { hookType: 'PostToolUse', scriptName: 'linear-mcp-auth-hook', matcher: 'mcp__linear__.*' },
   // PostToolUse only fires on successful tool calls; a failed MCP call (the
@@ -109,12 +106,17 @@ export const OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
   { hookType: 'Stop', scriptName: 'permission-event-hook' },
   { hookType: 'SessionStart', scriptName: 'session-start-hook' },
   { hookType: 'Notification', scriptName: 'notification-hook' },
-  { hookType: 'UserPromptSubmit', scriptName: 'user-prompt-submit-hook' },
   { hookType: 'PreCompact', scriptName: 'pre-compact-hook' },
   { hookType: 'PostCompact', scriptName: 'post-compact-hook' },
   { hookType: 'PermissionRequest', scriptName: 'permission-event-hook' },
   { hookType: 'PreToolUse', scriptName: 'tldr-read-enforcer', matcher: 'Read', requiresPython3: true },
   { hookType: 'PostToolUse', scriptName: 'tldr-post-edit', matcher: 'Edit|Write', requiresPython3: true },
+];
+
+/** Hooks intentionally retired from managed Overdeck sessions. */
+export const DISABLED_OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
+  { hookType: 'PreToolUse', scriptName: 'ask-user-question-hook', matcher: 'AskUserQuestion' },
+  { hookType: 'UserPromptSubmit', scriptName: 'user-prompt-submit-hook' },
 ];
 
 /**
@@ -186,6 +188,30 @@ export function pruneLegacyPanopticonHook(
   return removed;
 }
 
+/** Remove a current Overdeck registration while preserving unrelated hooks. */
+export function pruneOverdeckHook(
+  settings: ClaudeSettings,
+  hookType: HookType,
+  binDir: string,
+  scriptName: string,
+): boolean {
+  const list = settings.hooks?.[hookType];
+  if (!list) return false;
+  let removed = false;
+  const next = list.flatMap((config) => {
+    const hooks = (config.hooks ?? []).filter((hook) => {
+      const matches = hook.command?.includes(join(binDir, scriptName))
+        || hook.command?.includes(`overdeck/bin/${scriptName}`)
+        || hook.command?.includes(`panopticon/bin/${scriptName}`);
+      if (matches) removed = true;
+      return !matches;
+    });
+    return hooks.length > 0 ? [{ ...config, hooks }] : [];
+  });
+  if (removed) settings.hooks![hookType] = next;
+  return removed;
+}
+
 export function addOverdeckHookIfMissing(
   settings: ClaudeSettings,
   hookType: HookType,
@@ -219,6 +245,11 @@ export function applyOverdeckHookRegistrations(
 ): { added: string[]; removed: string[] } {
   const added: string[] = [];
   const removed: string[] = [];
+  for (const reg of DISABLED_OVERDECK_HOOK_REGISTRATIONS) {
+    if (pruneOverdeckHook(settings, reg.hookType, binDir, reg.scriptName)) {
+      removed.push(`${reg.hookType}:${reg.scriptName}`);
+    }
+  }
   for (const reg of OVERDECK_HOOK_REGISTRATIONS) {
     if (reg.requiresPython3 && !opts.python3Available) continue;
     if (pruneLegacyPanopticonHook(settings, reg.hookType, reg.scriptName)) {

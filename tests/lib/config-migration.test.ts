@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { needsMigrationSync, hasLegacySettingsSync, convertToYamlConfigSync, previewMigration, cleanupLegacyRuntimeSymlinksSync, migrateSyncTargetsSync } from '../../src/lib/config-migration.js';
+import { needsMigrationSync, hasLegacySettingsSync, convertToYamlConfigSync, previewMigration, migrateSyncTargetsSync } from '../../src/lib/config-migration.js';
 import type { SettingsConfig } from '../../src/lib/settings.js';
 import { existsSync, mkdirSync, rmSync, writeFileSync, symlinkSync } from 'fs';
 import { join } from 'path';
@@ -219,54 +219,6 @@ describe('config-migration', () => {
       expect(preview).toBeDefined();
       expect(preview.preset).toBeDefined();
       expect(preview.overrides).toBeDefined();
-    });
-  });
-
-  describe('cleanupLegacyRuntimeSymlinks', () => {
-    it('should return empty result when no legacy directories exist', () => {
-      // In CI / clean environments there are no ~/.codex etc. dirs — safe to call directly
-      const result = cleanupLegacyRuntimeSymlinksSync();
-
-      expect(result).toHaveProperty('cleaned');
-      expect(result).toHaveProperty('total');
-      expect(result).toHaveProperty('errors');
-      expect(Array.isArray(result.cleaned)).toBe(true);
-      expect(Array.isArray(result.errors)).toBe(true);
-      expect(result.total).toBe(result.cleaned.length);
-    });
-
-    it('should remove only Overdeck-managed symlinks', () => {
-      const tmpDir = join(testDir, 'fake-runtime', 'skills');
-      mkdirSync(tmpDir, { recursive: true });
-
-      // Create a Overdeck-managed symlink (target contains '.overdeck')
-      const panSymlinkPath = join(tmpDir, 'pan-skill');
-      const panTarget = join(process.env.OVERDECK_HOME ?? join(process.cwd(), '.test-migration-pan-home'), '.overdeck', 'skills', 'pan-skill');
-      symlinkSync(panTarget, panSymlinkPath);
-
-      // Create a non-Overdeck symlink (user-managed)
-      const userSymlinkPath = join(tmpDir, 'user-skill');
-      const userTarget = join(homedir(), '.other', 'skill');
-      symlinkSync(userTarget, userSymlinkPath);
-
-      // Create a regular file (not a symlink)
-      const regularFilePath = join(tmpDir, 'regular-file.md');
-      writeFileSync(regularFilePath, 'content');
-
-      // We can't easily redirect homedir() in the function, so call with real dirs.
-      // Instead, verify the function correctly identifies and removes only Overdeck symlinks
-      // when given a realistic setup. We test the logic by checking it ran without throwing.
-      const result = cleanupLegacyRuntimeSymlinksSync();
-
-      expect(result.total).toBe(result.cleaned.length);
-      expect(result.errors).toBeDefined();
-
-      // Clean up our test symlinks manually (they were in testDir, not real legacy dirs)
-    });
-
-    it('should not throw when legacy directories are unreadable', () => {
-      // The function should handle errors gracefully (missing dirs, permission errors)
-      expect(() => cleanupLegacyRuntimeSymlinksSync()).not.toThrow();
     });
   });
 

@@ -29,8 +29,7 @@ import { getAgentStateSync, getAgentDir, spawnAgent as spawnAgentImpl, saveAgent
 import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } from '../tmux.js';
 import { parseClaudeSessionSync, getSessionFilesSync, getProjectDirsSync } from '../cost-parsers/jsonl-parser.js';
 import { ProcessSpawnError, TmuxError, FsError } from '../errors.js';
-
-const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+import { claudeProjectsRoots, claudeProjectsRootsForAgent, encodeClaudeProjectDir } from '../paths.js';
 
 /**
  * Claude Code session index entry
@@ -58,13 +57,26 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Claude Code hashes the workspace path to create project directories.
    * We need to find the project directory that contains sessions for this workspace.
    */
-  private getProjectDirForWorkspace(workspace: string): string | null {
-    if (!existsSync(CLAUDE_PROJECTS_DIR)) {
-      return null;
+  private getProjectDirForWorkspace(workspace: string, agentId?: string): string | null {
+    const roots = agentId ? claudeProjectsRootsForAgent(agentId) : claudeProjectsRoots();
+    const encoded = encodeClaudeProjectDir(workspace);
+
+    // Managed sessions use the deterministic encoded cwd directory. Check the
+    // agent-private root first, then the native legacy/manual fallback.
+    for (const root of roots) {
+      const exact = join(root, encoded);
+      if (existsSync(exact)) return exact;
     }
 
-    // Get all project directories
-    const projectDirs = getProjectDirsSync();
+    // Legacy indexes may use a non-current cwd encoding after a workspace move.
+    const projectDirs = roots.flatMap((root) => {
+      if (!existsSync(root)) return [];
+      try {
+        return readdirSync(root).map((name) => join(root, name));
+      } catch {
+        return [];
+      }
+    });
 
     for (const projectDir of projectDirs) {
       // Check if this project's sessions-index.json references the workspace
@@ -136,7 +148,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       return null;
     }
 
-    const projectDir = this.getProjectDirForWorkspace(state.workspace);
+    const projectDir = this.getProjectDirForWorkspace(state.workspace, agentId);
     if (!projectDir) {
       return null;
     }
@@ -360,7 +372,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
     });
 
     // Get the session ID (we'll need to look it up from the workspace)
-    const projectDir = this.getProjectDirForWorkspace(config.workspace);
+    const projectDir = this.getProjectDirForWorkspace(config.workspace, config.agentId);
     const sessionId = projectDir ? this.getActiveSessionId(projectDir) : undefined;
 
     return {

@@ -3,7 +3,16 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
-const realOverdeckHome = resolve(homedir(), '.overdeck');
+const realHome = resolve(homedir());
+const blockedRealHomeRoots = [
+  '.overdeck',
+  '.claude',
+  '.agents',
+  '.codex',
+  '.pi',
+  '.omp',
+].map((entry) => resolve(realHome, entry));
+const blockedRealHomeFiles = new Set([resolve(realHome, '.claude.json')]);
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -18,16 +27,16 @@ function blockedRealHomeTarget(value: unknown): string | null {
   if (!rawPath) return null;
   const resolved = resolve(rawPath);
   if (allowedRealHomeWrites.has(resolved)) return null;
-  return resolved === realOverdeckHome || resolved.startsWith(`${realOverdeckHome}${sep}`)
-    ? resolved
-    : null;
+  if (blockedRealHomeFiles.has(resolved)) return resolved;
+  return blockedRealHomeRoots.some((root) => resolved === root || resolved.startsWith(`${root}${sep}`))
+    ? resolved : null;
 }
 
 function assertNotRealOverdeckHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
-      throw new Error(`[test-guard] write to REAL ~/.overdeck blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
+      throw new Error(`[test-guard] write to real harness/global home blocked: ${blocked} — use a temp HOME/OVERDECK_HOME`);
     }
   }
 }
@@ -75,6 +84,10 @@ function withGuardedSyncFs(actual: Record<string, unknown>): Record<string, unkn
     unlinkSync: guarded(actual.unlinkSync as never, [0]),
     renameSync: guarded(actual.renameSync as never, [0, 1]),
     cpSync: guarded(actual.cpSync as never, [0, 1]),
+    copyFileSync: guarded(actual.copyFileSync as never, [1]),
+    symlinkSync: guarded(actual.symlinkSync as never, [1]),
+    linkSync: guarded(actual.linkSync as never, [1]),
+    chmodSync: guarded(actual.chmodSync as never, [0]),
     createWriteStream: guarded(actual.createWriteStream as never, [0]),
     promises: withGuardedPromiseFs(actual.promises as Record<string, unknown>),
   };
@@ -89,6 +102,10 @@ function withGuardedPromiseFs(actual: Record<string, unknown>): Record<string, u
     rm: guardedPromise(actual.rm as never, [0]),
     rename: guardedPromise(actual.rename as never, [0, 1]),
     cp: guardedPromise(actual.cp as never, [0, 1]),
+    copyFile: guardedPromise(actual.copyFile as never, [1]),
+    symlink: guardedPromise(actual.symlink as never, [1]),
+    link: guardedPromise(actual.link as never, [1]),
+    chmod: guardedPromise(actual.chmod as never, [0]),
   };
 }
 

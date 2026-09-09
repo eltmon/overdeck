@@ -18,7 +18,6 @@
 import { execFile } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -28,7 +27,7 @@ import {
   type ClaudeSettings,
 } from './claude-hooks-registration.js';
 import { atomicWriteJsonSync, backupSettingsSync, pruneBackupsSync } from './claude-settings-file.js';
-import { BIN_DIR, SYNC_SOURCES } from './paths.js';
+import { BIN_DIR, getOverdeckClaudeHome, SYNC_SOURCES } from './paths.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -62,23 +61,7 @@ export async function provisionClaudeHooks(
     pruned: [],
   };
 
-  // Under a test runner the default settingsPath still resolves to the
-  // developer's REAL ~/.claude/settings.json while binDir follows the test's
-  // temp OVERDECK_HOME — provisioning would register hook commands under a
-  // per-run mkdtemp dir into the live settings file, where they outlive the
-  // temp dir and fire "not found" hook errors on every matching tool call
-  // (observed: dozens of /tmp/pan-agent-role-* linear-mcp-auth-hook entries
-  // accumulated by agent-state-role.test.ts runs reaching the spawn path).
-  // Tests that exercise provisioning pass explicit settingsPath/binDir.
-  if (!options.settingsPath && process.env.VITEST) {
-    return {
-      ok: true,
-      reason: 'test runner detected with default settingsPath — skipping real ~/.claude/settings.json provisioning',
-      ...none,
-    };
-  }
-
-  const settingsPath = options.settingsPath ?? join(homedir(), '.claude', 'settings.json');
+  const settingsPath = options.settingsPath ?? join(getOverdeckClaudeHome(), 'settings.json');
   const binDir = options.binDir ?? BIN_DIR;
 
   try {

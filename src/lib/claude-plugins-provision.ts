@@ -18,7 +18,7 @@ import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { SYNC_SOURCES } from './paths.js';
+import { SYNC_SOURCES, getOverdeckClaudeHome } from './paths.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -72,7 +72,7 @@ function parseManifest(raw: string): BundledClaudePlugin[] | null {
   return entries;
 }
 
-type ExecFn = (cmd: string, args: string[], opts: { timeout: number }) => Promise<{ stdout: string }>;
+type ExecFn = (cmd: string, args: string[], opts: { timeout: number; env: NodeJS.ProcessEnv }) => Promise<{ stdout: string }>;
 
 const defaultExec: ExecFn = (cmd, args, opts) => execFileAsync(cmd, args, opts);
 
@@ -81,10 +81,15 @@ const defaultExec: ExecFn = (cmd, args, opts) => execFileAsync(cmd, args, opts);
  * Claude Code (user scope), adding its marketplace first when missing.
  */
 export async function provisionClaudePlugins(
-  options: { manifestPath?: string; exec?: ExecFn } = {},
+  options: { manifestPath?: string; configDir?: string; exec?: ExecFn } = {},
 ): Promise<ProvisionClaudePluginsResult> {
   const manifestPath = options.manifestPath ?? SYNC_SOURCES.plugins;
   const exec = options.exec ?? defaultExec;
+  const configDir = options.configDir ?? getOverdeckClaudeHome();
+  const commandOptions = (timeout: number) => ({
+    timeout,
+    env: { ...process.env, CLAUDE_CONFIG_DIR: configDir },
+  });
   const result: ProvisionClaudePluginsResult = { ok: true, installed: [], alreadyInstalled: [], errors: [] };
 
   if (!existsSync(manifestPath)) {
@@ -101,8 +106,8 @@ export async function provisionClaudePlugins(
   let marketplaceNames: Set<string>;
   try {
     const [pluginList, marketplaceList] = await Promise.all([
-      exec('claude', ['plugin', 'list', '--json'], { timeout: 30_000 }),
-      exec('claude', ['plugin', 'marketplace', 'list', '--json'], { timeout: 30_000 }),
+      exec('claude', ['plugin', 'list', '--json'], commandOptions(30_000)),
+      exec('claude', ['plugin', 'marketplace', 'list', '--json'], commandOptions(30_000)),
     ]);
     installedIds = new Set(
       (JSON.parse(pluginList.stdout) as Array<{ id?: string }>).map((p) => p.id).filter((id): id is string => typeof id === 'string'),
@@ -122,10 +127,10 @@ export async function provisionClaudePlugins(
     const marketplaceName = entry.plugin.slice(entry.plugin.indexOf('@') + 1);
     try {
       if (!marketplaceNames.has(marketplaceName)) {
-        await exec('claude', ['plugin', 'marketplace', 'add', entry.marketplace], { timeout: NETWORK_TIMEOUT_MS });
+        await exec('claude', ['plugin', 'marketplace', 'add', entry.marketplace], commandOptions(NETWORK_TIMEOUT_MS));
         marketplaceNames.add(marketplaceName);
       }
-      await exec('claude', ['plugin', 'install', entry.plugin, '--scope', 'user'], { timeout: NETWORK_TIMEOUT_MS });
+      await exec('claude', ['plugin', 'install', entry.plugin, '--scope', 'user'], commandOptions(NETWORK_TIMEOUT_MS));
       result.installed.push(entry.plugin);
     } catch (error) {
       result.errors.push(`${entry.plugin}: ${error instanceof Error ? error.message : String(error)}`);

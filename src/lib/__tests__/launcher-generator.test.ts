@@ -36,9 +36,11 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
   // unrelated directory (standing in for a fixture's temp repo) must exist.
   const worktree = join(tempHome, 'workspace');
   const outside = join(tempHome, 'elsewhere');
+  const isolatedHome = join(tempHome, 'test-home');
   mkdirSync(realGitDir, { recursive: true });
   mkdirSync(worktree, { recursive: true });
   mkdirSync(outside, { recursive: true });
+  mkdirSync(isolatedHome, { recursive: true });
   writeFileSync(realGitPath, '#!/bin/sh\nexit 23\n');
   chmodSync(realGitPath, 0o755);
 
@@ -53,7 +55,7 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
 
   const launcherResult = spawnSync('bash', [launcherPath], {
     encoding: 'utf-8',
-    env: { ...process.env, PATH: `${realGitDir}:${process.env.PATH ?? ''}` },
+    env: { ...process.env, HOME: isolatedHome, PATH: `${realGitDir}:${process.env.PATH ?? ''}` },
   });
   if (launcherResult.status !== 0) {
     throw new Error(`Launcher failed: ${launcherResult.stderr}`);
@@ -68,6 +70,25 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
 }
 
 describe('generateLauncherScript', () => {
+  it('reopens a stable private Claude home for resume without exporting workflow identity', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      resumeSessionId: 'resume-session-1',
+      managedStateKey: 'conversation-1',
+    });
+
+    expect(script).toContain(`${tempHome}/agents/conversation-1/claude-home`);
+    expect(script).toContain(`${tempHome}/agents/conversation-1/claude-runs/run-XXXXXX`);
+    expect(script).not.toContain('export OVERDECK_AGENT_ID=');
+  });
+
+  it('fails closed instead of resuming Claude against an empty ephemeral home', () => {
+    expect(() => generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      resumeSessionId: 'resume-session-1',
+    })).toThrow(/resume requires managedStateKey/);
+  });
+
   it('exports the spawning process home for non-remote launchers', () => {
     const script = generateLauncherScriptSync(DEFAULT_CONFIG);
     expect(script).toContain(`export OVERDECK_HOME='${tempHome}'`);
@@ -98,6 +119,20 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
@@ -119,6 +154,20 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
@@ -136,6 +185,7 @@ describe('generateLauncherScript', () => {
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
+      managedStateKey: 'agent-pan-982',
       model: 'gpt-5.4',
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
@@ -145,6 +195,11 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents/agent-pan-982/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/agent-pan-982/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/agent-pan-982/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4'
@@ -217,7 +272,9 @@ describe('generateLauncherScript', () => {
     chmodSync(join(foreignGuardDir, 'git'), 0o755);
 
     const worktree = join(tempHome, 'workspace');
+    const isolatedHome = join(tempHome, 'inherited-guard-home');
     mkdirSync(worktree, { recursive: true });
+    mkdirSync(isolatedHome, { recursive: true });
     const launcherPath = join(tempHome, 'inherited-guard-launcher.sh');
     writeFileSync(launcherPath, generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
@@ -229,7 +286,7 @@ describe('generateLauncherScript', () => {
 
     const result = spawnSync('bash', [launcherPath], {
       encoding: 'utf-8',
-      env: { ...process.env, PATH: `${foreignGuardDir}:${process.env.PATH ?? ''}` },
+      env: { ...process.env, HOME: isolatedHome, PATH: `${foreignGuardDir}:${process.env.PATH ?? ''}` },
     });
 
     expect(result.status).toBe(0);
@@ -422,6 +479,11 @@ describe('generateLauncherScript', () => {
       EOF
       chmod 0755 '<OVERDECK_HOME>/agents/plan-abc/git-guard/git'
       export PATH="<OVERDECK_HOME>/agents/plan-abc/git-guard:$PATH"
+      mkdir -p '<OVERDECK_HOME>/agents/plan-abc/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/plan-abc/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/plan-abc/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
@@ -607,6 +669,11 @@ describe('generateLauncherScript', () => {
       EOF
       chmod 0755 '<OVERDECK_HOME>/agents/spec-123/git-guard/git'
       export PATH="<OVERDECK_HOME>/agents/spec-123/git-guard:$PATH"
+      mkdir -p '<OVERDECK_HOME>/agents/spec-123/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/spec-123/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/spec-123/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -697,6 +764,11 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents/sess-xyz/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/sess-xyz/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/sess-xyz/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -732,6 +804,20 @@ describe('generateLauncherScript', () => {
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE
@@ -769,6 +855,11 @@ describe('generateLauncherScript', () => {
       export COLORFGBG='15;0'
       export OVERDECK_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
+      mkdir -p '<OVERDECK_HOME>/agents/sess-conv/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/sess-conv/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/sess-conv/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       trap '' HUP
       claude --session-id 'sess-conv' --effort "high"
@@ -789,6 +880,7 @@ describe('generateLauncherScript', () => {
       trapHup: true,
       baseCommand: 'claude',
       resumeSessionId: 'sess-resume',
+      managedStateKey: 'conversation-resume',
       keepAlive: true,
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
@@ -803,6 +895,11 @@ describe('generateLauncherScript', () => {
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
       export COLORFGBG='15;0'
+      mkdir -p '<OVERDECK_HOME>/agents/conversation-resume/claude-runs'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/conversation-resume/claude-runs/run-XXXXXX')"
+      '/home/eltmon/Projects/overdeck/node_modules/.bin/tsx' '/home/eltmon/Projects/overdeck/src/lib/claude-launch-home.ts' "$HOME/.claude" '<OVERDECK_HOME>/harnesses/claude' "$CLAUDE_CONFIG_DIR" '<OVERDECK_HOME>/agents/conversation-resume/claude-home' '/workspace/project' '<OVERDECK_HOME>/credentials/claude/.credentials.json'
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       trap '' HUP
       claude --resume 'sess-resume'
@@ -852,6 +949,20 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
@@ -874,6 +985,20 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
       "
@@ -914,6 +1039,20 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      mkdir -p '<OVERDECK_HOME>/agents'
+      export CLAUDE_CONFIG_DIR="$(mktemp -d '<OVERDECK_HOME>/agents/launch-claude-XXXXXX')"
+      mkdir -p "$CLAUDE_CONFIG_DIR"
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/skills' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/skills' "$CLAUDE_CONFIG_DIR/skills"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/agents' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/agents' "$CLAUDE_CONFIG_DIR/agents"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/commands' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/commands' "$CLAUDE_CONFIG_DIR/commands"; fi
+      if [ -d '<OVERDECK_HOME>/harnesses/claude/plugins' ]; then cp -a '<OVERDECK_HOME>/harnesses/claude/plugins' "$CLAUDE_CONFIG_DIR/plugins"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/settings.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/settings.json' "$CLAUDE_CONFIG_DIR/settings.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/mcp.json' ]; then cp '<OVERDECK_HOME>/harnesses/claude/mcp.json' "$CLAUDE_CONFIG_DIR/mcp.json"; fi
+      if [ -f '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' ]; then cp '<OVERDECK_HOME>/harnesses/claude/statusline-command.sh' "$CLAUDE_CONFIG_DIR/statusline-command.sh"; fi
+      mkdir -p '<OVERDECK_HOME>/credentials/claude'
+      if [ ! -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" '<OVERDECK_HOME>/credentials/claude/.credentials.json'; chmod 600 '<OVERDECK_HOME>/credentials/claude/.credentials.json'; fi
+      if [ -e '<OVERDECK_HOME>/credentials/claude/.credentials.json' ]; then ln -sfn '<OVERDECK_HOME>/credentials/claude/.credentials.json' "$CLAUDE_CONFIG_DIR/.credentials.json"; fi
+      mkdir -p "$CLAUDE_CONFIG_DIR/projects"
       exec claude --model claude-sonnet-4-6
       "
     `);
@@ -981,6 +1120,7 @@ describe('generateLauncherScript', () => {
       spawnMode: 'resume',
       baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
+      managedStateKey: 'agent-pan-resume',
     });
     expect(script).toContain('--agent pan-work-agent');
     expect(script).toContain("--resume 'sess-123'");
@@ -1065,6 +1205,7 @@ describe('generateLauncherScript', () => {
       spawnMode: 'conversation',
       baseCommand: 'claude',
       resumeSessionId: 'sess-conv',
+      managedStateKey: 'conversation-supervisor-test',
       keepAlive: true,
     };
     expect(generateLauncherScriptSync({ ...conversationConfig, useSupervisor: false })).toBe(
@@ -1189,19 +1330,9 @@ describe('generateLauncherWrapper', () => {
 
     it('flag-off: omits channels bridge arguments', () => {
       const script = generateLauncherScriptSync(FIXTURE_CONFIG);
-      expect(script).toBe(
-        [
-          '#!/bin/bash',
-          'export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"',
-          'unset TMUX TMUX_PANE STY',
-          `export OVERDECK_HOME='${tempHome}'`,
-          'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
-          'export SKIP_DOCS_INDEX=1',
-          "cd -- '/workspace/project'",
-          "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
-          '',
-        ].join('\n'),
-      );
+      expect(script).toContain("exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'");
+      expect(script).not.toContain('--mcp-config');
+      expect(script).not.toContain('--dangerously-load-development-channels');
     });
 
     it('flag-on: appends --mcp-config and --dangerously-load-development-channels before --session-id', () => {
@@ -1478,10 +1609,10 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
     expect(escapeHatch).toBe(legacy);
-    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
   });
 
-  it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
+  it('codex plan launchers translate shared context files to developer instructions', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'plan',
@@ -1490,11 +1621,11 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'work-tui',
       appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
     });
-    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).toMatch(/^codex -m 'gpt-5\.5' -c "developer_instructions=\$\(cat '\/workspace\/project\/\.pan\/context\.md' 2>\/dev\/null\)"$/m);
     expect(script).not.toMatch(/--append-system-prompt-file/);
   });
 
-  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
+  it('codex conversation (tui) leaves user-owned project AGENTS.md discovery enabled', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -1502,7 +1633,8 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'tui',
       spawnMode: 'conversation',
     });
-    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^codex$/m);
+    expect(script).not.toContain('project_doc_max_bytes');
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -1516,7 +1648,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -1531,7 +1663,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume -c project_doc_max_bytes=0 '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -1593,6 +1725,31 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       expect(script).toContain('unset ANTHROPIC_BASE_URL');
       expect(script).toContain('unset ANTHROPIC_AUTH_TOKEN');
       expect(script).not.toMatch(/export ANTHROPIC_(?:API_KEY|BASE_URL|AUTH_TOKEN)=/);
+    });
+
+    it('fails closed unless managed context declares the initial-message transport', () => {
+      expect(() => generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        appendSystemPromptFiles: ['/private/context/workspace.md'],
+      })).toThrow(/must declare the initial-message envelope transport/);
+    });
+
+    it('accepts managed context when the initial-message envelope transport is declared', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiContextDelivery: 'initial-message',
+        appendSystemPromptFiles: ['/private/context/workspace.md'],
+      });
+
+      expect(script).toMatch(/^exec kimi -m 'kimi-code\/k3-256k'$/m);
+      expect(script).not.toContain('/private/context/workspace.md');
+      expect(script).not.toContain('AGENTS.md');
     });
 
     it('never emits --session (long form), --work-dir, or -p/--print (D2/erratum E1)', () => {

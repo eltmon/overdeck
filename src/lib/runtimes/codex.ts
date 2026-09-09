@@ -18,7 +18,7 @@
  * per-home discovery location.
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, chmodSync, openSync, readSync, closeSync, copyFileSync, cpSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
@@ -45,6 +45,7 @@ import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cl
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
+import { getOverdeckHome } from '../paths.js'
 
 const execAsync = promisify(exec)
 
@@ -308,12 +309,23 @@ export interface InitCodexHomeOpts {
  *   <codexHomeDir>/
  *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
  *                     trust, notify hooks)
- *     AGENTS.md     — Populated by context-layering bead; placeholder for now
- *     rules/        — Symlink to the user's global Codex execpolicy rules
+ *     rules/        — Private import of the user's Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
 export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
-  mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+  mkdirSync(codexHomeDir, { recursive: true, mode: 0o700 })
+  if (codexHomeDir.endsWith('/codex-home-v2')) {
+    // Keep transcript data in the established private root while using a new
+    // config root that cannot discover historical codex-home/AGENTS.md.
+    const persistentSessions = join(dirname(codexHomeDir), 'codex-home', 'sessions')
+    mkdirSync(persistentSessions, { recursive: true, mode: 0o700 })
+    const sessionsLink = join(codexHomeDir, 'sessions')
+    if (!existsSync(sessionsLink)) {
+      try { symlinkSync(persistentSessions, sessionsLink, 'dir') } catch { /* best effort */ }
+    }
+  } else {
+    mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+  }
 
   const configPath = join(codexHomeDir, 'config.toml')
   // Always (re)write config.toml so permission-mode changes take effect on
@@ -383,100 +395,58 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
   }
 
-  // Seed auth so Codex skips its blocking sign-in onboarding on a fresh home.
-  // PAN-2285: symlink the per-agent auth.json to the global ~/.codex/auth.json
-  // instead of copying it. A copy forks the OAuth refresh-token family — OpenAI
-  // rotates refresh tokens on every refresh, so once the global side rotates
-  // (re-login or natural refresh) every stale per-agent copy is revoked and its
-  // agent wedges forever in a 401 `token_invalidated` loop (PAN-2285/PAN-2639).
-  // The codex CLI persists a refresh in place (open+truncate+write via
-  // FileAuthStorage::save in codex-rs/login/src/auth/storage.rs — no temp-file
-  // rename), so writing through the symlink updates the global file and the
-  // symlink survives: all agents share one refresh chain and a global
-  // `codex login` heals everyone. Best-effort: if the user has never signed in
-  // to Codex globally there is nothing to link, and onboarding will (correctly)
-  // prompt for a real first-time login.
+  // Seed auth so Codex skips sign-in onboarding on a fresh managed home. The
+  // native file is only a read source: once imported, the private copy is
+  // preserved so refresh rotation never writes through to ~/.codex.
   const globalCodexHome = join(homedir(), '.codex')
   const homeAuthPath = join(codexHomeDir, 'auth.json')
   const globalAuthPath = join(globalCodexHome, 'auth.json')
-  seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
+  const sharedAuthPath = join(getOverdeckHome(), 'credentials', 'codex', 'auth.json')
+  seedCodexSharedAuth(homeAuthPath, sharedAuthPath, globalAuthPath)
 
-  // Managed sessions use an isolated CODEX_HOME, so Codex would otherwise skip
-  // the user's native execpolicy layer at ~/.codex/rules and ask again in every
-  // agent home. Link the directory rather than copying it so rule amendments
-  // accepted in one persistent session remain available to later sessions.
-  seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
+  // Import user execpolicy once. Managed amendments remain private too.
+  seedCodexRulesCopy(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   // Skills are copied rather than linked: every managed CODEX_HOME remains
-  // isolated, while `pan sync` updates in the Agent Skills standard home are
-  // refreshed on each init/resume.
+  // isolated, while `pan sync` updates Overdeck's private skill tree.
   syncCodexSkillsIntoHome(
-    join(homedir(), '.agents', 'skills'),
+    join(getOverdeckHome(), 'harnesses', 'agent-skills'),
     join(codexHomeDir, 'skills'),
   )
-
-  const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
-  if (!existsSync(agentsMdPath)) {
-    // Seed from the pre-rendered Codex global context layer if available;
-    // fall back to a placeholder. The static file is written by `pan sync`
-    // via syncContextLayersSync → renderGlobalLayer('codex', …).
-    const globalCodexContext = join(homedir(), '.overdeck', 'context', 'codex-global.md')
-    if (existsSync(globalCodexContext)) {
-      copyFileSync(globalCodexContext, agentsMdPath)
-    } else {
-      writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
-    }
+  if (opts.trustedDir) {
+    // Project sources overlay the global private baseline without ever being
+    // copied into repository-native harness directories. .pan/skills has the
+    // highest precedence for Lexerra/MYN-specific managed behavior.
+    syncCodexSkillsIntoHome(join(opts.trustedDir, 'skills'), join(codexHomeDir, 'skills'))
+    syncCodexSkillsIntoHome(join(opts.trustedDir, '.pan', 'skills'), join(codexHomeDir, 'skills'))
   }
+
 }
 
 /**
- * Point a per-agent CODEX_HOME/auth.json at the global ~/.codex/auth.json via a
- * symlink so every agent shares one OAuth refresh-token family (PAN-2285).
- *
- * Idempotent and migration-safe:
- *   - global auth.json missing        → do nothing (onboarding prompts, as before)
- *   - home auth.json already the right → nothing
- *     symlink to global
- *   - home auth.json a regular-file    → remove the stale disposable copy and
- *     copy or a wrong symlink            replace it with the symlink (this is the
- *                                        in-place migration for already-deployed
- *                                        homes; removing a per-agent copy loses
- *                                        nothing — the global file is the source
- *                                        of truth)
- *
- * Exported for unit testing over temp dirs. Privacy: a symlink's permissions
- * follow its target (the global file is 0600), so no chmod is needed here.
+ * Import native Codex auth into a private managed home exactly once.
+ * Existing private state wins because it may contain a newer rotated token.
  */
-export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
-  if (!existsSync(globalAuthPath)) return
-
-  // If the home path is already a symlink pointing at the global file, we're done.
-  let currentLink: string | null = null
+export function seedCodexSharedAuth(homeAuthPath: string, sharedAuthPath: string, globalAuthPath: string): void {
   try {
-    if (lstatSync(homeAuthPath).isSymbolicLink()) {
-      currentLink = readlinkSync(homeAuthPath)
+    mkdirSync(dirname(sharedAuthPath), { recursive: true })
+    // Prefer an existing private agent token when upgrading from the old
+    // copy-per-agent topology; otherwise import native auth exactly once.
+    if (!existsSync(sharedAuthPath)) {
+      const importSource = existsSync(homeAuthPath) ? homeAuthPath : globalAuthPath
+      if (!existsSync(importSource)) return
+      copyFileSync(importSource, sharedAuthPath)
+      chmodSync(sharedAuthPath, 0o600)
     }
-  } catch {
-    currentLink = null
-  }
-  if (currentLink === globalAuthPath) return
-
-  // Anything else present at homeAuthPath (a stale copy or a wrong symlink) is a
-  // disposable per-agent artifact — remove it so we can install the symlink.
-  try {
-    if (existsSync(homeAuthPath) || currentLink !== null) {
+    try {
+      if (lstatSync(homeAuthPath).isSymbolicLink() && readlinkSync(homeAuthPath) === sharedAuthPath) return
       unlinkSync(homeAuthPath)
+    } catch {
+      // Missing destination is expected on the first managed launch.
     }
+    symlinkSync(sharedAuthPath, homeAuthPath)
   } catch {
-    // If we cannot remove it, fall through: the symlink create below will throw
-    // and we swallow it, leaving the existing file in place (no worse than today).
-  }
-
-  try {
-    symlinkSync(globalAuthPath, homeAuthPath)
-  } catch {
-    // Best-effort: if the symlink cannot be created (permissions, race), leave the
-    // home without auth.json — codex onboarding prompts, which is the safe default.
+    // Best-effort: without a private import, Codex safely prompts for login.
   }
 }
 
@@ -486,21 +456,12 @@ export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: strin
  * authorize out-of-sandbox execution, so Overdeck must never silently discard
  * or redirect a rule directory it did not create.
  */
-export function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
-  if (!existsSync(globalRulesPath)) return
-
+export function seedCodexRulesCopy(homeRulesPath: string, globalRulesPath: string): void {
+  if (existsSync(homeRulesPath) || !existsSync(globalRulesPath)) return
   try {
-    const homeRules = lstatSync(homeRulesPath)
-    if (homeRules.isSymbolicLink() && readlinkSync(homeRulesPath) === globalRulesPath) return
-    return
+    cpSync(globalRulesPath, homeRulesPath, { recursive: true, errorOnExist: true })
   } catch {
-    // The managed home has no rules path yet; install the native user rule layer.
-  }
-
-  try {
-    symlinkSync(globalRulesPath, homeRulesPath, 'dir')
-  } catch {
-    // Best-effort: without the link, Codex safely falls back to prompting.
+    // Best-effort: without imported rules, Codex safely falls back to prompting.
   }
 }
 
@@ -736,7 +697,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) {
       throw new Error(`Codex agent ${agentId}: no captured thread-id — cannot send message`)
     }
-    const codexHomeDir = join(agentDirFor(agentId), 'codex-home')
+    const codexHomeDir = join(agentDirFor(agentId), 'codex-home-v2')
     const cmd = `CODEX_HOME=${shellQuote(codexHomeDir)} codex exec resume -c sandbox_mode=read-only ${shellQuote(threadId)} ${shellQuote(message)}`
     await execAsync(cmd)
   }
@@ -802,9 +763,9 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const agentId = config.agentId
 
     // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
-    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home')
+    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2')
 
-    // 1. Create CODEX_HOME structure (config.toml + AGENTS.md + sessions/).
+    // 1. Create the private CODEX_HOME structure (config + sessions; no AGENTS.md).
     initCodexHome(codexHomeDir)
 
     // 2. Build the codex exec command — shell-quote every interpolated value.

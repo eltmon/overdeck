@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -32,10 +32,12 @@ import {
   resolveProjectContextFile,
   workspaceContextFile,
   resolveWorkspaceContextFile,
+  claudeGlobalContextFile,
+  piGlobalContextFile,
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
-import { configDisabledRuleNames, hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
-import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
+import { configDisabledRuleNames } from '../../../lib/context-layers/render.js';
+import { getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
@@ -238,8 +240,7 @@ async function layerRecord(
 }
 
 /**
- * Describe one injection target so the dashboard can show the user where a
- * managed region lands and whether their own content is preserved there.
+ * Describe one Overdeck-owned render artifact and its launch transport.
  */
 async function describeSyncTarget(
   harness: ContextPreviewHarness,
@@ -247,6 +248,7 @@ async function describeSyncTarget(
   projectKey: string | undefined,
   label: string,
   path: string,
+  deliveryChannel: ContextSyncTarget['deliveryChannel'],
 ): Promise<ContextSyncTarget> {
   const { exists, content } = await readOptionalFile(path);
   return {
@@ -256,35 +258,23 @@ async function describeSyncTarget(
     label,
     path,
     exists,
-    hasManagedRegion: exists ? hasManagedRegion(content) : false,
-    hasUserContent: exists ? userContentOutsideRegion(content).length > 0 : false,
+    deliveryChannel,
+    byteCount: Buffer.byteLength(content),
+    ...(exists ? { sha256: createHash('sha256').update(content).digest('hex') } : {}),
   };
 }
 
 /**
- * The files `pan sync` writes Overdeck-managed regions into: the global
- * Claude Code CLAUDE.md, and — for each project with a `project.md` — that
- * project's CLAUDE.md (Claude Code) and AGENTS.md (Pi). The Pi global layer is
- * a Overdeck-owned file, not a user file, so it is not listed as a target.
+ * The Overdeck-owned global render artifacts. Project/workspace layers are
+ * assembled into `.overdeck/context/workspace.md` when a workspace is created.
  */
 async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTarget[]> {
-  const targets: ContextSyncTarget[] = [
-    await describeSyncTarget('claude-code', 'global', undefined, 'Claude Code · global', join(CLAUDE_DIR, 'CLAUDE.md')),
-    await describeSyncTarget('codex', 'global', undefined, 'Codex · global (codex-global.md)', codexGlobalContextFile()),
+  void projects;
+  return [
+    await describeSyncTarget('claude-code', 'global', undefined, 'Claude · managed launch', claudeGlobalContextFile(), 'claude-append-system-prompt'),
+    await describeSyncTarget('ohmypi', 'global', undefined, 'Pi · managed launch', piGlobalContextFile(), 'pi-append-system-prompt'),
+    await describeSyncTarget('codex', 'global', undefined, 'Codex · managed launch', codexGlobalContextFile(), 'codex-developer-instructions'),
   ];
-
-  for (const { key, config } of projects) {
-    const projectMd = await readOptionalFile(resolveProjectContextFile(config.path));
-    if (!projectMd.exists) continue; // no project.md → sync leaves this project's files alone
-    targets.push(
-      await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
-    );
-    targets.push(
-      await describeSyncTarget('ohmypi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
-    );
-  }
-
-  return targets;
 }
 
 export async function buildContextLayerState(

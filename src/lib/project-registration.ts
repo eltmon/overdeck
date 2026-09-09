@@ -66,12 +66,6 @@ export async function registerProjectFromPath(
 
   const seededContextLayer = ensureProjectLayer(fullPath);
 
-  // Pre-trust the project directory in Claude Code (non-fatal — H7).
-  try {
-    const { preTrustDirectorySync } = await import('./workspace-manager.js');
-    preTrustDirectorySync(fullPath);
-  } catch { /* non-fatal */ }
-
   // Install git hooks where .git exists.
   let hooksInstalled = 0;
   const rootGit = join(fullPath, '.git');

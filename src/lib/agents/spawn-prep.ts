@@ -467,18 +467,6 @@ export async function buildAgentLaunchConfig(opts: {
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
-  // Substrate guard: inject permission deny rules for Overdeck infrastructure
-  // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
-  // into the workspace's .claude/settings.local.json. Idempotent. Without this
-  // an xBRIEF action like "delete the legacy pan-*-agent.md files" can convince
-  // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
-  try {
-    const { injectOverdeckInfraDeny } = await import('../claude-settings-overlay.js');
-    await Effect.runPromise(injectOverdeckInfraDeny(opts.workspace));
-  } catch (err) {
-    console.warn(`[agents] injectOverdeckInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
-  }
-
   const behavior = getHarnessBehavior(opts.harness);
   const isAcp = behavior.launchCommandKind === 'acp-host';
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);

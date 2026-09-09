@@ -136,8 +136,7 @@ export function ContextPage() {
   const isDirty = !!selectedLayer && drafts[selectedKey] !== undefined && drafts[selectedKey] !== selectedLayer.content;
   const actionPending = saveMutation.isPending || syncMutation.isPending;
 
-  // Injection targets relevant to the current selection — the files pan sync
-  // writes a managed region into for this layer.
+  // Overdeck-owned launch artifacts relevant to the current selection.
   const relevantTargets = useMemo(() => {
     if (!data) return [];
     if (selectedKind === 'global') return data.targets.filter((t) => t.layerKind === 'global');
@@ -284,12 +283,10 @@ export function ContextPage() {
         </div>
 
         <div className="mt-4 rounded-lg border border-border bg-background/70 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Where this gets injected</p>
+          <p className="font-medium text-foreground">Managed-session delivery</p>
           <p className="mt-1 leading-5">
-            <code className="rounded bg-muted px-1">pan sync</code> writes a managed region —
-            between <code className="rounded bg-muted px-1">BEGIN/END OVERDECK CONTEXT</code> markers —
-            into the files below. Anything you wrote <span className="font-medium text-foreground">outside</span> those
-            markers is never modified. Edit the layer source here, not the region.
+            <code className="rounded bg-muted px-1">pan sync</code> refreshes only the Overdeck-owned artifacts below.
+            They are passed explicitly when Overdeck launches a session. Native harness instruction files are never modified.
           </p>
           {relevantTargets.length > 0 ? (
             <ul className="mt-2 space-y-2">
@@ -297,13 +294,7 @@ export function ContextPage() {
                 <li key={target.path}>
                   <div className="break-all font-mono text-foreground">{target.path}</div>
                   <div className="mt-0.5">
-                    {!target.exists
-                      ? 'Not created yet — created on next sync.'
-                      : target.hasUserContent
-                        ? 'Has your own content — preserved outside the managed region.'
-                        : target.hasManagedRegion
-                          ? 'Managed by Overdeck (no other content).'
-                          : 'Exists — a managed region is added on next sync.'}
+                    {target.exists ? `${target.deliveryChannel} · ${target.byteCount} bytes` : 'Created on next sync.'}
                   </div>
                 </li>
               ))}
@@ -313,7 +304,7 @@ export function ContextPage() {
               Workspace context is auto-assembled into the workspace and is not injected into any hand-authored file.
             </p>
           ) : (
-            <p className="mt-2">No injection targets for this selection yet (the project has no project.md).</p>
+            <p className="mt-2">Project context is bundled into each workspace's Overdeck-owned context file.</p>
           )}
         </div>
 

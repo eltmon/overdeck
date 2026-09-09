@@ -31,6 +31,7 @@ import { resolveConversationDeliveryMethod } from '../../overdeck/conversation-d
 import { deliverAgentMessage } from '../delivery.js';
 import { resolveAgentDeliveryMethod } from '../messaging.js';
 import { sendKeys } from '../../tmux.js';
+import { KIMI_CONTEXT_START, KIMI_TASK_START } from '../../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agent-state.js';
 
 interface FakeBridgeOptions {
@@ -364,6 +365,56 @@ describe('app-server delivery tier', () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+describe('native Kimi context delivery', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-kimi-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('wraps the first work-agent message and leaves later messages unchanged in the same session', async () => {
+    const agentId = 'agent-kimi-work';
+    const workspace = join(tmpHome, 'workspace');
+    mkdirSync(workspace, { recursive: true });
+    writeAgentState(agentId, { harness: 'kimi-code', workspace, deliveryMethod: 'tmux' });
+    writeFileSync(join(stateDir, agentId, 'kimi-session-id'), 'session-work\n');
+
+    await deliverAgentMessage(agentId, 'First task', 'work-kickoff', 'tmux');
+    const firstMessage = vi.mocked(sendKeys).mock.calls[0]?.[1] as string;
+    expect(firstMessage).toContain(KIMI_CONTEXT_START);
+    expect(firstMessage).toContain(`${KIMI_TASK_START}\nFirst task`);
+
+    await deliverAgentMessage(agentId, 'Follow-up', 'work-follow-up', 'tmux');
+    expect(vi.mocked(sendKeys)).toHaveBeenLastCalledWith(agentId, 'Follow-up');
+    expect(existsSync(join(stateDir, agentId, 'kimi-context-delivery.json'))).toBe(true);
+  });
+
+  it('supports conversation sessions that have no AgentState via explicit context identity', async () => {
+    const agentId = 'conv-kimi-context';
+    const workspace = join(tmpHome, 'conversation-workspace');
+    mkdirSync(join(stateDir, agentId), { recursive: true });
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(stateDir, agentId, 'kimi-session-id'), 'session-conversation\n');
+
+    await deliverAgentMessage(agentId, 'Conversation task', 'conversation-message', 'tmux', {
+      kimiContext: { workspace },
+    });
+
+    const delivered = vi.mocked(sendKeys).mock.calls[0]?.[1] as string;
+    expect(delivered).toContain(KIMI_CONTEXT_START);
+    expect(delivered).toContain(`${KIMI_TASK_START}\nConversation task`);
   });
 });
 

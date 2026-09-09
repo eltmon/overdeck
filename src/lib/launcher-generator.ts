@@ -1,5 +1,7 @@
 import { Effect } from 'effect';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
@@ -10,6 +12,10 @@ import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+
+const LAUNCHER_MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+const CLAUDE_LAUNCH_HOME_TS = join(LAUNCHER_MODULE_DIR, 'claude-launch-home.ts');
+const CLAUDE_LAUNCH_HOME_JS = join(LAUNCHER_MODULE_DIR, 'claude-launch-home.js');
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -97,6 +103,8 @@ export interface LauncherConfig {
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
   kimiCodeAddDirs?: string[];
+  /** Required proof that managed context will be delivered as Kimi's first user message. */
+  kimiContextDelivery?: 'initial-message';
 
   // Command construction
   /**
@@ -158,6 +166,13 @@ export interface LauncherConfig {
   unsetProviderEnv?: boolean;
   cavemanExports?: string;
   overdeckEnv?: { agentId?: string; issueId?: string; sessionType?: string };
+  /**
+   * Stable Overdeck-private state identity for launch/relaunch continuity.
+   * Unlike overdeckEnv.agentId, this does not export workflow identity or
+   * enable git guards; conversation launchers use it solely to retain their
+   * managed Claude transcript/config home across resume.
+   */
+  managedStateKey?: string;
   unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
@@ -333,9 +348,119 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     }
   }
 
+  // Persist the exact launch-time context composition beside agent state. This
+  // is a receipt, not another instruction source: it records paths/hashes and
+  // delivery channel for audit/debugging across spawn, resume, and recovery.
+  const managedStateKey = config.managedStateKey ?? config.overdeckEnv?.agentId ?? config.sessionId;
+  const receiptKey = managedStateKey;
+  const receiptFiles = [
+    ...systemPromptFiles(config),
+    ...(config.acpContextFile ? [config.acpContextFile] : []),
+  ];
+  if (receiptKey && receiptFiles.length > 0) {
+    const receiptPath = join(getOverdeckHome(), 'agents', receiptKey, 'context-receipt.json');
+    const receiptChannel = config.harness === 'codex'
+      ? 'developer_instructions'
+      : config.harness === 'ohmypi'
+        ? 'append-system-prompt'
+        : config.harness === 'kimi-code'
+          ? 'initial-message-envelope'
+        : config.harness === 'acp'
+          ? 'acp-initial-context'
+          : 'append-system-prompt-file';
+    const receiptScript = 'const fs=require("fs"),c=require("crypto"),p=require("path");const [out,ch,...files]=process.argv.slice(1);const sources=files.filter(f=>fs.existsSync(f)).map(path=>{const b=fs.readFileSync(path);return{path,bytes:b.length,estimatedTokens:Math.ceil(b.length/4),sha256:c.createHash("sha256").update(b).digest("hex")}});fs.mkdirSync(p.dirname(out),{recursive:true});const t=out+".tmp-"+process.pid;fs.writeFileSync(t,JSON.stringify({version:1,generatedAt:new Date().toISOString(),deliveryChannel:ch,sources},null,2)+"\\n",{mode:384});fs.renameSync(t,out)';
+    lines.push(`node -e ${shellQuote(receiptScript)} ${shellQuote(receiptPath)} ${shellQuote(receiptChannel)} ${receiptFiles.map(shellQuote).join(' ')}`);
+  }
+
   // Codex: per-agent CODEX_HOME so each agent has isolated sessions/config
   if (config.codexHome) {
     lines.push(`export CODEX_HOME=${shellQuote(config.codexHome)}`);
+  }
+
+  // Claude: isolate every Overdeck-managed launch from the user's native
+  // ~/.claude tree. pan sync builds a canonical private home; each agent gets
+  // its own copy so session-local writes cannot leak into either the canonical
+  // source or another agent. Native global CLAUDE.md is delivered directly as
+  // an explicit prompt file; it is never copied under a reserved native name.
+  if ((config.harness ?? 'claude-code') === 'claude-code' && config.spawnMode !== 'remote') {
+    const canonicalClaudeHome = join(getOverdeckHome(), 'harnesses', 'claude');
+    const launchKey = managedStateKey;
+    if (config.resumeSessionId && !launchKey) {
+      throw new Error(
+        'Managed Claude resume requires managedStateKey (or overdeckEnv.agentId) so its private transcript home can be reopened.',
+      );
+    }
+    if (launchKey) {
+      const persistentClaudeHome = join(getOverdeckHome(), 'agents', launchKey, 'claude-home');
+      const runRoot = join(getOverdeckHome(), 'agents', launchKey, 'claude-runs');
+      lines.push(`mkdir -p ${shellQuote(runRoot)}`);
+      lines.push(`export CLAUDE_CONFIG_DIR="$(mktemp -d ${shellQuote(`${runRoot}/run-XXXXXX`)})"`);
+      const helperCommand = existsSync(CLAUDE_LAUNCH_HOME_TS)
+        ? `${shellQuote(join(packageRoot, 'node_modules', '.bin', 'tsx'))} ${shellQuote(CLAUDE_LAUNCH_HOME_TS)}`
+        : `node ${shellQuote(CLAUDE_LAUNCH_HOME_JS)}`;
+      lines.push(`${helperCommand} "$HOME/.claude" ${shellQuote(canonicalClaudeHome)} "$CLAUDE_CONFIG_DIR" ${shellQuote(persistentClaudeHome)} ${shellQuote(config.workingDir)} ${shellQuote(join(getOverdeckHome(), 'credentials', 'claude', '.credentials.json'))}`);
+    } else {
+      const launchRoot = join(getOverdeckHome(), 'agents');
+      lines.push(`mkdir -p ${shellQuote(launchRoot)}`);
+      lines.push(`export CLAUDE_CONFIG_DIR="$(mktemp -d ${shellQuote(`${launchRoot}/launch-claude-XXXXXX`)})"`);
+    }
+    lines.push('mkdir -p "$CLAUDE_CONFIG_DIR"');
+    // Launches without a stable key are intentionally ephemeral. They receive
+    // the managed baseline in-shell; normal agent/conversation launches were
+    // prepared above with the full native-user + managed + project merge.
+    if (!launchKey) {
+      for (const directory of ['skills', 'agents', 'commands', 'plugins']) {
+        lines.push(`if [ -d ${shellQuote(join(canonicalClaudeHome, directory))} ]; then cp -a ${shellQuote(join(canonicalClaudeHome, directory))} "$CLAUDE_CONFIG_DIR/${directory}"; fi`);
+      }
+      for (const file of ['settings.json', 'mcp.json', 'statusline-command.sh']) {
+        lines.push(`if [ -f ${shellQuote(join(canonicalClaudeHome, file))} ]; then cp ${shellQuote(join(canonicalClaudeHome, file))} "$CLAUDE_CONFIG_DIR/${file}"; fi`);
+      }
+    }
+    // Native credentials are a read-only import source. Preserve a private
+    // credential once it exists so token refreshes remain in Overdeck-owned
+    // state and never write through to ~/.claude.
+    // Stable-key homes are wired by the helper to the shared private refresh
+    // chain. Ephemeral launches also use that private store when available.
+    if (!launchKey) {
+      const sharedClaudeCredentials = join(getOverdeckHome(), 'credentials', 'claude', '.credentials.json');
+      lines.push(`mkdir -p ${shellQuote(dirname(sharedClaudeCredentials))}`);
+      lines.push(`if [ ! -e ${shellQuote(sharedClaudeCredentials)} ] && [ -f "$HOME/.claude/.credentials.json" ]; then cp "$HOME/.claude/.credentials.json" ${shellQuote(sharedClaudeCredentials)}; chmod 600 ${shellQuote(sharedClaudeCredentials)}; fi`);
+      lines.push(`if [ -e ${shellQuote(sharedClaudeCredentials)} ]; then ln -sfn ${shellQuote(sharedClaudeCredentials)} "$CLAUDE_CONFIG_DIR/.credentials.json"; fi`);
+    }
+    // Claude stores transcripts below CLAUDE_CONFIG_DIR/projects. Keeping that
+    // directory real (never symlinked) makes managed history persistent and
+    // private for this agent/conversation.
+    lines.push('mkdir -p "$CLAUDE_CONFIG_DIR/projects"');
+  }
+
+  if (config.harness === 'ohmypi' && config.spawnMode !== 'remote') {
+    const launchKey = managedStateKey;
+    const privateRoot = launchKey
+      ? join(getOverdeckHome(), 'agents', launchKey, 'pi-runs')
+      : join(getOverdeckHome(), 'agents');
+    if (launchKey) {
+      lines.push(`mkdir -p ${shellQuote(privateRoot)}`);
+      lines.push(`export PI_CODING_AGENT_DIR="$(mktemp -d ${shellQuote(`${privateRoot}/run-XXXXXX`)})"`);
+    } else {
+      lines.push(`mkdir -p ${shellQuote(privateRoot)}`);
+      lines.push(`export PI_CODING_AGENT_DIR="$(mktemp -d ${shellQuote(`${privateRoot}/launch-pi-XXXXXX`)})"`);
+    }
+    const canonicalOhmypiHome = join(getOverdeckHome(), 'harnesses', 'ohmypi');
+    const privateSkills = join(getOverdeckHome(), 'harnesses', 'agent-skills');
+    lines.push(`if [ -d ${shellQuote(canonicalOhmypiHome)} ]; then cp -a ${shellQuote(`${canonicalOhmypiHome}/.`)} "$PI_CODING_AGENT_DIR"; fi`);
+    lines.push('rm -rf "$PI_CODING_AGENT_DIR/skills"');
+    lines.push(`if [ -d ${shellQuote(privateSkills)} ]; then cp -a ${shellQuote(privateSkills)} "$PI_CODING_AGENT_DIR/skills"; fi`);
+    for (const projectSkills of [join(config.workingDir, 'skills'), join(config.workingDir, '.pan', 'skills')]) {
+      lines.push(`if [ -d ${shellQuote(projectSkills)} ]; then mkdir -p "$PI_CODING_AGENT_DIR/skills"; cp -a ${shellQuote(`${projectSkills}/.`)} "$PI_CODING_AGENT_DIR/skills"; fi`);
+    }
+    // Native OMP auth is a one-time read-only import. The managed home keeps
+    // its own persistent refresh chain and SQLite state thereafter.
+    const sharedOmpAuth = join(getOverdeckHome(), 'credentials', 'ohmypi');
+    lines.push(`mkdir -p ${shellQuote(sharedOmpAuth)}`);
+    lines.push(`if [ ! -e ${shellQuote(join(sharedOmpAuth, 'auth.json'))} ] && [ -f "$HOME/.omp/agent/auth.json" ]; then cp "$HOME/.omp/agent/auth.json" ${shellQuote(join(sharedOmpAuth, 'auth.json'))}; chmod 600 ${shellQuote(join(sharedOmpAuth, 'auth.json'))}; fi`);
+    lines.push(`if [ ! -e ${shellQuote(join(sharedOmpAuth, 'agent.db'))} ] && [ -f "$HOME/.omp/agent/agent.db" ]; then cp "$HOME/.omp/agent/agent.db" ${shellQuote(join(sharedOmpAuth, 'agent.db'))}; chmod 600 ${shellQuote(join(sharedOmpAuth, 'agent.db'))}; fi`);
+    lines.push(`if [ -e ${shellQuote(join(sharedOmpAuth, 'auth.json'))} ]; then ln -sfn ${shellQuote(join(sharedOmpAuth, 'auth.json'))} "$PI_CODING_AGENT_DIR/auth.json"; fi`);
+    lines.push(`if [ -e ${shellQuote(join(sharedOmpAuth, 'agent.db'))} ]; then ln -sfn ${shellQuote(join(sharedOmpAuth, 'agent.db'))} "$PI_CODING_AGENT_DIR/agent.db"; fi`);
   }
 
   // Change directory (after env setup, before command)
@@ -672,6 +797,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (config.piExtensionPath) {
     tokens.push('--extension', shellQuote(config.piExtensionPath));
   }
+  // PI_CODING_AGENT_DIR points discovery at an Overdeck-private per-agent home.
   // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
 
   for (const file of systemPromptFiles(config)) {
@@ -803,6 +929,11 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   if (!config.kimiCodeModel) {
     throw new Error('kimi-code launcher requires kimiCodeModel');
   }
+  if (systemPromptFiles(config).length > 0 && config.kimiContextDelivery !== 'initial-message') {
+    throw new Error(
+      'Managed kimi-code launch blocked: required context must declare the initial-message envelope transport.',
+    );
+  }
 
   // Translate here, at the single chokepoint every kimi-code launch passes
   // through, rather than at each caller. Only the work-agent path translated;
@@ -857,7 +988,14 @@ export function buildPiCommand(config: LauncherConfig, useExec: boolean): string
   if (config.piExtensionPath) {
     tokens.push('--extension', shellQuote(config.piExtensionPath));
   }
-  tokens.push('--no-context-files');
+  tokens.push(
+    '--no-skills',
+    '--skill',
+    shellQuote(join(getOverdeckHome(), 'harnesses', 'agent-skills')),
+  );
+  for (const projectSkills of [join(config.workingDir, 'skills'), join(config.workingDir, '.pan', 'skills')]) {
+    if (existsSync(projectSkills)) tokens.push('--skill', shellQuote(projectSkills));
+  }
 
   // PAN-1566: deliver Overdeck's injected context (global engineering-rules
   // layer, workspace/briefing) via --append-system-prompt. The pi-extension

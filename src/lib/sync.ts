@@ -1,13 +1,12 @@
-import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, unlinkSync, lstatSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
-import { homedir } from 'os';
 import { Effect } from 'effect';
 import {
-  SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, CLAUDE_DIR,
+  SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
   SYNC_SOURCES,
   CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
-  SYNC_TARGET, isDevMode,
+  SYNC_TARGET, isDevMode, getOverdeckClaudeHome, getOverdeckHome,
 } from './paths.js';
 import { FsError } from './errors.js';
 import {
@@ -16,20 +15,14 @@ import {
   type Manifest,
   compareFileToManifest,
 } from './manifest.js';
-import { listProjectsSync } from './projects.js';
 import { planHooksSyncSync, syncHooksSync, type HookItem, type HooksSyncResult } from './sync-hooks.js';
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
-  renderProjectLayer,
-  applyManagedRegion,
-  hasManagedRegion,
-  cleanLegacyBeadsTargetSync,
-  type LegacyBeadsCleanup,
+  claudeGlobalContextFile,
   piGlobalContextFile,
   codexGlobalContextFile,
 } from './context-layers/index.js';
-import { backupFileSync, createBackupTimestamp } from './backup.js';
 export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
@@ -46,101 +39,6 @@ export interface SyncPlan {
   devSkills: SyncItem[];  // Developer-only skills (only synced in dev mode)
 }
 
-/**
- * Remove a file, symlink, or directory safely
- */
-function removeTarget(targetPath: string): void {
-  const stats = lstatSync(targetPath);
-  if (stats.isDirectory() && !stats.isSymbolicLink()) {
-    // It's a real directory, remove recursively
-    rmSync(targetPath, { recursive: true, force: true });
-  } else {
-    // It's a file or symlink
-    unlinkSync(targetPath);
-  }
-}
-
-/**
- * Check if a path is a Overdeck-managed symlink
- */
-export function isOverdeckSymlinkSync(targetPath: string): boolean {
-  if (!existsSync(targetPath)) return false;
-
-  try {
-    const stats = lstatSync(targetPath);
-    if (!stats.isSymbolicLink()) return false;
-
-    const linkTarget = readlinkSync(targetPath);
-    // It's ours if it points to our skills/commands dir
-    return linkTarget.includes('.overdeck');
-  } catch {
-    return false;
-  }
-}
-
-export interface MigrationResult {
-  removedSymlinks: string[];
-  preservedUserContent: string[];
-  errors: string[];
-}
-
-/**
- * One-time migration: remove Overdeck-managed symlinks from ~/.claude/.
- *
- * Detects symlinks in ~/.claude/skills/ and ~/.claude/agents/ that point to
- * .overdeck directories. Removes only those symlinks, preserving any
- * user-created content (real files/directories).
- *
- * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
- *
- * Removes stale Overdeck content from ~/.claude/:
- * - Symlinks pointing to .overdeck or overdeck (legacy sync method)
- *
- * Plain directories are always preserved as user content — there is no reliable
- * way to prove a plain directory was created by Overdeck vs the user.
- */
-export function migrateStalePersonalContentSync(): MigrationResult {
-  const claudeDir = join(homedir(), '.claude');
-  const result: MigrationResult = {
-    removedSymlinks: [],
-    preservedUserContent: [],
-    errors: [],
-  };
-
-  for (const subdir of ['skills', 'commands', 'agents']) {
-    const dir = join(claudeDir, subdir);
-    if (!existsSync(dir)) continue;
-
-    try {
-      const entries = readdirSync(dir);
-      for (const entry of entries) {
-        const entryPath = join(dir, entry);
-        try {
-          const stats = lstatSync(entryPath);
-          if (stats.isSymbolicLink()) {
-            const linkTarget = readlinkSync(entryPath);
-            if (linkTarget.includes('.overdeck') || linkTarget.includes('overdeck')) {
-              unlinkSync(entryPath);
-              result.removedSymlinks.push(`${subdir}/${entry}`);
-            } else {
-              // Symlink to somewhere else — leave it
-              result.preservedUserContent.push(`${subdir}/${entry}`);
-            }
-          } else {
-            // Plain file or directory — user content, never touch
-            result.preservedUserContent.push(`${subdir}/${entry}`);
-          }
-        } catch (err: any) {
-          result.errors.push(`${subdir}/${entry}: ${err.message}`);
-        }
-      }
-    } catch (err: any) {
-      result.errors.push(`${subdir}: ${err.message}`);
-    }
-  }
-
-  return result;
-}
 
 /**
  * Remove legacy skill directories from ~/.claude/skills/ that were renamed or deleted
@@ -363,12 +261,10 @@ export function refreshCacheSync(): RefreshCacheResult {
 }
 
 /**
- * Plan what `pan sync` would distribute to ~/.claude/ (dry run).
+ * Plan what `pan sync` would distribute to Overdeck's private Claude home.
  *
- * PAN-1201: targets the user's Claude Code home directly — the layered
- * context model replaced the old `<devroot>/.claude/` indirection. Skills
- * and agents are distributed as files; rules now fold into CLAUDE.md (see
- * the context-layers subsystem) and are not planned here.
+ * Vendor-global Claude files are deliberately outside this plan. Managed
+ * launchers opt into the private home through CLAUDE_CONFIG_DIR.
  */
 export function planSyncSync(): SyncPlan {
   const plan: SyncPlan = {
@@ -379,7 +275,7 @@ export function planSyncSync(): SyncPlan {
     devSkills: [],
   };
 
-  const targetBase = CLAUDE_DIR;
+  const targetBase = getOverdeckClaudeHome();
   const manifestPath = join(targetBase, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
@@ -429,8 +325,7 @@ export interface SyncResult {
 }
 
 /**
- * Distribute cached skills and agents into the user's Claude Code home
- * (~/.claude/skills/, ~/.claude/agents/).
+ * Distribute cached skills and agents into Overdeck's private Claude home.
  *
  * PAN-1201: this is the Global → claude-code half of the sync output map.
  * It targets ~/.claude/ directly — the deprecated `<devroot>/.claude/`
@@ -455,7 +350,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
     diffs: [],
   };
 
-  const targetBase = CLAUDE_DIR;
+  const targetBase = getOverdeckClaudeHome();
   const manifestPath = join(targetBase, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
@@ -549,82 +444,54 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-export interface ContextFirstInjection {
-  file: string;
-  backupPath: string;
-}
-
 export interface ContextLayerSyncResult {
-  /** True when ~/.claude/CLAUDE.md's managed region was written this run. */
-  globalWritten: boolean;
+  /** True when ~/.overdeck/context/claude-global.md was written this run. */
+  claudeGlobalWritten: boolean;
   /** True when global.md did not exist and a starter template was seeded. */
   globalStubCreated: boolean;
-  /** Names of registered projects whose CLAUDE.md/AGENTS.md was written this run. */
-  projectsWritten: string[];
   /** True when ~/.overdeck/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
-  firstInjections: ContextFirstInjection[];
-  legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
 }
 
 /**
- * Write a managed region into `targetFile`, preserving any hand-authored
- * content outside the markers. Returns true when the file changed. The first
- * time a region is injected into a non-empty file with no existing region, the
- * file is backed up first and recorded in `result.firstInjections`.
+ * Write an Overdeck-owned render artifact when its content changed.
  */
-function writeManagedTargetSync(
+function writeContextArtifactSync(
   targetFile: string,
-  managed: string,
-  result: ContextLayerSyncResult,
-  backupTimestamp: string,
+  content: string,
 ): boolean {
   const existing = existsSync(targetFile) ? readFileSync(targetFile, 'utf-8') : '';
-  const next = applyManagedRegion(existing, managed);
+  const next = content.trim() + '\n';
   if (next === existing) return false;
-  if (existing.trim().length > 0 && !hasManagedRegion(existing)) {
-    const backupPath = backupFileSync(targetFile, backupTimestamp);
-    if (backupPath) result.firstInjections.push({ file: targetFile, backupPath });
-  }
   mkdirSync(dirname(targetFile), { recursive: true });
   writeFileSync(targetFile, next, 'utf-8');
   return true;
 }
 
 /**
- * Render the global and project context layers into harness CLAUDE.md files.
- *
- * PAN-1201: the layered-context half of `pan sync`. The global layer
- * (~/.overdeck/context/global.md + the folded bundled rules) renders into
- * the managed region of ~/.claude/CLAUDE.md; each registered project's
- * `.pan/context/project.md` renders into the managed region of its own
- * CLAUDE.md. Content outside the managed region is preserved untouched, so a
- * hand-authored CLAUDE.md is never clobbered.
+ * Render harness-specific global context into Overdeck-owned artifacts.
+ * Native harness instruction files are user-owned and are never inspected or
+ * changed by this path. Project context is assembled into each workspace's
+ * `.overdeck/context/workspace.md` and delivered at managed-session launch.
  */
 export function syncContextLayersSync(): ContextLayerSyncResult {
   const result: ContextLayerSyncResult = {
-    globalWritten: false,
+    claudeGlobalWritten: false,
     globalStubCreated: false,
-    projectsWritten: [],
     piGlobalWritten: false,
     codexGlobalWritten: false,
-    firstInjections: [],
-    legacyBeadsCleanups: [],
     errors: [],
   };
-  // One backup dir for every first-injection this run.
-  const backupTimestamp = createBackupTimestamp();
 
-  // Global layer → ~/.claude/CLAUDE.md
+  // Global layer → Overdeck-owned Claude launch artifact.
   result.globalStubCreated = ensureGlobalLayer();
   try {
     const managed = renderGlobalLayer('claude-code', isDevMode());
-    const claudeMd = join(CLAUDE_DIR, 'CLAUDE.md');
-    if (writeManagedTargetSync(claudeMd, managed, result, backupTimestamp)) {
-      result.globalWritten = true;
+    if (writeContextArtifactSync(claudeGlobalContextFile(), managed)) {
+      result.claudeGlobalWritten = true;
     }
   } catch (err: any) {
     result.errors.push(`global: ${err?.message ?? err}`);
@@ -634,10 +501,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   try {
     const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
-    const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
-    if (piManaged.trim() !== existingPi.trim()) {
-      mkdirSync(dirname(piGlobalFile), { recursive: true });
-      writeFileSync(piGlobalFile, piManaged.trim() + '\n', 'utf-8');
+    if (writeContextArtifactSync(piGlobalFile, piManaged)) {
       result.piGlobalWritten = true;
     }
   } catch (err: any) {
@@ -645,48 +509,15 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   }
 
   // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md
-  // This static file is copied into each agent's CODEX_HOME/AGENTS.md at spawn time
-  // by initCodexHome(), keeping Codex context isolated from the project-root AGENTS.md.
+  // This artifact is passed as developer instructions when Overdeck launches Codex.
   try {
     const codexManaged = renderGlobalLayer('codex', isDevMode());
     const codexGlobalFile = codexGlobalContextFile();
-    const existingCodex = existsSync(codexGlobalFile) ? readFileSync(codexGlobalFile, 'utf-8') : '';
-    if (codexManaged.trim() !== existingCodex.trim()) {
-      mkdirSync(dirname(codexGlobalFile), { recursive: true });
-      writeFileSync(codexGlobalFile, codexManaged.trim() + '\n', 'utf-8');
+    if (writeContextArtifactSync(codexGlobalFile, codexManaged)) {
       result.codexGlobalWritten = true;
     }
   } catch (err: any) {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
-  }
-
-  // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —
-  // it reads the shared AGENTS.md layer natively via ~/.agents/skills discovery, same as acp.
-  // PAN-1837 review fix: AGENTS.md itself must therefore render as the UNION of every
-  // harness that reads it (ohmypi + kimi-code), not ohmypi alone — rendering for 'ohmypi'
-  // in isolation stripped every span authored only under {{#harness:kimi-code}}.
-
-  // Clean stale agent instructions in every project; Beads itself remains installed.
-  for (const { config } of listProjectsSync()) {
-    if (!existsSync(config.path)) continue;
-    try {
-      let wrote = false;
-      for (const name of ['CLAUDE.md', 'AGENTS.md']) {
-        const cleanup = cleanLegacyBeadsTargetSync(join(config.path, name), backupTimestamp);
-        if (cleanup) result.legacyBeadsCleanups.push(cleanup);
-      }
-      const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, ['ohmypi', 'kimi-code']);
-      if (claudeManaged) {
-        wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
-      }
-      if (piManaged) {
-        wrote = writeManagedTargetSync(join(config.path, 'AGENTS.md'), piManaged, result, backupTimestamp) || wrote;
-      }
-      if (wrote) result.projectsWritten.push(config.name);
-    } catch (err: any) {
-      result.errors.push(`${config.name}: ${err?.message ?? err}`);
-    }
   }
 
   return result;
@@ -703,9 +534,9 @@ export type { HookItem, HooksSyncResult };
  */
 const STATUSLINE_TARGETS: Record<string, { configDir: string; scriptName: string; settingsFile: string }> = {
   claude: {
-    configDir: join(homedir(), '.claude'),
+    configDir: getOverdeckClaudeHome(),
     scriptName: 'statusline-command.sh',
-    settingsFile: join(homedir(), '.claude', 'settings.json'),
+    settingsFile: join(getOverdeckClaudeHome(), 'settings.json'),
   },
   // Other runtimes can be added as they support statusline
 };
@@ -862,8 +693,7 @@ function resolveSkillsRoot(startDir: string): string | null {
 }
 
 /**
- * Mirror the top-level skills/ directory into .claude/skills/ when run inside a
- * overdeck-style project that has a skills/ tree with SKILL.md files.
+ * Mirror a project's top-level skills/ into an Overdeck-private project cache.
  *
  * - Creates missing skill directories and recursively copies all their contents
  * - Updates out-of-date files when source content has changed
@@ -907,7 +737,8 @@ export function mirrorProjectSkillsSync(
 
   const resolvedCwd = resolveSkillsRoot(cwd) ?? cwd;
   const sourceDir = join(resolvedCwd, 'skills');
-  const targetDir = join(resolvedCwd, '.claude', 'skills');
+  const projectKey = resolvedCwd.replace(/[/\\:]/g, '_');
+  const targetDir = join(getOverdeckHome(), 'harnesses', 'project-skills', projectKey);
 
   if (!existsSync(sourceDir)) return result;
 
@@ -934,7 +765,7 @@ export function mirrorProjectSkillsSync(
   // Testable via opts.manifestDir.
   const manifestDir =
     opts?.manifestDir ??
-    join(homedir(), '.overdeck', 'state', 'mirrors', resolvedCwd.replace(/[/\\:]/g, '_'));
+    join(getOverdeckHome(), 'state', 'mirrors', projectKey);
   mkdirSync(manifestDir, { recursive: true });
   // Read manifest BEFORE the mirror loop so we can check ownership on existing target dirs.
   // Only mirror-managed dirs (listed in the manifest) may be overwritten; dirs that pre-existed
@@ -1031,8 +862,6 @@ export interface PiSettingsSyncResult {
   reason?: string;
 }
 
-const PI_SKILLS_PATH = join(homedir(), '.claude', 'skills');
-
 function isPiOnPath(): boolean {
   try {
     execSync('which pi', { stdio: 'pipe' });
@@ -1053,7 +882,8 @@ function isPiOnPath(): boolean {
  * we never overwrite user config for a tool they have not installed.
  */
 export function syncPiSettingsSync(): PiSettingsSyncResult {
-  const settingsPath = join(homedir(), '.pi', 'agent', 'settings.json');
+  const settingsPath = join(getOverdeckHome(), 'harnesses', 'pi', 'settings.json');
+  const piSkillsPath = join(getOverdeckHome(), 'harnesses', 'agent-skills');
 
   if (!isPiOnPath()) {
     return { status: 'skipped', path: settingsPath, reason: 'pi not on PATH' };
@@ -1078,12 +908,12 @@ export function syncPiSettingsSync(): PiSettingsSyncResult {
     : [];
 
   const fileExistedBefore = existsSync(settingsPath);
-  const alreadyPresent = currentSkills.includes(PI_SKILLS_PATH);
+  const alreadyPresent = currentSkills.includes(piSkillsPath);
   if (alreadyPresent && fileExistedBefore) {
     return { status: 'unchanged', path: settingsPath };
   }
 
-  const nextSkills = alreadyPresent ? currentSkills : [...currentSkills, PI_SKILLS_PATH];
+  const nextSkills = alreadyPresent ? currentSkills : [...currentSkills, piSkillsPath];
   const next = { ...existing, skills: nextSkills };
 
   mkdirSync(dirname(settingsPath), { recursive: true });
@@ -1099,18 +929,6 @@ export function syncPiSettingsSync(): PiSettingsSyncResult {
 
 const toSyncFsError = (op: string, cause: unknown): FsError =>
   new FsError({ path: SYNC_TARGET.skills, operation: op, cause });
-
-/** True if `targetPath` is a Overdeck-managed symlink. */
-export const isOverdeckSymlink = (
-  targetPath: string,
-): Effect.Effect<boolean> => Effect.sync(() => isOverdeckSymlinkSync(targetPath));
-
-/** Migrate Overdeck-owned content out of ~/.claude/ (idempotent). */
-export const migrateStalePersonalContent = (): Effect.Effect<MigrationResult, FsError> =>
-  Effect.try({
-    try: () => migrateStalePersonalContentSync(),
-    catch: (cause) => toSyncFsError('migrateStalePersonalContent', cause),
-  });
 
 /** Remove legacy 0.7.0-era skill directories that were renamed/dropped. */
 export const removeLegacySkills070 = (): Effect.Effect<readonly string[], FsError> =>

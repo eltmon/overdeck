@@ -17,10 +17,11 @@
  * A missing or relocated omp OAuth module degrades to 'unavailable' — never throws.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, realpathSync, copyFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, delimiter } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { getOverdeckHome } from './paths.js';
 
 export const PI_CODEX_PROVIDER = 'openai-codex';
 
@@ -61,8 +62,22 @@ export function getOhmypiAuthPath(): string {
   return join(homedir(), '.omp', 'agent', 'auth.json');
 }
 
-function readAuthFile(): Record<string, unknown> {
-  const path = getOhmypiAuthPath();
+export function getManagedOhmypiAuthPath(): string {
+  return join(getOverdeckHome(), 'credentials', 'ohmypi', 'auth.json');
+}
+
+/** One-time read-only import used by managed launches. */
+export function ensureManagedOhmypiAuthImported(): string {
+  const managed = getManagedOhmypiAuthPath();
+  const native = getOhmypiAuthPath();
+  if (!existsSync(managed) && existsSync(native)) {
+    mkdirSync(dirname(managed), { recursive: true });
+    copyFileSync(native, managed);
+  }
+  return managed;
+}
+
+function readAuthFile(path = getOhmypiAuthPath()): Record<string, unknown> {
   if (!existsSync(path)) return {};
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf-8'));
@@ -72,8 +87,8 @@ function readAuthFile(): Record<string, unknown> {
   }
 }
 
-export function readOhmypiCodexCredential(): OhmypiCodexCredential | null {
-  const cred = readAuthFile()[PI_CODEX_PROVIDER];
+export function readOhmypiCodexCredential(authPath = getOhmypiAuthPath()): OhmypiCodexCredential | null {
+  const cred = readAuthFile(authPath)[PI_CODEX_PROVIDER];
   if (
     cred && typeof cred === 'object' &&
     typeof (cred as Record<string, unknown>)['access'] === 'string' &&
@@ -85,10 +100,9 @@ export function readOhmypiCodexCredential(): OhmypiCodexCredential | null {
 }
 
 /** Atomically merge a fresh codex credential into auth.json (mode 0600). */
-function writeOhmypiCodexCredential(tokens: OhmypiOAuthTokens): OhmypiCodexCredential {
-  const path = getOhmypiAuthPath();
+function writeOhmypiCodexCredential(tokens: OhmypiOAuthTokens, path = getOhmypiAuthPath()): OhmypiCodexCredential {
   mkdirSync(dirname(path), { recursive: true });
-  const auth = readAuthFile();
+  const auth = readAuthFile(path);
   const stored: OhmypiCodexCredential = {
     type: 'oauth',
     access: tokens.access,
@@ -170,26 +184,27 @@ export type OhmypiCodexAuthStatus =
 
 const EXPIRY_MARGIN_MS = 60_000;
 
-export async function getOhmypiCodexAuthStatus(opts?: { refreshIfExpired?: boolean }): Promise<OhmypiCodexAuthStatus> {
-  const cred = readOhmypiCodexCredential();
+export async function getOhmypiCodexAuthStatus(opts?: { refreshIfExpired?: boolean; authPath?: string }): Promise<OhmypiCodexAuthStatus> {
+  const authPath = opts?.authPath ?? getOhmypiAuthPath();
+  const cred = readOhmypiCodexCredential(authPath);
   if (!cred) return { status: 'missing' };
   if (cred.expires > Date.now() + EXPIRY_MARGIN_MS) return { status: 'ok', expiresAt: cred.expires };
 
   if (opts?.refreshIfExpired) {
-    const refreshed = await refreshOhmypiCodexAuth();
+    const refreshed = await refreshOhmypiCodexAuth(authPath);
     if (refreshed) return { status: 'ok', expiresAt: refreshed.expires };
     return { status: 'expired', expiresAt: cred.expires, refreshFailed: true };
   }
   return { status: 'expired', expiresAt: cred.expires, refreshFailed: false };
 }
 
-export async function refreshOhmypiCodexAuth(): Promise<OhmypiCodexCredential | null> {
-  const cred = readOhmypiCodexCredential();
+export async function refreshOhmypiCodexAuth(authPath = getOhmypiAuthPath()): Promise<OhmypiCodexCredential | null> {
+  const cred = readOhmypiCodexCredential(authPath);
   if (!cred?.refresh) return null;
   const mod = await loadOhmypiCodexOAuth();
   if (!mod) return null;
   try {
-    return writeOhmypiCodexCredential(await mod.refreshOpenAICodexToken(cred.refresh));
+    return writeOhmypiCodexCredential(await mod.refreshOpenAICodexToken(cred.refresh), authPath);
   } catch {
     return null;
   }

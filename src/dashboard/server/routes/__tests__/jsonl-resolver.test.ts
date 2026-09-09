@@ -189,6 +189,28 @@ describe('resolveJsonlPath (PAN-830)', () => {
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
   });
 
+  it('resolves the matching agent private transcript root before native fallback', async () => {
+    const projectDir = join(
+      agentsDir,
+      AGENT_ID,
+      'claude-home',
+      'projects',
+      encodeClaudeProjectDir(WORKSPACE_PATH),
+    );
+    const jsonlPath = join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+    await writeFile(join(agentsDir, AGENT_ID, 'state.json'), JSON.stringify({
+      harness: 'claude-code',
+      workspace: WORKSPACE_PATH,
+    }));
+    await writeFile(jsonlPath, '{"type":"event"}\n');
+
+    await expect(resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+    })).resolves.toBe(jsonlPath);
+  });
+
   it('prefers a stopped strike agent recorded workspace over the caller convention path', async () => {
     const diagnostics: string[] = [];
     const strikeAgentDir = join(agentsDir, STRIKE_AGENT_ID);

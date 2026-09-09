@@ -304,6 +304,8 @@ Continue the PLANNING session. Do NOT implement anything.
             baseCommand: msgCmdWithArgs,
             extraEnvExports: [harnessLaunch.pathExport],
             appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
+            managedStateKey: sessionName,
+            overdeckEnv: { agentId: sessionName, issueId, sessionType: 'plan' },
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
           }),
           { mode: 0o755 },

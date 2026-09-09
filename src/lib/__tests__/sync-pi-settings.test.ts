@@ -1,132 +1,80 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-const execSyncMock = vi.fn<(cmd: string, opts?: unknown) => string | Buffer>()
+const execSyncMock = vi.fn<(cmd: string, opts?: unknown) => string | Buffer>();
 vi.mock('child_process', async () => {
-  const actual = await vi.importActual<typeof import('child_process')>('child_process')
-  return {
-    ...actual,
-    execSync: (cmd: string, opts?: unknown) => execSyncMock(cmd, opts),
-  }
-})
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  return { ...actual, execSync: (cmd: string, opts?: unknown) => execSyncMock(cmd, opts) };
+});
 
-import { syncPiSettingsSync } from '../sync.js'
+import { syncPiSettingsSync } from '../sync.js';
 
-const PI_SKILLS_TARGET = '/.claude/skills'
-
-function withFakeHome(): { home: string; cleanup: () => void } {
-  const home = mkdtempSync(join(tmpdir(), 'pan-pi-sync-'))
-  const original = process.env['HOME']
-  process.env['HOME'] = home
-  return {
-    home,
-    cleanup: () => {
-      if (original === undefined) delete process.env['HOME']
-      else process.env['HOME'] = original
-      rmSync(home, { recursive: true, force: true })
-    },
-  }
-}
-
-describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
-  let h: ReturnType<typeof withFakeHome>
+describe('syncPiSettings — private managed Pi home', () => {
+  let root: string;
+  let overdeckHome: string;
+  let originalOverdeckHome: string | undefined;
 
   beforeEach(() => {
-    h = withFakeHome()
-    execSyncMock.mockReset()
-  })
+    root = mkdtempSync(join(tmpdir(), 'pan-pi-sync-'));
+    overdeckHome = join(root, '.overdeck');
+    originalOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = overdeckHome;
+    execSyncMock.mockReset();
+    execSyncMock.mockReturnValue('/usr/local/bin/pi\n');
+  });
 
   afterEach(() => {
-    h.cleanup()
-    vi.restoreAllMocks()
-  })
+    if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalOverdeckHome;
+    rmSync(root, { recursive: true, force: true });
+  });
 
-  it('AC1: creates ~/.pi/agent/settings.json with skills containing ~/.claude/skills when Pi is on PATH and the file is absent', () => {
-    execSyncMock.mockImplementation((cmd: string) => {
-      if (cmd.startsWith('which pi')) return '/usr/local/bin/pi\n'
-      throw new Error(`unexpected command: ${cmd}`)
-    })
+  it('creates only an Overdeck-private settings file with private skills', () => {
+    const nativeSettings = join(root, '.pi', 'agent', 'settings.json');
+    mkdirSync(join(root, '.pi', 'agent'), { recursive: true });
+    writeFileSync(nativeSettings, '{"native":"sentinel"}\n');
 
-    const result = syncPiSettingsSync()
+    const result = syncPiSettingsSync();
 
-    expect(result.status).toBe('created')
-    expect(result.path).toBe(join(h.home, '.pi', 'agent', 'settings.json'))
+    expect(result.status).toBe('created');
+    expect(result.path).toBe(join(overdeckHome, 'harnesses', 'pi', 'settings.json'));
+    expect(JSON.parse(readFileSync(result.path, 'utf-8')).skills).toContain(
+      join(overdeckHome, 'harnesses', 'agent-skills'),
+    );
+    expect(readFileSync(nativeSettings, 'utf-8')).toBe('{"native":"sentinel"}\n');
+  });
 
-    const parsed = JSON.parse(readFileSync(result.path, 'utf-8'))
-    expect(Array.isArray(parsed.skills)).toBe(true)
-    expect(parsed.skills.some((s: string) => s.endsWith(PI_SKILLS_TARGET))).toBe(true)
-  })
+  it('preserves unrelated keys in the private settings file', () => {
+    const settingsPath = join(overdeckHome, 'harnesses', 'pi', 'settings.json');
+    mkdirSync(join(settingsPath, '..'), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ theme: 'dark', skills: ['/custom'] }));
 
-  it('AC2: preserves unrelated keys and only adds/updates the skills entry', () => {
-    execSyncMock.mockImplementation((cmd: string) => {
-      if (cmd.startsWith('which pi')) return '/usr/local/bin/pi\n'
-      throw new Error(`unexpected command: ${cmd}`)
-    })
+    expect(syncPiSettingsSync().status).toBe('updated');
+    const parsed = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    expect(parsed.theme).toBe('dark');
+    expect(parsed.skills).toEqual(['/custom', join(overdeckHome, 'harnesses', 'agent-skills')]);
+  });
 
-    const settingsPath = join(h.home, '.pi', 'agent', 'settings.json')
-    mkdirSync(join(h.home, '.pi', 'agent'), { recursive: true })
-    writeFileSync(settingsPath, JSON.stringify({
-      apiKey: 'sk-secret',
-      tokenLimit: 100000,
-      // Existing skills entry that does NOT include the Claude path —
-      // we expect the function to append, not replace.
-      skills: ['/home/me/custom-skills'],
-    }, null, 2))
+  it('does not create settings when Pi is not installed', () => {
+    execSyncMock.mockImplementation(() => { throw new Error('not found'); });
+    const result = syncPiSettingsSync();
+    expect(result.status).toBe('skipped');
+    expect(existsSync(result.path)).toBe(false);
+  });
 
-    const result = syncPiSettingsSync()
+  it('is idempotent', () => {
+    expect(syncPiSettingsSync().status).toBe('created');
+    expect(syncPiSettingsSync().status).toBe('unchanged');
+  });
 
-    expect(result.status).toBe('updated')
-    const parsed = JSON.parse(readFileSync(settingsPath, 'utf-8'))
-    expect(parsed.apiKey).toBe('sk-secret')
-    expect(parsed.tokenLimit).toBe(100000)
-    expect(parsed.skills).toContain('/home/me/custom-skills')
-    expect(parsed.skills.some((s: string) => s.endsWith(PI_SKILLS_TARGET))).toBe(true)
-  })
-
-  it('AC3: does NOT touch ~/.pi/agent/settings.json when Pi is not on PATH', () => {
-    execSyncMock.mockImplementation((cmd: string) => {
-      if (cmd.startsWith('which pi')) throw new Error('not found')
-      throw new Error(`unexpected command: ${cmd}`)
-    })
-
-    const settingsPath = join(h.home, '.pi', 'agent', 'settings.json')
-    const result = syncPiSettingsSync()
-
-    expect(result.status).toBe('skipped')
-    expect(result.reason).toMatch(/pi not on PATH/i)
-    expect(existsSync(settingsPath)).toBe(false)
-  })
-
-  it('returns "unchanged" on a second sync when the skills entry is already present (idempotent)', () => {
-    execSyncMock.mockImplementation((cmd: string) => {
-      if (cmd.startsWith('which pi')) return '/usr/local/bin/pi\n'
-      throw new Error(`unexpected command: ${cmd}`)
-    })
-
-    const first = syncPiSettingsSync()
-    expect(first.status).toBe('created')
-
-    const second = syncPiSettingsSync()
-    expect(second.status).toBe('unchanged')
-  })
-
-  it('leaves a malformed settings.json untouched and reports skipped (never clobbers user config)', () => {
-    execSyncMock.mockImplementation((cmd: string) => {
-      if (cmd.startsWith('which pi')) return '/usr/local/bin/pi\n'
-      throw new Error(`unexpected command: ${cmd}`)
-    })
-
-    const settingsPath = join(h.home, '.pi', 'agent', 'settings.json')
-    mkdirSync(join(h.home, '.pi', 'agent'), { recursive: true })
-    const malformed = '{ this is not valid json '
-    writeFileSync(settingsPath, malformed)
-
-    const result = syncPiSettingsSync()
-
-    expect(result.status).toBe('skipped')
-    expect(result.reason).toMatch(/not valid JSON/i)
-    expect(readFileSync(settingsPath, 'utf-8')).toBe(malformed)
-  })
-})
+  it('does not overwrite malformed private settings', () => {
+    const settingsPath = join(overdeckHome, 'harnesses', 'pi', 'settings.json');
+    mkdirSync(join(settingsPath, '..'), { recursive: true });
+    writeFileSync(settingsPath, '{ malformed');
+    const result = syncPiSettingsSync();
+    expect(result.status).toBe('skipped');
+    expect(readFileSync(settingsPath, 'utf-8')).toBe('{ malformed');
+  });
+});

@@ -21,18 +21,18 @@ import { CLAUDE_FEATURES } from './interface.js';
 import { FsError } from '../errors.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
-import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
+import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
 import { prepareHarnessLaunch, resolveHarnessBinary } from '../harness-binary.js';
-
-const CLAUDE_DIR = join(homedir(), '.claude');
+import { getOverdeckClaudeHome } from '../paths.js';
 
 export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
+  const claudeDir = getOverdeckClaudeHome();
   const config: RuntimeConfig = {
     type: 'claude',
     name: 'Claude Code',
-    configDir: CLAUDE_DIR,
-    skillsDir: join(CLAUDE_DIR, 'skills'),
-    commandsDir: join(CLAUDE_DIR, 'commands'),
+    configDir: claudeDir,
+    skillsDir: join(claudeDir, 'skills'),
+    commandsDir: join(claudeDir, 'commands'),
     executable: 'claude',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
     features: CLAUDE_FEATURES,
@@ -107,7 +107,8 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
             setTerminalEnv: true,
             promptFile,
             baseCommand: 'claude',
-            appendSystemPromptFiles: [await ensureSessionContextBriefingFile()],
+            appendSystemPromptFiles: await claudeSystemPromptFiles(options.workingDir, 'claude-code'),
+            overdeckEnv: { agentId: id },
             extraEnvExports: [harnessLaunch.pathExport],
             extraArgs: args.length > 0 ? args.join(' ') : undefined,
           }),

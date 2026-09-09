@@ -33,7 +33,7 @@ are unambiguous:
 | **Project layer** | `<root>/.overdeck/context/project.md` |
 | **Workspace layer** | auto-assembled per issue; never hand-authored |
 | **Bundled rule** | `sync-sources/rules/<name>.md` (`scope: universal` or `dev`) — every-machine engineering rules |
-| **Harness context files** | the rendered outputs (`~/.claude/CLAUDE.md` managed region, project `CLAUDE.md`/`AGENTS.md`, `pi-global.md`, `codex-global.md`) — never edited directly |
+| **Managed-session launch artifacts** | Overdeck-owned renders under `~/.overdeck/context/` delivered explicitly at launch |
 
 There is no "global context template": a request phrased that way means either
 a **bundled rule** (every machine) or the **global layer** (this machine). The
@@ -85,31 +85,24 @@ Rendering rules:
   `pan context validate` warns about it but does not reject it, so a layer
   can be authored ahead of a harness adapter shipping.
 
-## `pan sync` and the managed region
+## `pan sync` and launch-time delivery
 
-`pan sync` renders each layer for the `claude-code` harness and writes it into
-a **managed region** of the target CLAUDE.md, delimited by HTML comment
-markers:
+`pan sync` writes only Overdeck-owned global renders:
+`~/.overdeck/context/claude-global.md`, `pi-global.md`, and
+`codex-global.md`. Each workspace's `.overdeck/context/workspace.md` remains
+harness-neutral. At managed-session launch, Overdeck renders global rules and
+the canonical project layer for the active harness, combines them exactly once
+with workspace-only content in `~/.overdeck/context/launch/`, and delivers that
+private artifact explicitly. Native harness files are never sync targets.
 
-```
-<!-- BEGIN OVERDECK CONTEXT — managed by `pan sync`; edit the layer source, not this region -->
-…rendered content…
-<!-- END OVERDECK CONTEXT -->
-```
-
-Content **outside** the markers is preserved untouched — a hand-authored
-`~/.claude/CLAUDE.md` is never clobbered. The sole managed-content exception is
-a block explicitly marked `BEGIN/END BEADS INTEGRATION`: `pan sync` removes it
-because Beads' generic conservative Git profiles conflict with Overdeck's
-managed-work lifecycle. Edit the layer source
-(`global.md` / `project.md`) and re-run `pan sync`; never edit the region
-directly.
-
-For each registered project that has a `project.md`, the project layer is
-rendered into **two** target files: `<root>/CLAUDE.md` (rendered for
-`claude-code`) and `<root>/AGENTS.md` (rendered for `pi`). Both use the same
-managed-region markers, so a hand-authored `AGENTS.md` is preserved exactly
-like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
+Claude Code receives the artifact through its append-system-prompt launch
+mechanism, Codex through `developer_instructions`, and Pi through its spawn-time
+system context. Native Kimi has no launch-only system-prompt flag, so Overdeck
+sends a clearly delimited context envelope once as the first user message after
+capturing Kimi's generated session id. The context block precedes the original
+operator task, and a per-session receipt prevents resume/recovery paths from
+injecting it again. This transport does not create or edit `AGENTS.md`,
+`CLAUDE.md`, or any other native instruction file.
 
 `pan sync` also:
 
@@ -117,39 +110,15 @@ like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
   context, hooks, agents, or skills, the dashboard shows a **Sync now** banner;
   the button runs `pan sync` on the host and disappears only after the manifest
   matches the installed package;
-- distributes Overdeck's bundled skills → `~/.claude/skills/` for Claude Code and `~/.agents/skills/` for Codex, Pi, and Oh My Pi; agent definitions go to `~/.claude/agents/`, with manifest-based conflict resolution
-  (a file you modified is left alone; an unmodified one is updated);
-- folds the bundled **engineering rules** into the global CLAUDE.md region.
+- folds bundled engineering rules into harness-specific launch artifacts.
 
 ## Respecting your existing context
 
-Overdeck is designed to **augment, never replace** any context files you
-already maintain. Three guarantees:
-
-1. **Managed-region surgery.** `pan sync` only ever owns the span between the
-   `BEGIN/END OVERDECK CONTEXT` markers in `~/.claude/CLAUDE.md`, each
-   project's `CLAUDE.md`, and each project's `AGENTS.md`. Everything outside
-   the markers — including content you add *above* or *below* the region — is
-   preserved verbatim across every sync.
-
-2. **First-injection backup.** The first time a sync injects a region into a
-   file that already had hand-authored content (no region yet), that file is
-   snapshotted into `~/.overdeck/backups/<timestamp>/context/` *before* the
-   write. `pan sync` prints a one-time notice naming the file and its backup so
-   the very first write that touches your content always has a safety net.
-
-3. **Opt-in per project.** A project's files are touched only when its
-   `.overdeck/context/project.md` exists. Register a project but write no
-   `project.md` and its `CLAUDE.md`/`AGENTS.md` are never modified.
-
-The Pi **global** layer is the one exception to "we only write managed
-regions": it renders to `~/.overdeck/context/pi-global.md`, a
-Overdeck-owned file (whole-file write), not your `AGENTS.md`. Project-level
-Pi context *does* go into your `AGENTS.md` as a managed region.
-
-The dashboard Context page surfaces all of this: for the selected layer it
-lists the exact target files, whether each already has your own content
-(preserved), and restates that the region is the only part `pan sync` owns.
+Native instruction files are a strict no-touch boundary. Overdeck may let a
+harness read the user's files normally, but no automatic Overdeck path creates,
+edits, cleans, backs up, migrates, or deletes them. Historical marked regions
+can be removed only through the explicit dry-run-first `pan context detach`
+migration.
 
 ## Bundled rules
 
@@ -182,7 +151,9 @@ pan context list                  # show all three layers and their files
 pan context list --layer global   # one layer
 pan context edit                  # open global.md in $EDITOR
 pan context edit --layer project  # open this project's project.md
-pan context sync                  # render the layers into harness CLAUDE.md
+pan context sync                  # refresh managed-session launch artifacts
+pan context detach --dry-run      # preview historical managed blocks
+pan context detach --apply        # back up and remove unambiguous blocks
 pan context diff                  # show what each harness would receive
 pan context diff --harness pi     # just one harness
 pan context validate              # lint templates for malformed blocks
@@ -206,7 +177,7 @@ prompts that Overdeck cannot read.
 
 Previewing is read-only. **Save** writes only the selected layer file. **Save &
 Sync** writes the selected layer first, then explicitly runs `pan context sync`
-so the rendered Claude Code target files update. Live preview and ordinary Save
+so the managed-session launch artifacts update. Live preview and ordinary Save
 do not run sync.
 
 ## `sync-sources/` — Overdeck's own bundled content

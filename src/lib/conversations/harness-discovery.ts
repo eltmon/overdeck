@@ -144,6 +144,7 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
     const agentHarness = await readAgentHarness(agentDir);
     const piHarness = agentHarness === 'pi' || agentHarness === 'ohmypi' ? agentHarness : 'ohmypi';
 
+    result.push(...await collectClaudeProjectFiles(join(agentDir, 'claude-home', 'projects'), warnings));
     result.push(...await collectPiFamilyRoot(join(agentDir, 'sessions'), piHarness, warnings));
     await collectAgentRootFiles(agentDir, piHarness, warnings, result);
     await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);

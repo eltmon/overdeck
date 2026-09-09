@@ -14,7 +14,7 @@ import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
+import { materializeSharedManagedLaunchContext } from '../context-layers/materialize.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
@@ -85,38 +85,33 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
 }
 
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
-  const behavior = getHarnessBehavior(harness);
+  const effectiveHarness = harness ?? 'claude-code';
+  const behavior = getHarnessBehavior(effectiveHarness);
   if (behavior.contextLayerKind === 'acp') {
     return [];
   }
 
   const files: string[] = [];
-  const contextFile = workspaceContextFile(workspace);
-  try {
-    await statAsync(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNodeNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
+  if (behavior.contextLayerKind === 'claude') {
+    // CLAUDE_CONFIG_DIR isolates managed state, so the user's native global
+    // instruction file is delivered read-only and never copied into a private
+    // home under the reserved CLAUDE.md name.
+    const nativeGlobal = join(homedir(), '.claude', 'CLAUDE.md');
+    if (existsSync(nativeGlobal)) files.push(nativeGlobal);
   }
 
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
   if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
+    // A private CODEX_HOME moves native ~/.codex/AGENTS.md out of discovery.
+    // Preserve that user-authored layer through the explicit developer channel.
+    const nativeGlobal = join(homedir(), '.codex', 'AGENTS.md');
+    if (existsSync(nativeGlobal)) files.push(nativeGlobal);
   }
+
+  // Every managed harness receives one current-harness render of Overdeck's
+  // global, project, and workspace layers. Native Kimi consumes this file via
+  // its once-per-session first-user-message envelope rather than a launch flag.
+  files.push(materializeSharedManagedLaunchContext(workspace, effectiveHarness));
+  files.push(await ensureSessionContextBriefingFile());
 
   return files;
 }
@@ -251,6 +246,7 @@ export function getKimiCodeLauncherFields(model: string): {
   kimiCodeYolo: true;
   model: string;
   unsetProviderEnv: true;
+  kimiContextDelivery: 'initial-message';
 } {
   const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
@@ -259,6 +255,7 @@ export function getKimiCodeLauncherFields(model: string): {
     kimiCodeYolo: true,
     model,
     unsetProviderEnv: true,
+    kimiContextDelivery: 'initial-message',
   };
 }
 
@@ -269,7 +266,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the

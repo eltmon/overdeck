@@ -238,8 +238,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
     spinner.warn(`Failed to refresh cache: ${error}`);
   }
 
-  // Step 2c: Seed the global context layer (PAN-1201). `pan sync` renders it
-  // into ~/.claude/CLAUDE.md; seed it here so it exists right after install.
+  // Step 2c: seed the canonical source; `pan sync` renders only Overdeck-owned
+  // managed-session launch artifacts from it.
   try {
     if (ensureGlobalLayer()) {
       console.log(chalk.dim('  Seeded ~/.overdeck/context/global.md (starter template)'));
@@ -250,10 +250,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   await setupHooksCommand();
 
-  // Claude Code reads statusLine from ~/.claude/settings.json at conversation
-  // launch. Provision it during install as well as sync so a first conversation
-  // immediately shows model, context-window, cost, and subscription usage.
-  spinner.start('Installing Claude Code statusline...');
+  // Managed Claude launchers read the Overdeck-private statusline settings.
+  spinner.start('Installing Overdeck-private Claude Code statusline...');
   const statusline = syncStatuslineSync();
   if (statusline.errors.length > 0) {
     spinner.warn(`Claude Code statusline installation had errors: ${statusline.errors.join('; ')}`);

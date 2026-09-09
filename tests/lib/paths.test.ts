@@ -11,10 +11,10 @@ import {
   COSTS_DIR,
   CONFIG_FILE,
   CLAUDE_DIR,
+  OVERDECK_CLAUDE_HOME,
   LEGACY_RUNTIME_DIRS,
   SYNC_TARGET,
   TEMPLATES_DIR,
-  CLAUDE_MD_TEMPLATES,
   INIT_DIRS,
   CERTS_DIR,
   TRAEFIK_DIR,
@@ -72,18 +72,17 @@ describe('paths', () => {
   });
 
   describe('SYNC_TARGET', () => {
-    it('should have claude target paths', () => {
+    it('should have Overdeck-private Claude target paths', () => {
       expect(SYNC_TARGET).toBeDefined();
-      expect(SYNC_TARGET.skills).toBe(join(home, '.claude', 'skills'));
-      expect(SYNC_TARGET.commands).toBe(join(home, '.claude', 'commands'));
-      expect(SYNC_TARGET.agents).toBe(join(home, '.claude', 'agents'));
+      expect(SYNC_TARGET.skills).toBe(join(OVERDECK_CLAUDE_HOME, 'skills'));
+      expect(SYNC_TARGET.commands).toBe(join(OVERDECK_CLAUDE_HOME, 'commands'));
+      expect(SYNC_TARGET.agents).toBe(join(OVERDECK_CLAUDE_HOME, 'agents'));
     });
   });
 
   describe('Templates', () => {
     it('should have correct paths', () => {
       expect(TEMPLATES_DIR).toBe(join(OVERDECK_HOME, 'templates'));
-      expect(CLAUDE_MD_TEMPLATES).toBe(join(OVERDECK_HOME, 'templates', 'claude-md', 'sections'));
     });
   });
 
@@ -96,7 +95,6 @@ describe('paths', () => {
       expect(INIT_DIRS).toContain(BACKUPS_DIR);
       expect(INIT_DIRS).toContain(COSTS_DIR);
       expect(INIT_DIRS).toContain(TEMPLATES_DIR);
-      expect(INIT_DIRS).toContain(CLAUDE_MD_TEMPLATES);
       expect(INIT_DIRS).toContain(CERTS_DIR);
       expect(INIT_DIRS).toContain(TRAEFIK_DIR);
       expect(INIT_DIRS).toContain(TRAEFIK_DYNAMIC_DIR);
@@ -112,7 +110,7 @@ describe('paths', () => {
     });
 
     it('should have correct number of directories', () => {
-      expect(INIT_DIRS.length).toBe(20);
+      expect(INIT_DIRS.length).toBe(19);
     });
   });
 });

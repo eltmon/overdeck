@@ -1,10 +1,11 @@
 import { open, readFile, stat } from 'fs/promises';
-import { readFileSync, statSync } from 'fs';
+import { readFileSync, statSync, existsSync, mkdirSync, copyFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
 import { getProviderForModelSync } from './providers.js';
+import { getOverdeckHome } from './paths.js';
 
 /**
  * Which store a codex auth status came from (PAN-2285). 'native' = the codex
@@ -71,6 +72,25 @@ export function getNativeCodexAuthPath(): string {
   return join(homedir(), '.codex', 'auth.json');
 }
 
+export function getManagedCodexAuthPath(): string {
+  return join(getOverdeckHome(), 'credentials', 'codex', 'auth.json');
+}
+
+/** Explicit login/import bridge; ordinary spawn never overwrites private auth. */
+export function importNativeCodexAuthToManagedSync(): boolean {
+  const native = getNativeCodexAuthPath();
+  const managed = getManagedCodexAuthPath();
+  if (!existsSync(native)) return false;
+  mkdirSync(join(getOverdeckHome(), 'credentials', 'codex'), { recursive: true });
+  copyFileSync(native, managed);
+  return true;
+}
+
+function activeManagedCodexAuthPath(): string {
+  const managed = getManagedCodexAuthPath();
+  return existsSync(managed) ? managed : getNativeCodexAuthPath();
+}
+
 interface NativeCodexAuthFile {
   OPENAI_API_KEY?: unknown;
   last_refresh?: unknown;
@@ -130,7 +150,7 @@ export function classifyNativeCodexAuth(raw: string | null, now: number = Date.n
 
 /** Async native-store probe used by the dashboard status endpoint. */
 async function probeNativeCodexAuth(now: number = Date.now()): Promise<NativeCodexAuthResult & { mtimeMs: number }> {
-  const path = getNativeCodexAuthPath();
+  const path = activeManagedCodexAuthPath();
   let raw: string | null;
   let mtimeMs = 0;
   try {
@@ -146,7 +166,7 @@ async function probeNativeCodexAuth(now: number = Date.now()): Promise<NativeCod
 export function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexAuthResult {
   let raw: string | null;
   try {
-    raw = readFileSync(getNativeCodexAuthPath(), 'utf8');
+    raw = readFileSync(activeManagedCodexAuthPath(), 'utf8');
   } catch {
     raw = null;
   }
@@ -155,7 +175,7 @@ export function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexA
 
 function nativeCodexAuthMtimeSync(): number {
   try {
-    return statSync(getNativeCodexAuthPath()).mtimeMs;
+    return statSync(activeManagedCodexAuthPath()).mtimeMs;
   } catch {
     return 0;
   }
@@ -269,7 +289,7 @@ export function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: num
   if (!state.troubledAt) state.troubledAt = nowIso;
   state.lastFailureReason =
     `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
-    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
+    're-authenticate with the dashboard Codex-auth banner so the private managed store is refreshed';
   state.lastFailureAt = nowIso;
   return true;
 }
@@ -410,16 +430,16 @@ export function assertCodexNativeAuthForSpawn(
   const native = probeNativeCodexAuthSync();
   const reason =
     native.status === 'missing'
-      ? 'not signed in (~/.codex/auth.json is missing)'
+      ? 'not signed in (the managed Codex credential store is missing)'
       : native.status === 'expired'
-        ? 'expired (~/.codex/auth.json access token has lapsed)'
+        ? 'expired (the managed Codex access token has lapsed)'
         : hasActiveBurnedCodexAgentsSync(agentStates)
           ? 'revoked (a running codex agent hit a revoked refresh token — the shared token family is dead)'
           : null;
   if (reason === null) return;
   throw new Error(
     `Cannot spawn a Codex agent: native Codex authentication is ${reason}. ` +
-      'Run `codex login` on the host (or click Re-authenticate in the dashboard Codex-auth banner), then retry.',
+      'Use Re-authenticate in the dashboard to refresh Overdeck\'s private Codex store, then retry.',
   );
 }
 

@@ -13,7 +13,11 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   deliverAgentMessage: deliverAgentMessageMock,
 }));
 
-import { deliverResumeContractUnlessGated } from '../../../../src/lib/overdeck/resume-contract-delivery.js';
+import {
+  assertKimiResumeContractResult,
+  deliverMandatoryKimiResumeContext,
+  deliverResumeContractUnlessGated,
+} from '../../../../src/lib/overdeck/resume-contract-delivery.js';
 
 const RESUME_GATE_MENU = [
   'This session is 4h 5m old and 146.9k tokens.',
@@ -90,5 +94,47 @@ describe('deliverResumeContractUnlessGated', () => {
       `[conversations] resume contract delivery failed for ${SESSION}:`,
       'delivery unavailable',
     );
+  });
+});
+
+describe('native Kimi resume context', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturePaneTextMock.mockResolvedValue(CLEAR_COMPOSER);
+    deliverAgentMessageMock.mockResolvedValue({ ok: true, path: 'supervisor' });
+  });
+
+  it('delivers mandatory context separately with an empty task message', async () => {
+    await deliverMandatoryKimiResumeContext(SESSION, '/workspace/kimi', METHOD);
+
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+      SESSION,
+      '',
+      'conversation-resume-context',
+      METHOD,
+      { kimiContext: { workspace: '/workspace/kimi' } },
+    );
+  });
+
+  it('fails closed before delivery when the native resume gate is blocking', async () => {
+    capturePaneTextMock.mockResolvedValue(RESUME_GATE_MENU);
+
+    await expect(deliverMandatoryKimiResumeContext(SESSION, '/workspace/kimi', METHOD))
+      .rejects.toThrow(/native resume choice gate/);
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when context delivery returns a failure', async () => {
+    deliverAgentMessageMock.mockResolvedValue({ ok: false, path: 'tmux', failure: 'not ready' });
+
+    await expect(deliverMandatoryKimiResumeContext(SESSION, '/workspace/kimi', METHOD))
+      .rejects.toThrow(/context delivery failed.*not ready/);
+  });
+
+  it('allows an operator-skipped optional contract but rejects failed or newly gated delivery', () => {
+    expect(() => assertKimiResumeContractResult('skipped-user')).not.toThrow();
+    expect(() => assertKimiResumeContractResult('delivered')).not.toThrow();
+    expect(() => assertKimiResumeContractResult('failed')).toThrow(/not delivered/);
+    expect(() => assertKimiResumeContractResult('skipped-gated')).toThrow(/not delivered/);
   });
 });

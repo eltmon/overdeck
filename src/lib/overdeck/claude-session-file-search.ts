@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { claudeProjectsRoots } from '../paths.js';
 
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -66,11 +67,11 @@ export async function findClaudeSessionFileById(sessionId: string): Promise<stri
   const cached = cachedLookup(sessionId);
   if (cached !== undefined) return cached;
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const dirs = await readdir(claudeProjects);
-    const candidates = dirs
-      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+    const candidates: string[] = [];
+    for (const claudeProjects of claudeProjectsRoots()) {
+      const dirs = await readdir(claudeProjects).catch(() => []);
+      candidates.push(...dirs.filter((dir) => SAFE_DIR_PATTERN.test(dir)).map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`)));
+    }
     const found = await firstExisting(candidates);
     if (found) {
       sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
@@ -95,9 +96,9 @@ export async function findSubagentTranscriptById(agentId: string): Promise<strin
   const cached = cachedLookup(agentId);
   if (cached !== undefined) return cached;
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const projectDirs = (await readdir(claudeProjects)).filter((dir) => SAFE_DIR_PATTERN.test(dir));
-    for (const projectDir of projectDirs) {
+    for (const claudeProjects of claudeProjectsRoots()) {
+      const projectDirs = (await readdir(claudeProjects).catch(() => [])).filter((dir) => SAFE_DIR_PATTERN.test(dir));
+      for (const projectDir of projectDirs) {
       let sessionDirs: string[];
       try {
         sessionDirs = await readdir(join(claudeProjects, projectDir));
@@ -111,6 +112,7 @@ export async function findSubagentTranscriptById(agentId: string): Promise<strin
       if (found) {
         sessionFileByIdCache.set(agentId, { path: found, ts: Date.now() });
         return found;
+      }
       }
     }
   } catch {

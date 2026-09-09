@@ -15,11 +15,11 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
 import { join } from 'path';
 
 import { getDashScopeUpstreamBaseUrl } from './openai-compatible-proxy.js';
 import { getProviderForModelSync } from './providers.js';
+import { getOverdeckHome } from './paths.js';
 
 interface OmpModelDef {
   id: string;
@@ -79,7 +79,7 @@ export function provisionOhmypiProviderForModel(modelId: string, agentDir?: stri
   const def = ompProviderDef(providerName);
   if (!def) return;
 
-  const dir = agentDir ?? join(homedir(), '.omp', 'agent');
+  const dir = agentDir ?? join(getOverdeckHome(), 'harnesses', 'ohmypi');
   const registryPath = join(dir, 'models.json');
 
   let registry: { providers?: Record<string, unknown> } = {};

@@ -1,13 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync, statSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { Effect } from 'effect';
 import {
   getAgentDir,
   getAgentStateSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { claudeProjectsRootsForAgent, encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -156,13 +155,14 @@ function pickFreshestExistingSessionIdSync(agentId: string, candidates: unknown[
   if (valid.length === 0) return null;
   const workspace = getAgentStateSync(agentId)?.workspace;
   if (workspace) {
-    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
     let best: { id: string; mtimeMs: number } | null = null;
-    for (const id of valid) {
-      try {
-        const s = statSync(join(projectDir, `${id}.jsonl`));
-        if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
-      } catch { /* no JSONL for this id — skip */ }
+    for (const projectDir of claudeProjectDirs(agentId, workspace)) {
+      for (const id of valid) {
+        try {
+          const s = statSync(join(projectDir, `${id}.jsonl`));
+          if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
+        } catch { /* no JSONL for this id in this root — skip */ }
+      }
     }
     if (best) return best.id;
   }
@@ -180,13 +180,14 @@ export interface ClaudeSessionRecoveryDeps {
   isSessionReset?: (agentId: string) => boolean;
   readAgentPlaneRecord: typeof readAgentPlaneRecordSync;
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
-  transcriptExists: (workspace: string, sessionId: string) => boolean;
-  listTranscriptSessionIds: (workspace: string) => string[];
+  transcriptExists: (workspace: string, sessionId: string, agentId?: string) => boolean;
+  listTranscriptSessionIds: (workspace: string, agentId?: string) => string[];
   log: (message: string) => void;
 }
 
-function claudeProjectDir(workspace: string): string {
-  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
+function claudeProjectDirs(agentId: string, workspace: string): string[] {
+  const encoded = encodeClaudeProjectDir(workspace);
+  return claudeProjectsRootsForAgent(agentId).map((root) => join(root, encoded));
 }
 
 function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
@@ -194,22 +195,27 @@ function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
     isSessionReset: isSessionResetMarker,
     readAgentPlaneRecord: readAgentPlaneRecordSync,
     readEventSessionId: readLatestAgentClaudeSessionIdEventSync,
-    transcriptExists: (workspace, sessionId) => existsSync(join(claudeProjectDir(workspace), `${sessionId}.jsonl`)),
-    listTranscriptSessionIds: (workspace) => {
-      const projectDir = claudeProjectDir(workspace);
-      try {
-        return readdirSync(projectDir, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-          .map((entry) => entry.name.slice(0, -'.jsonl'.length));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.warn(
-            `[agents] Transcript-directory scan failed for ${projectDir}: `
-            + `${error instanceof Error ? error.message : String(error)}`,
-          );
+    transcriptExists: (workspace, sessionId, agentId = '') => claudeProjectDirs(agentId, workspace)
+      .some((projectDir) => existsSync(join(projectDir, `${sessionId}.jsonl`))),
+    listTranscriptSessionIds: (workspace, agentId = '') => {
+      const ids = new Set<string>();
+      for (const projectDir of claudeProjectDirs(agentId, workspace)) {
+        try {
+          for (const entry of readdirSync(projectDir, { withFileTypes: true })) {
+            if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+              ids.add(entry.name.slice(0, -'.jsonl'.length));
+            }
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            console.warn(
+              `[agents] Transcript-directory scan failed for ${projectDir}: `
+              + `${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
         }
-        return [];
       }
+      return [...ids];
     },
     log: (message) => console.warn(message),
   };
@@ -230,7 +236,7 @@ export function resolveClaudeSessionRecoverySync(
     const record = deps.readAgentPlaneRecord(agentState.issueId, agentId);
     const candidates = [...(record?.sessions ?? [])]
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
-    const candidate = candidates.find((entry) => deps.transcriptExists(agentState.workspace, entry.id));
+    const candidate = candidates.find((entry) => deps.transcriptExists(agentState.workspace, entry.id, agentId));
     if (candidate) return { sessionId: candidate.id, checked, needsPointerRepair: true };
   } catch (error) {
     deps.log(
@@ -242,7 +248,7 @@ export function resolveClaudeSessionRecoverySync(
   try {
     checked.push('agent.model_set event history');
     const eventSessionId = deps.readEventSessionId(agentId);
-    if (eventSessionId && deps.transcriptExists(agentState.workspace, eventSessionId)) {
+    if (eventSessionId && deps.transcriptExists(agentState.workspace, eventSessionId, agentId)) {
       return { sessionId: eventSessionId, checked, needsPointerRepair: true };
     }
   } catch (error) {
@@ -253,7 +259,7 @@ export function resolveClaudeSessionRecoverySync(
   }
 
   checked.push('exactly-one transcript-directory scan');
-  const transcriptIds = deps.listTranscriptSessionIds(agentState.workspace);
+  const transcriptIds = deps.listTranscriptSessionIds(agentState.workspace, agentId);
   return transcriptIds.length === 1
     ? { sessionId: transcriptIds[0] ?? null, checked, needsPointerRepair: true }
     : { sessionId: null, checked };

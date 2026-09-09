@@ -26,6 +26,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
+import { claudeProjectsRoots } from '../paths.js';
 import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
 import { findConversationForCostSessionSync } from '../overdeck/conversations.js';
 import type { IssueId } from '../overdeck/issues.js';
@@ -667,21 +668,21 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
     latestEventTs: null,
   };
 
-  const claudeProjectsDir = getClaudeProjectsDir();
-  if (!existsSync(claudeProjectsDir)) return result;
+  const claudeProjectsDirs = claudeProjectsRoots().filter(existsSync);
 
   // Build reverse index: session UUID → (agentId, issueId, sessionType)
   const sessionIndex = buildSessionIndex();
 
-  // Scan all Claude project directories
-  let projectDirs: string[];
-  try {
-    projectDirs = readdirSync(claudeProjectsDir);
-  } catch {
-    return result;
-  }
+  // Scan managed private roots first, then native legacy/manual sessions.
+  for (const claudeProjectsDir of claudeProjectsDirs) {
+    let projectDirs: string[];
+    try {
+      projectDirs = readdirSync(claudeProjectsDir);
+    } catch {
+      continue;
+    }
 
-  for (const dirName of projectDirs) {
+    for (const dirName of projectDirs) {
     const projectDir = join(claudeProjectsDir, dirName);
 
     // Skip non-directories
@@ -809,6 +810,7 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
       } catch {
         // Non-fatal
       }
+    }
     }
   }
 

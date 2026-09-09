@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, realpathSync, rmSync, unlinkSync } from 'fs';
-import { join, dirname, basename, resolve } from 'path';
+import { join, dirname, basename, resolve, normalize, isAbsolute } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -12,7 +12,6 @@ import { addDnsEntry, syncDnsToWindows } from '../dns.js';
 import { addTunnelIngress } from '../tunnel.js';
 import { createHumeConfig } from '../hume.js';
 import { mergeSkillsIntoWorkspaceSync, mergePanSkillsIntoWorkspaceSync } from '../skills-merge.js';
-import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
@@ -26,7 +25,6 @@ import {
   copyProjectTemplateDirs,
   createWorktree,
   installPreRebaseHook,
-  preTrustDirectorySync,
   relocateVenvScripts,
   restorePreWorktreeMetadataSync,
   stagePreWorktreeMetadataSync,
@@ -42,6 +40,45 @@ import {
   renderDevcontainerSync,
   processTemplatesSync,
 } from '../workspace/devcontainer-renderer.js';
+
+export function isHarnessNativeTarget(target: string): boolean {
+  const slashTarget = target.replace(/\\/g, '/');
+  const pathNormalized = normalize(slashTarget).replace(/\\/g, '/').replace(/^\.\//, '');
+  // Template/copy targets are workspace-relative. Treat traversal and absolute
+  // paths as protected so join()/normalization cannot escape the workspace or
+  // disguise a native harness target (nested/../CLAUDE.md).
+  if (isAbsolute(slashTarget) || pathNormalized === '..' || pathNormalized.startsWith('../')) return true;
+  const normalized = pathNormalized.toLowerCase();
+  return normalized === 'claude.md'
+    || normalized === 'agents.md'
+    || normalized === 'gemini.md'
+    || normalized === 'conventions.md'
+    || normalized === '.clinerules'
+    || normalized === '.cursorrules'
+    || normalized === '.windsurfrules'
+    || normalized === '.mcp.json'
+    || normalized === '.claude'
+    || normalized.startsWith('.claude/')
+    || normalized === '.agents'
+    || normalized.startsWith('.agents/')
+    || normalized === '.codex'
+    || normalized.startsWith('.codex/')
+    || normalized === '.pi'
+    || normalized.startsWith('.pi/')
+    || normalized === '.omp'
+    || normalized.startsWith('.omp/')
+    || normalized === '.gemini'
+    || normalized.startsWith('.gemini/')
+    || normalized === '.kimi'
+    || normalized.startsWith('.kimi/')
+    || normalized === '.cursor'
+    || normalized.startsWith('.cursor/')
+    || normalized === '.windsurf'
+    || normalized.startsWith('.windsurf/')
+    || normalized === '.github/instructions'
+    || normalized.startsWith('.github/instructions/')
+    || normalized === '.github/copilot-instructions.md';
+}
 
 const execAsync = promisify(exec);
 
@@ -633,16 +670,24 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
     // Process template files
+    const configuredTemplates = workspaceConfig.agent.templates;
+    const discoveredTemplates = configuredTemplates === undefined
+      ? readdirSync(templateDir)
+        .filter((source) => source.endsWith('.template'))
+        .map((source) => ({ source, target: source.slice(0, -'.template'.length) }))
+      : configuredTemplates;
+    const safeTemplates = discoveredTemplates.filter(({ target }) => !isHarnessNativeTarget(target));
     const templateSteps = processTemplatesSync(
       templateDir,
       workspacePath,
       placeholders,
-      workspaceConfig.agent.templates
+      safeTemplates,
     );
     result.steps.push(...templateSteps);
 
     // Copy .claude/ directories from project template (copy_dirs replaces legacy symlinks)
-    const dirsToSync = workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks;
+    const dirsToSync = (workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks)
+      ?.filter((dir) => !isHarnessNativeTarget(dir));
     if (dirsToSync) {
       const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync, placeholders);
       result.steps.push(...copySteps);
@@ -762,31 +807,6 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     progress('Starting Docker containers', 'Containers running', 'complete');
   }
 
-  // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
-  try {
-    preTrustDirectorySync(workspacePath);
-    result.steps.push('Pre-trusted workspace in Claude Code');
-  } catch {
-    // Non-fatal — agent can still work, user will just see trust prompt
-  }
-
-  // Inject caveman hooks into workspace .claude/settings.json (if enabled in config)
-  try {
-    const { determineCavemanVariant, injectCavemanSettings } = await import('../caveman/workspace.js');
-    const yamlConfig = loadYamlConfig();
-    const cavemanConfig = yamlConfig.config.caveman;
-    const variant = determineCavemanVariant(cavemanConfig);
-    await Effect.runPromise(injectCavemanSettings(workspacePath, variant));
-    if (variant === 'enabled') {
-      result.steps.push('Injected caveman compression hooks into .claude/settings.json');
-    } else if (variant === 'disabled') {
-      result.steps.push('Caveman A/B test: assigned disabled variant for this workspace');
-    }
-  } catch (cavemanErr: unknown) {
-    // Non-fatal — workspace works without caveman
-    result.steps.push(`Caveman setup skipped: ${cavemanErr instanceof Error ? cavemanErr.message : String(cavemanErr)}`);
-  }
-
   // Copy Overdeck global settings into workspace so agents testing Overdeck
   // itself have the same projects, model assignments, and hooks.
   try {
@@ -796,14 +816,6 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     }
   } catch (settingsErr: unknown) {
     result.steps.push(`Overdeck settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
-  }
-
-  try {
-    const { injectMemoryHookSettings } = await import('../caveman/workspace.js');
-    await injectMemoryHookSettings(workspacePath);
-    result.steps.push('Injected memory hooks into .claude/settings.json');
-  } catch (memoryHookErr: unknown) {
-    result.steps.push(`Memory hook setup skipped: ${memoryHookErr instanceof Error ? memoryHookErr.message : String(memoryHookErr)}`);
   }
 
   result.success = result.errors.length === 0;

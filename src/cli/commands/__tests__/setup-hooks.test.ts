@@ -24,6 +24,7 @@ vi.mock('child_process', async (importOriginal) => {
 
 describe('setup hooks', () => {
   const originalHome = process.env.HOME;
+  const originalOverdeckHome = process.env.OVERDECK_HOME;
 
   it('parses hook harness choices', () => {
     expect(parseHookHarness(undefined)).toBeUndefined();
@@ -74,7 +75,6 @@ describe('setup hooks', () => {
     ['Stop', 'stop-hook', '.*'],
     ['Stop', 'permission-event-hook', '.*'],
     ['PreToolUse', 'gh-issue-trailer-hook', 'Bash'],
-    ['PreToolUse', 'ask-user-question-hook', 'AskUserQuestion'],
     ['PreToolUse', 'tldr-read-enforcer', 'Read'],
     ['PostToolUse', 'tldr-post-edit', 'Edit|Write'],
   ] as const)('adds restored tool-event hook %s:%s once', (hookType, scriptName, matcher) => {
@@ -105,14 +105,15 @@ describe('setup hooks', () => {
     ]);
   });
 
-  it('registers restored tool-event hooks globally during setup', async () => {
+  it('registers tool-event hooks only in the Overdeck-private Claude home', async () => {
     const home = mkdtempSync(join(tmpdir(), 'pan-setup-hooks-'));
     process.env.HOME = home;
+    process.env.OVERDECK_HOME = join(home, '.overdeck');
 
     try {
       await setupHooksCommand({ harness: 'claude-code' });
 
-      const settings = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8')) as ClaudeSettings;
+      const settings = JSON.parse(readFileSync(join(home, '.overdeck', 'harnesses', 'claude', 'settings.json'), 'utf8')) as ClaudeSettings;
       expect(settings.hooks?.PreToolUse).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
@@ -122,11 +123,10 @@ describe('setup hooks', () => {
           matcher: 'Bash',
           hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'gh-issue-trailer-hook') }],
         },
-        {
-          matcher: 'AskUserQuestion',
-          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'ask-user-question-hook') }],
-        },
       ]));
+      expect(settings.hooks?.PreToolUse?.some((entry) =>
+        entry.hooks.some((hook) => hook.command.includes('ask-user-question-hook')))).toBe(false);
+      expect(settings.hooks?.UserPromptSubmit).toBeUndefined();
       expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
@@ -162,6 +162,8 @@ describe('setup hooks', () => {
         ]));
       }
     } finally {
+      if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = originalOverdeckHome;
       rmSync(home, { recursive: true, force: true });
     }
   });

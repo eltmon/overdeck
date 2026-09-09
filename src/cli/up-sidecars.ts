@@ -86,7 +86,7 @@ export async function startPostLaunchSidecars(config: {
     });
     syncChild.on('error', () => { /* non-fatal: sync is best-effort */ });
     syncChild.unref();
-    console.log(chalk.dim('Context sync (skills, rules, hooks, MCP, CLAUDE.md) running in background'));
+    console.log(chalk.dim('Context sync (skills, rules, hooks, MCP, launch artifacts) running in background'));
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), errorMessage(error));
   }

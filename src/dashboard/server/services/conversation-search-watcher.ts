@@ -1,11 +1,10 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
+import { claudeProjectsRoots, getOverdeckHome, nativeClaudeProjectsRoot } from '../../../lib/paths.js';
 import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
 
 interface WatcherLike {
@@ -22,6 +21,10 @@ type RemoveFileFn = (options: { filePath: string; config: NormalizedConversation
 export interface ConversationSearchWatcherOptions {
   config?: NormalizedConversationSearchConfig;
   roots?: string[];
+  /** Stable recursive subscriptions; defaults differ from startup index roots. */
+  watchRoots?: string[];
+  /** Internal/default-mode guard: admit only Claude transcript path families. */
+  strictClaudePathFamilies?: boolean;
   debounceMs?: number;
   watchFactory?: WatchFactory;
   indexAll?: IndexAllFn;
@@ -50,7 +53,12 @@ async function defaultRemoveFile(options: { filePath: string; config: Normalized
   }
 }
 
-function watcherSignature(config: NormalizedConversationSearchConfig, roots: string[]): string {
+function watcherSignature(
+  config: NormalizedConversationSearchConfig,
+  roots: string[],
+  watchRoots: string[],
+  strictClaudePathFamilies: boolean,
+): string {
   return JSON.stringify({
     enabled: config.enabled,
     provider: config.provider,
@@ -58,12 +66,16 @@ function watcherSignature(config: NormalizedConversationSearchConfig, roots: str
     apiKeyRef: config.apiKeyRef ?? null,
     dbPath: config.dbPath,
     roots,
+    watchRoots,
+    strictClaudePathFamilies,
   });
 }
 
 export class ConversationSearchWatcher {
   private readonly config: NormalizedConversationSearchConfig;
   private readonly roots: string[];
+  private readonly watchRoots: string[];
+  private readonly strictClaudePathFamilies: boolean;
   private readonly debounceMs: number;
   private readonly watchFactory: WatchFactory;
   private readonly indexAll: IndexAllFn;
@@ -86,8 +98,16 @@ export class ConversationSearchWatcher {
   constructor(options: ConversationSearchWatcherOptions = {}) {
     this.config = options.config ?? getConversationSearchConfigSync();
     this.roots = options.roots ?? defaultConversationRoots();
+    this.watchRoots = options.watchRoots ?? (options.roots ? options.roots : defaultConversationWatchRoots());
+    this.strictClaudePathFamilies = options.strictClaudePathFamilies
+      ?? (options.roots === undefined && options.watchRoots === undefined);
     this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
-    this.signature = watcherSignature(this.config, this.roots);
+    this.signature = watcherSignature(
+      this.config,
+      this.roots,
+      this.watchRoots,
+      this.strictClaudePathFamilies,
+    );
     this.watchFactory = options.watchFactory ?? ((paths) => new ConversationDirectoryWatcher(paths));
     this.indexAll = options.indexAll ?? indexConversationSearch;
     this.indexFile = options.indexFile ?? indexConversationFile;
@@ -128,7 +148,7 @@ export class ConversationSearchWatcher {
         this.drainQueue();
       });
 
-    this.watcher = this.watchFactory(this.roots, {
+    this.watcher = this.watchFactory(this.watchRoots, {
       ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: DEFAULT_WRITE_STABILITY_MS,
@@ -161,7 +181,7 @@ export class ConversationSearchWatcher {
   }
 
   private schedule(filePath: string): void {
-    if (this.stopped || !filePath.endsWith('.jsonl')) return;
+    if (this.stopped || !this.acceptsTranscriptPath(filePath)) return;
     const existing = this.pending.get(filePath);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
@@ -182,7 +202,7 @@ export class ConversationSearchWatcher {
   }
 
   private remove(filePath: string): void {
-    if (this.stopped || !filePath.endsWith('.jsonl')) return;
+    if (this.stopped || !this.acceptsTranscriptPath(filePath)) return;
     // A pending or queued index for a now-deleted file would only fail on ENOENT.
     const timer = this.pending.get(filePath);
     if (timer) clearTimeout(timer);
@@ -233,6 +253,21 @@ export class ConversationSearchWatcher {
       this.activeTasks.add(task);
     }
   }
+
+  private acceptsTranscriptPath(filePath: string): boolean {
+    if (!filePath.endsWith('.jsonl')) return false;
+    if (!this.strictClaudePathFamilies) return true;
+
+    if (isPathWithin(nativeClaudeProjectsRoot(), filePath)) return true;
+
+    const agentsRoot = join(getOverdeckHome(), 'agents');
+    if (!isPathWithin(agentsRoot, filePath)) return false;
+    const segments = relative(agentsRoot, filePath).split(sep);
+    return segments.length >= 5
+      && segments[0]!.length > 0
+      && segments[1] === 'claude-home'
+      && segments[2] === 'projects';
+  }
 }
 
 export function startConversationSearchWatcher(options: ConversationSearchWatcherOptions = {}): ConversationSearchWatcher | null {
@@ -261,6 +296,9 @@ export async function stopConversationSearchWatcher(): Promise<void> {
 export async function syncConversationSearchWatcher(options: ConversationSearchWatcherOptions = {}): Promise<ConversationSearchWatcher | null> {
   const config = options.config ?? getConversationSearchConfigSync();
   const roots = options.roots ?? defaultConversationRoots();
+  const watchRoots = options.watchRoots ?? (options.roots ? options.roots : defaultConversationWatchRoots());
+  const strictClaudePathFamilies = options.strictClaudePathFamilies
+    ?? (options.roots === undefined && options.watchRoots === undefined);
   if (!config.enabled) {
     await stopConversationSearchWatcher();
     options.log?.log?.('[conversation-search] watcher stopped because config is disabled');
@@ -273,20 +311,40 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
     return null;
   }
 
-  const signature = watcherSignature(config, roots);
+  const signature = watcherSignature(config, roots, watchRoots, strictClaudePathFamilies);
   if (activeWatcher?.signature === signature) return activeWatcher;
 
   if (activeWatcher) {
     await stopConversationSearchWatcher();
     options.log?.log?.('[conversation-search] watcher restarting because config changed');
   }
-  activeWatcher = new ConversationSearchWatcher({ ...options, config, roots });
+  activeWatcher = new ConversationSearchWatcher({
+    ...options,
+    config,
+    roots,
+    watchRoots,
+    strictClaudePathFamilies,
+  });
   activeWatcher.start();
   return activeWatcher;
 }
 
 function defaultConversationRoots(): string[] {
-  return [join(homedir(), '.claude', 'projects')];
+  return claudeProjectsRoots();
+}
+
+/**
+ * Subscribe to the stable agents parent, not today's set of private Claude
+ * homes. A managed agent created after dashboard boot is then visible to the
+ * same native recursive watcher as soon as its claude-home tree appears.
+ */
+function defaultConversationWatchRoots(): string[] {
+  return [join(getOverdeckHome(), 'agents'), nativeClaudeProjectsRoot()];
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel.length > 0 && !rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel);
 }
 
 function isAbortError(error: unknown): boolean {

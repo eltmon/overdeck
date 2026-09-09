@@ -23,7 +23,7 @@ describe('ensurePanGitignore', () => {
     expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
     expect(content).toContain('.pan/test/');
-    expect(content).toContain('.claude/skills/');
+    expect(content).not.toContain('.claude/skills/');
   });
 
   it('appends missing entries to an existing .gitignore', () => {
@@ -35,7 +35,7 @@ describe('ensurePanGitignore', () => {
     expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
     expect(content).toContain('.pan/test/');
-    expect(content).toContain('.claude/skills/');
+    expect(content).not.toContain('.claude/skills/');
   });
 
   it('does not duplicate entries if already present', () => {
@@ -44,10 +44,9 @@ describe('ensurePanGitignore', () => {
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
     const testMatches = (content.match(/\.pan\/test\//g) || []).length;
-    const skillsMatches = (content.match(/\.claude\/skills\//g) || []).length;
     expect(panMatches).toBe(1);
     expect(testMatches).toBe(1);
-    expect(skillsMatches).toBe(1);
+    expect(content.match(/\.claude\/skills\//g) || []).toHaveLength(1);
   });
 
   it('does not add .pan/ itself (only runtime subdirs)', () => {
@@ -70,10 +69,9 @@ describe('ensurePanGitignore', () => {
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
     const testMatches = (content.match(/\.pan\/test\//g) || []).length;
-    const skillsMatches = (content.match(/\.claude\/skills\//g) || []).length;
     expect(panMatches).toBe(1);
     expect(testMatches).toBe(1);
-    expect(skillsMatches).toBe(1);
+    expect(content).not.toContain('.claude/skills/');
   });
 });
 
@@ -173,14 +171,14 @@ describe('mergePanSkillsIntoWorkspace', () => {
     expect(result.added).toHaveLength(0);
   });
 
-  it('copies skill from .pan/skills/ to .claude/skills/', () => {
+  it('does not copy project skills into a native workspace harness directory', () => {
     const skillDir = join(projectDir, '.pan', 'skills', 'my-skill');
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), '# My Skill\nContent', 'utf-8');
 
     const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
-    expect(result.added.length).toBeGreaterThan(0);
-    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'my-skill', 'SKILL.md'))).toBe(true);
+    expect(result.added).toEqual([]);
+    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'my-skill', 'SKILL.md'))).toBe(false);
   });
 
   it('skips skill when .claude/skills/<name>/ already exists (never overwrites)', () => {
@@ -194,13 +192,13 @@ describe('mergePanSkillsIntoWorkspace', () => {
     writeFileSync(join(existingDir, 'SKILL.md'), '# User Owned', 'utf-8');
 
     const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
-    expect(result.skipped.some(s => s.includes('my-skill'))).toBe(true);
+    expect(result.skipped).toEqual([]);
     // Content must be unchanged
     const content = readFileSync(join(existingDir, 'SKILL.md'), 'utf-8');
     expect(content).toBe('# User Owned');
   });
 
-  it('copies multiple skills from .pan/skills/', () => {
+  it('leaves multiple project skills for explicit launcher delivery', () => {
     for (const name of ['skill-a', 'skill-b', 'skill-c']) {
       const d = join(projectDir, '.pan', 'skills', name);
       mkdirSync(d, { recursive: true });
@@ -208,8 +206,8 @@ describe('mergePanSkillsIntoWorkspace', () => {
     }
 
     const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
-    expect(result.overlayed).toHaveLength(3);
-    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-a'))).toBe(true);
-    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-b'))).toBe(true);
+    expect(result.overlayed).toEqual([]);
+    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-a'))).toBe(false);
+    expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-b'))).toBe(false);
   });
 });

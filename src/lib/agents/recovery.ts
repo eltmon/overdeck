@@ -656,6 +656,12 @@ export async function recoverAgent(
     extraEnvExports: [harnessLaunch.pathExport],
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
+    managedStateKey: normalizedId,
+    overdeckEnv: {
+      agentId: normalizedId,
+      issueId: state.issueId,
+      sessionType: recoveryRole,
+    },
     ...(recoveryHarness === 'codex' ? {} : { promptInline: recoveryPrompt }),
     resumeSessionId: resolveRecoveryResumeSessionId(normalizedId, recoveryHarness),
     useSupervisor: recoverySupervisorLaunch.useSupervisor,

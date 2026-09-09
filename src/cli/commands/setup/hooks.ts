@@ -14,10 +14,10 @@ import {
 } from 'fs';
 import { join, dirname } from 'path';
 import { execFileSync, execSync } from 'child_process';
-import { arch as osArch, homedir, platform as osPlatform, tmpdir } from 'os';
+import { arch as osArch, platform as osPlatform, tmpdir } from 'os';
 import { createHash } from 'crypto';
 import { readSettingsOrAbort, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
-import { SYNC_SOURCES } from '../../../lib/paths.js';
+import { getOverdeckClaudeHome, getOverdeckHome, SYNC_SOURCES } from '../../../lib/paths.js';
 
 const RTK_VERSION = '0.41.0';
 const RTK_RELEASE_TAG = `v${RTK_VERSION}`;
@@ -306,7 +306,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   }
 
   // 2. Ensure ~/.overdeck/bin directory exists
-  const overdeckHome = join(homedir(), '.overdeck');
+  const overdeckHome = getOverdeckHome();
   const binDir = join(overdeckHome, 'bin');
   const heartbeatsDir = join(overdeckHome, 'heartbeats');
 
@@ -340,8 +340,9 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
   console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop, specialist-stop)'));
 
-  // 4. Read or create Claude Code settings.json
-  const claudeDir = join(homedir(), '.claude');
+  // 4. Read or create Overdeck-private Claude Code settings.json. Managed
+  // launchers opt into this file; the user's native ~/.claude stays untouched.
+  const claudeDir = getOverdeckClaudeHome();
   const settingsPath = join(claudeDir, 'settings.json');
 
   // PAN-1137: refuse to proceed on parse failure. Previous behavior reset
@@ -354,7 +355,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   let settings: ClaudeSettings = settingsBefore;
 
   if (existsSync(settingsPath)) {
-    console.log(chalk.green('✓ Read existing Claude Code settings'));
+    console.log(chalk.green('✓ Read existing Overdeck-private Claude Code settings'));
   } else {
     console.log(chalk.dim('No existing settings.json found, creating new file'));
     if (!existsSync(claudeDir)) {
@@ -459,12 +460,11 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
   // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
-  console.log(chalk.dim('Claude Code hooks are now configured:'));
+  console.log(chalk.dim('Overdeck-managed Claude Code hooks are now configured:'));
   console.log(chalk.dim('  • PreToolUse        - Records tool usage before tools run'));
   console.log(chalk.dim('  • PostToolUse       - Emits heartbeats and tool/permission events'));
   console.log(chalk.dim('  • Stop              - Records session stop and permission lifecycle events'));
   console.log(chalk.dim('  • SessionStart      - Bootstraps agent state, emits model_set'));
-  console.log(chalk.dim('  • UserPromptSubmit  - Clears waiting state, restarts spinner'));
   console.log(chalk.dim('  • PreCompact/Post   - Tracks compaction lifecycle'));
   console.log(chalk.dim('  • Notification      - Emits agent.waiting_started events'));
   console.log(chalk.dim('  • PermissionRequest - Surfaces permission prompts to dashboard'));

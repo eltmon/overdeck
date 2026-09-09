@@ -54,13 +54,13 @@ import { canUseHarnessSync } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
-import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
+import { ensureManagedOhmypiAuthImported, getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
-import { workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
@@ -71,7 +71,11 @@ import { markRespawnPending } from '../../dashboard/server/services/pending-resp
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
-import { deliverResumeContractUnlessGated } from './resume-contract-delivery.js';
+import {
+  assertKimiResumeContractResult,
+  deliverMandatoryKimiResumeContext,
+  deliverResumeContractUnlessGated,
+} from './resume-contract-delivery.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -512,16 +516,10 @@ export function startConversationModelBackfill(resolveSessionFile: (conv: Conver
   });
 }
 async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-  return files;
+  return claudeSystemPromptFiles(cwd, 'claude-code');
+}
+export async function codexConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  return claudeSystemPromptFiles(cwd, 'codex');
 }
 async function ensurePiConversationSourceContractFile(): Promise<string> {
   const contextDir = join(getOverdeckHome(), 'context');
@@ -531,23 +529,8 @@ async function ensurePiConversationSourceContractFile(): Promise<string> {
   return path;
 }
 export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const globalFile = piGlobalContextFile();
-  try {
-    await stat(globalFile);
-    files.push(globalFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
+  const files = await claudeSystemPromptFiles(cwd, 'ohmypi');
   files.push(await ensurePiConversationSourceContractFile());
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
   return files;
 }
 function isNotFound(error: unknown): boolean {
@@ -588,7 +571,7 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
-  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; resumeSessionId?: string } | undefined;
+  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiContextDelivery: 'initial-message'; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -615,7 +598,8 @@ export async function spawnConversationSession(
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
       if (getProviderForModelSync(model).name === 'openai') {
-        const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
+        const authPath = ensureManagedOhmypiAuthImported();
+        const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true, authPath });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
             'ohmypi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
@@ -638,7 +622,7 @@ export async function spawnConversationSession(
         resumeSessionId: storedPiSessionId || undefined,
       };
     } else if (behavior.usesCodexHome) {
-      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
+      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home-v2');
       const codexConfig = loadConfigSync().config.codex;
       const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
       codexTransport = codexConfig?.transport ?? 'app-server';
@@ -690,6 +674,7 @@ export async function spawnConversationSession(
         harness: 'kimi-code',
         kimiCodeModel: model,
         kimiCodeYolo: true,
+        kimiContextDelivery: 'initial-message',
         ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
       };
     }
@@ -761,6 +746,7 @@ export async function spawnConversationSession(
         workingDir: cwd,
         setTerminalEnv: true,
         unsetProviderEnv: true,
+        managedStateKey: tmuxSession,
         overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
@@ -771,9 +757,13 @@ export async function spawnConversationSession(
         baseCommand: runtimeCommand,
         appendSystemPromptFiles: piFields
           ? await piConversationSystemPromptFiles(cwd)
-          : codexFields || acpFields || kimiCodeFields
-            ? []
-            : await claudeConversationSystemPromptFiles(cwd),
+          : codexFields
+            ? await codexConversationSystemPromptFiles(cwd)
+            : acpFields
+              ? []
+              : kimiCodeFields
+                ? await claudeSystemPromptFiles(cwd, 'kimi-code')
+              : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
         ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
@@ -948,10 +938,19 @@ export async function handleConversationCreate(
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
         await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-        if (message) {
-          const delivery = await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
-          if (harness === 'acp' && !delivery.ok) {
-            throw new Error(`ACP initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+        if (message || harness === 'kimi-code') {
+          const method = resolveConversationDeliveryMethod(conv);
+          const delivery = harness === 'kimi-code'
+            ? await deliverAgentMessage(
+                tmuxSession,
+                message,
+                'conversation-message',
+                method,
+                { kimiContext: { workspace: cwd } },
+              )
+            : await deliverAgentMessage(tmuxSession, message, 'conversation-message', method);
+          if ((harness === 'acp' || harness === 'kimi-code') && !delivery.ok) {
+            throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
           }
         }
       } catch (spawnErr: unknown) {
@@ -1045,15 +1044,20 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+      const method = resolveConversationDeliveryMethod(conv);
+      if (harness === 'kimi-code') {
+        await deliverMandatoryKimiResumeContext(conv.tmuxSession, conv.cwd, method);
+      }
       // The harness may open its own blocking gate on resume. The operator owns
       // that answer, so the contract delivery seam skips rather than races it.
-      await deliverResumeContractUnlessGated(
+      const resumeContractResult = await deliverResumeContractUnlessGated(
         conv.tmuxSession,
         `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
         'conversation-resume',
-        resolveConversationDeliveryMethod(conv),
+        method,
         sendResumeContract,
       );
+      if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
@@ -1110,8 +1114,17 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
-        if (harness === 'acp') {
+        if (harness === 'acp' || harness === 'kimi-code') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+        }
+        if (harness === 'kimi-code') {
+          await deliverAgentMessage(
+            conv.tmuxSession,
+            '',
+            'conversation-restart-context',
+            resolveConversationDeliveryMethod(conv),
+            { kimiContext: { workspace: conv.cwd } },
+          );
         }
         setConversationHarness(conv.name, harness);
         markConversationActive(conv.name);

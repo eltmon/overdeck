@@ -9,7 +9,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { claudeProjectsRoots, encodeClaudeProjectDir } from '../paths.js';
 import { TokenUsage, calculateCostSync, getPricingSync, AIProvider, logCostSync, CostEntry } from '../cost.js';
 import { FsError } from '../errors.js';
 
@@ -73,21 +73,14 @@ export interface SessionUsage {
 }
 
 // Claude projects directory
-function getClaudeProjectsDir(): string {
-  return process.env.CLAUDE_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
-}
-
 /**
  * Get all Claude Code project directories
  */
 export function getProjectDirsSync(): string[] {
-  const claudeProjectsDir = getClaudeProjectsDir();
-  if (!existsSync(claudeProjectsDir)) {
-    return [];
-  }
-
-  return readdirSync(claudeProjectsDir)
-    .map(name => join(claudeProjectsDir, name))
+  return claudeProjectsRoots().flatMap(claudeProjectsDir => {
+    if (!existsSync(claudeProjectsDir)) return [];
+    return readdirSync(claudeProjectsDir).map(name => join(claudeProjectsDir, name));
+  })
     .filter(path => {
       try {
         return statSync(path).isDirectory();
@@ -451,10 +444,11 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     //    -> -home-user-projects-myn-workspaces-feature-min-664
     // NOTE: The directory name KEEPS the leading dash
     const projectDirName = encodeClaudeProjectDir(workspacePath);
-    const projectDir = join(getClaudeProjectsDir(), projectDirName);
-
-    // Find most recently modified session file
-    const sessions = getSessionFilesSync(projectDir);
+    // Find most recently modified session file across managed-private and
+    // native legacy/manual roots.
+    const sessions = claudeProjectsRoots()
+      .flatMap(root => getSessionFilesSync(join(root, projectDirName)))
+      .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
     if (sessions.length === 0) {
       return null;
     }

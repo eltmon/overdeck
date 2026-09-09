@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe('injectOverdeckInfraDeny', () => {
-  it('denies tmux session input commands idempotently while preserving existing permissions', async () => {
+  it('is a compatibility no-op that preserves native settings byte-for-byte', async () => {
     const workspace = await makeTempWorkspace();
     const claudeDir = join(workspace, '.claude');
     await mkdir(claudeDir, { recursive: true });
@@ -36,17 +36,8 @@ describe('injectOverdeckInfraDeny', () => {
     await Effect.runPromise(injectOverdeckInfraDeny(workspace));
     await Effect.runPromise(injectOverdeckInfraDeny(workspace));
 
-    const settings = await readSettings(workspace);
-    expect(settings.other).toBe(true);
-    const deny = (settings.permissions as { deny: string[] }).deny;
-
-    expect(deny).toEqual(expect.arrayContaining([
-      'Bash(existing:*)',
-      'Bash(tmux send-keys:*)',
-      'Bash(tmux -L overdeck send-keys:*)',
-      'Bash(tmux paste-buffer:*)',
-      'Bash(tmux -L overdeck paste-buffer:*)',
-    ]));
-    expect(deny.filter(pattern => pattern === 'Bash(tmux send-keys:*)')).toHaveLength(1);
+    expect(await readFile(join(claudeDir, 'settings.local.json'), 'utf8')).toBe(
+      JSON.stringify({ permissions: { deny: ['Bash(existing:*)'] }, other: true }, null, 2),
+    );
   });
 });

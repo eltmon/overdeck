@@ -13,25 +13,19 @@ import {
   planSyncSync,
   executeSyncSync,
   refreshCacheSync,
-  migrateStalePersonalContentSync,
-  removeLegacySkills070Sync,
   planHooksSyncSync,
   syncHooksSync,
   syncStatuslineSync,
-  mirrorProjectSkillsSync,
-  syncPiSettingsSync,
   syncContextLayersSync,
   isStartupSyncNeededSync,
   writeSyncManifestSync,
 } from '../../lib/sync.js';
 import { executeAgentSkillsSync, planAgentSkillsSync } from '../../lib/harness-skill-sync.js';
-import { SYNC_TARGET, SYNC_SOURCES, isDevMode, isDeploymentGenerationRoot, packageRoot } from '../../lib/paths.js';
+import { SYNC_TARGET, SYNC_SOURCES, getOverdeckClaudeHome, isDevMode, isDeploymentGenerationRoot, packageRoot } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import { cleanupLegacyRuntimeSymlinksSync, migrateSyncTargetsSync } from '../../lib/config-migration.js';
 import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
-import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
@@ -146,8 +140,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log('');
     }
 
-    // Bundled skills + agents → ~/.claude/
-    console.log(chalk.cyan('~/.claude/ (skills + agents):'));
+    // Bundled skills + agents → Overdeck-private Claude home.
+    console.log(chalk.cyan('~/.overdeck/harnesses/claude/ (skills + agents):'));
     const plan = planSyncSync();
     const allItems = [...plan.skills, ...plan.agents];
     if (allItems.length === 0) {
@@ -164,7 +158,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
     console.log('');
 
-    console.log(chalk.cyan('~/.agents/skills/ (Codex + Pi + Oh My Pi):'));
+    console.log(chalk.cyan('~/.overdeck/harnesses/agent-skills/ (managed harness launches):'));
     const agentSkillPlan = planAgentSkillsSync();
     const agentCount = (s: string) => agentSkillPlan.filter((i) => i.status === s).length;
     console.log(
@@ -175,16 +169,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     );
     console.log('');
 
-    // Context layers → CLAUDE.md managed regions
-    console.log(chalk.cyan('context layers → CLAUDE.md:'));
-    console.log(`  ${chalk.blue('↻')} global → ~/.claude/CLAUDE.md ${chalk.dim('(managed region)')}`);
-    for (const { config } of listProjectsSync()) {
-      if (existsSync(resolveProjectContextFile(config.path))) {
-        console.log(
-          `  ${chalk.blue('↻')} ${config.name} → ${join(config.path, 'CLAUDE.md')} ${chalk.dim('(managed region)')}`,
-        );
-      }
-    }
+    console.log(chalk.cyan('context layers → Overdeck launch artifacts:'));
+    console.log(`  ${chalk.blue('↻')} global → ~/.overdeck/context/{claude,pi,codex}-global.md`);
 
     // Show .pan/skills/ source files for each registered project
     const dryRunProjects = listProjectsSync();
@@ -203,22 +189,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         }
       }
 
-      // Show multi-tool sync targets
-      const tools = resolveAlsoSyncToolsSync(config.path);
-      if (tools.length > 0) {
-        console.log(chalk.cyan(`\nmulti-tool sync (${config.name}): ${tools.join(', ')}`));
-        const panSkillsDirExists = existsSync(join(config.path, '.pan', 'skills'));
-        if (panSkillsDirExists) {
-          const skills = readdirSync(join(config.path, '.pan', 'skills'), { withFileTypes: true })
-            .filter(e => e.isDirectory())
-            .map(e => e.name);
-          for (const tool of tools) {
-            for (const skillName of skills) {
-              console.log(`  ${chalk.green('+')} ${skillName} → ${tool}`);
-            }
-          }
-        }
-      }
     }
 
     // Agent directory cleanup preview
@@ -238,35 +208,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
     printTimings();
     return;
-  }
-
-  // Run one-time migration: strip legacy sync targets from config.toml
-  const syncMigration = time('migrate-sync-targets', () => migrateSyncTargetsSync());
-  if (syncMigration.migrated) {
-    if (syncMigration.hadNonClaudeTargets) {
-      console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Overdeck now syncs to Claude Code only).'));
-    }
-  }
-
-  // Run one-time migration: remove Overdeck-managed symlinks from legacy runtime dirs
-  const cleanupResult = time('cleanup-legacy-runtimes', () => cleanupLegacyRuntimeSymlinksSync());
-  if (cleanupResult.cleaned.length > 0) {
-    console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
-  }
-
-  // One-time migration: remove Overdeck symlinks from ~/.claude/ (devroot replaces this)
-  const migration = time('migrate-stale-personal', () => migrateStalePersonalContentSync());
-  if (migration.removedSymlinks.length > 0) {
-    console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Overdeck symlink(s) from ~/.claude/`));
-    if (migration.preservedUserContent.length > 0) {
-      console.log(chalk.dim(`  Preserved ${migration.preservedUserContent.length} user-created item(s)`));
-    }
-  }
-
-  // 0.7.0 upgrade: remove renamed/deleted legacy skills from ~/.claude/skills/
-  const removedLegacy = time('remove-legacy-skills', () => removeLegacySkills070Sync());
-  if (removedLegacy.length > 0) {
-    console.log(chalk.dim(`Removed ${removedLegacy.length} legacy skill(s) from upgrade to 0.7.0: ${removedLegacy.join(', ')}`));
   }
 
   const config = loadConfigSync();
@@ -306,9 +247,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (cacheResult.keptModified.length > 0) cacheParts.push(`kept ${cacheResult.keptModified.length} user-modified stale`);
   cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
-  // Distribute bundled skills + agents to Claude and native skill bundles to
-  // the Agent Skills standard home used by Codex, Pi, and Oh My Pi.
-  const spinner = ora('Distributing skills across agent harnesses...').start();
+  // Populate only Overdeck-owned harness homes. Managed launchers opt in;
+  // native ~/.claude and ~/.agents trees are never touched.
+  const spinner = ora('Refreshing Overdeck-private harness assets...').start();
   const result = time('execute-sync', () => executeSyncSync({ force: options.force, diff: options.diff }));
   const agentSkillsResult = time('execute-agent-skills-sync', () =>
     executeAgentSkillsSync({ force: options.force, diff: options.diff }),
@@ -347,23 +288,23 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   if (result.conflicts.length + agentSkillsResult.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
+    spinner.warn(`Synced ${totalSynced} private Claude items and ${totalAgentSkillsSynced} private skill files${adoptionSummary}${staleSummaryText}, ${result.conflicts.length + agentSkillsResult.conflicts.length} modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
-    for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `~/.agents/skills/${name}`)]) {
+    for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `harnesses/agent-skills/${name}`)]) {
       console.log(chalk.dim(`  - ${name}`));
     }
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
   } else if (result.skipped.length + agentSkillsResult.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
+    spinner.succeed(`Synced ${totalSynced} private Claude items and ${totalAgentSkillsSynced} private skill files${adoptionSummary}${staleSummaryText} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText}`);
+    spinner.succeed(`Synced ${totalSynced} private Claude items and ${totalAgentSkillsSynced} private skill files${adoptionSummary}${staleSummaryText}`);
   }
 
   const keptModifiedPaths = [
     ...result.keptModified,
-    ...agentSkillsResult.keptModified.map((name) => `~/.agents/${name}`),
+    ...agentSkillsResult.keptModified.map((name) => `harnesses/agent-skills/${name}`),
   ];
   if (keptModifiedPaths.length > 0) {
     console.log('');
@@ -371,18 +312,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     for (const name of keptModifiedPaths) console.log(chalk.dim(`  - ${name}`));
   }
 
-  // Render the layered context into harness CLAUDE.md files (PAN-1201).
+  // Render layered context into Overdeck-owned launch artifacts.
   const ctxSpinner = ora('Rendering context layers...').start();
   const ctx = time('context-layers', () => syncContextLayersSync());
   const ctxParts: string[] = [];
   if (ctx.globalStubCreated) ctxParts.push('seeded global.md');
-  if (ctx.globalWritten) ctxParts.push('~/.claude/CLAUDE.md');
-  if (ctx.projectsWritten.length > 0) {
-    ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
-  }
-  if (ctx.legacyBeadsCleanups.length > 0) {
-    ctxParts.push(`${ctx.legacyBeadsCleanups.length} legacy Beads reference file(s) cleaned`);
-  }
+  if (ctx.claudeGlobalWritten) ctxParts.push('claude-global.md');
+  if (ctx.piGlobalWritten) ctxParts.push('pi-global.md');
+  if (ctx.codexGlobalWritten) ctxParts.push('codex-global.md');
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
     for (const e of ctx.errors) console.log(chalk.red(`  ✗ ${e}`));
@@ -390,33 +327,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
-  }
-
-  for (const cleanup of ctx.legacyBeadsCleanups) {
-    console.log(chalk.green(`  ✓ Removed legacy generated Beads references: ${cleanup.file}`));
-    console.log(chalk.dim(`    Backup: ${cleanup.backupPath}`));
-  }
-
-  // One-time notice: a managed region was added to a file that already had
-  // hand-authored content. Reassure the user their content is preserved and
-  // point at the backup taken before the first injection.
-  if (ctx.firstInjections.length > 0) {
-    console.log(
-      chalk.cyan('\n  ℹ Overdeck added a managed region to existing context file(s):'),
-    );
-    for (const fi of ctx.firstInjections) {
-      console.log(`    • ${fi.file}`);
-      console.log(
-        chalk.dim(
-          `      Your content outside the markers is untouched. Backup: ${fi.backupPath}`,
-        ),
-      );
-    }
-    console.log(
-      chalk.dim(
-        '    Edit the layer source (pan context edit), never the region between the markers.',
-      ),
-    );
   }
 
   // Sync hooks (bin scripts)
@@ -443,10 +353,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.info('No hooks to sync');
   }
 
-  // Registration is as important as copying the scripts. Repair the complete
-  // global hook table on every explicit sync so upgrades cannot leave an old
-  // heartbeat hook present while SessionStart is still missing.
-  const hookRegistrationSpinner = ora('Registering Claude Code hooks...').start();
+  // Register only in Overdeck's private Claude settings. Managed launchers
+  // copy this private config into their per-agent CLAUDE_CONFIG_DIR.
+  const hookRegistrationSpinner = ora('Registering private Claude Code hooks...').start();
   const hookProvision = await timeAsync('register-claude-hooks', () => provisionClaudeHooks());
   if (!hookProvision.ok) {
     hookRegistrationSpinner.warn(`Claude Code hooks unavailable: ${hookProvision.reason}`);
@@ -456,23 +365,21 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hookRegistrationSpinner.info('Claude Code hooks already registered');
   }
 
-  // Bundled Claude Code plugins (sync-sources/plugins.json) install through
-  // the `claude plugin` CLI — they are marketplace bundles, not copyable files.
-  const pluginSpinner = ora('Provisioning Claude Code plugins...').start();
-  const pluginProvision = await timeAsync('provision-claude-plugins', () => provisionClaudePlugins());
+  // Plugin CLI state is also provisioned only in Overdeck's canonical private
+  // Claude home. Managed launch homes merge this layer with user-owned plugin
+  // state without touching ~/.claude.
+  const pluginSpinner = ora('Provisioning private Claude Code plugins...').start();
+  const pluginProvision = await timeAsync('provision-claude-plugins', () =>
+    provisionClaudePlugins({ configDir: getOverdeckClaudeHome() }));
   if (!pluginProvision.ok) {
     pluginSpinner.warn(`Claude Code plugins unavailable: ${pluginProvision.reason}`);
   } else if (pluginProvision.errors.length > 0) {
-    pluginSpinner.warn(`Installed ${pluginProvision.installed.length} Claude Code plugin(s), ${pluginProvision.errors.length} error(s)`);
-    for (const error of pluginProvision.errors) {
-      console.log(chalk.red(`  ✗ ${error}`));
-    }
+    pluginSpinner.warn(`Provisioned plugins with ${pluginProvision.errors.length} error(s)`);
+    for (const error of pluginProvision.errors) console.log(chalk.red(`  ✗ ${error}`));
   } else if (pluginProvision.installed.length > 0) {
-    pluginSpinner.succeed(`Installed Claude Code plugin(s): ${pluginProvision.installed.join(', ')}`);
-  } else if (pluginProvision.alreadyInstalled.length > 0) {
-    pluginSpinner.info('Claude Code plugins already installed');
+    pluginSpinner.succeed(`Installed ${pluginProvision.installed.length} private Claude Code plugin(s)`);
   } else {
-    pluginSpinner.info('No bundled Claude Code plugins declared');
+    pluginSpinner.info('Private Claude Code plugins already provisioned');
   }
 
   const projects = listProjectsSync();
@@ -530,7 +437,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // flag (prevents stale zoom/profile state) and the off-the-shelf Excalidraw
   // MCP server (backs the /excalidraw skill). Both helpers are idempotent and
   // mutate the parsed config in place; we only write back if anything changed.
-  const mcpPath = join(homedir(), '.claude', 'mcp.json');
+  const mcpPath = join(getOverdeckClaudeHome(), 'mcp.json');
   try {
     if (existsSync(mcpPath)) {
       const mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf-8'));
@@ -550,7 +457,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     // Non-fatal — skip if mcp.json can't be read/written
   }
 
-  // Migrate .overdeck/ → .pan/ and run multi-tool sync in all registered projects
+  // Migrate legacy Overdeck-owned workspace state in registered projects.
   for (const { config } of projects) {
     if (!existsSync(config.path)) continue;
 
@@ -566,16 +473,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log(chalk.red(`Migration error in ${config.name}: ${err}`));
     }
 
-    // Multi-tool skill sync (cursor, codex, windsurf, cline, copilot, aider)
-    const toolSyncResults = runMultiToolSyncSync(config.path);
-    for (const r of toolSyncResults) {
-      if (r.written.length > 0) {
-        console.log(chalk.cyan(`Synced ${r.written.length} skill(s) to ${r.tool} in ${config.name}`));
-      }
-      for (const err of r.errors) {
-        console.log(chalk.red(`Multi-tool sync error (${r.tool}) in ${config.name}: ${err}`));
-      }
-    }
   }
 
   // Sync git hooks to all registered projects (branch protection)
@@ -653,28 +550,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     } else {
       gitHooksSpinner.info('Git hooks already up to date');
     }
-  }
-
-  // Pi harness — point Pi's settings file at ~/.claude/skills so it sees the
-  // same skills tree we just synced. No-op when Pi is not on PATH (PAN-636).
-  const piResult = syncPiSettingsSync();
-  if (piResult.status === 'created') {
-    console.log(chalk.cyan(`Pi settings: created ${piResult.path.replace(homedir(), '~')}`));
-  } else if (piResult.status === 'updated') {
-    console.log(chalk.cyan(`Pi settings: merged skills entry into ${piResult.path.replace(homedir(), '~')}`));
-  } else if (piResult.status === 'skipped' && piResult.reason === 'existing settings.json is not valid JSON') {
-    console.log(chalk.yellow(`Pi settings: ${piResult.path.replace(homedir(), '~')} is not valid JSON — left untouched`));
-  }
-
-  // Mirror project-level skills/ → .claude/skills/ for a project that keeps a
-  // top-level skills/ tree, so pan sync works from inside such a project.
-  const skillsMirror = mirrorProjectSkillsSync(process.cwd());
-  const skillsParts: string[] = [];
-  if (skillsMirror.added.length > 0) skillsParts.push(`${skillsMirror.added.length} added`);
-  if (skillsMirror.updated.length > 0) skillsParts.push(`${skillsMirror.updated.length} updated`);
-  if (skillsMirror.removed.length > 0) skillsParts.push(`${skillsMirror.removed.length} removed`);
-  if (skillsParts.length > 0) {
-    console.log(chalk.cyan(`Skills mirror: ${skillsParts.join(', ')}`));
   }
 
   // Agent directory cleanup

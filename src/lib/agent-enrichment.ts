@@ -15,7 +15,7 @@ import { existsSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
-import { encodeClaudeProjectDir } from './paths.js'
+import { claudeProjectsRootsForAgent, encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
@@ -187,6 +187,22 @@ export function getClaudeProjectDir(workspacePath: string): string {
   return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
+/** Agent-private Claude project dir first, native legacy/manual dir last. */
+export function getClaudeProjectDirsForAgent(agentId: string, workspacePath: string): string[] {
+  const encoded = encodeClaudeProjectDir(workspacePath)
+  return claudeProjectsRootsForAgent(agentId).map(root => join(root, encoded))
+}
+
+async function projectDirsWithJsonlFallback(agentId: string, workspacePath: string): Promise<string[]> {
+  for (const projectDir of getClaudeProjectDirsForAgent(agentId, workspacePath)) {
+    try {
+      const entries = await readdir(projectDir)
+      if (entries.some(entry => entry.endsWith('.jsonl'))) return [projectDir]
+    } catch { /* try native legacy/manual fallback */ }
+  }
+  return []
+}
+
 export async function getActiveSessionPath(projectDir: string): Promise<string | null> {
   if (!existsSync(projectDir)) return null
   try {
@@ -285,13 +301,19 @@ function getProjectPathByPrefix(issuePrefix: string): string {
 async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
-  const projectDir = getClaudeProjectDir(workspace)
+  const projectDirs = getClaudeProjectDirsForAgent(agentId, workspace)
   const sessionId = getLatestSessionIdSync(agentId)
   if (sessionId) {
-    const ownPath = join(projectDir, `${sessionId}.jsonl`)
-    if (existsSync(ownPath)) return ownPath
+    for (const projectDir of projectDirs) {
+      const ownPath = join(projectDir, `${sessionId}.jsonl`)
+      if (existsSync(ownPath)) return ownPath
+    }
   }
-  return await getActiveSessionPath(projectDir)
+  for (const projectDir of projectDirs) {
+    const active = await getActiveSessionPath(projectDir)
+    if (active) return active
+  }
+  return null
 }
 
 /**
@@ -305,22 +327,20 @@ async function getAgentJsonlPathPromise(agentId: string): Promise<string | null>
 async function countPendingAskUserQuestionsForAgentPromise(agentId: string): Promise<number> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return 0
-  const projectDir = getClaudeProjectDir(workspace)
-  if (!existsSync(projectDir)) return 0
-  let files: string[]
-  try {
-    files = (await readdir(projectDir)).filter(f => f.endsWith('.jsonl'))
-  } catch {
-    return 0
-  }
+  const projectDirs = await projectDirsWithJsonlFallback(agentId, workspace)
+  if (projectDirs.length === 0) return 0
   let total = 0
-  for (const f of files) {
-    try {
-      const scan = await scanPendingInputsPromise(join(projectDir, f))
-      total += scan.askUserQuestions.length
-    } catch {
-      // A file vanishing mid-scan (rotation) is not "no question" — but we
-      // can't read it, so skip it; other files still contribute.
+  for (const projectDir of projectDirs) {
+    let files: string[] = []
+    try { files = (await readdir(projectDir)).filter(f => f.endsWith('.jsonl')) } catch { /* rotated */ }
+    for (const f of files) {
+      try {
+        const scan = await scanPendingInputsPromise(join(projectDir, f))
+        total += scan.askUserQuestions.length
+      } catch {
+        // A file vanishing mid-scan (rotation) is not "no question" — but we
+        // can't read it, so skip it; other files still contribute.
+      }
     }
   }
   return total

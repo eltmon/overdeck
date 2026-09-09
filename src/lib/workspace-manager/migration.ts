@@ -76,25 +76,19 @@ export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResul
  *   - ~/.overdeck/config.yaml      → <workspace>/.overdeck/config.yaml
  *   - ~/.overdeck/projects.yaml    → <workspace>/.overdeck/projects.yaml
  *   - ~/.overdeck/settings.json    → <workspace>/.overdeck/settings.json
- *   - ~/.claude/settings.json hooks  → <workspace>/.claude/settings.json (merged)
- *
- * Safe to call multiple times — merges rather than overwrites.
+ * Harness-native files are intentionally excluded. Managed launches receive
+ * settings, hooks, MCP, skills, and context through Overdeck-private homes.
  */
 export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
   const result = { copied: [] as string[], errors: [] as string[] };
   const overdeckDir = join(workspacePath, '.overdeck');
-  const claudeDir = join(workspacePath, '.claude');
 
   mkdirSync(overdeckDir, { recursive: true });
-  if (!existsSync(claudeDir)) {
-    mkdirSync(claudeDir, { recursive: true });
-  }
 
   const filesToCopy = [
     { source: join(homedir(), '.overdeck', 'config.yaml'), target: join(overdeckDir, 'config.yaml') },
     { source: join(homedir(), '.overdeck', 'projects.yaml'), target: join(overdeckDir, 'projects.yaml') },
     { source: join(homedir(), '.overdeck', 'settings.json'), target: join(overdeckDir, 'settings.json') },
-    { source: join(homedir(), '.claude', 'mcp.json'), target: join(claudeDir, 'mcp.json') },
   ];
 
   for (const { source, target } of filesToCopy) {
@@ -104,92 +98,6 @@ export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { co
       result.copied.push(target);
     } catch (err: any) {
       result.errors.push(`${source}: ${err.message}`);
-    }
-  }
-
-  // Merge global ~/.claude/settings.json into workspace .claude/settings.json
-  const globalSettingsPath = join(homedir(), '.claude', 'settings.json');
-  const workspaceSettingsPath = join(claudeDir, 'settings.json');
-
-  if (existsSync(globalSettingsPath)) {
-    try {
-      const globalSettings = JSON.parse(readFileSync(globalSettingsPath, 'utf-8'));
-      let workspaceSettings: Record<string, unknown> = {};
-      if (existsSync(workspaceSettingsPath)) {
-        try {
-          workspaceSettings = JSON.parse(readFileSync(workspaceSettingsPath, 'utf-8'));
-        } catch {
-          // Unparseable — start fresh
-          workspaceSettings = {};
-        }
-      }
-
-      // Deep-merge hooks so workspace settings (e.g. caveman) are preserved
-      const mergedHooks: Record<string, unknown> = {};
-      if (globalSettings.hooks) {
-        Object.assign(mergedHooks, globalSettings.hooks);
-      }
-      if (workspaceSettings.hooks) {
-        for (const [key, value] of Object.entries(workspaceSettings.hooks as Record<string, unknown>)) {
-          if (Array.isArray(value) && Array.isArray(mergedHooks[key])) {
-            mergedHooks[key] = [...(mergedHooks[key] as unknown[]), ...value];
-          } else {
-            mergedHooks[key] = value;
-          }
-        }
-      }
-
-      // Validate hook paths — remove hooks that reference non-existent absolute paths
-      // to prevent Claude Code from hanging when executing broken hooks.
-      function isBrokenHookCommand(command: string): boolean {
-        const tokens = command.split(/\s+/);
-        for (let token of tokens) {
-          token = token.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
-          if (token.startsWith('/')) {
-            try {
-              if (!existsSync(token)) return true;
-            } catch {
-              return true;
-            }
-          }
-        }
-        return false;
-      }
-
-      for (const [category, hookList] of Object.entries(mergedHooks)) {
-        if (!Array.isArray(hookList)) continue;
-        const validHooks = (hookList as Array<{ command?: string }>).filter((hook) => {
-          if (typeof hook.command !== 'string') return true;
-          if (!hook.command.trim()) return true;
-          const hasAbsolutePath = hook.command.split(/\s+/).some((t) => {
-            const clean = t.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
-            return clean.startsWith('/');
-          });
-          if (!hasAbsolutePath) return true; // relative / shell-only, skip validation
-          if (isBrokenHookCommand(hook.command)) {
-            result.errors.push(`Removed broken hook from workspace settings: ${category} → ${hook.command}`);
-            return false;
-          }
-          return true;
-        });
-        if (validHooks.length === 0) {
-          delete mergedHooks[category];
-        } else {
-          mergedHooks[category] = validHooks;
-        }
-      }
-
-      const merged = { ...globalSettings, ...workspaceSettings };
-      if (Object.keys(mergedHooks).length > 0) {
-        merged.hooks = mergedHooks;
-      } else {
-        delete (merged as Record<string, unknown>).hooks;
-      }
-
-      writeFileSync(workspaceSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
-      result.copied.push(workspaceSettingsPath);
-    } catch (err: any) {
-      result.errors.push(`${globalSettingsPath}: ${err.message}`);
     }
   }
 
@@ -203,7 +111,7 @@ export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { co
  */
 export function ensurePanGitignoreSync(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
-  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/'];
+  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/'];
 
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const lines = content.split('\n');

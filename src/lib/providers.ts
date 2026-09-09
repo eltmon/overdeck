@@ -5,9 +5,6 @@
  * or through local Anthropic-compatible sidecars such as CLIProxyAPI.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { Effect } from 'effect';
 import type { ModelId, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -604,28 +601,8 @@ export function getProviderEnvSync(
  * Must be called before spawning the agent.
  */
 export function setupCredentialFileAuthSync(provider: ProviderConfig, workspacePath: string): void {
-  if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
-
-  const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
-  const claudeDir = join(workspacePath, '.claude');
-  const settingsPath = join(claudeDir, 'settings.local.json');
-
-  if (!existsSync(claudeDir)) {
-    mkdirSync(claudeDir, { recursive: true });
-  }
-
-  // Read existing settings or start fresh
-  let settings: Record<string, unknown> = {};
-  if (existsSync(settingsPath)) {
-    try {
-      settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-    } catch { /* start fresh */ }
-  }
-
-  // Set the apiKeyHelper to our token reader script
-  settings.apiKeyHelper = helperPath;
-
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  void provider;
+  void workspacePath;
 }
 
 /**
@@ -637,16 +614,7 @@ export function setupCredentialFileAuthSync(provider: ProviderConfig, workspaceP
  * token helper and fail with "Invalid API key".
  */
 export function clearCredentialFileAuthSync(workspacePath: string): void {
-  const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
-  if (!existsSync(settingsPath)) return;
-
-  try {
-    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-    if (!settings.apiKeyHelper) return; // Nothing to clear
-
-    delete settings.apiKeyHelper;
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-  } catch { /* non-fatal */ }
+  void workspacePath;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -666,45 +634,17 @@ export const getProviderEnv = (
 export const setupCredentialFileAuth = (
   provider: ProviderConfig,
   workspacePath: string,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: async () => {
-      if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
-
-      const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
-      const claudeDir = join(workspacePath, '.claude');
-      const settingsPath = join(claudeDir, 'settings.local.json');
-
-      if (!existsSync(claudeDir)) {
-        await mkdir(claudeDir, { recursive: true });
-      }
-
-      let settings: Record<string, unknown> = {};
-      if (existsSync(settingsPath)) {
-        try {
-          settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-        } catch { /* start fresh */ }
-      }
-
-      settings.apiKeyHelper = helperPath;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    },
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'setupCredentialFileAuth', cause }),
-  });
+): Effect.Effect<void, FsError> => {
+  void provider;
+  void workspacePath;
+  return Effect.void;
+};
 
 /** Effect variant of {@link clearCredentialFileAuthSync}. Swallows all errors (non-fatal). */
-export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<void, never> =>
-  Effect.promise(async () => {
-    const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
-    if (!existsSync(settingsPath)) return;
-    try {
-      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-      if (!settings.apiKeyHelper) return;
-      delete settings.apiKeyHelper;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    } catch { /* non-fatal */ }
-  });
+export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<void, never> => {
+  void workspacePath;
+  return Effect.void;
+};
 
 /**
  * Map a Overdeck provider to the Pi harness's provider name for that

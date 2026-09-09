@@ -3,16 +3,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import {
-  PROJECT_LAYER_END,
-  PROJECT_LAYER_START,
   assembleWorkspaceContext,
   workspaceContextWithoutProjectLayer,
 } from '../../../src/lib/context-layers/assemble.js';
-import { projectContextFile } from '../../../src/lib/context-layers/layers.js';
 
 describe('assembleWorkspaceContext', () => {
   let projectRoot: string;
@@ -26,8 +23,6 @@ describe('assembleWorkspaceContext', () => {
 
   it('includes the issue header, branch and workspace path', () => {
     const out = assembleWorkspaceContext({
-      projectRoot,
-      harness: 'claude-code',
       issueId: 'PAN-1201',
       workspacePath: '/ws/feature-pan-1201',
       branch: 'feat/pan-1201',
@@ -37,29 +32,18 @@ describe('assembleWorkspaceContext', () => {
     expect(out).toContain('feat/pan-1201');
   });
 
-  it('marks the rendered project layer so consumers can remove it structurally', () => {
-    const pf = projectContextFile(projectRoot);
-    mkdirSync(dirname(pf), { recursive: true });
-    writeFileSync(pf, 'Project rule.\n\n---\n\nSecond rule.\n{{#harness:pi}}pi-only{{/harness:pi}}');
-
-    const claude = assembleWorkspaceContext({
-      projectRoot,
-      harness: 'claude-code',
+  it('is harness-neutral and leaves project rendering to launch composition', () => {
+    const workspace = assembleWorkspaceContext({
       issueId: 'PAN-1',
       workspacePath: '/ws',
     });
-    expect(claude).toContain(PROJECT_LAYER_START);
-    expect(claude).toContain('Project rule.\n\n---\n\nSecond rule.');
-    expect(claude).toContain(PROJECT_LAYER_END);
-    expect(claude).not.toContain('pi-only');
-    expect(workspaceContextWithoutProjectLayer(claude)).toContain('# Workspace: PAN-1');
-    expect(workspaceContextWithoutProjectLayer(claude)).not.toContain('Project rule.');
+    expect(workspace).toContain('# Workspace: PAN-1');
+    expect(workspace).not.toContain('overdeck:project-layer');
+    expect(workspaceContextWithoutProjectLayer(workspace)).toBe(workspace.trim());
   });
 
   it('composes the memory and status sections after the header', () => {
     const out = assembleWorkspaceContext({
-      projectRoot,
-      harness: 'claude-code',
       issueId: 'PAN-1',
       workspacePath: '/ws',
       memoryContext: '## Memory\nremembered fact',
@@ -71,8 +55,6 @@ describe('assembleWorkspaceContext', () => {
 
   it('omits sections with no content', () => {
     const out = assembleWorkspaceContext({
-      projectRoot,
-      harness: 'claude-code',
       issueId: 'PAN-1',
       workspacePath: '/ws',
     });

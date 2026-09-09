@@ -142,16 +142,17 @@ describe('provisionClaudeHooks', () => {
     expect(existsSync(join(binDir, 'record-cost-event.js'))).toBe(true);
   });
 
-  // Regression: tests that reach the spawn path with a temp OVERDECK_HOME used
-  // to append temp-bin hook entries into the developer's REAL settings.json —
-  // one /tmp/pan-agent-role-* linear-mcp-auth-hook pair per run — which then
-  // fired "not found" PostToolUse errors in every live Claude session.
-  it('never touches the real ~/.claude/settings.json when called with defaults under vitest', async () => {
-    const result = await provisionClaudeHooks();
-
-    expect(result.ok).toBe(true);
-    expect(result.changed).toBe(false);
-    expect(result.binariesSynced).toBe(0);
-    expect(result.reason).toContain('test runner');
+  it('uses the Overdeck-private Claude settings path by default', async () => {
+    const previous = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = tmpRoot;
+    try {
+      const result = await provisionClaudeHooks();
+      expect(result.ok).toBe(true);
+      expect(result.changed).toBe(true);
+      expect(existsSync(join(tmpRoot, 'harnesses', 'claude', 'settings.json'))).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = previous;
+    }
   });
 });
