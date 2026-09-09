@@ -85,6 +85,11 @@ function makeGhMocks(logExcerpt = 'FAIL: assertion failed') {
   const execFileMock = makeExecFileMock([
     {
       cmd: 'gh',
+      args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+      stdout: 'main-sha\n',
+    },
+    {
+      cmd: 'gh',
       args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
       stdout: JSON.stringify([
         { databaseId: 10, name: 'main-lint', workflowName: 'CI', headSha: 'main-sha', conclusion: 'failure' },
@@ -139,7 +144,7 @@ describe('relayCiFailureFeedback', () => {
     }));
   });
 
-  it('labels failures inherited from main', async () => {
+  it('labels failures inherited when the exact current main head is failing', async () => {
     makeGhMocks();
 
     await Effect.runPromise(relayCiFailureFeedback({
@@ -155,6 +160,134 @@ describe('relayCiFailureFeedback', () => {
     const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
     expect(markdownBody).toContain('### pr-test');
     expect(markdownBody).toContain('### main-lint [INHERITED FROM MAIN — also failing on main]');
+  });
+
+  it('does not label a branch failure inherited from a stale historical main run', async () => {
+    const execFileMock = makeExecFileMock([
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'current-main-sha\n',
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
+        stdout: JSON.stringify([
+          { databaseId: 10, name: 'pr-test', workflowName: 'CI', headSha: 'old-main-sha', conclusion: 'failure' },
+        ]),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'],
+        stdout: JSON.stringify([
+          { databaseId: 20, name: 'pr-test', workflowName: 'CI', headSha: 'abc123def456', conclusion: 'failure' },
+        ]),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'view', '20'],
+        stdout: 'branch failure',
+      },
+    ]);
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
+
+    await Effect.runPromise(relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      source: 'check_run:test',
+    }));
+
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('### pr-test');
+    expect(markdownBody).not.toContain('### pr-test [INHERITED FROM MAIN');
+  });
+
+  it('does not label a branch failure inherited when the main-head lookup fails', async () => {
+    const execFileMock = makeExecFileMock([
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: '',
+        error: new Error('network error'),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'],
+        stdout: JSON.stringify([
+          { databaseId: 20, name: 'pr-test', workflowName: 'CI', headSha: 'abc123def456', conclusion: 'failure' },
+        ]),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'view', '20'],
+        stdout: 'branch failure',
+      },
+    ]);
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
+
+    await Effect.runPromise(relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      source: 'check_run:test',
+    }));
+
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('### pr-test');
+    expect(markdownBody).not.toContain('### pr-test [INHERITED FROM MAIN');
+    expect(execFile).not.toHaveBeenCalledWith(
+      'gh',
+      expect.arrayContaining(['--branch', 'main']),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('does not label a branch failure inherited when the main-run lookup fails', async () => {
+    const execFileMock = makeExecFileMock([
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'current-main-sha\n',
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
+        stdout: '',
+        error: new Error('network error'),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'],
+        stdout: JSON.stringify([
+          { databaseId: 20, name: 'pr-test', workflowName: 'CI', headSha: 'abc123def456', conclusion: 'failure' },
+        ]),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'view', '20'],
+        stdout: 'branch failure',
+      },
+    ]);
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
+
+    await Effect.runPromise(relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      source: 'check_run:test',
+    }));
+
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('### pr-test');
+    expect(markdownBody).not.toContain('### pr-test [INHERITED FROM MAIN');
   });
 
   it('debounces duplicate feedback for the same head SHA', async () => {
@@ -173,7 +306,7 @@ describe('relayCiFailureFeedback', () => {
     await Effect.runPromise(relayCiFailureFeedback(opts));
     await Effect.runPromise(relayCiFailureFeedback(opts));
 
-    expect(execFile).toHaveBeenCalledTimes(4); // 2 list + 2 view (only once because debounced)
+    expect(execFile).toHaveBeenCalledTimes(5); // main SHA + 2 list + 2 view (only once because debounced)
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
@@ -222,6 +355,11 @@ describe('relayCiFailureFeedback', () => {
     const execFileMock = makeExecFileMock([
       {
         cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'main-sha\n',
+      },
+      {
+        cmd: 'gh',
         args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
         stdout: JSON.stringify([]),
       },
@@ -259,6 +397,11 @@ describe('relayCiFailureFeedback', () => {
     const execFileMock = makeExecFileMock([
       {
         cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'main-sha\n',
+      },
+      {
+        cmd: 'gh',
         args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
         stdout: JSON.stringify([]),
       },
@@ -288,6 +431,11 @@ describe('relayCiFailureFeedback', () => {
     const execFileMock = makeExecFileMock([
       {
         cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'main-sha\n',
+      },
+      {
+        cmd: 'gh',
         args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
         stdout: JSON.stringify([]),
       },
@@ -315,6 +463,11 @@ describe('relayCiFailureFeedback', () => {
 
   it('skips non-status sources when no failing run is found', async () => {
     const execFileMock = makeExecFileMock([
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main', '--jq', '.sha'],
+        stdout: 'main-sha\n',
+      },
       {
         cmd: 'gh',
         args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],

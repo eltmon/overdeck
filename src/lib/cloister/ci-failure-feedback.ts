@@ -82,6 +82,23 @@ interface GhRunListItem {
   conclusion: string;
 }
 
+async function resolveBranchHeadSha(owner: string, repo: string, branch: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFilePromise(
+      'gh',
+      ['api', `repos/${owner}/${repo}/commits/${branch}`, '--jq', '.sha'],
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    return stdout.trim() || undefined;
+  } catch (err) {
+    console.warn(
+      `[ci-failure-feedback] Failed to resolve ${branch} head:`,
+      err instanceof Error ? err.message : String(err),
+    );
+    return undefined;
+  }
+}
+
 async function listFailingRuns(
   owner: string,
   repo: string,
@@ -221,7 +238,10 @@ async function relayCiFailureFeedbackPromise(
   const { owner, repo } = parseRepo(opts.repo);
 
   // Diff against main's current failing checks so agents do not chase inherited failures.
-  const mainRuns = await listFailingRuns(owner, repo, 'main');
+  const mainHeadSha = await resolveBranchHeadSha(owner, repo, 'main');
+  const mainRuns = mainHeadSha
+    ? await listFailingRuns(owner, repo, 'main', mainHeadSha)
+    : [];
   const mainFailingNames = new Set(mainRuns.map((r) => r.name || r.workflowName || `run-${r.databaseId}`));
 
   // Collect the concrete failures for this PR head.
