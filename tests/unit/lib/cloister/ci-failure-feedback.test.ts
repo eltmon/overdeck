@@ -284,6 +284,35 @@ describe('relayCiFailureFeedback', () => {
     expect(markdownBody).toContain('no failing workflow runs were found');
   });
 
+  it('includes a polling source even when no failing run is found', async () => {
+    const execFileMock = makeExecFileMock([
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'],
+        stdout: JSON.stringify([]),
+      },
+      {
+        cmd: 'gh',
+        args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801', '--status', 'failure'],
+        stdout: JSON.stringify([]),
+      },
+    ]);
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
+
+    const result = await Effect.runPromise(relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      source: 'polling_reconciliation',
+    }));
+
+    expect(result.agentMessageSent).toBe(true);
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('no failing workflow runs were found');
+  });
+
   it('skips non-status sources when no failing run is found', async () => {
     const execFileMock = makeExecFileMock([
       {

@@ -237,7 +237,7 @@ describe('getPullRequestState', () => {
           mergeable: true,
           mergeable_state: 'unstable',
           draft: false,
-          head: { sha: 'abc123' },
+          head: { sha: 'abc123', ref: 'feature/pan-42' },
           base: { ref: 'main' },
         }), { status: 200 });
       }
@@ -258,7 +258,7 @@ describe('getPullRequestState', () => {
     ]);
 
     await expect(Effect.runPromise(getPullRequestState('eltmon', 'overdeck', 42)))
-      .resolves.toMatchObject({ checksPending: false, checksFailed: false });
+      .resolves.toMatchObject({ headRef: 'feature/pan-42', checksPending: false, checksFailed: false });
   });
 
   it('still fails when a real commit status fails', async () => {
