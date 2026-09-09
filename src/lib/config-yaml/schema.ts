@@ -379,7 +379,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -483,6 +483,7 @@ export interface YamlConfig {
       minimax?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
+      meta?: ProviderConfig | boolean;
       mimo?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
       nous?: ProviderConfig | boolean;

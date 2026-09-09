@@ -20,6 +20,8 @@ type ConvAskUserQuestionRow = {
   name: string;
   title?: string | null;
   issueId?: string | null;
+  /** PAN-3766 — pi ask modals are answered by keystrokes, not a message. */
+  harness?: string | null;
   pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
   // PAN-1520 (FR-2) — pending ExitPlanMode plan payload for conversation rows.
   pendingProposedPlan?: PlanApprovalSubject['pendingProposedPlan'];
@@ -174,7 +176,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     visiblePlanApprovalSubjects[0] ??
     null;
 
-  const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
+  const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string; harness?: string | null }> = [
     ...agentsWithAskUserQuestion.map((a) => ({
       kind: 'agent' as const,
       id: a.id,
@@ -192,6 +194,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       issueTitle: c.issueId ? (issues.find((i) => i.id === c.issueId)?.title ?? null) : null,
       kindLabel: 'Conversation',
       title: c.title ?? null,
+      harness: c.harness ?? null,
       pendingAskUserQuestion: c.pendingAskUserQuestion,
       askedAt: c.pendingAskUserQuestion?.askedAt ?? '',
     })),
@@ -328,7 +331,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
   }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issues]);
 
   const askUserQuestionAnswerMutation = useMutation({
-    mutationFn: async ({ kind, id, answers, questions }: {
+    mutationFn: async ({ kind, id, answers, questions, harness, toolUseId }: {
       kind: 'agent' | 'conv';
       id: string;
       /** Friendly display label (issue/conversation title) for the toast. */
@@ -336,6 +339,9 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       answers: string[];
       questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
         ? T extends { questions: infer Q } ? Q : never : never;
+      /** PAN-3766 — conversation harness; pi asks are answered by keystrokes. */
+      harness?: string | null;
+      toolUseId?: string;
     }) => {
       if (kind === 'agent') {
         // fetchWithTimeout everywhere in these mutations: a plain fetch that
@@ -345,6 +351,21 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers }),
+        });
+        if (!res.ok) {
+          let message = `Failed to deliver answer (${res.status})`;
+          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+          throw new Error(message);
+        }
+        return res.json();
+      }
+      // PAN-3766 — a pi ask modal holds the session's input; a queued message
+      // is swallowed. Drive the modal with keystrokes instead.
+      if (harness === 'ohmypi' || harness === 'pi') {
+        const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/pi-ask-answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolUseId, answers }),
         });
         if (!res.ok) {
           let message = `Failed to deliver answer (${res.status})`;
@@ -447,6 +468,8 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       label: subject.title?.trim() || subject.id,
       answers,
       questions: subject.pendingAskUserQuestion?.questions as never,
+      harness: (subject as { harness?: string | null }).harness ?? null,
+      toolUseId: subject.pendingAskUserQuestion?.toolUseId,
     });
   }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
 

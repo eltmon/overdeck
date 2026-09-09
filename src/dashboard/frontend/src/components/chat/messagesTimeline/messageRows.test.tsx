@@ -114,8 +114,8 @@ describe('subagent transcript action', () => {
     status: 'done',
   };
 
-  it('opens the matching subagent from an expanded Agent row without a raw JSON fallback', () => {
-    const agentEntry = { ...entry, label: 'Agent', toolTitle: 'Agent' };
+  it.each(['Agent', 'Task'])('opens the matching subagent from an expanded %s row', (tool) => {
+    const agentEntry = { ...entry, label: tool, toolTitle: tool };
     const onOpenSubagent = vi.fn();
     render(
       <WorkLogGroup
@@ -125,10 +125,23 @@ describe('subagent transcript action', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Agent'));
+    fireEvent.click(screen.getByText(tool));
     expect(screen.getByText('Explore')).toBeInTheDocument();
     expect(screen.getByTestId('md')).toHaveTextContent('Find the relevant message path.');
     expect(screen.queryByText(/"subagent_type"/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open subagent transcript' }));
+    expect(onOpenSubagent).toHaveBeenCalledWith(entry.id);
+  });
+
+  it('opens a Codex child while preserving every spawn argument and the tool result', () => {
+    const toolInput = { task_name: 'reader', message: 'Inspect the parser', fork_turns: 'all', agent_type: 'explorer' };
+    const result = '{"task_name":"/root/reader"}';
+    const onOpenSubagent = vi.fn();
+    render(<WorkLogGroup entries={[{ ...entry, label: 'spawn_agent', toolTitle: 'spawn_agent', toolInput, result }]}
+      subagentByToolUseId={new Map([[entry.id, subagent]])} onOpenSubagent={onOpenSubagent} />);
+    fireEvent.click(screen.getByText('spawn_agent'));
+    expect(screen.getByText((_, element) => element?.tagName === 'CODE' && element.textContent === JSON.stringify(toolInput, null, 2))).toBeInTheDocument();
+    expect(screen.getByText(result)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open subagent transcript' }));
     expect(onOpenSubagent).toHaveBeenCalledWith(entry.id);
   });

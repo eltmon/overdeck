@@ -94,6 +94,16 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    `Flywheel-Affects-Criterion: N[,M]` trailer line in the issue body using the 1–7 numbering from
    `docs/FLYWHEEL.md` **Reading the Stats panel**. This lets the Flywheel weight model rank the
    bug higher when that criterion is the current bottleneck.
+   **Recurrence is the step-back signal.** One stuck agent is an instance; the same failure on two
+   issues — or the same issue failing the same way twice — is a *class*, and a class is never fixed
+   instance-by-instance. On recurrence, stop dispatching recoveries: name the class, find the shared
+   mechanism in the code, and land the one fix that deletes the class. And when machinery exists
+   mainly to compensate for an unfixed root cause — retry loops, reset/restart plumbing,
+   status-repair sweeps, cycling an issue between work and review — **that machinery is itself the
+   symptom.** File the substrate issue that removes the cause and simplifies the machinery, and
+   route the refactor through supervised handoff per TENET-10. Pipeline code whose main job is
+   shuttling an issue between work and review forever is what an unrooted cause looks like after
+   it calcifies; your job is to dissolve it, not to operate it faster.
    **A `pan tell` nudge that unblocks one stuck/conflicted/blocked agent is the same anti-pattern:**
    it clears one instance while the identical failure recurs for the next issue — a band-aid, not
    a fix. Your job is not to nudge things to keep them moving; it is to identify the **root cause
@@ -329,7 +339,11 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    at the root (Mission #4), never a `pan tell` band-aid.
 2. **Orient.** Classify each issue: healthy, ghost, stuck, stalled, wrong-column, reverting,
    awaiting-UAT, merge-ready, blocked. Relevance-vet every launch candidate (above). An idle
-   issue is a bug unless explicitly parked with a concrete reason.
+   issue is a bug unless explicitly parked with a concrete reason. A troubled/stuck agent is a
+   **diagnosis target, not a resume target** — read WHY it tripped the gate (pane tail,
+   transcript, verdict, DB state) before you clear or restart it. Two agents troubled the same
+   way, or the same agent troubled twice for the same reason, is a fleet symptom: one substrate
+   cause, one fix (Mission #4) — never N individual clearances.
 3. **Decide.** Rank: red-main/P0 → **substrate-hardening** (`substrate-improvement` /
    `architecture` / `v1.0-required` — the substrate is the prerequisite for everything else, per
    `vision.mdx`) → P1 bugs → P2 features → older work; within a tier, oldest ready first, never
@@ -398,6 +412,16 @@ judge **divergence, not elapsed time**:
 Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE.md`.
 
 ## Recovery actions (drive through — do not surface)
+
+**A recovery verb moves one instance; it never explains it.** Before the FIRST restart, resync,
+or re-dispatch of any issue, form a root-cause hypothesis from evidence (pane tail, transcript,
+review verdict, `review_status` in `overdeck.db`) and record it in `docs/FLYWHEEL-STATE.md`.
+Running the same recovery verb on the same issue a SECOND time without a confirmed cause and a
+substrate fix in flight is a failed tick — you are cycling the pipeline, not repairing it. The
+work↔review loop is the canonical trap: a review that stalls twice is not "stalled again," it is
+telling you the review machinery (verdict delivery, recording, convoy synthesis, the status
+resolver) is broken. Go to the code per Mission #4's deep-dive rule and fix that, or every next
+issue cycles the same way.
 
 - **Merge-blockers (PAN-1620):** `pan flywheel merge-blockers --json` each tick. `merge_conflict`
   on a stopped branch → resync/restart decision; `failing_checks` → resume/restart the agent.

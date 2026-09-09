@@ -100,6 +100,36 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
     await expect(ready).resolves.toBe(true);
   });
 
+  it('accepts the omp v17 footer after a stable startup grace period', async () => {
+    paneSnapshots.values = Array.from(
+      { length: 22 },
+      () => '╭── π  > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮\n╰─  ─╯',
+    );
+
+    const ready = waitForPiTuiReady('conv-pi', 6000);
+    await vi.advanceTimersByTimeAsync(5250);
+
+    await expect(ready).resolves.toBe(true);
+  });
+
+  it('waits for omp v17 MCP startup to finish before accepting its footer', async () => {
+    paneSnapshots.values = [
+      '╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+      'Connecting to MCP servers: sentry, linear…\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+      'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+    ];
+
+    paneSnapshots.values.push(...Array.from(
+      { length: 20 },
+      () => 'MCP finished with failures. Connected: node_repl.\n╭── π > ⬢ Ox Alpha · ◉ max > 📁 myn ──╮',
+    ));
+
+    const ready = waitForPiTuiReady('conv-pi', 6000);
+    await vi.advanceTimersByTimeAsync(5500);
+
+    await expect(ready).resolves.toBe(true);
+  });
+
   it('times out when Pi renders text but never reaches the input prompt', async () => {
     paneSnapshots.values = Array.from({ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
 

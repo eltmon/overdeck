@@ -101,6 +101,33 @@ describe('reconcileInFlightJournals', () => {
     expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2341');
   });
 
+  it('PAN-3764: keeps failing required checks as blocker state without reporting false advancement', async () => {
+    const failingChecks = [{
+      type: 'failing_checks' as const,
+      summary: 'Required checks are failing',
+      detectedAt: '2026-08-22T00:00:00.000Z',
+    }];
+    const before = status({
+      issueId: 'PAN-3668',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      blockerReasons: failingChecks,
+    });
+    const after = status({
+      ...before,
+      updatedAt: '2026-08-22T00:01:00.000Z',
+    });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-3668': before })),
+      getReviewStatusSync: vi.fn(() => after),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([]);
+    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-3668');
+  });
+
   it('enumerates tmux-alive advancing sessions with no DB row and skips merged issues', async () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({

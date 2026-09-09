@@ -204,6 +204,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     handoffAuthor: params.handoffAuthor,
     ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
+    ...(params.title !== undefined ? { title: params.title } : {}),
   };
 }
 
@@ -420,6 +421,7 @@ export async function runForkPipeline(
   handoffAuthor: HandoffAuthor = 'external',
   handoffAuthorModel?: string,
   handoffAuthorHarness?: RuntimeName,
+  customTitle?: string,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -529,11 +531,14 @@ export async function runForkPipeline(
     summary = await buildSummary();
   }
   updateConversationForkFallbackReason(convName, forkFallbackReason);
+  // An operator-provided title (--title / fork modal) is authoritative in every
+  // mode and every fallback — re-deriving from the focus here silently
+  // overwrote it once the session came up (PAN-3774).
   updateConversationTitle(
     convName,
-    effectiveForkMode === 'handoff'
+    customTitle ?? (effectiveForkMode === 'handoff'
       ? handoffTitleFromFocus(handoffFocus, parentConv.title || parentConv.name)
-      : `Summary Fork: ${parentConv.title || parentConv.name}`,
+      : `Summary Fork: ${parentConv.title || parentConv.name}`),
     'manual',
   );
   if (handoffDocPath) {
@@ -645,6 +650,7 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthor,
         request.handoffAuthorModel,
         request.handoffAuthorHarness,
+        request.title,
       ));
       recovered += 1;
     } catch (error) {
@@ -841,11 +847,12 @@ export async function handleConversationSummaryFork(
       handoffAuthor,
       ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
+      ...(customTitle !== undefined ? { title: customTitle } : {}),
     });
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(
-      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
+      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle),
     ).catch((err) => {
       handleForkPipelineFailure(newConv.name, err);
     });

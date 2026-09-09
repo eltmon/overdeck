@@ -27,6 +27,7 @@ export const KIMI_NATIVE_EFFORT_LEVELS = ['low', 'high', 'max'] as const;
 const HARNESS_ROW_LABELS = {
   'claude-code': 'Claude Code',
   'kimi-code': 'Kimi Code CLI',
+  muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
   acp: 'ACP (Kimi Code)',
 } as const;
@@ -70,6 +71,7 @@ export function expandHarnessRows<T extends RowBase>(models: T[]): T[] {
  * which is correct for the claude-code route).
  */
 export function pickerEffortLevels(modelId: string): readonly string[] | undefined {
-  if (modelId.startsWith('kimi-code/')) return KIMI_NATIVE_EFFORT_LEVELS;
+  if (modelId.startsWith('kimi-code/kimi-for-coding')) return [];
+  if (modelId.startsWith('kimi-code/k3')) return KIMI_NATIVE_EFFORT_LEVELS;
   return undefined;
 }

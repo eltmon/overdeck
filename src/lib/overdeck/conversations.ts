@@ -103,7 +103,7 @@ export type  ConversationName = typeof ConversationName.Type;
 
 // Includes legacy 'pi' (pre-rename alias for 'ohmypi', see normalizeHarness) so
 // decoding old DB rows never throws; 'pi' is never written by current code.
-export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code']);
+export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse']);
 export type  Harness     = typeof Harness.Type;
 
 export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
@@ -438,7 +438,7 @@ export const ConversationWriterLive = Layer.effect(
             projectKey:  opts.projectKey ?? null,
             harness:     opts.harness ?? null,
             model:       opts.model ?? null,
-            effort:      opts.effort ?? null,
+            effort:      opts.effort ?? 'high',
             title:       opts.title ?? null,
             titleSource: opts.title ? 'manual' : null,
             createdAt:   ts,
@@ -449,7 +449,7 @@ export const ConversationWriterLive = Layer.effect(
           id, name: opts.name, cwd: opts.cwd,
           issueId: opts.issueId ?? null, projectKey: opts.projectKey ?? null,
           harness: opts.harness ?? null,
-          model: opts.model ?? null, effort: opts.effort ?? null,
+          model: opts.model ?? null, effort: opts.effort ?? 'high',
           title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
           createdAt: ts, archivedAt: null,
           handoffDocPath: null, handoffTargetConvId: null, clearedToConvId: null,
@@ -656,6 +656,10 @@ export interface ForkRequest {
   handoffAuthor: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
+  /** Operator-provided title (--title / fork modal). Authoritative: the
+   * pipeline must re-apply it after authoring instead of the focus-derived
+   * fallback (PAN-3774). */
+  title?: string;
 }
 
 export interface LegacyConversation {
@@ -884,7 +888,7 @@ function toMillis(value: Date | string | number = new Date()): number {
 /** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
 export function normalizeHarness(harness: string | null): RuntimeName | null {
   if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
-  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'prime-agent') return harness;
+  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') return harness;
   return null;
 }
 

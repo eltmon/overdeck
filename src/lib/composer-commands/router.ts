@@ -17,6 +17,7 @@ import {
   type ComposerConfirmationStore,
 } from './confirmations.js';
 import { runDetachedCommand } from './detached.js';
+import { runComposerReload } from './reload.js';
 import { runCapturedCommand } from './executors.js';
 import {
   parseOverdeckComposerCommand,
@@ -121,7 +122,9 @@ export async function handleComposerCommand({
     return runCapturedCommand(parsed.argv);
   }
   if (policy.mode === 'detached') {
-    return runDetachedCommand(parsed.argv);
+    return parsed.entry.path[0] === 'reload'
+      ? runComposerReload(parsed.argv)
+      : runDetachedCommand(parsed.argv);
   }
   if (policy.mode === 'ui' && policy.uiAction) {
     return uiCommandResult(

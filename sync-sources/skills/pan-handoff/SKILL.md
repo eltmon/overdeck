@@ -1,6 +1,6 @@
 ---
 name: pan-handoff
-description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737)."
+description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737). Pass --title to name the successor."
 triggers:
   - pan handoff
   - hand off conversation
@@ -74,6 +74,7 @@ pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into che
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
 pan handoff source-conv --issue PAN-1234 continue the API wiring
+pan handoff source-conv --title "Checkout webhook repair" continue the API wiring
 ```
 
 ## Project and issue association
@@ -94,7 +95,17 @@ Use a normal summary fork when a quick passive summary is enough. Use a plain fo
 
 The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
 
-**Hard ceiling: 10,000 characters** (PAN-3737; multi-line focus is allowed). Don't pack the backstory into the focus even so; the detail belongs in the transcript the author reads or in a brief file in the successor cwd. The focus only steers what the author emphasizes, and its first ~70 characters become the new conversation's title.
+**Hard ceiling: 10,000 characters** (PAN-3737; multi-line focus is allowed). Don't pack the backstory into the focus even so; the detail belongs in the transcript the author reads or in a brief file in the successor cwd. The focus only steers what the author emphasizes.
+
+## Title
+
+Without `--title`, the new conversation is titled `Handoff: <first ~70 chars of focus>` (or `Handoff: <source title>` when there is no focus). Pass `--title "<title>"` to name it explicitly — useful when the focus is a file pointer like "Read .pan/handoff-brief.md FIRST" and would otherwise become the title verbatim:
+
+```bash
+pan handoff self --title "Checkout webhook repair" Read .pan/handoff-brief.md FIRST and follow it exactly.
+```
+
+A blank `--title` falls back to the default naming above.
 
 ## Authoring modes
 

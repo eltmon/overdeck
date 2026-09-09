@@ -1,3 +1,5 @@
+import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -26,6 +28,7 @@ import {
   getConversationByClaudeSessionId,
   getConversationById,
   getConversationByName,
+  getConversationByTmuxSession,
   listConversations,
   updateConversationCost,
   updateConversationTitle,
@@ -47,6 +50,7 @@ import { isPiSessionFile, parsePiConversationMessages } from '../../dashboard/se
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dashboard/server/services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
+import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import {
   readLauncherPinnedSessionId,
@@ -122,6 +126,7 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
       .catch(() => null);
     if (sessionPath) return sessionPath;
   }
+  if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
@@ -262,6 +267,8 @@ export async function getCachedMessages(
     parsed = await parseCodexConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
+  } else if (sessionFile.includes('/muse-data/muse/sessions/') && sessionFile.endsWith('/session.jsonl')) {
+    parsed = await parseMuseConversationMessages(sessionFile);
   } else if (isKimiWireSessionFile(sessionFile)) {
     parsed = await parseKimiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
@@ -404,6 +411,9 @@ export async function getConversationsPendingInputFeed(
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
+          // PAN-3766 — the answer path depends on the harness: pi ask modals
+          // must be driven by keystrokes, not sent a message.
+          harness: conv.harness ?? 'claude-code',
           ...(pending ? { pendingAskUserQuestion: pending } : {}),
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
@@ -426,10 +436,7 @@ export async function getConversationRead(
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'tmuxSessionExists'>,
 ): Promise<ConversationReadResult> {
   try {
-    const numericId = Number(rawId);
-    const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
-      ? getConversationById(numericId)
-      : getConversationByName(rawId);
+    const conv = resolveConversationKey(rawId);
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const sessionAlive = conv.status === 'active' && !conv.forkStatus && await deps.tmuxSessionExists(conv.tmuxSession);
@@ -534,10 +541,11 @@ async function resolveSpecialistSessionFile(name: string): Promise<string | null
       agentHarness !== 'codex' &&
       agentHarness !== 'ohmypi' &&
       agentHarness !== 'pi' &&
-      agentHarness !== 'kimi-code'
+      agentHarness !== 'kimi-code' && agentHarness !== 'muse'
     ) {
       return null;
     }
+    if (agentHarness === 'muse') return resolveMuseSessionPath(name);
     const agentBehavior = getHarnessBehavior(agentHarness);
     if (agentBehavior.transcriptKind === 'codex-rollout-jsonl') {
       const rollout = await resolveCodexRolloutPath(name);
@@ -629,7 +637,9 @@ export async function getConversationMessagesRead(
 
     const parentSessionFile = sessionFile;
     if (agentId !== undefined) {
-      sessionFile = subagentTranscriptPath(parentSessionFile, agentId);
+      sessionFile = isCodexSessionFile(parentSessionFile)
+        ? await resolveCodexSubagentTranscript(parentSessionFile, agentId)
+        : subagentTranscriptPath(parentSessionFile, agentId);
       if (!sessionFile) return result({ error: 'Invalid subagent id' }, 400);
     }
 
@@ -648,7 +658,9 @@ export async function getConversationMessagesRead(
         }
       }
       const subagents = agentId === undefined
-        ? (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
+        ? isCodexSessionFile(parentSessionFile)
+          ? await listCodexSubagents(parentSessionFile, parsed.workLog)
+          : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
       return result({
@@ -738,11 +750,19 @@ export async function generateAiTitle(
 
 const MAX_TITLE_LENGTH = 200;
 
+function resolveConversationKey(key: string): Conversation | null {
+  const numericId = Number(key);
+  if (!Number.isNaN(numericId) && /^\d+$/.test(key)) {
+    return getConversationById(numericId);
+  }
+  return getConversationByName(key) ?? getConversationByTmuxSession(key);
+}
+
 export function patchConversationTitle(
-  name: string,
+  key: string,
   body: Record<string, unknown>,
 ): { status: number; body: { success: true } | { error: string } } {
-  const conv = getConversationByName(name);
+  const conv = resolveConversationKey(key);
   if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
 
   if (typeof body.title === 'string' && body.title.trim()) {
@@ -750,7 +770,7 @@ export function patchConversationTitle(
     if (trimmed.length > MAX_TITLE_LENGTH) {
       return { status: 400, body: { error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters` } };
     }
-    updateConversationTitle(name, trimmed, 'manual');
+    updateConversationTitle(conv.name, trimmed, 'manual');
   }
 
   return { status: 200, body: { success: true } };

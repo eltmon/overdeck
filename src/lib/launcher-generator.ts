@@ -1,3 +1,4 @@
+import { museDataHome } from './runtimes/muse-session.js';
 import { Effect } from 'effect';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
@@ -10,10 +11,12 @@ import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+import { resolveKimiNativeEffort } from './kimi-effort.js';
+import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
 
 export interface LauncherConfig {
   role: Role;
@@ -58,6 +61,7 @@ export interface LauncherConfig {
    *   - 'app-server': persistent Codex app-server host process
    */
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -84,6 +88,8 @@ export interface LauncherConfig {
   acpBinaryPath?: string;
   /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
   acpContextFile?: string;
+  /** Requested effort applied after the ACP model is selected. */
+  acpEffort?: string;
 
   /**
    * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
@@ -93,10 +99,18 @@ export interface LauncherConfig {
    * workDirKey bucket.
    */
   kimiCodeModel?: string;
+  /** Per-launch effort supplied without editing the shared Kimi config. */
+  kimiCodeEffort?: string;
   /** Auto-approve regular tool calls (`kimi --yolo`). Required for harness='kimi-code'. */
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
   kimiCodeAddDirs?: string[];
+
+  /** Exact Muse model and saved native UUID; never reuse a Claude session id. */
+  museModel?: string;
+  museResumeSessionId?: string;
+  museEffort?: string;
+  museContextFile?: string;
 
   // Command construction
   /**
@@ -149,6 +163,7 @@ export interface LauncherConfig {
   resumeSessionId?: string;
   sessionId?: string;
   model?: string;
+  piEffort?: string;
   permissionFlags?: string[];
   extraArgs?: string;
 
@@ -460,6 +475,7 @@ const PROVIDER_ENV_UNSETS = [
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, config.spawnMode !== 'conversation');
 
   if (config.spawnMode === 'conversation') {
     if (behavior.launchCommandKind === 'ohmypi-rpc') {
@@ -558,10 +574,11 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (getHarnessBehavior(config.harness ?? 'claude-code').launchCommandKind === 'prime-agent-rpc') {
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, useExec);
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
     return buildPrimeAgentCommand(config, useExec);
   }
-  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
   }
@@ -574,10 +591,6 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     return buildKimiCodeCommand(config, useExec);
   }
-  if (behavior.launchCommandKind === 'prime-agent-rpc') {
-    return config.baseCommand ? [`${useExec ? 'exec ' : ''}${config.baseCommand}`] : [];
-  }
-
   const parts: string[] = [];
   if (!config.baseCommand) return parts;
 
@@ -605,7 +618,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelIdSync(config.model)}`;
+    cmd += ` --model ${shellQuoteModelIdSync(getClaudeCodeLaunchModelSync(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -683,6 +696,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
+  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }
@@ -801,6 +815,10 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
+  if (config.acpProvider === 'kimi' && config.model) {
+    const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
+    if (effort) tokens.push('--effort', shellQuote(effort));
+  }
 
   const cmd = tokens.join(' ');
   return [useExec ? `exec ${cmd}` : cmd];
@@ -844,7 +862,13 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   }
 
   const cmd = wrapWithSupervisor(config, tokens.join(' '));
-  return [useExec ? `exec ${cmd}` : cmd];
+  const effort = resolveKimiNativeEffort(config.kimiCodeModel, config.kimiCodeEffort);
+  return [
+    // 0.40.1 reads this operational override after model/config effort
+    // resolution. It applies to managed OAuth models without a synthetic model.
+    effort ? `export KIMI_MODEL_THINKING_EFFORT=${shellQuote(effort)}` : 'unset KIMI_MODEL_THINKING_EFFORT',
+    useExec ? `exec ${cmd}` : cmd,
+  ];
 }
 
 export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
@@ -929,3 +953,24 @@ export const generateLauncherScript = (
 export const generateLauncherWrapper = (
   config: LauncherConfig,
 ): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));
+
+/** Persistent native TUI, verified against Muse Code 1.0.2. */
+function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const model = config.museModel ?? config.model;
+  if (model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor') {
+    throw new Error('Muse launcher requires an explicit supported Muse Spark model');
+  }
+  const agentId = config.overdeckEnv?.agentId;
+  if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');
+  const effort = config.museEffort ?? 'high';
+  if (!['low', 'medium', 'high', 'xhigh'].includes(effort)) throw new Error('Unsupported Muse reasoning effort');
+  const tokens = ['muse', '--model', shellQuote(model), '--reasoning-effort', shellQuote(effort),
+    '--workspace', shellQuote(config.workingDir), '--trust-workspace'];
+  if (config.museResumeSessionId) tokens.push('resume', shellQuote(config.museResumeSessionId));
+  const command = wrapWithSupervisor(config, tokens.join(' '));
+  return [
+    `export XDG_DATA_HOME=${shellQuote(museDataHome(agentId))}`,
+    ...(config.museContextFile ? [`export TBH_EVAL_APPEND_DEVELOPER_PROMPT_FILE=${shellQuote(config.museContextFile)}`] : []),
+    useExec ? `exec ${command}` : command,
+  ];
+}

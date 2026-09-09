@@ -53,6 +53,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   codex: 'Codex',
   acp: 'ACP',
   'kimi-code': 'Kimi Code',
+  muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
 };
 
@@ -65,6 +66,7 @@ const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
   { id: 'minimax', name: 'MiniMax', placeholder: 'eyJ...' },
   { id: 'mimo', name: 'Xiaomi MiMo', placeholder: 'sk-... or tp-...' },
   { id: 'nous', name: 'Nous Portal', placeholder: 'ns-...' },
+  { id: 'meta', name: 'Meta (Muse)', placeholder: '' },
   { id: 'dashscope', name: 'Alibaba DashScope', placeholder: 'sk-...' },
 ];
 
@@ -78,6 +80,7 @@ function harnessLabel(harness: Harness): string {
  * provider would write a config that fails at every spawn.
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
+  if (provider === 'meta') return ['muse'];
   const shared: Harness[] = ['claude-code', 'ohmypi', 'codex', 'prime-agent'];
   return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
 }
@@ -249,6 +252,7 @@ export function ProviderManagementSection({
             const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
+              if (provider.id === 'meta') return { text: 'Muse login', variant: 'neutral' as const };
               if (isDefault) {
                 if (claudeAuth?.loggedIn) return { text: claudeAuth.subscriptionType ? `${claudeAuth.subscriptionType} plan` : 'Subscription', variant: 'success' as const };
                 if (claudeAuth?.hasAnthropicApiKey) return { text: 'API key', variant: 'neutral' as const };
@@ -306,7 +310,9 @@ export function ProviderManagementSection({
 
                 {isExpanded && (
                   <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
-                    {isDefault ? (
+                    {provider.id === 'meta' ? (
+                      <p className="text-xs text-muted-foreground">Sign in on the host with <code>muse login</code>, or store an API key with <code>muse auth set --api-key-stdin</code>. Contributor models permit training on prompts and replies.</p>
+                    ) : isDefault ? (
                       <div className="space-y-2">
                         {claudeAuth?.loggedIn ? (
                           <div className="flex items-center gap-2 text-xs">

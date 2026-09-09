@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '../../..');
-const ALL = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'prime-agent'];
+const ALL = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'];
 
 function source(path: string): string {
   return readFileSync(join(ROOT, path), 'utf8');

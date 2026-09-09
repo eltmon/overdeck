@@ -163,6 +163,28 @@ function looksLikePiPermission(text: string): boolean {
     || /(?:allow|approve|run|execute)\s+(?:this\s+)?(?:command|tool|action)/i.test(text)
 }
 
+/**
+ * PAN-3766 — ohmypi `ask` modal footer. Pi renders a blocking multiple-choice
+ * question in a box-drawn frame whose footer hint reads "Enter select · n note
+ * · ↑/↓ move · Esc cancel". The modal sits at the bottom of the pane while open
+ * and disappears when answered. The JSONL scan (scanPendingInputsPromise)
+ * carries the question payload for conversations; this pane signal covers
+ * sessions whose transcript is not wired into that scan (pi work agents).
+ */
+function looksLikePiAskFooter(line: string): boolean {
+  return /Enter\s+select\b/i.test(line) && /Esc\s+cancel/i.test(line)
+}
+
+/** Box-drawing chrome lines that may follow the ask modal's footer (╰───╯). */
+function looksLikePiBoxChrome(line: string): boolean {
+  return /^[\s╰╯╭╮─│├┤┌┐└┘┬┴┼]*$/.test(line)
+}
+
+/** The modal's header line: plain ("Ask  1 questions") or boxed ("╭─ Ask ─╮"). */
+function looksLikePiAskHeader(line: string): boolean {
+  return /^\s*(?:╭\s*─*\s*)?Ask\b/.test(line)
+}
+
 function looksLikePlanningDone(text: string): boolean {
   return /planning finalized\s*[—-]\s*click done/i.test(text)
     || /click Done in the dashboard/i.test(text)
@@ -252,6 +274,25 @@ export function detectAwaitingInputFromPaneSync(
     const snippet = snippetAround(lines, piIndex, 6, 2)
     const reason = looksLikeGenericConfirmation(lines[piIndex]!) ? 'confirmation' : 'tool_permission'
     return { reason, prompt: snippet }
+  }
+
+  // PAN-3766 — ohmypi `ask` modal. Key on the footer; only box-drawing chrome
+  // (the frame's bottom border) may follow it. Anchor the snippet at the
+  // modal's "Ask" header when present.
+  const piAskIndex = lastIndexMatching(lines, looksLikePiAskFooter)
+  if (piAskIndex >= 0 && isRecentPromptIndex(lines, piAskIndex)) {
+    const trailing = lines.slice(piAskIndex + 1)
+    const stillOnScreen = trailing.length <= 3 && trailing.every(looksLikePiBoxChrome)
+    if (stillOnScreen) {
+      let headerIndex = -1
+      for (let i = piAskIndex - 1; i >= 0 && i >= piAskIndex - 30; i--) {
+        if (looksLikePiAskHeader(lines[i]!)) { headerIndex = i; break }
+      }
+      return {
+        reason: 'user_question',
+        prompt: snippetAround(lines, headerIndex >= 0 ? headerIndex : piAskIndex, 0, 12),
+      }
+    }
   }
 
   if (options.isPlanning && looksLikePlanningDone(recentText)) {

@@ -69,6 +69,7 @@ import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-m
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
+import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
@@ -567,6 +568,9 @@ console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
+startConversationRescanScheduler();
+console.log('[overdeck] Conversation rescan scheduler started (boot pass + 6h interval)');
+
 let stopResourceRefreshServices = () => undefined;
 
 void (async () => {
@@ -712,6 +716,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   }
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
+  await stopConversationRescanScheduler();
   closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);

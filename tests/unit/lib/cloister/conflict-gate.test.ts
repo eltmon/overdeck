@@ -408,7 +408,7 @@ describe('buildRealConflictGateDeps', () => {
     vi.useRealTimers();
   });
 
-  it('dispatches a work-role resolver with rebase and review-request instructions', async () => {
+  it('dispatches a work-role resolver with sanctioned main-sync and review-request instructions', async () => {
     const spawnRun = vi.fn(async () => ({} as never));
     const setReviewStatus = vi.fn();
     const emitActivityEntry = vi.fn();
@@ -428,13 +428,14 @@ describe('buildRealConflictGateDeps', () => {
     });
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-1765', 'work', {
-      prompt: expect.stringContaining('Rebase this branch onto origin/main'),
+      prompt: expect.stringContaining('pan sync-main PAN-1765'),
       startedBy: 'conflict-gate',
     });
     const prompt = spawnRun.mock.calls[0][2].prompt;
     expect(prompt).toContain('BOTH intents are preserved');
     expect(prompt).toContain('Re-request review');
     expect(prompt).toContain('pan done or pan review request');
+    expect(prompt).not.toContain('Rebase this branch');
     expect(prompt).not.toContain('--force-with-lease');
     expect(setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
@@ -472,7 +473,7 @@ describe('buildRealConflictGateDeps', () => {
 
     expect(messageAgent).toHaveBeenCalledWith(
       'agent-pan-1765',
-      expect.stringContaining('Rebase this branch onto origin/main'),
+      expect.stringContaining('pan sync-main PAN-1765'),
       'conflict-gate',
     );
     expect(setReviewStatus).toHaveBeenCalledWith(

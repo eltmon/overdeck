@@ -12,7 +12,7 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, and `prime-agent`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `muse`, and `prime-agent`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -24,11 +24,12 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
+| `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | Prime Agent (`prime-agent`) | Opt-in multi-provider RPC work and conversations | Overdeck owns one persistent root RPC process per session; supported versions are `>=0.1.0 <1.0.0`. |
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, and `kimi-code`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, `kimi-code`, `muse`, and `prime-agent`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
@@ -43,14 +44,17 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 - Proxied models use a dedicated Claude Code context policy rather than copying
-  every value from the generic model registry. GPT-5.6 Sol, Terra, and Luna
-  default to a `272000`-token pin for both `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
+  every value from the generic model registry. GPT-6 Astra and GPT-5.6 Sol,
+  Terra, and Luna default to a `272000`-token pin for both
+  `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
   `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — OpenAI bills prompts with more than 272K
   input tokens at 2x input / 1.5x output for the full request, so the default
   keeps sessions under that tier. The `gpt-5.6-sol[372k]`, `gpt-5.6-terra[372k]`,
   and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
   long-research sessions that accept the surcharge; the `[372k]` suffix is
   Overdeck-side only and is stripped before the model id reaches the API.
+  `gpt-6-astra` has no `[372k]` variant — the 372K pin was measured on
+  `gpt-5.6-sol` and has not been re-measured for astra.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
   not an instruction to compact at exactly that token count. GPT-5.5 keeps its
@@ -94,6 +98,47 @@ coding harnesses. Overdeck writes managed context only under
 Prime sessions, remove `primeAgent` from the Overdeck config, and remove the
 upstream `prime-agent` package with the package manager that installed it.
 
+### Muse Code
+
+Install Muse Code and sign in with `muse login`. For API-key authentication,
+use `muse auth set --api-key-stdin`; Muse owns its credentials. Overdeck uses
+the installed `muse` binary and does not route these models through CLIProxy.
+The integration is verified with Muse Code 1.0.2.
+
+Enable **Meta (Muse)** in Settings → Providers, then choose either model in
+the model picker. Both use a 1,048,576-token context window:
+
+| Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
+| --- | --- | --- | --- |
+| `muse-spark-1.3` | $1.25 | $0.15 | $4.25 |
+| `muse-spark-1.3-contributor` | $0.10 | $0.002 | $0.20 |
+
+The Contributor tier requires contributing prompts and completions for model
+training. Choose it explicitly when that data use fits your work. Standard
+and Contributor remain separate model IDs throughout launch and accounting.
+These catalog prices are estimates; your Meta account's billing terms apply.
+
+You can also enable the provider in `~/.overdeck/config.yaml`:
+
+```yaml
+models:
+  providers:
+    meta:
+      enabled: true
+      harness: muse
+```
+
+Choose a Muse model explicitly for a conversation or role; enabling the
+provider does not change your configured default model. Muse runs with high
+reasoning effort by default and keeps its native tool-approval behavior.
+
+Overdeck supplies its context layers and role instructions through a managed
+developer-context file. Muse sessions are isolated by agent identity, and
+resume uses the native session UUID. The dashboard displays committed user
+and assistant messages and reports token costs. Use the Terminal tab for
+Muse's detailed tool activity and approval prompts. Native reasoning and
+internal configuration records are excluded from the chat feed.
+
 ### oh-my-pi / ohmypi (alternative)
 
 - Adds RPC mode (`omp --mode rpc`) so Overdeck can write structured commands to
@@ -108,9 +153,11 @@ upstream `prime-agent` package with the package manager that installed it.
 
 ### OpenAI Codex CLI (alternative)
 
-- First-party OpenAI agent loop for the GPT model family (GPT-5.6 Sol/Terra/Luna,
-  GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
-- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness.
+- First-party OpenAI agent loop for the GPT model family (GPT-6 Astra,
+  GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
+  ChatGPT-subscription or API-key auth.
+- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
+  is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
@@ -571,3 +618,13 @@ using the OS-bundled `curl` and `tar` tools.
   loading curated skill bundles into a single conversation
 - [Skills System](/features/skills) — how Overdeck distributes skills across
   harnesses
+
+## Context and reasoning effort
+
+Model pickers show the configured session context beside each model. This budget differs from the provider's maximum API context and from the remaining space shown in a running session. Runtime overhead and response reservations reduce usable space.
+
+Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
+
+Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort.
+
+Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.

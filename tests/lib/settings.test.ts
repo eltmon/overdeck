@@ -421,6 +421,7 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.anthropic).toEqual([
+        'claude-fable-5-1',
         'claude-fable-5',
         'claude-opus-5',
         'claude-opus-4-8',
@@ -453,18 +454,13 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.openai).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',
         'gpt-5.6-sol[372k]',
         'gpt-5.6-terra[372k]',
         'gpt-5.6-luna[372k]',
-        'gpt-5.5',
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex',
-        'gpt-5.3-codex-spark',
-        'gpt-5.2',
       ]);
     });
 
@@ -477,6 +473,8 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.google).toEqual([
+        'gemini-3.8-flash',
+        'gemini-3.5-flash-lite',
         'gemini-3.1-pro-preview',
         'gemini-3-flash-preview',
         'gemini-3.1-flash-lite-preview',
@@ -491,7 +489,7 @@ describe('settings', () => {
 
       const available = getAvailableModelsSync(settings);
 
-      expect(available.minimax).toEqual(['minimax-m2.7', 'minimax-m2.7-highspeed']);
+      expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {

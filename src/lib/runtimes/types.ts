@@ -41,7 +41,7 @@ export type {
  * by normalizeHarness() on read. normalizeHarness still accepts the raw string
  * 'pi' as input so old rows round-trip safely.
  */
-export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'prime-agent';
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
 
 /**
  * Legacy harness strings that can still appear in persisted state or older
@@ -119,6 +119,7 @@ export interface SpawnConfig {
   workspace: string;
   prompt?: string;
   model?: string;
+  effort?: string;
   sessionId?: string; // For resuming existing sessions
   runtime?: RuntimeName;
   env?: Record<string, string>;

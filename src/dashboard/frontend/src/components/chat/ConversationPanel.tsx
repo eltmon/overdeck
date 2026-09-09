@@ -25,7 +25,7 @@ import {
   useConversationOptimistic,
   useConversationOptimisticBaseCount,
 } from '../../lib/composerStore';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, TURN_STALL_MS, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -49,8 +49,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 // stalled, not working. Covers a slow compaction + response (a Claude-native
 // /compact here ran ~128s before any follow-up); finite so a prompt that was
 // eaten by submit-time compaction can't strand the spinner forever.
-const TURN_STALL_MS = 4 * 60_000;
-
+// Now lives in lib/workingPhase.ts alongside isConversationWorking (PAN-3770).
 /**
  * How long a conversation row may show "Starting…" without a live session.
  * Genuine spawns are seconds-to-a-couple-minutes; anything older with no
@@ -65,17 +64,6 @@ function isWithinSpawnWindow(createdAt: string | null | undefined, nowMs = Date.
   if (!createdAt) return false;
   const createdMs = Date.parse(createdAt);
   return Number.isFinite(createdMs) && nowMs - createdMs < SPAWN_PLACEHOLDER_MAX_AGE_MS;
-}
-
-/**
- * Whether the conversation's latest transcript entry is recent enough that the
- * agent could still be mid-turn. Empty/loading history counts as recent (startup).
- */
-function lastActivityRecent(lastMsg: ChatMessage | undefined): boolean {
-  if (!lastMsg) return true;
-  const ts = Date.parse(lastMsg.completedAt || lastMsg.createdAt || '');
-  if (Number.isNaN(ts)) return true;
-  return Date.now() - ts < TURN_STALL_MS;
 }
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -167,7 +155,12 @@ export function ConversationPanel({
   hideComposer = false,
   onSendFailed,
 }: ConversationPanelProps) {
-  const [resumed, setResumed] = useState(false);
+  // Resume-click latch: bridges the gap between a successful resume POST and
+  // the conversations poll reporting the session alive (up to one poll tick).
+  // Spent as soon as the server confirms the session — alive, or endedAt
+  // stamped because the resumed session died again — so a twice-stopped
+  // conversation gets its resume bar back instead of a read-only composer.
+  const [resumedAwaitingConfirm, setResumedAwaitingConfirm] = useState(false);
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -229,6 +222,25 @@ export function ConversationPanel({
     }
   }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
 
+  // The resume latch is spent once the poll confirms the resumed session came
+  // alive. Clearing on endedAt instead would let a stale pre-resume row
+  // (still carrying the previous death's endedAt) kill the bridge during the
+  // click→poll window. Without this effect, a session that stopped a second
+  // time left `showTerminal` — and with it the composer-vs-resume-bar choice
+  // — pinned until a full browser refresh.
+  useEffect(() => {
+    if (resumedAwaitingConfirm && conversation.sessionAlive) {
+      setResumedAwaitingConfirm(false);
+    }
+  }, [resumedAwaitingConfirm, conversation.sessionAlive]);
+
+  // A ConversationPanel instance can be reused for a different conversation
+  // (drawer / flywheel embeds switch the row in place) — never carry a resume
+  // latch across conversations.
+  useEffect(() => {
+    setResumedAwaitingConfirm(false);
+  }, [conversation.name]);
+
   // Query messages at this level so we can drive the header working-spinner.
   // Live claude-code conversations are pushed through useConversationMessagesStream;
   // keep the existing polling path for non-claude harnesses and historical views.
@@ -257,23 +269,19 @@ export function ConversationPanel({
   const { selectedAgentId: selectedSubagentId, selectedSubagent, clearSelection: clearSubagent } = useSubagentSelection(subagents);
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
-  const headerLastMsg = headerMessages[headerMessages.length - 1];
   const canSwitchConversationModel =
     !agentId &&
     !conversation.sessionAlive &&
     !conversation.claudeSessionId &&
     headerMessages.length === 0;
-  // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
-  // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
-  // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
-  // recent — otherwise a prompt eaten by submit-time compaction spins the header forever.
-  const isWorking = conversation.sessionAlive && (
-    messagesData == null ||
-    headerMessages.length === 0 ||
-    (lastActivityRecent(headerLastMsg) && (
-      headerLastMsg?.role === 'user' ||
-      (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
-    ))
+  // Spin unless truly idle. Message shape (trailing user / incomplete
+  // assistant) plus, for harnesses that append complete messages mid-turn
+  // (Codex narrates before tool runs), recent work-log activity newer than
+  // the last message. PAN-3770; recency guards per PAN-1635.
+  const isWorking = isConversationWorking(
+    conversation.sessionAlive,
+    messagesData == null ? [] : headerMessages,
+    headerWorkLog,
   );
   const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
@@ -395,9 +403,11 @@ export function ConversationPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
-      // PAN-2975: the resume bar reports the actual outcome too.
+      // PAN-2975: the resume bar reports the actual outcome too. The latch is
+      // only a bridge until the poll confirms the session — see the
+      // resumedAwaitingConfirm clear effect below.
       toastResumeOutcome(conversation.name);
-      setResumed(true);
+      setResumedAwaitingConfirm(true);
     },
   });
 
@@ -408,13 +418,22 @@ export function ConversationPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, harness }),
-      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
+      }).then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => null) as { error?: string } | null;
+          throw new Error(body?.error || `Failed to switch model (${r.status})`);
+        }
+        return r.json();
+      });
     },
     onSuccess: (_, { model, harness }) => {
       saveStoredModel(model);
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
     },
   });
 
@@ -618,7 +637,7 @@ export function ConversationPanel({
     }
   }, [conversation.handoffTargetConvId]);
 
-  const showTerminal = conversation.sessionAlive || resumed;
+  const showTerminal = conversation.sessionAlive || resumedAwaitingConfirm;
   // Diff deep-links are transcript-oriented. If this pane was previously left in
   // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
   // and looks like a reconnect loop when the user only asked to inspect a diff.
@@ -1327,17 +1346,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
   // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
-  const lastMsg = messages[messages.length - 1];
-  // PAN-1635: an in-progress compaction keeps us working; otherwise a trailing
-  // user/incomplete-assistant entry only implies "working" while it's recent, so a
-  // prompt eaten by Claude's submit-time compaction can't spin the panel forever.
-  const isWorking = conversation.sessionAlive && (
-    isCompacting ||
-    messages.length === 0 ||
-    (lastActivityRecent(lastMsg) && (
-      lastMsg?.role === 'user' ||
-      (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
-    ))
+  // PAN-1635: an in-progress compaction keeps us working; otherwise the shared
+  // helper applies message shape plus the Codex-style work-log gap signal
+  // (recent tool activity newer than the last completed message, PAN-3770).
+  const isWorking = isCompacting || isConversationWorking(
+    conversation.sessionAlive,
+    messages,
+    workLog,
   );
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;

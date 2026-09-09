@@ -123,6 +123,62 @@ describe('handoffCommand', () => {
     });
   });
 
+  it('forwards --title as the new conversation title and echoes it', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 456,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['wire', 'it'], { title: 'Checkout webhook repair' });
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Title: Checkout webhook repair (--title)');
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ title: 'Checkout webhook repair', focus: 'wire it' }),
+    );
+  });
+
+  it('sends no title when --title is blank, letting the server pick the default', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 456,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', [], { title: '   ' });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ title: undefined }),
+    );
+  });
+
   it('validates and forwards --issue to the fork server', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,

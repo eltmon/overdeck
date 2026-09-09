@@ -461,11 +461,11 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const openaiIds = models.openai.map(m => m.id);
-      expect(openaiIds).toContain('gpt-5.5');
-      expect(openaiIds).toContain('gpt-5.4');
-      expect(openaiIds).toContain('gpt-5.4-mini');
-      expect(openaiIds).toContain('gpt-5.3-codex');
-      expect(openaiIds).toContain('gpt-5.2');
+      expect(openaiIds).not.toContain('gpt-5.5');
+      expect(openaiIds).not.toContain('gpt-5.4');
+      expect(openaiIds).not.toContain('gpt-5.4-mini');
+      expect(openaiIds).not.toContain('gpt-5.3-codex');
+      expect(openaiIds).not.toContain('gpt-5.2');
     });
   });
 
@@ -561,7 +561,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, muse, or empty string');
     });
   });
 

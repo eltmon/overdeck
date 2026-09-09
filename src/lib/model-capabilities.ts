@@ -1,3 +1,5 @@
+import { MODEL_DEPRECATIONS } from './model-deprecations.js';
+import { AUDITED_MODEL_ADDITIONS } from './model-capability-additions.js';
 /**
  * Model Capability Matrix
  *
@@ -20,7 +22,6 @@
 import { Effect } from 'effect';
 import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW } from './model-context-windows.js';
 import { ModelId } from './settings.js';
-import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
  * Model ID deprecation mapping
@@ -29,42 +30,10 @@ import type { SubscriptionPlan } from './subscription-types.js';
  * When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
  * add the mapping here to enable automatic migration.
  *
- * Strategy: Single-hop only. Only add models here when the provider has
- * actually retired them — not just because a newer version exists.
+ * Strategy: Single-hop only. Add models here when the provider retires them or the operator explicitly
+ * removes them from the supported catalog. Preserve single-hop replacements.
  */
-export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
-  'claude-opus-4-5': 'claude-opus-4-7',
-  'claude-sonnet-4-5': 'claude-sonnet-4-6',
-  // OpenAI retired/superseded models — addendum 2026-05-23 trim to the
-  // Codex CLI catalog (gpt-5.5, 5.4, 5.4-mini, 5.3-codex, 5.3-codex-spark,
-  // 5.2). Pro tiers and the o-series reasoning models are out.
-  'gpt-5.2-codex': 'gpt-5.3-codex',     // superseded by gpt-5.3-codex (April 2026)
-  'gpt-5.5-mini': 'gpt-5.4-mini',       // hallucinated tier — never shipped
-  'gpt-5.5-nano': 'gpt-5.4-mini',       // hallucinated tier — never shipped
-  'gpt-5.4-nano': 'gpt-5.4-mini',       // hallucinated tier — never shipped
-  'gpt-5.5-pro': 'gpt-5.5',             // dropped 2026-05-23 — flagship absorbs Pro role
-  'gpt-5.4-pro': 'gpt-5.4',             // dropped 2026-05-23 — drop the -pro tier
-  'o3': 'gpt-5.4',                      // dropped 2026-05-23 — reasoning -> balanced flagship
-  'o3-deep-research': 'gpt-5.4',        // dropped 2026-05-23 — was already aliased to o3
-  'o4-mini': 'gpt-5.4-mini',            // dropped 2026-05-23 — compact reasoning -> mini
-  'gpt-4o': 'gpt-5.4',                  // dropped 2026-05-23 — legacy flagship -> current balanced
-  'gpt-4o-mini': 'gpt-5.4-mini',        // dropped 2026-05-23 — legacy economy -> mini
-  // Google deprecated models
-  'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
-  'gemini-3-flash': 'gemini-3-flash-preview',
-  'gemini-2.5-pro': 'gemini-3.1-pro-preview',
-  'gemini-2.5-flash': 'gemini-3-flash-preview',
-  // Kimi deprecated — K2.5/K2.6 generation retired 2026-07-30; the CLI catalog
-  // never carried these ids, so no native harness could launch them. They remap
-  // to the closest-priced live coding model, not the $9 K3 flagship.
-  'kimi-k2': 'kimi-k2.7-code',
-  'kimi-k2.5': 'kimi-k2.7-code',
-  'kimi-k2.6': 'kimi-k2.7-code',
-  'K2.6-code-preview': 'kimi-k2.7-code',
-  // Z.AI deprecated
-  'glm-4.7': 'glm-5.1',
-  'glm-4.7-flash': 'glm-5.1',
-};
+export { MODEL_DEPRECATIONS } from './model-deprecations.js';
 
 /**
  * Resolve a model ID to its current version
@@ -79,79 +48,13 @@ export function resolveModelIdSync(modelId: string): ModelId {
   return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
 }
 
-/**
- * Skill dimensions that models are evaluated on
- */
-export type SkillDimension =
-  | 'code-generation' // Writing new code
-  | 'code-review' // Finding issues in code
-  | 'debugging' // Root cause analysis
-  | 'planning' // Architecture and strategy
-  | 'documentation' // Writing docs, PRDs
-  | 'testing' // Test generation and analysis
-  | 'security' // Security analysis
-  | 'performance' // Performance optimization
-  | 'synthesis' // Combining information
-  | 'speed' // Response latency
-  | 'context-length'; // Max context window
-
-/**
- * Canonical effort/reasoning levels accepted by Claude Code's `--effort` flag.
- * `xhigh` was added in Opus 4.7 (between `high` and `max`); `max` predates it
- * (Opus 4.6+/Sonnet 4.6). This is the single source of truth for the union —
- * `RoleEffort` in config-yaml.ts aliases it.
- */
-export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-
-/**
- * Capability profile for a single model
- */
+import type { ModelCapability, SkillDimension, EffortLevel } from './model-capability-types.js';
+export type { ModelCapability, SkillDimension, EffortLevel } from './model-capability-types.js';
 type CapabilityModelId = ModelId;
 
 // CLIProxy context ceilings live in their own module so this table stays a table;
 // re-exported here because they are part of the capability contract.
-export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
-
-export interface ModelCapability {
-  /** Model identifier */
-  model: ModelId;
-  /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama';
-  /** Display name */
-  displayName: string;
-  /** Cost per 1M tokens (average of input/output) in USD */
-  costPer1MTokens: number;
-  /** Capability scores (0-100) for each skill dimension */
-  skills: Record<SkillDimension, number>;
-  /** Context window size in tokens */
-  contextWindow: number;
-  /** Maximum output tokens per response (undefined = not specified by the provider) */
-  maxOutputTokens?: number;
-  /** Minimum subscription plan required to access this model via OAuth (undefined = API key only or no tier restriction) */
-  minTier?: SubscriptionPlan;
-  /**
-   * Effort levels this model accepts via Claude Code's `--effort` flag.
-   * Undefined means the levels aren't enumerated for this model — callers treat
-   * that as "no model-specific restriction" and accept the full {@link EffortLevel}
-   * set. Populate only where there's ground truth (see docs/research/*-work-type-fit.md).
-   */
-  effortLevels?: readonly EffortLevel[];
-  /**
-   * Whether this model accepts image input (vision) on the endpoint Overdeck
-   * routes it through. Tri-state by design:
-   *   - `false` — proven text-only; image attachments must be blocked.
-   *   - `true`  — proven to accept images.
-   *   - `undefined` — not yet verified; callers treat as "allow" and rely on
-   *     the harness/provider to error if unsupported. Only populate from ground
-   *     truth (a real request against the live endpoint), never from marketing
-   *     copy — e.g. mimo-v2.5-pro's architecture is multimodal but its Token-Plan
-   *     serving endpoints are text-only (PAN-1685). Most models are intentionally
-   *     left undefined pending the per-model vision audit in PAN-1685.
-   */
-  supportsImages?: boolean;
-  /** Additional notes about this model's strengths */
-  notes?: string;
-}
+export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
 
 /**
  * Master capability database
@@ -164,6 +67,7 @@ export interface ModelCapability {
  * These are baseline scores - run Kimi 2.5 research to refine.
  */
 export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
+  ...AUDITED_MODEL_ADDITIONS,
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -172,12 +76,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-fable-5',
     provider: 'anthropic',
     displayName: 'Claude Fable 5',
-    // Real API pricing is $10/M input, $50/M output (≈2× Opus 4.8). The blended
-    // figure mirrors the inflated Opus-4.8 baseline (45) at the same 2× ratio so
-    // cost-awareness badges order Fable above Opus. Exact per-token rates live in
-    // cost.ts DEFAULT_PRICING.
-    costPer1MTokens: 90.0,
-    contextWindow: 200000,
+    costPer1MTokens: 30, // Equal input/output blend of published API prices.
+    contextWindow: 1000000,
     skills: {
       'code-generation': 99,
       'code-review': 99,
@@ -199,11 +99,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-opus-5',
     provider: 'anthropic',
     displayName: 'Claude Opus 5',
-    // Real API pricing is $5/M input, $25/M output (same as Opus 4.8; half of
-    // Fable 5). Blended figure mirrors the Opus-4.8 baseline (45) so
-    // cost-awareness ordering stays consistent. Exact per-token rates live in
-    // cost.ts DEFAULT_PRICING.
-    costPer1MTokens: 45.0,
+    costPer1MTokens: 15, // Equal input/output blend of published API prices.
     contextWindow: 1000000, // 1M context window by default (launch docs, 2026-07-24)
     skills: {
       'code-generation': 99,
@@ -226,8 +122,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-opus-4-8',
     provider: 'anthropic',
     displayName: 'Claude Opus 4.8',
-    costPer1MTokens: 45.0, // Same pricing tier as Opus 4.7/4.6 — verify at launch
-    contextWindow: 200000,
+    costPer1MTokens: 15, // Equal input/output blend of published API prices.
+    contextWindow: 1000000,
     skills: {
       'code-generation': 98,
       'code-review': 99,
@@ -249,8 +145,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-opus-4-7',
     provider: 'anthropic',
     displayName: 'Claude Opus 4.7',
-    costPer1MTokens: 45.0, // Same pricing tier as Opus 4.6 — verify at launch
-    contextWindow: 200000,
+    costPer1MTokens: 15, // Equal input/output blend of published API prices.
+    contextWindow: 1000000,
     skills: {
       'code-generation': 98,
       'code-review': 99,
@@ -272,7 +168,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-opus-4-6',
     provider: 'anthropic',
     displayName: 'Claude Opus 4.6',
-    costPer1MTokens: 45.0, // $5 in / $25 out → same pricing as 4.5
+    costPer1MTokens: 15, // Equal input/output blend of published API prices.
     contextWindow: 200000, // 1M available via opt-in beta, but we use 200K
     skills: {
       'code-generation': 96, // 80.9% SWE-bench (first >80%), 89.4% Aider Polyglot
@@ -312,8 +208,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 95,
     },
-    effortLevels: ['low', 'medium', 'high'],
-    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified.',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; pricing is $2/M input and $10/M output; the planned September increase was cancelled. Scores are provisional until benchmarks are verified.',
   },
 
   'claude-sonnet-4-6': {
@@ -335,7 +231,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 95,
     },
-    effortLevels: ['low', 'medium', 'high'],
+    effortLevels: ['low', 'medium', 'high', 'max'],
     notes: 'Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning.',
   },
 
@@ -365,7 +261,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'claude-haiku-4-5',
     provider: 'anthropic',
     displayName: 'Claude Haiku 4.5',
-    costPer1MTokens: 4.0, // $0.80 in / $4 out → avg ~$2.4
+    costPer1MTokens: 3, // Equal input/output blend of published API prices.
     contextWindow: 200000,
     skills: {
       'code-generation': 75,
@@ -502,6 +398,30 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
+  'gpt-6-astra': {
+    model: 'gpt-6-astra',
+    provider: 'openai',
+    displayName: 'GPT-6 Astra',
+    costPer1MTokens: 30, // $10.00 in / $50.00 out
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 99,
+      'code-review': 97,
+      debugging: 98,
+      planning: 98,
+      documentation: 95,
+      testing: 96,
+      security: 95,
+      performance: 95,
+      synthesis: 97,
+      speed: 55,
+      'context-length': 95,
+    },
+    notes: 'OpenAI flagship (September 2026), first GPT-6 generation. Codex catalog (`codex debug models`, 2026-09-07): context_window 272000, max_context_window 872000, default effort medium, efforts up to ultra, supported_in_api true. Pinned to the same 272K billing tier as the GPT-5.6 family (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] opt-in variant yet: the 372K pin was measured on gpt-5.6-sol and has not been re-measured for astra. 1.05M marketing context.',
+  },
+
   'gpt-5.6-sol': {
     model: 'gpt-5.6-sol',
     provider: 'openai',
@@ -509,6 +429,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 17.5, // $5.00 in / $30.00 out
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 98,
       'code-review': 95,
@@ -532,6 +453,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 17.5, // $5.00 in / $30.00 out — 2x in / 1.5x out past 272K input
     contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 98,
       'code-review': 95,
@@ -555,6 +477,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 7, // $2.00 in / $12.00 out (PAN-3388: was wrongly listed at $2.50/$15)
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 97,
       'code-review': 94,
@@ -578,6 +501,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 7, // $2.00 in / $12.00 out — 2x in / 1.5x out past 272K input
     contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 97,
       'code-review': 94,
@@ -601,6 +525,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 0.7, // $0.20 in / $1.20 out (PAN-3388: was wrongly listed at $1/$6)
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 82,
       'code-review': 78,
@@ -624,6 +549,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     costPer1MTokens: 0.7, // $0.20 in / $1.20 out — 2x in / 1.5x out past 272K input
     contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
     minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     skills: {
       'code-generation': 82,
       'code-review': 78,
@@ -790,6 +716,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities.',
   },
 
+
   'gemini-3-flash-preview': {
     model: 'gemini-3-flash-preview',
     provider: 'google',
@@ -811,6 +738,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     },
     notes: 'Fast and cheap with 1M context. Strong reasoning and agentic capabilities.',
   },
+
 
   'gemini-3.1-flash-lite-preview': {
     model: 'gemini-3.1-flash-lite-preview',
@@ -938,8 +866,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // namespaced `kimi-code/<alias>`, verified via `kimi provider list --json`.
   'kimi-code/k3': { model: 'kimi-code/k3', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias for K3 at its full 1M context (maxContextSize=1048576 per `kimi provider list --json`). Launched via `kimi -m kimi-code/k3 --yolo`.' },
   'kimi-code/k3-256k': { model: 'kimi-code/k3-256k', provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Native kimi-code harness alias for K3 at the smaller 256K context tier (maxContextSize=262144 per `kimi provider list --json`). Same per-token pricing as kimi-code/k3.' },
-  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
-  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'Kimi K2.7 Coding Highspeed', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'], contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
+  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: [], contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
+  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'Kimi K2.7 Coding Highspeed', costPer1MTokens: 2.5, effortLevels: [], contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
@@ -994,7 +922,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     provider: 'minimax',
     displayName: 'MiniMax M3',
     costPer1MTokens: 1.5, // Same $0.30/M in / $1.20/M out blended as M2.7; confirm at launch
-    contextWindow: 1024000, // 1M context via MSA architecture
+    contextWindow: 1000000, // 1M context via MSA architecture
     skills: {
       'code-generation': 93, // Top-tier coding; MSA architecture for scalable context
       'code-review': 90,
@@ -1012,6 +940,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   },
 
   // Z.AI models
+
   'glm-5.2': {
     model: 'glm-5.2',
     provider: 'zai',
@@ -1154,7 +1083,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     provider: 'mimo',
     displayName: 'MiMo V2.5',
     costPer1MTokens: 1.0,
-    contextWindow: 262144,
+    contextWindow: 1048576,
     // Multimodal — verified to accept image input on the same Token-Plan
     // endpoint where -pro rejects it. PAN-1685.
     supportsImages: true,
@@ -1291,6 +1220,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     },
     notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
   },
+
 
   'qwen3.8-max': {
     model: 'qwen3.8-max',
@@ -1446,7 +1376,7 @@ export function getModelEffortLevelsSync(model: ModelId | string): readonly Effo
  */
 export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
   const levels = getModelEffortLevelsSync(model);
-  return levels === undefined || levels.includes(effort);
+  return levels === undefined || levels.length === 0 || levels.includes(effort);
 }
 
 /**

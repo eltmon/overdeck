@@ -70,6 +70,7 @@ describe('router-config', () => {
       expect(config.providers[0].baseURL).toBe('https://api.anthropic.com/v1');
       expect(config.providers[0].apiKey).toBe('$ANTHROPIC_API_KEY');
       expect(config.providers[0].models).toEqual([
+        'claude-fable-5-1',
         'claude-fable-5',
         'claude-opus-5',
         'claude-opus-4-8',
@@ -113,15 +114,10 @@ describe('router-config', () => {
       expect(openaiProvider?.baseURL).toBe('https://api.openai.com/v1');
       expect(openaiProvider?.apiKey).toBe('sk-test-key');
       expect(openaiProvider?.models).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',
-        'gpt-5.5',
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex',
-        'gpt-5.3-codex-spark',
-        'gpt-5.2',
       ]);
     });
 
@@ -157,6 +153,8 @@ describe('router-config', () => {
       expect(googleProvider?.baseURL).toBe('https://generativelanguage.googleapis.com/v1beta');
       expect(googleProvider?.apiKey).toBe('AIza-test-key');
       expect(googleProvider?.models).toEqual([
+        'gemini-3.8-flash',
+        'gemini-3.5-flash-lite',
         'gemini-3.1-pro-preview',
         'gemini-3-flash-preview',
         'gemini-3.1-flash-lite-preview',

@@ -47,6 +47,18 @@ vi.mock('../../../src/lib/cloister/dead-end-trip.js', () => ({
   recordDeadEndNeedsYou: (...args: unknown[]) => mockRecordDeadEndNeedsYou(...args),
 }));
 
+// detectPendingOperatorDecision transitively reads overdeck.db through the
+// workspace resolver (getAgentWorkspace → read-only door → strict schema
+// audit). A full-suite run can leave an unmigrated overdeck.db in the shared
+// worker home, and the audit throw aborts checkDeadEndAgents mid-patrol,
+// failing the respawn assertions below. Dead-end respawn logic never depends
+// on pending operator decisions, so sever the edge and keep every gate
+// decision real.
+vi.mock('../../../src/lib/agents/pending-decision-gate.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/agents/pending-decision-gate.js')>()),
+  detectPendingOperatorDecision: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
 }));

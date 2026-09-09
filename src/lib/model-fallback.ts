@@ -8,19 +8,22 @@
 
 import { Effect } from 'effect';
 import { ModelId, AnthropicModel } from './settings.js';
-import { resolveModelIdSync } from './model-capabilities.js';
+import { resolveModelIdSync, MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta';
 
 /**
  * Map of model ID to provider
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
+  'muse-spark-1.3': 'meta',
+  'muse-spark-1.3-contributor': 'meta',
   // Anthropic models
+  'claude-fable-5-1': 'anthropic',
   'claude-fable-5': 'anthropic',
   'claude-opus-5': 'anthropic',
   'claude-opus-4-8': 'anthropic',
@@ -31,7 +34,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models (supported per Codex CLI catalog, 2026-07-09)
+  // OpenAI models (supported per Codex CLI catalog, 2026-09-07)
+  'gpt-6-astra': 'openai',
   'gpt-5.6-sol': 'openai',
   'gpt-5.6-terra': 'openai',
   'gpt-5.6-luna': 'openai',
@@ -53,6 +57,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-4o-mini': 'openai',
 
   // Google models (current)
+  'gemini-3.8-flash': 'google',
+  'gemini-3.5-flash-lite': 'google',
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
@@ -77,6 +83,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'MiniMax-M3': 'minimax',
 
   // Z.AI models
+  'glm-5.3': 'zai',
   'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
@@ -94,6 +101,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'qwen3-coder-plus': 'dashscope',
   'qwen3-plus': 'dashscope',
   'qwen3.7-max': 'dashscope',
+  'qwen3.7-plus': 'dashscope',
+  'qwen3.8-flash': 'dashscope',
   'qwen3.8-max': 'dashscope',
 
   // xAI models
@@ -118,6 +127,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
+  'gpt-6-astra': 'claude-sonnet-5', // GPT-6 flagship → Sonnet
   'gpt-5.6-sol': 'claude-sonnet-5', // Flagship model → Sonnet
   'gpt-5.6-terra': 'claude-sonnet-5', // Balanced model → Sonnet
   'gpt-5.6-luna': 'claude-haiku-4-5', // Fast/cheap tier → Haiku
@@ -203,7 +213,8 @@ const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-5';
  * Used for within-provider tier-aware fallback.
  */
 const MODEL_TIER_RANK: Record<string, number> = {
-  // OpenAI tiers — addendum 2026-07-09 catalog (Codex CLI)
+  // OpenAI tiers — addendum 2026-09-07 catalog (Codex CLI)
+  'gpt-6-astra': 3,
   'gpt-5.6-sol': 2,
   'gpt-5.6-terra': 2,
   'gpt-5.6-luna': 1,
@@ -360,6 +371,11 @@ export function applyTierAwareFallbackSync(
   userTier?: SubscriptionPlan
 ): ModelId {
   const provider = getModelProviderSync(modelId);
+  // Native Muse credentials are resolved by its CLI; never substitute another tier or provider.
+  if (provider === 'meta') {
+    if (!isProviderEnabled(provider, enabledProviders)) throw new Error('Meta (Muse) is disabled; enable it in Settings before selecting a Muse model');
+    return modelId;
+  }
 
   // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
@@ -534,10 +550,9 @@ export function filterAvailableModelsSync(
  * @returns List of available model IDs
  */
 export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): ModelId[] {
-  return Object.keys(MODEL_PROVIDERS).filter((modelId) => {
-    const provider = MODEL_PROVIDERS[modelId as ModelId];
-    return isProviderEnabled(provider, enabledProviders);
-  }) as ModelId[];
+  return Object.entries(MODEL_CAPABILITIES)
+    .filter(([id, capability]) => !(id in MODEL_DEPRECATIONS) && !capability.displayName.includes('(deprecated)') && isProviderEnabled(capability.provider, enabledProviders))
+    .map(([id]) => id as ModelId);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

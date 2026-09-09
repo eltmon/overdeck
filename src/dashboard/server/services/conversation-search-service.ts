@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
 import { sessionIdFromPath } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../../../lib/overdeck/conversations-search.js';
@@ -78,10 +79,20 @@ export async function searchConversationChunks(input: {
         provider: handle.provider,
       })
         .then((hits) => filterLiveHits(handle.db, hits))
-        .then(resolve, (error: unknown) => {
-          console.error('[conversation-search] service search failed:', error);
-          resolve([]);
-        });
+        .then(
+          (hits) => {
+            recordConversationSearchSuccess();
+            resolve(hits);
+          },
+          (error: unknown) => {
+            // PAN-3771: a failed search used to be indistinguishable from "no
+            // results". Record it so the dashboard banner can surface the
+            // reason (exhausted credits, quota, network, …).
+            recordConversationSearchFailure(error);
+            console.error('[conversation-search] service search failed:', error);
+            resolve([]);
+          },
+        );
     });
   });
 }

@@ -2,11 +2,15 @@
  * Harness-specific metadata parsers for discovered sessions (PAN-2224).
  */
 
+import { readFile } from 'node:fs/promises';
+import { museSessionId } from '../runtimes/muse-session.js';
+import { museTimestamp, parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-parser.js';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
 import type { AcpTranscriptEntry } from '../acp/transcript.js';
 import type { SessionMetadata } from './jsonl-async.js';
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface PiSessionLine {
   type: 'session';
@@ -248,7 +252,8 @@ export async function parseCodexSessionMetadata(filePath: string): Promise<Sessi
     }
 
     if (entry.type === 'event_msg') {
-      if (recordType === 'user_message' || recordType === 'agent_message') {
+      // Both rollout message shapes (PAN-3781) — see codex-rollout-message.ts.
+      if (readCodexRolloutMessage(entry)) {
         result.messageCount++;
         if (currentModel) modelCounts[currentModel] = (modelCounts[currentModel] ?? 0) + 1;
         return;
@@ -370,4 +375,27 @@ function extractFilePath(toolName: string, input: Record<string, unknown> | unde
   if (!input || !FILE_TOOLS.has(toolName.toLowerCase())) return null;
   const path = input['file_path'] ?? input['path'] ?? input['file'];
   return typeof path === 'string' && path.length > 0 ? path : null;
+}
+
+/** Native root events only; private reasoning/configuration never enter discovery metadata. */
+export async function parseMuseSessionMetadata(filePath: string): Promise<SessionMetadata> {
+  const result = emptySessionMetadata();
+  const records = parseMuseRecords(await readFile(filePath, 'utf8'));
+  result.sessionId = museSessionId(filePath);
+  for (const record of records) {
+    if (record.payload_type === 'runtime.session.metadata') {
+      result.cwdFromFirstMessage = record.payload?.record?.workspace_root ?? result.cwdFromFirstMessage;
+      result.primaryModel = record.payload?.record?.model_id ?? result.primaryModel;
+    }
+    const event = record.payload?.kind === 'run' ? record.payload.event : undefined;
+    if (event?.kind === 'started' || event?.kind === 'assistant_message_committed') {
+      result.messageCount++;
+      recordTimestamp(result, museTimestamp(record));
+    }
+  }
+  const usage = summarizeMuseRecords(records, filePath);
+  result.modelsUsed = result.primaryModel ? [result.primaryModel] : [];
+  result.tokenInput = usage ? usage.usage.inputTokens + (usage.usage.cacheReadTokens ?? 0) : 0;
+  result.tokenOutput = usage?.usage.outputTokens ?? 0;
+  return result;
 }

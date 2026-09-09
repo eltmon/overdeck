@@ -478,6 +478,95 @@ function isUserTextEntry(entry: unknown): boolean {
   return false
 }
 
+// ─── ohmypi transcript shapes (PAN-3766) ─────────────────────────────────────
+//
+// Pi's `ask` tool is the AskUserQuestion analogue: the assistant turn carries a
+// `toolCall` content item (name 'ask') whose `arguments.questions` match
+// AskUserQuestion's input.questions shape, and the operator's answer — or pi's
+// own synthetic interrupt-skip when a queued message arrives — lands as a
+// `role: 'toolResult'` message carrying the matching toolCallId. Pi lines are
+// distinguished by the `{type: 'message', message: {role, ...}}` envelope, so
+// one scan pass handles claude and pi transcripts (and stale-harness files)
+// without threading the harness through every caller.
+
+function isPiMessageEntry(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false
+  const e = entry as { type?: unknown; message?: { role?: unknown } }
+  return e.type === 'message' && typeof e.message?.role === 'string'
+}
+
+function piAskQuestions(raw: unknown): Question[] {
+  if (!Array.isArray(raw)) return []
+  const questions: Question[] = []
+  for (const q of raw) {
+    if (!q || typeof q !== 'object') continue
+    const r = q as Record<string, unknown>
+    const options: QuestionOption[] = Array.isArray(r['options'])
+      ? r['options']
+          .filter((o): o is Record<string, unknown> => !!o && typeof o === 'object')
+          .map((o) => ({
+            label: typeof o['label'] === 'string' ? o['label'] : '',
+            description: typeof o['description'] === 'string' ? o['description'] : '',
+          }))
+      : []
+    questions.push({
+      question: typeof r['question'] === 'string' ? r['question'] : '',
+      header: typeof r['header'] === 'string' ? r['header'] : '',
+      options,
+      multiSelect: r['multiSelect'] === true,
+    })
+  }
+  return questions
+}
+
+interface AskScanState {
+  askToolCalls: Map<string, PendingQuestion>
+  askAnswered: Set<string>
+  askDeniedAwaitingUser: Set<string>
+}
+
+function scanPiEntry(entry: unknown, state: AskScanState): void {
+  const e = entry as {
+    timestamp?: unknown
+    message?: { role?: unknown; toolCallId?: unknown; content?: unknown }
+  }
+  const message = e.message
+  if (!message) return
+  const timestamp = typeof e.timestamp === 'string' ? e.timestamp : new Date().toISOString()
+
+  if (message.role === 'assistant' && Array.isArray(message.content)) {
+    for (const item of message.content) {
+      if (!item || typeof item !== 'object') continue
+      const c = item as { type?: unknown; name?: unknown; id?: unknown; arguments?: { questions?: unknown } }
+      if (c.type === 'toolCall' && c.name === 'ask' && typeof c.id === 'string') {
+        state.askToolCalls.set(c.id, {
+          toolId: c.id,
+          timestamp,
+          questions: piAskQuestions(c.arguments?.questions),
+        })
+      }
+    }
+    return
+  }
+
+  // Any toolResult resolves the ask — including pi's synthetic interrupt-skip
+  // (details.source 'interrupt_skipped'): either way the modal is gone from the
+  // pane. If the agent still needs the answer it re-asks, creating a fresh
+  // pending entry.
+  if (message.role === 'toolResult' && typeof message.toolCallId === 'string') {
+    if (state.askToolCalls.has(message.toolCallId)) {
+      state.askAnswered.add(message.toolCallId)
+      state.askDeniedAwaitingUser.delete(message.toolCallId)
+    }
+  }
+}
+
+/**
+ * Scan a session transcript for inputs waiting on the operator: outstanding
+ * AskUserQuestion tool calls (claude) or `ask` tool calls (ohmypi, PAN-3766),
+ * and claude plan-mode state. Format is detected per line, so a transcript
+ * resolves correctly even when the recorded harness is stale.
+ */
 export async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
   if (!existsSync(jsonlPath)) {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
@@ -501,6 +590,13 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     for (const line of lines) {
       try {
         const entry = JSON.parse(line)
+
+        // PAN-3766 — ohmypi transcript line; pi's `ask` tool feeds the same
+        // pending-question bookkeeping as claude's AskUserQuestion.
+        if (isPiMessageEntry(entry)) {
+          scanPiEntry(entry, { askToolCalls, askAnswered, askDeniedAwaitingUser })
+          continue
+        }
 
         // PAN-1520 — a user-text turn resolves any AUQs still in the "denied
         // but awaiting operator response" state. Without this check, an AUQ

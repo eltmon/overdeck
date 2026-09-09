@@ -579,6 +579,20 @@ describe('ConversationPanel rename flow', () => {
 });
 
 describe('ConversationPanel resume message control', () => {
+  // A transcript with timeline activity keeps the pane off the isOrphaned
+  // "no saved history" empty state, so the tests exercise the real
+  // resume-bar-vs-composer footer choice. Served both as the seeded query
+  // data and as the /messages refetch a successful resume triggers.
+  const resumeWorkLog = [{
+    id: 'call_1',
+    createdAt: '2024-01-01T00:30:00Z',
+    label: 'Bash',
+    tone: 'tool' as const,
+    toolTitle: 'Bash',
+    detail: 'git status',
+  }];
+  const resumeMessagesData = { messages: [], workLog: resumeWorkLog, streaming: false };
+
   beforeEach(() => {
     queryClients = [];
     fetchControl = installStrictFetchMock(({ method, url }) => {
@@ -586,6 +600,10 @@ describe('ConversationPanel resume message control', () => {
       if (defaultResponse) return defaultResponse;
       if (method === 'POST' && url === '/api/conversations/test-conv/resume') {
         return Response.json({ ...mockConversation, status: 'active', sessionAlive: true });
+      }
+      // A successful resume invalidates the messages query; serve the refetch.
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages') {
+        return Response.json(resumeMessagesData);
       }
       return undefined;
     });
@@ -620,6 +638,39 @@ describe('ConversationPanel resume message control', () => {
       expect(resumeCall).toBeDefined();
       expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toMatchObject({ sendResumeContract: false });
     });
+  });
+
+  // The old `resumed` latch was one-way: a successful resume POST pinned
+  // showTerminal forever, so when the resumed session stopped again the pane
+  // showed a read-only composer with no resume bar short of a browser refresh.
+  it('brings the resume bar back when a resumed session stops again', async () => {
+    const dead = { ...mockConversation, status: 'ended' as const, sessionAlive: false, endedAt: '2024-01-01T01:00:01Z' };
+    const alive = { ...mockConversation, status: 'active' as const, sessionAlive: true, endedAt: null };
+    const { client, rerender } = renderPanel(dead, {}, resumeMessagesData);
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+
+    // Operator resumes; until the poll confirms the session, the latch (not
+    // the composer) owns the footer.
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull());
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+
+    // Poll confirms the session came alive — the latch is spent, harmlessly,
+    // because sessionAlive now carries showTerminal on its own.
+    const tree = (conv: typeof dead) => (
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel conversation={conv} viewMode="conversation" onArchived={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>
+    );
+    rerender(tree(alive));
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+
+    // The session stops again — the resume bar must come back.
+    rerender(tree(dead));
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+    expect(screen.queryByTestId('composer-footer')).toBeNull();
   });
 });
 

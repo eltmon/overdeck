@@ -63,7 +63,16 @@ describe('SubagentRail', () => {
     expect(screen.getByText('general-purpose')).toBeInTheDocument();
     expect(screen.getByText('depth 2')).toBeInTheDocument();
     expect(screen.getAllByLabelText('running')).toHaveLength(2); // main agent + Explore
-    expect(screen.getByLabelText('done')).toHaveClass('bg-muted-foreground/40');
+    // Only real activity pulses: the halo belongs to a working subagent, never to the
+    // main agent (whose 'running' is tmux liveness) and never to a finished subagent.
+    const [mainIndicator, exploreIndicator] = screen.getAllByLabelText('running');
+    expect(exploreIndicator?.querySelector('.animate-ping')).toBeInTheDocument();
+    expect(exploreIndicator?.querySelector('.bg-primary')).toBeInTheDocument();
+    expect(mainIndicator?.querySelector('.animate-ping')).not.toBeInTheDocument();
+    expect(mainIndicator?.querySelector('.bg-primary')).toBeInTheDocument();
+    const done = screen.getByLabelText('done');
+    expect(done.querySelector('.animate-ping')).not.toBeInTheDocument();
+    expect(done.querySelector('.bg-muted-foreground\\/40')).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveClass('min-w-0');
   });
 

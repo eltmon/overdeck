@@ -1,3 +1,5 @@
+import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
 /**
  * Conversation transcript adapter.
  *
@@ -29,6 +31,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -370,6 +373,29 @@ function serializeKimiEntry(entry: KimiWireLine, includeThinking: boolean): stri
   return undefined;
 }
 
+const museAdapter: ConversationTranscriptAdapter = {
+  name: 'muse', supportsPlainForkAsSource: false, supportsSourceAuthoredHandoff: false,
+  async resolveSessionFile(conv) { return resolveMuseSessionPath(conv.tmuxSession); },
+  async serializeTranscript(sessionFile) {
+    return parseMuseRecords(await readFile(sessionFile, 'utf8')).flatMap(record => {
+      if (record.payload?.kind !== 'run') return [];
+      const event = record.payload.event;
+      if (event?.kind === 'started' && event.prompt) return [`[user]\n${event.prompt}`];
+      if (event?.kind === 'assistant_message_committed' && event.text) return [`[assistant]\n${event.text}`];
+      return [];
+    }).join('\n\n');
+  },
+  async compactSummary(sessionFile, options) {
+    const serialized = await museAdapter.serializeTranscript(sessionFile, options);
+    if (!serialized.trim()) return { summary: '', summaryModel: null };
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model, richMode: options?.richMode ?? false, harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
+    });
+    return { summary, summaryModel: options?.model ?? null };
+  },
+};
+
 const kimiCodeAdapter: ConversationTranscriptAdapter = {
   name: 'kimi-code',
   // Not the raw Claude JSONL a `claude --resume` can consume; Kimi has its
@@ -441,15 +467,9 @@ function serializeCodexEntry(entry: CodexRolloutEntry): string | undefined {
   if (!payload) return undefined;
 
   if (entry.type === 'event_msg') {
-    if (
-      (payload.type === 'user_message' || payload.type === 'agent_message')
-      && typeof payload.message === 'string'
-    ) {
-      const message = payload.message.trim();
-      if (!message) return undefined;
-      const role = payload.type === 'user_message' ? 'user' : 'assistant';
-      return `[${role}]\n${message}`;
-    }
+    // Both rollout message shapes (PAN-3781) — see codex-rollout-message.ts.
+    const message = readCodexRolloutMessage(entry);
+    if (message) return `[${message.role}]\n${message.text}`;
     return undefined;
   }
 
@@ -529,6 +549,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'codex': codexAdapter,
   'acp': acpAdapter,
   'kimi-code': kimiCodeAdapter,
+  muse: museAdapter,
   'prime-agent': primeAgentAdapter,
 };
 

@@ -78,7 +78,7 @@ export function ConversationSearchSection({
           <div className="min-w-0">
             <span className="text-sm font-medium text-foreground">Conversation Search</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Index Claude JSONL transcripts for Ctrl+K semantic search. Disabled by default; enabling sends transcript chunks to the configured embedding provider.
+              Index Claude JSONL transcripts for Ctrl+K semantic search. Enabled by default; indexing sends transcript chunks to the configured embedding provider (small per-token cost). Turn off to disable indexing and palette conversation hits.
             </p>
           </div>
           <button

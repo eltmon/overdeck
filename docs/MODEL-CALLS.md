@@ -65,7 +65,7 @@ The Claude-backed ones spawn `claude -p` from the empty scratch cwd `${OVERDECK_
 | `summaryFork` / handoff author | External handoff document author | `src/lib/conversations/summary-fork.ts:185` | `claude-sonnet-4-6` | `options.handoffAuthorModel` | `background:summaryFork` (when JSON envelope has usage) | Yes (Background AI) |
 | `ttsSummarizer` | Narrate recent dashboard activity | `src/lib/config-yaml.ts:1112` → `src/dashboard/server/services/tts-summarizer.ts:159` | `gpt-5.4-mini` | `tts.summarizer.model` | `background:ttsSummarizer` | Yes (Background AI) |
 | Docs-corpus embeddings | Embed docs/skills/rules/PRDs for RAG | `src/lib/config-yaml.ts:1021` → `src/lib/docs/index-builder.ts:258` | `gte-small` (local, `Xenova/gte-small`) | `docs.embedding.provider` (`local`/`openai`), `docs.embedding.model` | **None** | No |
-| Conversation-search embeddings | Embed conversation JSONL chunks | `src/lib/config-yaml.ts:1033` → `src/lib/conversation-search/embedding-provider.ts:51` | `text-embedding-3-small` | `conversationSearch.model` | **None** (only cost estimate UI) | Yes (disabled by default) |
+| Conversation-search embeddings | Embed conversation JSONL chunks for Ctrl+K palette search | `src/lib/config-yaml.ts:1033` → `src/lib/conversation-search/embedding-provider.ts:51` | `text-embedding-3-small` | `conversationSearch.model` | **None** (only cost estimate UI) | Yes (enabled by default; toggle in Settings → Conversation Search) |
 
 ---
 

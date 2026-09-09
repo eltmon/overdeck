@@ -64,6 +64,7 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'GET /api/conversations/:name/diffs/:turnId',
   'POST /api/conversations/:name/retitle',
   'GET /api/conversations/:name/about',
+  'POST /api/conversations/:id/pi-ask-answer',
 ] as const;
 
 function enumerateConversationRoutes(): Set<string> {
@@ -94,7 +95,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(source).toMatch(/export\s+const\s+conversationsRouteLayer\s*=/);
   });
 
-  it('keeps all 37 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 38 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -117,6 +118,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(37);
+    expect(liveRoutes.size).toBe(38);
   });
 });
