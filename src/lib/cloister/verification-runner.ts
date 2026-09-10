@@ -32,6 +32,7 @@ import type {
   VerificationRunnerOutcome,
   WorkspaceInfo,
 } from './verification-types.js';
+import { INTERRUPTED_VERIFICATION_NOTE } from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -191,7 +192,8 @@ export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliati
       }
       setReviewStatusSync(issueId, {
         verificationStatus: 'pending',
-        verificationNotes: 'The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.',
+        verificationNotes: INTERRUPTED_VERIFICATION_NOTE,
+        lastVerifiedCommit: undefined,
       });
       reset += 1;
       try {
