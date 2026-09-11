@@ -1,4 +1,4 @@
-import { watch } from 'node:fs/promises';
+import { stat, watch } from 'node:fs/promises';
 import { parseConversationMessages } from './parser.js';
 import type { ParseResult, ParseState } from './types.js';
 
@@ -22,6 +22,9 @@ export function gateSnapshotEmission(
 
 // ─── File watcher ─────────────────────────────────────────────────────────────
 
+/** How often the fs.watch path re-checks the file size against the parsed offset. */
+export const RECONCILE_INTERVAL_MS = 5_000;
+
 export interface ConversationWatchHandle {
   stop: () => void;
 }
@@ -41,11 +44,20 @@ export function watchConversation(
   let priorState: ParseState | undefined = options.priorState;
   let stopped = false;
   let isParsing = false;
+  // A change that arrived mid-parse. Without this flag the append it signalled
+  // was silently dropped until the next event — which, for the last line of a
+  // turn, never comes.
+  let changePending = false;
   let abortController: AbortController | null = null;
   let pollInterval: ReturnType<typeof setTimeout> | null = null;
+  let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function handleChange(): Promise<void> {
-    if (stopped || isParsing) return;
+    if (stopped) return;
+    if (isParsing) {
+      changePending = true;
+      return;
+    }
     isParsing = true;
     try {
       const result = await parseConversationMessages(sessionFile, byteOffset, priorState);
@@ -99,6 +111,10 @@ export function watchConversation(
     } finally {
       isParsing = false;
     }
+    if (changePending && !stopped) {
+      changePending = false;
+      await handleChange();
+    }
   }
 
   // Try fs.watch first (inotify on Linux)
@@ -113,10 +129,39 @@ export function watchConversation(
         await handleChange();
       }
     } catch (err) {
-      if (!stopped) {
-        // Fallback to polling on watch failure
-        startPolling();
+      // Fall through to the polling fallback below.
+    }
+    // The iterator can also end without throwing (watcher closed by the
+    // runtime, inode replaced). Either way the subscription is still open, so
+    // never leave it with no change source at all.
+    if (!stopped) {
+      stopReconcile();
+      startPolling();
+    }
+  }
+
+  // Safety net for the fs.watch path: inotify can miss or coalesce events
+  // (and the subscription has no other way to learn the file grew), which
+  // left the reader frozen until a page refresh re-subscribed. Compare the
+  // on-disk size with what we have parsed and re-parse on any difference.
+  function startReconcile(): void {
+    async function reconcile(): Promise<void> {
+      if (stopped) return;
+      try {
+        const info = await stat(sessionFile);
+        if (info.size !== byteOffset) await handleChange();
+      } catch {
+        // Missing or unreadable file — the next tick retries.
       }
+      if (!stopped && reconcileTimer !== null) reconcileTimer = setTimeout(reconcile, RECONCILE_INTERVAL_MS);
+    }
+    reconcileTimer = setTimeout(reconcile, RECONCILE_INTERVAL_MS);
+  }
+
+  function stopReconcile(): void {
+    if (reconcileTimer !== null) {
+      clearTimeout(reconcileTimer);
+      reconcileTimer = null;
     }
   }
 
@@ -131,6 +176,7 @@ export function watchConversation(
 
   // Start watch; polling is only a fallback when fs.watch itself fails.
   startWatch();
+  startReconcile();
 
   return {
     stop() {
@@ -143,6 +189,7 @@ export function watchConversation(
         clearTimeout(pollInterval);
         pollInterval = null;
       }
+      stopReconcile();
     },
   };
 }
