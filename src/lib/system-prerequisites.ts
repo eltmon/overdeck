@@ -18,8 +18,9 @@ import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 
 import {
-  resolveExecutable,
-  resolveHarnessBinary,
+  resolveExecutableDetailed,
+  resolveHarnessBinaryDetailed,
+  type ExecutableResolution,
 } from './harness-binary.js';
 
 const execFileAsync = promisify(execFile);
@@ -191,10 +192,21 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
+/**
+ * Resolves a prerequisite to its executable path. May return the detailed
+ * resolution so diagnostics can explain a miss (e.g. a harness that is only
+ * installed on the Windows side of WSL); a bare path or null is normalized.
+ */
 export type PrerequisiteResolver = (
   command: string,
   options?: { acpHarness?: boolean; pathValue?: string },
-) => Promise<string | null>;
+) => Promise<string | null | ExecutableResolution>;
+
+function normalizeResolution(result: string | null | ExecutableResolution): ExecutableResolution {
+  return typeof result === 'string' || result === null
+    ? { path: result, windowsInterop: [] }
+    : result;
+}
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
   const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
@@ -206,22 +218,24 @@ const defaultResolver: PrerequisiteResolver = async (command, options) => {
     ? { pathValue: options.pathValue }
     : undefined;
   return options?.acpHarness
-    ? resolveHarnessBinary('acp', resolutionOptions)
-    : resolveExecutable(command, resolutionOptions);
+    ? resolveHarnessBinaryDetailed('acp', resolutionOptions)
+    : resolveExecutableDetailed(command, resolutionOptions);
 };
 
-function resolvePrerequisiteExecutable(
+async function resolvePrerequisiteExecutable(
   id: string,
   resolver: PrerequisiteResolver,
   pathValue?: string,
-): Promise<string | null> {
+): Promise<ExecutableResolution> {
   const options = {
     ...(id === 'kimi' ? { acpHarness: true } : {}),
     ...(pathValue !== undefined ? { pathValue } : {}),
   };
-  return Object.keys(options).length > 0
-    ? resolver(id, options)
-    : resolver(id);
+  return normalizeResolution(
+    Object.keys(options).length > 0
+      ? await resolver(id, options)
+      : await resolver(id),
+  );
 }
 
 function firstLine(output: string): string | null {
@@ -251,8 +265,12 @@ export async function collectSetupDiagnostics(
 ): Promise<SetupDiagnosticsReport> {
   const pathValue = process.env['PATH'] ?? '';
   const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs }) => {
-    const resolvedPath = await resolvePrerequisiteExecutable(id, resolver, pathValue);
-    if (!resolvedPath) return `✗ ${id}: command not found`;
+    const { path: resolvedPath, windowsInterop } = await resolvePrerequisiteExecutable(id, resolver, pathValue);
+    if (!resolvedPath) {
+      return windowsInterop.length > 0
+        ? `✗ ${id}: only the Windows install is reachable through WSL interop (${redactHome(windowsInterop[0]!)}) — install it inside the distro`
+        : `✗ ${id}: command not found`;
+    }
     try {
       const output = await probe(resolvedPath, versionArgs);
       return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${redactHome(resolvedPath)}`;
@@ -261,10 +279,13 @@ export async function collectSetupDiagnostics(
     }
   }));
 
-  const claudePath = await resolvePrerequisiteExecutable('claude', resolver, pathValue);
+  const { path: claudePath, windowsInterop: claudeWindowsInterop } =
+    await resolvePrerequisiteExecutable('claude', resolver, pathValue);
   const likelyCause = claudePath
     ? 'Claude resolved to an executable path; conversation and agent launchers will prepend that directory to PATH.'
-    : 'Claude was not found on the server PATH, in common user install locations, under the global npm prefix, or through the login shell.';
+    : claudeWindowsInterop.length > 0
+      ? `Claude is installed on Windows (${redactHome(claudeWindowsInterop[0]!)}) but not inside this WSL distro. A Windows binary launched from WSL writes its transcripts to the Windows user profile, where Overdeck cannot read them, so it is not used. Install Claude Code inside WSL.`
+      : 'Claude was not found on the server PATH, in common user install locations, under the global npm prefix, or through the login shell.';
 
   const markdown = [
     '## Overdeck setup diagnostics',
@@ -303,7 +324,7 @@ export async function checkSystemPrerequisite(
 
   const { versionArgs, ...checkDefinition } = definition;
   try {
-    const executable = await resolvePrerequisiteExecutable(id, resolver);
+    const { path: executable } = await resolvePrerequisiteExecutable(id, resolver);
     if (!executable) return { ...checkDefinition, found: false, version: null };
     const output = await probe(executable, versionArgs);
     return { ...checkDefinition, found: true, version: firstLine(output) };

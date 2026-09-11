@@ -7,8 +7,10 @@ import {
   configuredHarnessBinaryPath,
   harnessBinaryName,
   harnessPathExport,
+  isWindowsInteropPath,
   prepareHarnessLaunch,
   resolveExecutable,
+  resolveExecutableDetailed,
 } from '../harness-binary.js';
 
 function executableAccess(executablePaths: readonly string[]) {
@@ -104,6 +106,57 @@ describe('resolveExecutable', () => {
       accessExecutable: executableAccess([]),
       runCommand,
     })).resolves.toBeNull();
+  });
+
+  // PAN-3827: WSL appends the Windows PATH, so a distro with no Linux harness
+  // resolves `claude` to the Windows install on /mnt/c. That binary writes its
+  // transcript to the Windows profile where the WSL server never looks.
+  describe('WSL interop', () => {
+    const WINDOWS_CLAUDE = '/mnt/c/Users/test/AppData/Roaming/npm/claude';
+    const WSL_PATH = '/usr/bin:/mnt/c/Users/test/AppData/Roaming/npm';
+
+    it('skips a Windows-interop PATH entry in favor of a Linux install further down the lookup order', async () => {
+      await expect(resolveExecutable('claude', {
+        pathValue: WSL_PATH,
+        home: '/home/test',
+        windowsMountRoots: ['/mnt/c'],
+        accessExecutable: executableAccess([WINDOWS_CLAUDE, '/home/test/.local/bin/claude']),
+        runCommand: vi.fn(async () => ''),
+        allowLoginShell: false,
+      })).resolves.toBe('/home/test/.local/bin/claude');
+    });
+
+    it('reports the Windows install instead of returning it when nothing native exists', async () => {
+      const runCommand = vi.fn(async (command: string) => command === 'npm' ? '' : `${WINDOWS_CLAUDE}\n`);
+
+      await expect(resolveExecutableDetailed('claude', {
+        pathValue: WSL_PATH,
+        home: '/home/test',
+        shell: '/bin/bash',
+        windowsMountRoots: ['/mnt/c'],
+        accessExecutable: executableAccess([WINDOWS_CLAUDE]),
+        runCommand,
+      })).resolves.toEqual({ path: null, windowsInterop: [WINDOWS_CLAUDE] });
+    });
+
+    it('refuses an explicitly configured Windows-interop executable', async () => {
+      await expect(resolveExecutableDetailed('kimi', {
+        executablePath: '/mnt/c/Users/test/.kimi-code/bin/kimi',
+        windowsMountRoots: ['/mnt/c'],
+        accessExecutable: executableAccess(['/mnt/c/Users/test/.kimi-code/bin/kimi']),
+      })).resolves.toEqual({ path: null, windowsInterop: ['/mnt/c/Users/test/.kimi-code/bin/kimi'] });
+    });
+
+    it('leaves native paths alone when no Windows mounts exist', async () => {
+      await expect(resolveExecutableDetailed('claude', {
+        pathValue: WSL_PATH,
+        home: '/home/test',
+        windowsMountRoots: [],
+        accessExecutable: executableAccess([WINDOWS_CLAUDE]),
+        runCommand: vi.fn(async () => ''),
+        allowLoginShell: false,
+      })).resolves.toEqual({ path: WINDOWS_CLAUDE, windowsInterop: [] });
+    });
   });
 
   it('uses an explicit absolute executable without searching fallback locations', async () => {
@@ -212,6 +265,29 @@ describe('prepareHarnessLaunch', () => {
     expect((error as Error).message).not.toContain('execvp');
   });
 
+  it('tells the operator to install inside WSL when only the Windows harness is reachable', async () => {
+    const windowsClaude = '/mnt/c/Users/test/AppData/Roaming/npm/claude';
+    let error: unknown;
+    try {
+      await prepareHarnessLaunch('claude-code', {
+        pathValue: `/usr/bin:${windowsClaude.replace(/\/claude$/, '')}`,
+        home: '/home/test',
+        windowsMountRoots: ['/mnt/c'],
+        accessExecutable: executableAccess([windowsClaude]),
+        runCommand: vi.fn(async () => ''),
+        allowLoginShell: false,
+      });
+    } catch (cause) {
+      error = cause;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message).toContain(`only resolves to a Windows install through WSL interop (${windowsClaude})`);
+    expect(message).toContain('Install Claude Code inside WSL');
+    expect(message).toContain('No terminal session was created');
+  });
+
   it('quotes harness directories in PATH exports', () => {
     expect(harnessPathExport("/home/test/O'Reilly/bin/claude"))
       .toBe("export PATH='/home/test/O'\\''Reilly/bin':\"$PATH\"");
@@ -224,6 +300,15 @@ describe('prepareHarnessLaunch', () => {
     })).rejects.toThrow(
       'Kimi Code CLI configured executable "/configured/missing-kimi" was not found or is not executable',
     );
+  });
+});
+
+describe('isWindowsInteropPath', () => {
+  it('matches paths under a mount root but not sibling prefixes', () => {
+    expect(isWindowsInteropPath('/mnt/c/Users/test/bin/claude', ['/mnt/c'])).toBe(true);
+    expect(isWindowsInteropPath('/mnt/c', ['/mnt/c'])).toBe(true);
+    expect(isWindowsInteropPath('/mnt/cdrom/claude', ['/mnt/c'])).toBe(false);
+    expect(isWindowsInteropPath('/home/test/.local/bin/claude', ['/mnt/c', '/mnt/d'])).toBe(false);
   });
 });
 
