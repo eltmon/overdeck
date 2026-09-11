@@ -124,6 +124,32 @@ const pinnedDependencies = (packages, label) => {
   return dependencies;
 };
 
+// Transitive pins for the fresh `npm install` below. The stubs pin only the
+// externals the bundle imports directly; npm then resolves THEIR dependencies
+// from the registry by semver range, and a prerelease family like
+// @effect/* (`^4.0.0-beta.73` also admits `4.0.0-rc.*`) can drift onto a
+// version whose peers do not exist yet. On 2026-09-11 that broke every
+// desktop build (`@effect/platform-node-shared@4.0.0-rc.114` requiring
+// `effect@^4.0.0-rc.114`). Pin every Effect package to what the repo root
+// actually runs, via npm `overrides`, so the packaged server matches `pan up`.
+const rootInstalledOverrides = () => {
+  const overrides = {};
+  const pin = (packageName) => {
+    const manifestPath = join(repoRoot, "node_modules", packageName, "package.json");
+    if (existsSync(manifestPath)) {
+      overrides[packageName] = JSON.parse(readFileSync(manifestPath, "utf8")).version;
+    }
+  };
+  pin("effect");
+  const scopeDir = join(repoRoot, "node_modules", "@effect");
+  if (existsSync(scopeDir)) {
+    for (const entry of readdirSync(scopeDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.isDirectory() || entry.isSymbolicLink()) pin(`@effect/${entry.name}`);
+    }
+  }
+  return overrides;
+};
+
 const installDependencies = (runtimeDir) => {
   execSync("npm install --omit=dev --no-audit --no-fund", {
     cwd: runtimeDir,
@@ -294,6 +320,7 @@ writeFileSync(
       private: true,
       type: "module",
       dependencies,
+      overrides: rootInstalledOverrides(),
     },
     null,
     2,
@@ -375,6 +402,7 @@ writeFileSync(
       private: true,
       type: "module",
       dependencies: cliDependencies,
+      overrides: rootInstalledOverrides(),
     },
     null,
     2,
