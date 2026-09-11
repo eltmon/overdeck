@@ -1,0 +1,11 @@
+[Unit]
+Description=Preserve transcript snapshots every five minutes without expiry
+
+[Timer]
+OnBootSec=1min
+OnCalendar=*:0/5
+Persistent=true
+Unit=overdeck-transcript-preservation.service
+
+[Install]
+WantedBy=timers.target
