@@ -9,5 +9,5 @@ export { contextUsageFromParseResult, computeContextUsage } from './conversation
 export { findLastCompactBoundary } from './conversation/compact-boundary.js';
 export { parseConversationMessages, parseEntireConversation, parseFromLastCompactBoundary } from './conversation/parser.js';
 export { snapshotSessionFiles, discoverSessionFile } from './conversation/session-files.js';
-export { gateSnapshotEmission, watchConversation } from './conversation/watch.js';
+export { gateSnapshotEmission, RECONCILE_INTERVAL_MS, watchConversation } from './conversation/watch.js';
 export type { ConversationWatchHandle } from './conversation/watch.js';
