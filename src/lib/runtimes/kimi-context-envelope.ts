@@ -45,6 +45,32 @@ export function readManagedKimiSessionId(agentId: string, overdeckHome = getOver
   }
 }
 
+/**
+ * Wait for the spawn path to persist the captured kimi-session-id.
+ *
+ * A conversation's tmux session exists (and the composer enables) before
+ * `spawnConversationSession` finishes diffing Kimi's session bucket, so a
+ * message sent in that window used to fail with "captured kimi-session-id is
+ * missing". Poll the pointer file instead of failing on the first miss. Returns
+ * null when the id has still not appeared at the deadline — the caller decides
+ * how to report that (the spawn may have failed, or Kimi may still be starting).
+ */
+export async function waitForManagedKimiSessionId(
+  agentId: string,
+  options: { timeoutMs?: number; pollMs?: number; overdeckHome?: string } = {},
+): Promise<string | null> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const pollMs = options.pollMs ?? 250;
+  const overdeckHome = options.overdeckHome ?? getOverdeckHome();
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const sessionId = readManagedKimiSessionId(agentId, overdeckHome);
+    if (sessionId) return sessionId;
+    if (Date.now() >= deadline) return null;
+    await new Promise<void>((resolve) => setTimeout(resolve, Math.min(pollMs, Math.max(0, deadline - Date.now()))));
+  }
+}
+
 /** Pure formatter: context first, original task afterward, with hard delimiters. */
 export function buildKimiContextEnvelope(contextFiles: readonly string[], taskMessage: string): {
   message: string;
