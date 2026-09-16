@@ -342,17 +342,17 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:45:41.190Z",
+  "updated": "2026-09-16T18:45:44.221Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "passed",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:45:41.110Z",
+    "updatedAt": "2026-09-16T18:45:41.794Z",
     "testNotes": "Reconciled from green GitHub Actions CI on fcad7fae: build (22) (https://github.com/eltmon/overdeck/actions/runs/35134130718/job/104922116379)",
     "verificationNotes": "Verification FAILED at test (814354ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -481,10 +481,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 156,
-            "output": 35763,
-            "cacheRead": 17498664,
-            "cacheWrite": 288203
+            "input": 158,
+            "output": 36309,
+            "cacheRead": 17782862,
+            "cacheWrite": 288903
           }
         },
         "work": {
@@ -504,10 +504,10 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-sonnet-5": {
-          "input": 156,
-          "output": 35763,
-          "cacheRead": 17498664,
-          "cacheWrite": 288203
+          "input": 158,
+          "output": 36309,
+          "cacheRead": 17782862,
+          "cacheWrite": 288903
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 6722,
@@ -517,8 +517,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.830874,
-        "pricingAsOf": "2026-09-16T18:45:41.148Z"
+        "usd": 36.894928,
+        "pricingAsOf": "2026-09-16T18:45:44.198Z"
       }
     },
     "merges": [
