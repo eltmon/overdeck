@@ -122,14 +122,46 @@ describe('retrospective template invariants', () => {
     }
   });
 
-  it('routes canonical record reads through the read door (operator review)', () => {
-    // Per the canonical-state single-source-of-truth rule, agents must not
-    // read records/*.json directly. The prompt must point at the resolver
-    // (pan records show / pan show).
+  it('points at the verified canonical read door for per-issue records', () => {
+    // Operator review: there is no `pan records show` CLI verb and `pan show`
+    // alone is the runtime lens (issueId/agentId/shadow/health/cv/pipeline),
+    // not the full record (no feedback / scopeDrift / sessionHistory /
+    // recoveryTrips). The actual canonical read door is the lib function
+    // `readIssueRecord` (and `readIssueRecordSync`) in
+    // `src/lib/pan-dir/record.ts`, with `getIssueRecordPath` resolving the
+    // path. The prompt must reference that lib surface and must teach the
+    // agent that the non-existent CLI verb does not exist.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toContain('pan records show');
-    expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toContain('pan show');
+    expect(inputsSection, RAIL_MESSAGE).toContain('readIssueRecord');
+    expect(inputsSection, RAIL_MESSAGE).toContain('src/lib/pan-dir/record.ts');
+    expect(inputsSection, RAIL_MESSAGE).toContain('getIssueRecordPath');
+    expect(inputsSection, RAIL_MESSAGE).toContain('pan show');
+    expect(inputsSection, RAIL_MESSAGE).toContain('does NOT expose');
+    // The prompt is allowed to name the non-existent verb — but only in a
+    // "There is no X" sentence that teaches the agent to stop searching.
+    // A positive assertion ("records show" appears as a working command)
+    // is what the operator forbade. Check that any reference is in the
+    // "no such verb" framing.
+    if (inputsSection.toLowerCase().includes('pan records show')) {
+      expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toMatch(/there is no.*pan records show|pan records show.*does not exist/);
+    }
+  });
+
+  it('forbids treating every feedback file as superseding the report verdict', () => {
+    // Operator review: feedback files do NOT automatically supersede a
+    // verdict. Each feedback file must be matched to the run/head/time the
+    // verdict was produced under, otherwise an older feedback file for a
+    // since-fixed defect silently shadows the current verdict (the
+    // stale-approval problem).
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    expect(inputs, RAIL_MESSAGE).not.toBeNull();
+    const inputsSection = inputs![1].toLowerCase();
+    expect(inputsSection, RAIL_MESSAGE).toContain('feedback');
+    expect(inputsSection, RAIL_MESSAGE).toContain('run');
+    expect(inputsSection, RAIL_MESSAGE).toContain('head');
+    expect(inputsSection, RAIL_MESSAGE).not.toContain('they supersede');
+    expect(inputsSection, RAIL_MESSAGE).not.toContain('supersede the formal report');
   });
 });
