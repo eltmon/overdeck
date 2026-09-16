@@ -238,7 +238,7 @@
     "recordedAt": "2026-09-16T17:26:25.189Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:26:25.191Z",
+  "updated": "2026-09-16T17:26:26.115Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -247,12 +247,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:20:21.365Z",
+    "updatedAt": "2026-09-16T17:26:26.113Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (449190ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
-    "reviewRequestedAt": "2026-09-16T17:19:43.429Z",
+    "reviewRequestedAt": "2026-09-16T17:26:26.113Z",
     "reviewSpawnedAt": "2026-09-16T16:51:13.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -349,7 +349,7 @@
         "tests/unit/lib/projects/create-intent.test.ts",
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
-      "recordedAt": "2026-09-16T17:17:24.960Z"
+      "recordedAt": "2026-09-16T17:26:25.189Z"
     }
   },
   "closeOut": {
