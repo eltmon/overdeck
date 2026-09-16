@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T14:39:06.869Z",
+  "updated": "2026-09-16T14:41:54.603Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "registration-extras": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 2238681,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T14:39:06.868Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -84,12 +76,27 @@
         "outcome": "completed",
         "reason": "Implemented parseRepoUrl with comprehensive URL parsing for shorthand, SCP-like, SSH, and HTTPS formats. Created unit tests covering all acceptance criteria.",
         "releasedAt": "2026-09-16T14:37:44.754Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2238681,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T14:39:06.868Z",
+        "itemId": "registration-extras",
+        "outcome": "completed",
+        "reason": "Added RegisterProjectExtras type and optional extras parameter. Tests verify extras are saved and backward compatibility is maintained.",
+        "releasedAt": "2026-09-16T14:41:54.603Z"
       }
     ],
     "statusReasons": {
       "repo-url-parser": {
         "reason": "Implemented parseRepoUrl with comprehensive URL parsing for shorthand, SCP-like, SSH, and HTTPS formats. Created unit tests covering all acceptance criteria.",
         "updatedAt": "2026-09-16T14:37:44.754Z"
+      },
+      "registration-extras": {
+        "reason": "Added RegisterProjectExtras type and optional extras parameter. Tests verify extras are saved and backward compatibility is maintained.",
+        "updatedAt": "2026-09-16T14:41:54.603Z"
       }
     }
   },
@@ -100,6 +107,10 @@
     "repo-url-parser.ac3": "completed",
     "repo-url-parser.ac4": "completed",
     "repo-url-parser.ac5": "completed",
-    "registration-extras": "running"
+    "registration-extras": "completed",
+    "registration-extras.ac1": "completed",
+    "registration-extras.ac2": "completed",
+    "registration-extras.ac3": "completed",
+    "registration-extras.ac4": "completed"
   }
 }
