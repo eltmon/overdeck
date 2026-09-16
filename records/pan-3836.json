@@ -392,18 +392,18 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T21:23:00.664Z",
+  "updated": "2026-09-16T21:48:06.067Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-09-16T21:19:35.510Z",
-    "reviewNotes": "Cycle 8: one-commit UAT fix to read /projects/new mode preset via window.location (was crashing on react-router's useSearchParams). Cycle diff is bounded to NewProjectPage + tests; standing advisories from cycles 6/7 demoted under the convergence gate.",
+    "readyForMerge": false,
+    "updatedAt": "2026-09-16T21:48:06.000Z",
+    "reviewNotes": "Operator-authorized override: three reproduced correctness blockers (SSH port corruption repo-url.ts:58, dotted-repo rejection repo-url.ts:45, partial-registration blocks retry create.ts:574-593) plus non-duplicate 409 mapping at projects.ts:1041. Cycle 8 cycle-diff itself (the routing fix) is clean — blockers are in PR-introduced code previously passed under the convergence gate. Work agent is manually stopped (operator note); orchestrator cannot dispatch rework until un-paused.",
     "testNotes": "Reconciled from green GitHub Actions CI on 9e039c17: lint (https://github.com/eltmon/overdeck/actions/runs/35142550786/job/104950389383)",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -534,9 +534,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 1372282,
-            "output": 49427,
-            "cacheRead": 12350208,
+            "input": 2250924,
+            "output": 71170,
+            "cacheRead": 15153536,
             "cacheWrite": 0
           }
         },
@@ -597,9 +597,9 @@
           "cacheWrite": 246599
         },
         "custom/MiniMax-M3": {
-          "input": 3043390,
-          "output": 135473,
-          "cacheRead": 41717472,
+          "input": 3922032,
+          "output": 157216,
+          "cacheRead": 44520800,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -616,8 +616,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.2606,
-        "pricingAsOf": "2026-09-16T21:19:35.640Z"
+        "usd": 46.550282,
+        "pricingAsOf": "2026-09-16T21:48:06.048Z"
       }
     },
     "merges": [
@@ -626,7 +626,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
