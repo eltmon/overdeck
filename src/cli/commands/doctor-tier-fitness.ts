@@ -1,4 +1,11 @@
-import type { CheckResult } from './doctor.js';
+// Structurally identical to doctor.ts's CheckResult; re-declared (like
+// doctor-inotify.ts) because importing it would create a module cycle.
+interface CheckResult {
+  name: string;
+  status: 'ok' | 'warn' | 'error';
+  message: string;
+  fix?: string;
+}
 import { loadConfigSync } from '../../lib/config-yaml/load.js';
 import { TIERED_EXECUTION_DIFFICULTIES } from '../../lib/agents/tier-table.js';
 import { resolveModel } from '../../lib/config-yaml/roles.js';
