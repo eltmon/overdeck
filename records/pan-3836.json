@@ -307,7 +307,7 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:11:09.178Z",
+  "updated": "2026-09-16T18:11:19.735Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "reviewing",
@@ -446,10 +446,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 6175,
-            "output": 273965,
-            "cacheRead": 93790658,
-            "cacheWrite": 1312313
+            "input": 6191,
+            "output": 274214,
+            "cacheRead": 94087232,
+            "cacheWrite": 1313060
           }
         }
       },
@@ -461,15 +461,15 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 6175,
-          "output": 273965,
-          "cacheRead": 93790658,
-          "cacheWrite": 1312313
+          "input": 6191,
+          "output": 274214,
+          "cacheRead": 94087232,
+          "cacheWrite": 1313060
         }
       },
       "costAtCloseOut": {
-        "usd": 31.199427,
-        "pricingAsOf": "2026-09-16T18:11:07.349Z"
+        "usd": 31.23128,
+        "pricingAsOf": "2026-09-16T18:11:19.725Z"
       }
     },
     "merges": [
@@ -478,7 +478,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
