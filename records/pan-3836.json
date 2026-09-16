@@ -207,6 +207,11 @@
       "reason": "feedback",
       "note": "[2026-09-16T18:14Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-09-16T18:14:46.685Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T18:23:47.402Z"
     }
   ],
   "feedback": [],
@@ -312,7 +317,7 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:23:46.576Z",
+  "updated": "2026-09-16T18:23:47.418Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -482,7 +487,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "k3",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
