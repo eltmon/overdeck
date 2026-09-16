@@ -1,0 +1,578 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T21:36:47.000Z",
+    "author": "overdeck/0.50.4",
+    "description": "Plan for PAN-3849: Substrate Phase 4: one liveness oracle; no placeholders; no inferred identity",
+    "updated": "2026-09-16T21:40:24.692Z"
+  },
+  "plan": {
+    "id": "pan-3849",
+    "title": "Substrate Phase 4: one liveness oracle; no placeholders; no inferred identity",
+    "status": "proposed",
+    "uid": "483b9422-70bf-4c61-b3b1-db58cefe14cc",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T21:36:47.000Z",
+    "updated": "2026-09-16T21:40:24.692Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3849",
+        "label": "PAN-3849",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3849.md",
+        "label": "PRD drafts/pan-3849.md (phase 4 of PAN-3845)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3845.md",
+        "label": "Epic PRD drafts/pan-3845.md (wins on disagreement)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pipeline-reliability-review.md",
+        "label": "Evidence: pipeline reliability review (F1..F17, patrols #1..#78)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "agents",
+      "liveness",
+      "deacon",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "Four different liveness predicates disagree (tmux session, pane dead, harness process, mirror label), so a remain-on-exit zombie pane looks alive to feedback routing and a working agent looks idle to the nudge patrol. Spawn writes a pending-work-spawn row that a reconciliation patrol must clean up, and session recovery adopts a transcript by directory listing when exactly one file exists, which is how a planner transcript was attributed to a work agent.",
+      "Proposal": "Create src/lib/agents/liveness.ts as the single oracle with a lint guard, have the PTY supervisor emit lifecycle events that the projection writes in one transaction, replace the start row with an in-process in-flight set, stop adopting transcripts by listing, audit, then delete the liveness flips and the Phase 4 patrols behind the soak; document.",
+      "NonGoals": "- No change to how non-supervisor (tmux-only) agents are launched.\n- No change to the boot-time crash recovery role of handleAgentHeartbeatDeadEvent.\n- No new dashboard UI; only the lifecycle route."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "sizeJustification": "Phase of epic PAN-3845; the work items are the PRD work items and cannot be split without losing the audit-before-delete ordering. Subsystem count is inflated by single docs files (each counts as its own subsystem).",
+      "codeReadAt": "3d5051040a2",
+      "epic": "PAN-3845",
+      "phase": 4,
+      "canonicalFilename": "2026-09-16-PAN-3849-substrate-phase-4-one-liveness-oracle-no-placeholders-no-inferred-identity.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w32-one-liveness-module",
+        "title": "One liveness module with a lint guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3849",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/agents/liveness.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/parked/resolver.ts",
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/work-agent-lifecycle.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/cloister/agent-idle.ts",
+            "scripts/lint-liveness.sh",
+            "package.json",
+            "tests/unit/lib/agents/liveness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/liveness.test.ts",
+            "bash scripts/lint-liveness.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "liveness.test.ts exits 0",
+            "lint-liveness.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-23"
+          ],
+          "foundationFor": [
+            "w34-no-start-placeholder-rows",
+            "w36-delete-liveness-flips-and-patrols",
+            "w37-liveness-no-loss-audit"
+          ],
+          "parallelSafeReason": "w33 touches only supervisor, projection and route files; the shared consumers in deacon-auto-resume.ts and work-agent-lifecycle.ts are edited by w34 which sits behind an edge."
+        },
+        "narrative": {
+          "Action": "Follow PRD W32 in drafts/pan-3849.md. Create src/lib/agents/liveness.ts exporting LivenessVerdict, isAlive, isAliveSync, isIdle and idleAgeMs built from sessionExists (tmux.ts:1097), isPaneDead and hasAgentRuntimeInSubtree (messaging.ts:597); move the w5 idle helpers here. Replace each private liveness definition in deacon-auto-resume.ts (queryConfirmedSession, handleAgentStoppedEvent), parked/resolver.ts:461, feedback-target.ts isLiveSession, work-agent-lifecycle.ts:102 and messaging.ts:596-612 with the module functions. Add scripts/lint-liveness.sh modelled on lint-pipeline-membership.sh that fails on sessionExists(, sessionExistsSync( or pane_dead outside liveness.ts, tmux.ts and tests, and wire it into npm run lint."
+        },
+        "items": [
+          {
+            "id": "w32-one-liveness-module.ac1",
+            "title": "Given no tmux session, when isAlive runs, then it returns alive false with reason no-session.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w32-one-liveness-module.ac2",
+            "title": "Given a session with a dead pane it returns pane-dead, given a live pane with no harness process it returns runtime-missing, and given all present, when isAlive runs, then it returns alive true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w32-one-liveness-module.ac3",
+            "title": "When bash scripts/lint-liveness.sh runs on the tree, then it exits 0, and with --self-test it detects a seeded violation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w32-one-liveness-module.ac4",
+            "title": "Given a remain-on-exit zombie pane, when feedback-target isLiveSession runs, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w33-supervisor-lifecycle-events",
+        "title": "The PTY supervisor emits lifecycle events; the projection writes state from them",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3849",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/channels/pty-supervisor.ts",
+            "src/dashboard/server/services/agent-projection.ts",
+            "src/dashboard/server/routes/agents/lifecycle.ts",
+            "src/lib/pty-token.ts",
+            "tests/unit/lib/channels/pty-supervisor-lifecycle.test.ts",
+            "tests/unit/dashboard/routes/agents-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/channels/pty-supervisor-lifecycle.test.ts",
+            "npx vitest run tests/unit/dashboard/routes/agents-lifecycle.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pty-supervisor-lifecycle.test.ts exits 0",
+            "agents-lifecycle.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-23",
+            "FR-24"
+          ],
+          "foundationFor": [
+            "w34-no-start-placeholder-rows",
+            "w36-delete-liveness-flips-and-patrols"
+          ],
+          "parallelSafeReason": "Its files (supervisor, projection, new route) are not touched by w32 or w35; w34 waits behind an edge before editing the projection."
+        },
+        "narrative": {
+          "Action": "Follow PRD W33 in drafts/pan-3849.md. In src/lib/channels/pty-supervisor.ts POST session-started, turn-started, turn-ended and exited events to OVERDECK_DASHBOARD_URL /api/agents/:id/lifecycle authenticated with the agent pty-token, retrying three times with backoff and never blocking the child. Add the route under src/dashboard/server/routes/agents/ and register it; it calls one projection function applyAgentLifecycleEvent that writes state.json and the agents row in one transaction (saveAgentStateAndEmitEventWithDeps, agent-projection.ts:148-170). Restrict handleAgentHeartbeatDeadEvent to the boot-time call from startDeacon."
+        },
+        "items": [
+          {
+            "id": "w33-supervisor-lifecycle-events.ac1",
+            "title": "Given an exited event with a valid pty-token, when POST /api/agents/:id/lifecycle runs, then state.json status is stopped and the agents row agrees.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w33-supervisor-lifecycle-events.ac2",
+            "title": "Given a missing or invalid token, when the route is called, then it returns 401.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w33-supervisor-lifecycle-events.ac3",
+            "title": "Given the dashboard is unreachable, when the supervisor child exits, then it retries the POST three times with backoff under fake timers and never blocks the child.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w33-supervisor-lifecycle-events.ac4",
+            "title": "Given a reviewer exits in a fixture, when only the supervisor event path runs, then its state reads stopped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w34-no-start-placeholder-rows",
+        "title": "Replace the pending-work-spawn start row with an in-process in-flight set",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents/spawn-helpers.ts",
+            "src/dashboard/server/services/agent-projection.ts",
+            "src/lib/agents/placeholder-reconciliation.ts",
+            "src/lib/work-agent-lifecycle.ts",
+            "src/lib/agents/resume.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/agents/spawn.ts",
+            "tests/unit/dashboard/routes/agents-spawn-in-flight.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/agents-spawn-in-flight.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-spawn-in-flight.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-24"
+          ],
+          "parallelSafeReason": "Runs after w32 and w33 (edges); w35 edits only activity.ts."
+        },
+        "narrative": {
+          "Action": "Follow PRD W34 in drafts/pan-3849.md. In routes/agents/spawn.ts:845-935 replace the claim with a module-level startsInFlight Set added before spawnPanCommand and removed in finally, returning the existing 409 AGENT_START_IN_FLIGHT on a duplicate. Delete buildAgentStartPlaceholder, claimAgentStartPlaceholderProgram, rollbackAgentStartPlaceholderProgram, src/lib/agents/placeholder-reconciliation.ts, the pending-work-spawn literal everywhere and both isPlaceholder predicates (work-agent-lifecycle.ts:112, resume.ts:169); drop the deacon-auto-resume.ts:183-186 special case. Confirm agent.started is emitted where the child writes real state (spawn.ts:668-685) and nowhere earlier."
+        },
+        "items": [
+          {
+            "id": "w34-no-start-placeholder-rows.ac1",
+            "title": "Given two concurrent spawn requests for one issue, when they run, then exactly one returns 409 AGENT_START_IN_FLIGHT.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w34-no-start-placeholder-rows.ac2",
+            "title": "Given a child exit code 1 with no state written, when getAgentStateSync runs, then it returns null and pan start proceeds fresh.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w34-no-start-placeholder-rows.ac3",
+            "title": "When grep pending-work-spawn runs over src, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w34-no-start-placeholder-rows.ac4",
+            "title": "When the child writes its real state, then agent.started is emitted there and nowhere earlier.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w35-no-inferred-session-identity",
+        "title": "A transcript is never adopted by directory listing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/activity.ts",
+            "tests/unit/lib/agents/activity-session-recovery.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/activity-session-recovery.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "activity-session-recovery.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W35 in drafts/pan-3849.md. Replace activity.ts:255-258 so resolveClaudeSessionRecoverySync returns sessionId null instead of adopting the single transcript in the workspace directory; remove listTranscriptSessionIds from the deps type if unused. Checkpoint: extend the existing test for resolveClaudeSessionRecoverySync if one exists, else create it."
+        },
+        "items": [
+          {
+            "id": "w35-no-inferred-session-identity.ac1",
+            "title": "Given a workspace with exactly one transcript not referenced by session.id, sessions.json or the event store, when resolveClaudeSessionRecoverySync runs, then it returns sessionId null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w35-no-inferred-session-identity.ac2",
+            "title": "When grep \"transcript-directory scan\" runs over src, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w37-liveness-no-loss-audit",
+        "title": "No-loss audit for liveness state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/agents/liveness-no-loss-audit.test.ts",
+            "tests/fixtures/liveness-before/*.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/liveness-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "liveness-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W37 in drafts/pan-3849.md. Capture before fixtures on the Phase 3 tree (outputs of pan status, pan parked, evaluateDodGate and getWorkAgentLifecycleStateSync on recorded agent and issue fixtures) into tests/fixtures/liveness-before, then write tests/unit/lib/agents/liveness-no-loss-audit.test.ts that enumerates the twelve holders from review Section 6 and asserts each consumer-read field resolves to its new source and the outputs match the fixtures."
+        },
+        "items": [
+          {
+            "id": "w37-liveness-no-loss-audit.ac1",
+            "title": "Given the before fixtures captured on the Phase 3 tree, when pan status, pan parked, evaluateDodGate and getWorkAgentLifecycleStateSync run on them, then their outputs equal the fixtures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w37-liveness-no-loss-audit.ac2",
+            "title": "When the audit runs, then every consumer-read field (status, lastActivity, sessionId, stoppedAt, startedAt) resolves to its named new source.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w36-delete-liveness-flips-and-patrols",
+        "title": "Delete the liveness flips and the Phase 4 patrols after the soak",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/launcher-generator.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "tests/unit/lib/cloister/*-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/liveness-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "liveness-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22",
+            "FR-23"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W36 in drafts/pan-3849.md with the w29 protocol (counter, soak, audit test, delete, one commit each) for rows #2, #8, #29, #42, #45, #63, #76, the stopped-to-running flip at deacon-auto-resume.ts:719-727 and the non-boot running-to-stopped flip in handleAgentHeartbeatDeadEvent. For #42 confirm complete-planning also kills the planner tmux session (add killSession in planning-promotion.ts if missing) before deleting. Delete the w26 launcher line once the supervisor event path is confirmed by the soak."
+        },
+        "items": [
+          {
+            "id": "w36-delete-liveness-flips-and-patrols.ac1",
+            "title": "Given complete-planning marks the planner stopped, when the handoff runs, then it also kills the planner tmux session.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w36-delete-liveness-flips-and-patrols.ac2",
+            "title": "Given each Phase 4 patrol would-fire counter is zero for the soak, when it is deleted, then the commit names its audit test and the counter value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w36-delete-liveness-flips-and-patrols.ac3",
+            "title": "When the branch builds, then the stopped-to-running flip in deacon-auto-resume.ts and the launcher pan admin agents exited line are gone.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w38-phase4-docs",
+        "title": "Phase 4 documentation: one liveness oracle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/AGENT-MESSAGE-DELIVERY.md",
+            "docs/ROLES.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:prompts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W38 in drafts/pan-3849.md. In docs/AGENT-STATE-PLANES.md rename the liveness oracle section to name src/lib/agents/liveness.ts, rewrite Stopped but session-alive for supervisor events and drop the pending-work-spawn paragraph from spawn provenance; document supervisor lifecycle events in docs/AGENT-MESSAGE-DELIVERY.md; fix reviewer exit signalling in docs/ROLES.md if described; add the one-liveness-module invariant to CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "w38-phase4-docs.ac1",
+            "title": "When grep PAN-3849 runs over the four files, then each contains the string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w38-phase4-docs.ac2",
+            "title": "When docs/AGENT-STATE-PLANES.md is read, then the liveness oracle section names src/lib/agents/liveness.ts and the spawn provenance section no longer describes a pending-work-spawn row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w32-one-liveness-module",
+        "to": "w34-no-start-placeholder-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "w33-supervisor-lifecycle-events",
+        "to": "w34-no-start-placeholder-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "w32-one-liveness-module",
+        "to": "w37-liveness-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w33-supervisor-lifecycle-events",
+        "to": "w37-liveness-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w34-no-start-placeholder-rows",
+        "to": "w37-liveness-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w35-no-inferred-session-identity",
+        "to": "w37-liveness-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w37-liveness-no-loss-audit",
+        "to": "w36-delete-liveness-flips-and-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w32-one-liveness-module",
+        "to": "w36-delete-liveness-flips-and-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w34-no-start-placeholder-rows",
+        "to": "w36-delete-liveness-flips-and-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w36-delete-liveness-flips-and-patrols",
+        "to": "w38-phase4-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
