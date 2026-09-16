@@ -35,15 +35,22 @@ import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
 import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
 import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
+import {
+  resolveProjectCreateIntent,
+  performProjectCreate,
+  type ProjectCreateInput,
+  type ResolvedProjectIntent,
+} from '../../../lib/projects/create.js';
+import {
+  startProjectCreateJob,
+  getProjectCreateJob,
+} from './project-create-jobs.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
 
-const execAsync = promisify(exec);
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -899,15 +906,82 @@ const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staf
   return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
 })));
 
-// ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
+// ─── Route: POST /api/projects/resolve ──────────────────────────────────────
+// PAN-3836: dry-run resolve intent before POST /api/projects. Uses the
+// resolve-before-create pattern from PAN-3330 (workspaces) — dashboard /projects/new
+// calls this endpoint on every keystroke to show findings without creating anything.
 
-async function buildHomeGuard(): Promise<(p: string) => boolean> {
-  const home = homedir();
-  let ch: string;
-  try { ch = await realpath(home); }
-  catch { ch = home; }
-  return (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
-}
+const postProjectsResolveRoute = HttpRouter.add(
+  'POST',
+  '/api/projects/resolve',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
+    const body = (yield* readProjectJsonBody) as {
+      mode?: unknown;
+      url?: unknown;
+      path?: unknown;
+      parentDir?: unknown;
+      name?: unknown;
+      issuePrefix?: unknown;
+    };
+
+    // Validate mode
+    const mode = body.mode;
+    if (mode !== 'clone' && mode !== 'existing' && mode !== 'new') {
+      return jsonResponse({ error: "mode must be 'clone', 'existing', or 'new'" }, { status: 400 });
+    }
+
+    // Validate malformed/empty body
+    if (!body || Object.keys(body).length === 0) {
+      return jsonResponse({ error: 'request body is required' }, { status: 400 });
+    }
+
+    const input: ProjectCreateInput = {
+      mode,
+      url: typeof body.url === 'string' ? body.url : undefined,
+      path: typeof body.path === 'string' ? body.path : undefined,
+      parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
+      name: typeof body.name === 'string' ? body.name : undefined,
+      issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      homeBoundary: true,
+      refreshRemote: true,
+    };
+
+    const intent = yield* Effect.tryPromise({
+      try: () => resolveProjectCreateIntent(input),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    return jsonResponse(intent);
+  })),
+);
+
+// ─── Route: GET /api/projects/create-jobs/:jobId ────────────────────────────
+// PAN-3836: poll background job status during clone operations.
+// Returns 404 if job not found (TTL expired or invalid ID), or 200 with job object.
+
+const getProjectCreateJobRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/create-jobs/:jobId',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const jobId = params['jobId'] ?? '';
+
+    if (!jobId) {
+      return jsonResponse({ error: 'jobId is required' }, { status: 400 });
+    }
+
+    const job = getProjectCreateJob(jobId);
+    if (!job) {
+      return jsonResponse({ error: 'Unknown job' }, { status: 404 });
+    }
+
+    return jsonResponse(job);
+  })),
+);
 
 // ─── Route: POST /api/projects ───────────────────────────────────────────────
 // PAN-1970: register a project in mode='existing' or create one in mode='new'.
@@ -922,150 +996,65 @@ const postProjectsRoute = HttpRouter.add(
 
     const body = (yield* readProjectJsonBody) as {
       mode?: unknown;
+      url?: unknown;
       path?: unknown;
       parentDir?: unknown;
       name?: unknown;
+      issuePrefix?: unknown;
     };
 
-    function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9-]/g, '-'); }
-
-    // ── mode='existing' ──────────────────────────────────────────────────────
-
-    if (body.mode === 'existing') {
-      const rawPath = body.path;
-      if (typeof rawPath !== 'string' || !rawPath.trim()) {
-        return jsonResponse({ error: 'path is required' }, { status: 400 });
-      }
-      if (!isAbsolute(rawPath)) {
-        return jsonResponse({ error: 'path must be absolute' }, { status: 400 });
-      }
-      const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
-      return yield* Effect.promise(async () => {
-        try { await access(rawPath); }
-        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
-
-        // Canonicalize and enforce home-directory boundary (rejects symlink escapes).
-        const withinHome = await buildHomeGuard();
-        let canonicalPath: string;
-        try { canonicalPath = await realpath(rawPath); }
-        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
-        if (!withinHome(canonicalPath)) {
-          return jsonResponse({ error: 'path is outside home directory' }, { status: 400 });
-        }
-
-        try {
-          const result = await registerProjectFromPath({ path: canonicalPath, name: nameOpt });
-          return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
-        } catch (err) {
-          if (err instanceof DuplicateProjectError) {
-            return jsonResponse(
-              { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
-              { status: 409 },
-            );
-          }
-          throw err;
-        }
-      });
+    // Validate mode
+    const mode = body.mode;
+    if (mode !== 'clone' && mode !== 'existing' && mode !== 'new') {
+      return jsonResponse({ error: "mode must be 'clone', 'existing', or 'new'" }, { status: 400 });
     }
 
-    // ── mode='new' ───────────────────────────────────────────────────────────
+    const input: ProjectCreateInput = {
+      mode,
+      url: typeof body.url === 'string' ? body.url : undefined,
+      path: typeof body.path === 'string' ? body.path : undefined,
+      parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
+      name: typeof body.name === 'string' ? body.name : undefined,
+      issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      homeBoundary: true,
+      refreshRemote: true,
+    };
 
-    if (body.mode === 'new') {
-      const rawName = body.name;
-      if (typeof rawName !== 'string' || !rawName.trim()) {
-        return jsonResponse({ error: 'name is required for mode=new' }, { status: 400 });
-      }
-      const rawParent = body.parentDir;
-      if (typeof rawParent !== 'string' || !rawParent.trim()) {
-        return jsonResponse({ error: 'parentDir is required for mode=new' }, { status: 400 });
-      }
-      if (!isAbsolute(rawParent)) {
-        return jsonResponse({ error: 'parentDir must be absolute' }, { status: 400 });
-      }
+    // Resolve intent first to check for findings
+    const intent = yield* Effect.tryPromise({
+      try: () => resolveProjectCreateIntent(input),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-      const name = rawName.trim();
-      const key = slugify(name);
+    // If there are findings, return 422 with them
+    if (intent.findings.length > 0) {
+      return jsonResponse({ findings: intent.findings }, { status: 422 });
+    }
 
-      // Reject names whose slug contains no alphanumeric characters (e.g., "!!!").
-      if (!key.replace(/-/g, '')) {
-        return jsonResponse({ error: 'Name must contain at least one alphanumeric character' }, { status: 400 });
-      }
+    // For clone mode, start a background job and return 202
+    if (intent.mode === 'clone') {
+      const jobId = startProjectCreateJob(intent);
+      return jsonResponse({ jobId }, { status: 202 });
+    }
 
-      // Dup-check BEFORE any fs work.
-      if (getProjectSync(key)) {
+    // For existing/new modes, perform the create and return the result
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await performProjectCreate(intent);
+        return jsonResponse({ key: result.key, name: result.name, path: result.path });
+      } catch (err) {
+        if (err instanceof DuplicateProjectError) {
+          return jsonResponse(
+            { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
+            { status: 409 },
+          );
+        }
         return jsonResponse(
-          { error: `project key '${key}' is already registered` },
+          { error: err instanceof Error ? err.message : String(err) },
           { status: 409 },
         );
       }
-
-      return yield* Effect.promise(async () => {
-        // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
-        // parentDir need not exist yet — the default ~/Projects home for new projects is
-        // created on demand. Climb to the nearest existing ancestor, canonicalize THAT (so a
-        // symlinked ancestor pointing outside home is still rejected), then re-anchor the
-        // requested parent onto it; mkdir -p below creates the full chain. Because `probe` is
-        // always an ancestor of `rawParentResolved`, the re-anchored suffix can never contain
-        // '..', so the home-boundary check cannot be escaped by a non-existent tail.
-        const withinHome = await buildHomeGuard();
-        const rawParentResolved = resolve(normalize(rawParent));
-        let probe = rawParentResolved;
-        let existingAncestor: string | null = null;
-        for (;;) {
-          try { existingAncestor = await realpath(probe); break; }
-          catch { /* probe doesn't exist — climb toward the filesystem root */ }
-          const up = dirname(probe);
-          if (up === probe) break; // reached the root without finding an existing dir
-          probe = up;
-        }
-        if (!existingAncestor || !withinHome(existingAncestor)) {
-          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
-        }
-        const suffix = relative(probe, rawParentResolved);
-        const canonicalParent = suffix ? resolve(existingAncestor, suffix) : existingAncestor;
-        if (!withinHome(canonicalParent)) {
-          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
-        }
-
-        const target = join(canonicalParent, key);
-
-        // If target exists and is non-empty, reject with no fs change.
-        let targetExists = false;
-        try {
-          await access(target);
-          targetExists = true;
-        } catch { /* target doesn't exist yet */ }
-
-        if (targetExists) {
-          const entries = await readdir(target).catch(() => []);
-          if (entries.length > 0) {
-            return jsonResponse(
-              { error: `target directory already exists and is non-empty: ${target}` },
-              { status: 409 },
-            );
-          }
-        }
-
-        // Create directory and git-init.
-        await mkdir(target, { recursive: true });
-        await execAsync('git init', { cwd: target });
-
-        try {
-          const result = await registerProjectFromPath({ path: target, name });
-          return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
-        } catch (err) {
-          if (err instanceof DuplicateProjectError) {
-            return jsonResponse(
-              { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
-              { status: 409 },
-            );
-          }
-          throw err;
-        }
-      });
-    }
-
-    return jsonResponse({ error: "mode must be 'existing' or 'new'" }, { status: 400 });
+    });
   })),
 );
 
@@ -1084,6 +1073,8 @@ export const projectsRouteLayer = Layer.mergeAll(
   postIssueSwarmPolicyRoute,
   getIssueStaffingRoute,
   postIssueStaffingRoute,
+  postProjectsResolveRoute,
+  getProjectCreateJobRoute,
   postProjectsRoute,
 );
 
