@@ -92,19 +92,22 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:21:14.019Z",
+  "updated": "2026-09-16T21:40:12.439Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:21:11.549Z",
+    "updatedAt": "2026-09-16T21:40:12.261Z",
     "reviewNotes": "Retrospective feature: pure renderer, origin-validated route, body allowlist omits projectKey/issueId, 24h/7d windows enforced, prompt read-only pinned by tests, CommandDeck mount respects non-goal (no ProjectHome button).",
+    "testNotes": "typecheck/lint/test all exit 0 (14320 tests + 64 frontend tests passed, 51 unrelated pre-existing skips); no new lint/typecheck findings",
+    "uatNotes": "Workspace container (feature-pan-3841) has a persistent pre-existing session/WS bootstrap fault (403 Invalid origin on /api/dashboard/session and /ws/rpc, reproduces on untouched routes too) that blocks the pan-recovery-overlay from clearing long enough to click through retro-mount.ac2/ac4. Button renders correctly (AC1) and menu opens; final click-to-navigate unproven. See .pan/test/result.json for full detail; flywheel-orchestrator notified.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
@@ -190,9 +193,9 @@
         },
         "review.correctness": {
           "custom/MiniMax-M3": {
-            "input": 234700,
-            "output": 3969,
-            "cacheRead": 4367650,
+            "input": 277140,
+            "output": 28601,
+            "cacheRead": 12016597,
             "cacheWrite": 0
           }
         },
@@ -206,18 +209,26 @@
         },
         "review.requirements": {
           "custom/MiniMax-M3": {
-            "input": 600460,
-            "output": 3359,
-            "cacheRead": 2850432,
+            "input": 734769,
+            "output": 22166,
+            "cacheRead": 10284416,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "custom/MiniMax-M3": {
-            "input": 224565,
-            "output": 3149,
-            "cacheRead": 2812672,
+            "input": 243954,
+            "output": 11342,
+            "cacheRead": 5848960,
             "cacheWrite": 0
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 194,
+            "output": 48444,
+            "cacheRead": 20749850,
+            "cacheWrite": 302060
           }
         },
         "work": {
@@ -243,15 +254,21 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 3483757,
-          "output": 65670,
-          "cacheRead": 24361890,
+          "input": 3679895,
+          "output": 117302,
+          "cacheRead": 42481109,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 194,
+          "output": 48444,
+          "cacheRead": 20749850,
+          "cacheWrite": 302060
         }
       },
       "costAtCloseOut": {
-        "usd": 16.8081324,
-        "pricingAsOf": "2026-09-16T21:21:11.554Z"
+        "usd": 22.3188804,
+        "pricingAsOf": "2026-09-16T21:40:12.358Z"
       }
     },
     "merges": [
