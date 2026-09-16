@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:46.214Z",
+  "updated": "2026-09-16T22:59:49.234Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 34,
+    "sequence": 35,
     "claims": {},
     "claimHistory": [
       {
@@ -885,8 +885,8 @@
         "updatedAt": "2026-09-16T15:51:14.944Z"
       },
       "new-project-page": {
-        "reason": "react-router removed; hand-rolled getNewProjectModeFromSearch; no-Router render test added; commit 9e039c178b3",
-        "updatedAt": "2026-09-16T19:46:21.453Z"
+        "reason": "Cycle-10 review BLOCKING [requirements FR-7, WI-5 rows 3 and 5]: NewProjectPage.tsx replaced the modal's FolderPicker directory browsing with bare text inputs. Mount FolderPicker (as NewWorkspacePage does) for the existing-mode path and the clone/new parent directory, feeding setPath/setParentDir; add data-testid=new-project-name-input to the name input. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:49.233Z"
       },
       "wire-entry-points-no-loss": {
         "reason": "All entry points wired: sidebar +, workspace chips (3x), App.handleNewProject all navigate to /projects/new with proper mode params",
@@ -957,12 +957,12 @@
     "use-project-create-intent-hook.ac3": "completed",
     "use-project-create-intent-hook.ac4": "completed",
     "use-project-create-intent-hook.ac5": "completed",
-    "new-project-page": "completed",
-    "new-project-page.ac1": "completed",
-    "new-project-page.ac2": "completed",
-    "new-project-page.ac3": "completed",
-    "new-project-page.ac4": "completed",
-    "new-project-page.ac5": "completed",
+    "new-project-page": "pending",
+    "new-project-page.ac1": "pending",
+    "new-project-page.ac2": "pending",
+    "new-project-page.ac3": "pending",
+    "new-project-page.ac4": "pending",
+    "new-project-page.ac5": "pending",
     "wire-entry-points-no-loss": "completed",
     "wire-entry-points-no-loss.ac1": "completed",
     "wire-entry-points-no-loss.ac2": "completed",
