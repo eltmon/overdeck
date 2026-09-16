@@ -131,7 +131,7 @@
     "recordedAt": "2026-09-16T16:30:07.994Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:41:11.125Z",
+  "updated": "2026-09-16T16:41:38.072Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -140,7 +140,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-09-16T16:35:07.892Z",
     "updatedAt": "2026-09-16T16:41:02.520Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "verificationNotes": "Verification FAILED at lint (185958ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
