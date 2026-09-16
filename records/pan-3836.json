@@ -342,19 +342,19 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:25:45.579Z",
+  "updated": "2026-09-16T18:27:56.777Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:25:42.714Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
-    "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
+    "updatedAt": "2026-09-16T18:27:56.685Z",
+    "reviewNotes": "Approved cycle 6: both c5 blockers verified fixed at head (url-invalid guard + acceptance suites 72/72 unit, 20/20 frontend green); 0 blockers from all four reviewers; advisories recorded for follow-up.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "3cab2fdf2711dffed8eea5dedbe80926aaa35e38",
     "reviewRequestedAt": "2026-09-16T18:25:42.317Z",
@@ -505,7 +505,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.25269,
-        "pricingAsOf": "2026-09-16T18:25:45.569Z"
+        "pricingAsOf": "2026-09-16T18:27:56.759Z"
       }
     },
     "merges": [
