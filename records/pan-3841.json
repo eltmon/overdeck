@@ -2,7 +2,7 @@
   "issueId": "PAN-3841",
   "schemaVersion": 2,
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T19:37:46.804Z",
+  "updated": "2026-09-16T19:38:07.308Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -37,5 +37,6 @@
       "open": true,
       "needsYouEmittedAt": "2026-09-16T19:37:46.793Z"
     }
-  ]
+  ],
+  "workModel": "k3"
 }
