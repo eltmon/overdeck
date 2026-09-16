@@ -1,0 +1,684 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T21:36:47.000Z",
+    "author": "overdeck/0.50.4",
+    "description": "Plan for PAN-3846: Substrate Phase 1: delivery is a confirmed turn; no monitor mail",
+    "updated": "2026-09-16T21:39:51.225Z"
+  },
+  "plan": {
+    "id": "pan-3846",
+    "title": "Substrate Phase 1: delivery is a confirmed turn; no monitor mail",
+    "status": "proposed",
+    "uid": "e3beaf23-e18f-45bd-bac4-af8d9e960730",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T21:36:47.000Z",
+    "updated": "2026-09-16T21:39:51.225Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3846",
+        "label": "PAN-3846",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3846.md",
+        "label": "PRD drafts/pan-3846.md (phase 1 of PAN-3845)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3845.md",
+        "label": "Epic PRD drafts/pan-3845.md (wins on disagreement)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pipeline-reliability-review.md",
+        "label": "Evidence: pipeline reliability review (F1..F17, patrols #1..#78)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "delivery",
+      "deacon",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "Automatic message delivery to a running Claude Code agent reports delivered:true without any turn appearing in the transcript. The PAN-3015 monitor-mail tier sits ahead of the PTY supervisor whenever a monitor heartbeat is live, so it became the everyday path for pipeline feedback and pan tell; on PAN-3836 the UAT feedback was reported delivered and the agent never took a turn. A failed UAT does not count as owed rework, pan tell prints Message sent unconditionally, and the deacon nudges working agents through raw sendKeys because idle is read from the mirror label instead of work activity. Four patrols exist only to repair unconfirmed deliveries.",
+      "Proposal": "Make messageAgent confirm the turn against the transcript (the primitive resumeAgent already uses), return delivered:false with a reason otherwise, delete the monitor-mail tier and the eaten-message watcher, count a failed UAT as owed rework, make pan tell exit with the truth, derive idle from work activity and route nudges through messageAgent, write a delivery no-loss audit, then delete the four delivery-recovery patrols and document the contract.",
+      "NonGoals": "- No change to the paused, suspended or stopped delivery gates; they keep returning delivered:false with the gate reason.\n- No removal of the pan monitor or pan inbox commands (manual transport stays).\n- No change to non-Claude harness delivery beyond the confirmed:false field.\n- No patrol deletions from later phases."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "sizeJustification": "Phase of epic PAN-3845; the work items are the PRD work items and cannot be split without losing the audit-before-delete ordering. Subsystem count is inflated by single docs files (each counts as its own subsystem).",
+      "codeReadAt": "3d5051040a2",
+      "epic": "PAN-3845",
+      "phase": 1,
+      "canonicalFilename": "2026-09-16-PAN-3846-substrate-phase-1-delivery-is-a-confirmed-turn-no-monitor-mail.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-confirmed-turn-delivery",
+        "title": "messageAgent confirms the turn for running Claude Code agents; delete the eaten-message watcher",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3846",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/delivery.ts",
+            "src/lib/agents/eaten-message-watcher.ts",
+            "src/lib/agents/__tests__/message-agent.test.ts",
+            "src/lib/agents/__tests__/eaten-message-watcher.test.ts",
+            "src/lib/agents/__tests__/delivery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/message-agent.test.ts",
+            "npx vitest run src/lib/agents/__tests__/delivery.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "message-agent.test.ts exits 0",
+            "delivery.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "w4-tell-exits-with-truth",
+            "w5-idle-is-work-activity",
+            "w6-delete-delivery-patrols",
+            "w7-delivery-no-loss-audit"
+          ],
+          "parallelSafeReason": "Wave-1 item with no incoming edges; every item that touches messaging.ts or reads the confirmed field sits behind a blocks edge from this one."
+        },
+        "narrative": {
+          "Action": "Follow PRD W1 in drafts/pan-3846.md. In delivery.ts rename deliverResumeMessageWithTranscriptConfirmation to deliverMessageWithTranscriptConfirmation and keep the old name as an alias export; use args.caller in the retry warning. In messaging.ts add confirmed?: boolean to MessageDeliveryOutcome and replace the running-agent branch (from const transcriptSessionId at line 625 through the final return) with the After block in W1 step 3: unkeyed Claude Code deliveries call the confirming primitive and return delivered:false, confirmed:false with a NOT confirmed lifecycle line when no turn appears; keyed deliveries and non-Claude harnesses keep deliverWithOptionalKey with confirmed:false. When agentState.deliveryMethod is supervisor or supervisorEnabled is true pass deliveryMethod supervisor explicitly and never fall back to tmux paste (resume.ts:576-582 states why). Delete eaten-message-watcher.ts, its test, and its import. Checkpoint: if deliverWithOptionalKey already confirms keyed messages, set confirmed from its result."
+        },
+        "items": [
+          {
+            "id": "w1-confirmed-turn-delivery.ac1",
+            "title": "Given a running Claude Code agent whose transcript probe never matches within the window, when messageAgent runs with no dedupKey, then it returns delivered false and confirmed false and the lifecycle log contains NOT confirmed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-confirmed-turn-delivery.ac2",
+            "title": "Given the probe reports matchedUserRecord on the second poll, when messageAgent runs, then it returns delivered true and confirmed true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-confirmed-turn-delivery.ac3",
+            "title": "Given opts.dedupKey is set, when messageAgent runs, then the confirming primitive is not called and confirmed is false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-confirmed-turn-delivery.ac4",
+            "title": "When the branch builds, then src/lib/agents/eaten-message-watcher.ts no longer exists and delivery.ts exports deliverMessageWithTranscriptConfirmation plus the old name as an alias.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-remove-monitor-mail-tier",
+        "title": "Remove the monitor-mail delivery tier and the pan monitor instruction from role prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "roles/work.md",
+            "roles/strike.md",
+            "docs/MONITOR-TRANSPORT.md",
+            "src/lib/agents/__tests__/messaging-busy-agent-mail.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/messaging-busy-agent-mail.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "messaging-busy-agent-mail.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W2 in drafts/pan-3846.md. Delete the PAN-3015 monitor tier block at messaging.ts:525-546 (the isMonitorLive branch that returns delivered:true after queueAgentMail) and drop the isMonitorLive import if unused. Delete the Message inbox section at roles/work.md:55-63 and the inbox sentence at roles/strike.md:37. Rewrite the first paragraph of docs/MONITOR-TRANSPORT.md as a manual opt-in transport and drop the Monitor tier and Role instruction rows. Keep queueAgentMail in the paused, suspended and stopped gate branches because those return delivered:false. Keep the pan monitor and pan inbox commands."
+        },
+        "items": [
+          {
+            "id": "w2-remove-monitor-mail-tier.ac1",
+            "title": "When grep -n isMonitorLive runs on src/lib/agents/messaging.ts, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-remove-monitor-mail-tier.ac2",
+            "title": "When grep -n \"pan monitor\" runs on roles/work.md and roles/strike.md, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-remove-monitor-mail-tier.ac3",
+            "title": "Given a live monitor.json for the agent, when messageAgent runs, then the outcome equals the outcome without the monitor file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-remove-monitor-mail-tier.ac4",
+            "title": "When docs/MONITOR-TRANSPORT.md is read, then it contains Manual, opt-in transport and contains no Monitor tier row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-uat-failed-owes-rework",
+        "title": "A failed UAT owes rework; pan tell passes owesRework",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/work-agent-lifecycle.ts",
+            "src/cli/commands/tell.ts",
+            "tests/unit/lib/work-agent-lifecycle.test.ts",
+            "tests/unit/cli/tell.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/work-agent-lifecycle.test.ts",
+            "npx vitest run tests/unit/cli/tell.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "work-agent-lifecycle.test.ts exits 0",
+            "tell.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W3 in drafts/pan-3846.md. Add || row.uatStatus === \"failed\" to issueOwesReworkSync at work-agent-lifecycle.ts:30-40 and list UAT in its doc comment. In tell.ts:29 look up the agent issue with getAgentStateSync and call messageAgent with { owesRework: issueOwesReworkSync(issueId) }, importing issueOwesReworkSync from work-agent-lifecycle. Create tests/unit/lib/work-agent-lifecycle.test.ts if absent and tests/unit/cli/tell.test.ts."
+        },
+        "items": [
+          {
+            "id": "w3-uat-failed-owes-rework.ac1",
+            "title": "Given a row whose only failed field is uatStatus failed, when issueOwesReworkSync runs, then it returns true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-uat-failed-owes-rework.ac2",
+            "title": "Given the stubbed row has uatStatus failed, when pan tell runs, then messageAgent receives owesRework true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-uat-failed-owes-rework.ac3",
+            "title": "Given a stub agent with a completion marker and uatStatus failed, when getWorkAgentLifecycleStateSync runs, then it returns the warm-resume recommendation, not nothing-to-resume.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-tell-exits-with-truth",
+        "title": "pan tell exits non-zero when the message was not delivered",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tell.ts",
+            "tests/unit/cli/tell.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/tell.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tell.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W4 in drafts/pan-3846.md. Replace tell.ts:29-38 with the After block: when outcome.delivered is false print Message NOT delivered, the message, the reason and the mail path to stderr and return exitCli(1); otherwise print Message delivered with a turn confirmed suffix when outcome.confirmed is true and return exitCli(0). Checkpoint: confirm exitCli(0) is the success form in src/cli/exit.ts, else set process.exitCode = 0 and return."
+        },
+        "items": [
+          {
+            "id": "w4-tell-exits-with-truth.ac1",
+            "title": "Given messageAgent returns delivered false, when pan tell runs, then it exits 1 and prints the reason on stderr.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-tell-exits-with-truth.ac2",
+            "title": "Given messageAgent returns delivered true and confirmed true, when pan tell runs, then it exits 0 and prints turn confirmed on stdout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-idle-is-work-activity",
+        "title": "Idle means work activity older than the threshold; nudges go through messageAgent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/agent-idle.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "tests/unit/lib/cloister/agent-idle.test.ts",
+            "tests/unit/lib/cloister/deacon-idle-inspection-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/agent-idle.test.ts",
+            "npx vitest run tests/unit/lib/cloister/deacon-idle-inspection-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-idle.test.ts exits 0",
+            "deacon-idle-inspection-gate.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W5 in drafts/pan-3846.md. In agent-idle.ts:65-95 make isAgentIdleForNudge derive idleness from getAgentWorkActivityMs age only (the mirror label idle alone never returns true) and export getAgentIdleAgeMs. In deacon.ts:1997-1998 replace the raw sendKeys dead-end nudge with messageAgent(agentSessionName, nudgeMessage, \"deacon:dead-end\", { owesRework: true }) and log the outcome and real idle minutes; apply the idle-minutes fix at deacon.ts:1962 and drop the sendKeys import if unused. Checkpoint: in deacon-auto-resume.ts nudgeIdleWorkAgentsWithOpenBeads (lines 550-575), route any sendKeys, sendKeysAsync or deliverAgentMessage nudge through messageAgent with caller deacon:idle-nudge."
+        },
+        "items": [
+          {
+            "id": "w5-idle-is-work-activity.ac1",
+            "title": "Given the mirror says idle and the transcript heartbeat is 10 seconds old, when isAgentIdleForNudge runs, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-idle-is-work-activity.ac2",
+            "title": "Given the heartbeat is 6 minutes old with the mirror idle or active, when isAgentIdleForNudge runs, then it returns true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-idle-is-work-activity.ac3",
+            "title": "When the dead-end nudge fires, then it sends through messageAgent and grep \"sendKeys(\" on src/lib/cloister/deacon.ts shows no dead-end nudge call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-idle-is-work-activity.ac4",
+            "title": "Given the nudge outcome is not delivered, when the patrol records its action, then the line contains nudge NOT delivered and the reason.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-delivery-no-loss-audit",
+        "title": "No-loss audit for message delivery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/agents/delivery-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/delivery-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "delivery-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W7 in drafts/pan-3846.md. Create tests/unit/lib/agents/delivery-no-loss-audit.test.ts. Paste the grep of every messageAgent, deliverAgentMessage and resumeAgent call site under src/lib/cloister, src/cli and src/dashboard/server as a constant, and have the test re-scan the tree with fs so a new call site fails the test. Drive messageAgent with stubs for the five scenarios in W7 step 2 and the parked-issue scenario in step 3 and assert each outcome."
+        },
+        "items": [
+          {
+            "id": "w7-delivery-no-loss-audit.ac1",
+            "title": "When the audit runs, then it reads the source tree and fails if a messageAgent, deliverAgentMessage or resumeAgent call site is missing from its list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-delivery-no-loss-audit.ac2",
+            "title": "Given an idle Claude Code session whose transcript grows, when the audited delivery runs, then it records delivered true and confirmed true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-delivery-no-loss-audit.ac3",
+            "title": "Given a session whose transcript never grows, when uat-failure-feedback and review-verdict-feedback deliver, then each calls surfaceIssueFeedbackNeedsYou.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-delivery-no-loss-audit.ac4",
+            "title": "Given a row with stuckReason feedback_delivery_needs_you and a live stub session, when confirmed delivery lands, then clearWorkspaceStuck is called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-delete-delivery-patrols",
+        "title": "Delete the four delivery-recovery patrols",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/feedback-stuck-retirement.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/cloister/review-agent.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/delivery-no-loss-audit.test.ts",
+            "npx vitest run src/lib/agents/__tests__/message-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "delivery-no-loss-audit.test.ts exits 0",
+            "message-agent.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ],
+          "parallelSafeReason": "Runs only after w5 and w7 (blocks edges); no other Phase 1 item remains open when it starts, so its deacon.ts edits cannot collide."
+        },
+        "narrative": {
+          "Action": "Follow PRD W6 in drafts/pan-3846.md, only after w7 is green. Checkpoint on spawn.ts: deliverInitialPromptWithRetry (delivery.ts:710) must probe the transcript or fail the spawn; make it call deliverMessageWithTranscriptConfirmation first if it does not. Replace retireResolvedFeedbackDeliveryStuckFlags by clearing feedback_delivery_needs_you inside the confirmed-success path of messageAgent via clearWorkspaceStuck. Checkpoint on clearFeedbackFiles: if no dispatch-time call exists, add it at the start of spawnReviewRoleForIssue in review-agent.ts. Then remove registrations #5, #15, #16, #75 from runPatrol (deacon.ts:2686, 2742, 2746, 3142), delete the functions and their tests."
+        },
+        "items": [
+          {
+            "id": "w6-delete-delivery-patrols.ac1",
+            "title": "When the branch builds, then grep for retireResolvedFeedbackDeliveryStuckFlags, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs and cleanupAbandonedFeedback over src returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-delete-delivery-patrols.ac2",
+            "title": "Given a confirmed delivery to an agent whose issue row has stuckReason feedback_delivery_needs_you, when messageAgent returns, then clearWorkspaceStuck has been called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-delete-delivery-patrols.ac3",
+            "title": "Given the initial prompt never appears in the transcript, when spawn runs, then it fails the spawn instead of leaving a kickoff for a patrol.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-delete-delivery-patrols.ac4",
+            "title": "When npm test runs, then the delivery no-loss audit and the messaging suites exit 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-phase1-docs",
+        "title": "Phase 1 documentation: delivery contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3846",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-MESSAGE-DELIVERY.md",
+            "docs/MONITOR-TRANSPORT.md",
+            "docs/PIPELINE-GATES.md",
+            "CLAUDE.md",
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:prompts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W8 in drafts/pan-3846.md. Add a Delivery contract (PAN-3846) section to docs/AGENT-MESSAGE-DELIVERY.md after the tier list and remove any sentence that names the monitor tier as part of the cascade. Add the confirmed-delivery sentence to the Verdict feedback routing paragraph of docs/PIPELINE-GATES.md. Keep the pan tell sentence in roles/work.md. Point the CLAUDE.md Topic Index delivery row at the new section."
+        },
+        "items": [
+          {
+            "id": "w8-phase1-docs.ac1",
+            "title": "When grep PAN-3846 runs over docs/AGENT-MESSAGE-DELIVERY.md, docs/PIPELINE-GATES.md and docs/MONITOR-TRANSPORT.md, then each file contains the string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-phase1-docs.ac2",
+            "title": "When docs/AGENT-MESSAGE-DELIVERY.md is read, then it contains a section named Delivery contract stating that delivered true requires a transcript turn within the confirmation window.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-phase1-docs.ac3",
+            "title": "When docs/MONITOR-TRANSPORT.md is read, then it does not list messageAgent as a consumer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-confirmed-turn-delivery",
+        "to": "w2-remove-monitor-mail-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-confirmed-turn-delivery",
+        "to": "w4-tell-exits-with-truth",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-uat-failed-owes-rework",
+        "to": "w4-tell-exits-with-truth",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-confirmed-turn-delivery",
+        "to": "w5-idle-is-work-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-confirmed-turn-delivery",
+        "to": "w7-delivery-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-remove-monitor-mail-tier",
+        "to": "w7-delivery-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-uat-failed-owes-rework",
+        "to": "w7-delivery-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-tell-exits-with-truth",
+        "to": "w7-delivery-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-idle-is-work-activity",
+        "to": "w7-delivery-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-idle-is-work-activity",
+        "to": "w6-delete-delivery-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-delivery-no-loss-audit",
+        "to": "w6-delete-delivery-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-remove-monitor-mail-tier",
+        "to": "w6-delete-delivery-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-remove-monitor-mail-tier",
+        "to": "w8-phase1-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-confirmed-turn-delivery",
+        "to": "w6-delete-delivery-patrols",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
