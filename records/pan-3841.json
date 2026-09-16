@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T20:14:09.046Z",
+  "updated": "2026-09-16T20:14:49.537Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "retro-docs": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 3753890,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:14:09.046Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -161,6 +153,17 @@
         "outcome": "completed",
         "reason": "Mounted RetrospectiveButton in index.tsx sidebarHeaderGroup between ModelPicker and the New-conversation plus button (one import + one JSX line; file 1605 lines, under the 1612 allowlist cap — no allowlist row needed). Typecheck passes; lint-file-size passes; full CommandDeck frontend suite 477/477 green. Browser UAT on the workspace endpoint (Playwright, isolated profile): button renders between picker and plus; menu opens; 'Last 24 hours' navigates to /conv/20260916-5096; first user message begins 'Pipeline retrospective: last 24 hours'; conversation listed under the No project bucket; at narrowest sidebar width the picker/retrospective/plus bounding boxes are disjoint and each clickable (screenshot self-verified). Also verified AC-8 live: editing the template title line and POSTing again produced a conversation titled 'Pipeline retrospective (edited): last 24 hours' with no rebuild or restart; template reverted. Commit 315a7916d4e pushed.",
         "releasedAt": "2026-09-16T20:13:54.637Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 3753890,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:14:09.046Z",
+        "itemId": "retro-docs",
+        "outcome": "completed",
+        "reason": "Added the '**Pipeline retrospective button:**' paragraph to docs/DASHBOARD-ARCHITECTURE.md directly after the Simple home conversation composer paragraph (endpoint path, per-request roles/retrospective.md template read, unscoped conversation under the No project bucket, read-only prompt contract pinned by the invariant test) and the '### Conversation kickoff templates (not roles)' subsection to docs/ROLES.md after the active-role-files table listing roles/retrospective.md alongside the three handoff templates with the Prompt-Change: trailer requirement. Both grep checks print one line each. Commit cadccbb20a3 pushed.",
+        "releasedAt": "2026-09-16T20:14:49.537Z"
       }
     ],
     "statusReasons": {
@@ -187,6 +190,10 @@
       "retro-mount": {
         "reason": "Mounted RetrospectiveButton in index.tsx sidebarHeaderGroup between ModelPicker and the New-conversation plus button (one import + one JSX line; file 1605 lines, under the 1612 allowlist cap — no allowlist row needed). Typecheck passes; lint-file-size passes; full CommandDeck frontend suite 477/477 green. Browser UAT on the workspace endpoint (Playwright, isolated profile): button renders between picker and plus; menu opens; 'Last 24 hours' navigates to /conv/20260916-5096; first user message begins 'Pipeline retrospective: last 24 hours'; conversation listed under the No project bucket; at narrowest sidebar width the picker/retrospective/plus bounding boxes are disjoint and each clickable (screenshot self-verified). Also verified AC-8 live: editing the template title line and POSTing again produced a conversation titled 'Pipeline retrospective (edited): last 24 hours' with no rebuild or restart; template reverted. Commit 315a7916d4e pushed.",
         "updatedAt": "2026-09-16T20:13:54.637Z"
+      },
+      "retro-docs": {
+        "reason": "Added the '**Pipeline retrospective button:**' paragraph to docs/DASHBOARD-ARCHITECTURE.md directly after the Simple home conversation composer paragraph (endpoint path, per-request roles/retrospective.md template read, unscoped conversation under the No project bucket, read-only prompt contract pinned by the invariant test) and the '### Conversation kickoff templates (not roles)' subsection to docs/ROLES.md after the active-role-files table listing roles/retrospective.md alongside the three handoff templates with the Prompt-Change: trailer requirement. Both grep checks print one line each. Commit cadccbb20a3 pushed.",
+        "updatedAt": "2026-09-16T20:14:49.537Z"
       }
     }
   },
@@ -221,6 +228,8 @@
     "retro-mount.ac2": "completed",
     "retro-mount.ac3": "completed",
     "retro-mount.ac4": "completed",
-    "retro-docs": "running"
+    "retro-docs": "completed",
+    "retro-docs.ac1": "completed",
+    "retro-docs.ac2": "completed"
   }
 }
