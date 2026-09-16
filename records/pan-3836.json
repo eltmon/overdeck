@@ -206,7 +206,7 @@
     "recordedAt": "2026-09-16T16:51:08.216Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:58:57.330Z",
+  "updated": "2026-09-16T16:59:51.596Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -215,7 +215,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-09-16T16:51:47.407Z",
     "updatedAt": "2026-09-16T16:55:21.321Z",
     "reviewNotes": "creating race fix ineffective: submit() finally still clears creating after first poll; gate it on !jobStarted (cycle-2 caveat unheeded)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
