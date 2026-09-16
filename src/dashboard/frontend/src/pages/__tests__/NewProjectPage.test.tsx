@@ -4,13 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { NewProjectPage } from '../NewProjectPage';
 
-// Mock the dashboard state hook
-const mockSetActiveTabState = vi.fn();
-vi.mock('../../lib/dashboard-state.js', () => ({
-  useDashboardState: () => ({
-    setActiveTabState: mockSetActiveTabState,
-  }),
-}));
+// No dashboard state mock needed for this component
 
 // Mock the useProjectCreateIntent hook
 const mockSubmit = vi.fn();
@@ -54,7 +48,6 @@ vi.mock('../../components/inputs/FolderPicker.js', () => ({
 
 describe('NewProjectPage (WI-4)', () => {
   beforeEach(() => {
-    mockSetActiveTabState.mockClear();
     mockSubmit.mockClear();
   });
 
@@ -65,7 +58,7 @@ describe('NewProjectPage (WI-4)', () => {
   it('renders with three mode tabs', () => {
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
       </BrowserRouter>
     );
 
@@ -77,7 +70,7 @@ describe('NewProjectPage (WI-4)', () => {
   it('shows the guide line', () => {
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
       </BrowserRouter>
     );
 
@@ -87,7 +80,7 @@ describe('NewProjectPage (WI-4)', () => {
   it('renders clone mode fields by default', () => {
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
       </BrowserRouter>
     );
 
@@ -99,7 +92,7 @@ describe('NewProjectPage (WI-4)', () => {
   it('has Cancel and Create buttons', () => {
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
       </BrowserRouter>
     );
 
@@ -107,24 +100,25 @@ describe('NewProjectPage (WI-4)', () => {
     expect(screen.getByText('Create project')).toBeInTheDocument();
   });
 
-  it('Cancel button navigates to knowledge tab', async () => {
+  it('Cancel button calls onCancel prop', async () => {
     const user = userEvent.setup();
+    const mockOnCancel = vi.fn();
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={mockOnCancel} onCreated={() => {}} />
       </BrowserRouter>
     );
 
     const cancelButton = screen.getByText('Cancel');
     await user.click(cancelButton);
 
-    expect(mockSetActiveTabState).toHaveBeenCalledWith('knowledge');
+    expect(mockOnCancel).toHaveBeenCalled();
   });
 
   it('Create button is disabled initially', () => {
     render(
       <BrowserRouter>
-        <NewProjectPage />
+        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
       </BrowserRouter>
     );
 
