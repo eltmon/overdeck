@@ -367,7 +367,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:04:24.781Z",
+  "updated": "2026-09-16T19:22:47.045Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -567,7 +567,7 @@
     }
   ],
   "tasks": {
-    "sequence": 28,
+    "sequence": 29,
     "claims": {},
     "claimHistory": [
       {
@@ -763,8 +763,9 @@
         "updatedAt": "2026-09-16T15:51:14.944Z"
       },
       "new-project-page": {
-        "reason": "NewProjectPage component fully implemented with three mode tabs, inline findings, status strip, and proper routing",
-        "updatedAt": "2026-09-16T15:59:50.788Z"
+        "reason": "UAT failed: NewProjectPage uses react-router useSearchParams with no Router mounted; page throws on every entry point. Rework required per PRD WI-4/D-14 (hand-rolled getNewProjectModeFromSearch).",
+        "updatedAt": "2026-09-16T19:22:47.044Z",
+        "forced": true
       },
       "wire-entry-points-no-loss": {
         "reason": "All entry points wired: sidebar +, workspace chips (3x), App.handleNewProject all navigate to /projects/new with proper mode params",
@@ -835,12 +836,12 @@
     "use-project-create-intent-hook.ac3": "completed",
     "use-project-create-intent-hook.ac4": "completed",
     "use-project-create-intent-hook.ac5": "completed",
-    "new-project-page": "completed",
-    "new-project-page.ac1": "completed",
-    "new-project-page.ac2": "completed",
-    "new-project-page.ac3": "completed",
-    "new-project-page.ac4": "completed",
-    "new-project-page.ac5": "completed",
+    "new-project-page": "pending",
+    "new-project-page.ac1": "pending",
+    "new-project-page.ac2": "pending",
+    "new-project-page.ac3": "pending",
+    "new-project-page.ac4": "pending",
+    "new-project-page.ac5": "pending",
     "wire-entry-points-no-loss": "completed",
     "wire-entry-points-no-loss.ac1": "completed",
     "wire-entry-points-no-loss.ac2": "completed",
