@@ -64,6 +64,7 @@ import {
   resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
+  logTierFitnessAtSpawn,
   resolveSingleWorkTierSpawnParams,
   resolveFlywheelSpawnEnv,
   runAgentId,
@@ -135,6 +136,7 @@ async function spawnRunWithoutConsentClaim(
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
       const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model, modelSpawnKey);
+      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: tierParams.model, harness: tierParams.harness }, tierParams.difficulty ? [tierParams.difficulty] : [], [slot.slotItemId]);
       if (tierParams.model) {
         slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
         // Implicit staffing (PAN-2397) omits harness — keep the parent's

@@ -22,12 +22,15 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
+import type { XBriefDifficulty } from '../xbrief/types.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
 import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
+import { checkStaffingFitness } from './tier-fitness.js';
+import { buildTierFitnessContextSync } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -218,6 +221,8 @@ export interface SlotTierSpawnParams {
   model?: string;
   harness?: RuntimeName;
   tierName?: string;
+  /** The slot item's xBRIEF difficulty, when the plan item declares one. */
+  difficulty?: XBriefDifficulty;
   /** PAN-2397: true when staffing came from the implicit roles.work tier.
    * Implicit staffing intentionally omits `harness` so the spawn keeps its
    * historical harness handling (provider-default derived from the model). */
@@ -285,7 +290,34 @@ export function resolveSlotTierSpawnParams(
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    difficulty: item.metadata?.difficulty as XBriefDifficulty | undefined,
   };
+}
+
+/**
+ * PAN-3842: one `[spawn] tier fitness:` console.warn line per fitness warning
+ * for the staffed (model, harness) at spawn time. Never throws — a fitness
+ * check failure must not prevent a spawn.
+ */
+export function logTierFitnessAtSpawn(
+  label: string,
+  staffing: { tierName: string; model?: string; harness?: RuntimeName },
+  difficulties: XBriefDifficulty[],
+  itemIds: string[],
+  log: (line: string) => void = console.warn,
+): void {
+  if (!staffing.model || difficulties.length === 0) return;
+  try {
+    const ctx = buildTierFitnessContextSync(loadYamlConfig().config);
+    const warnings = checkStaffingFitness(
+      { tierName: staffing.tierName, model: staffing.model, harness: staffing.harness, path: `tier '${staffing.tierName}'` },
+      difficulties,
+      ctx,
+    );
+    for (const w of warnings) log(`[spawn] tier fitness: ${label} — ${w.message} (items: ${itemIds.join(', ')}) — PAN-3842`);
+  } catch (error) {
+    log(`[spawn] tier fitness check skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**

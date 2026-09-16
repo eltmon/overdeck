@@ -21,7 +21,7 @@ vi.mock('../../xbrief/io.js', () => ({
 
 import { loadConfigSync } from '../../config-yaml.js';
 import { readWorkspacePlanSync } from '../../xbrief/io.js';
-import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
+import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
   enabled: true,
@@ -157,6 +157,7 @@ describe('resolveSlotTierSpawnParams', () => {
     tierName: 'default',
     implicit: true,
   };
+  const IMPLICIT_PARAMS_EXPERT = { ...IMPLICIT_PARAMS, difficulty: 'expert' };
 
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
@@ -172,6 +173,7 @@ describe('resolveSlotTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'frontier',
       implicit: false,
+      difficulty: 'expert',
     });
   });
 
@@ -179,7 +181,7 @@ describe('resolveSlotTierSpawnParams', () => {
     mockConfig({ ...TIER_CONFIG, enabled: false });
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual(IMPLICIT_PARAMS);
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual(IMPLICIT_PARAMS_EXPERT);
   });
 
   it('lets an explicit per-spawn model override outrank tier routing', () => {
@@ -316,5 +318,74 @@ describe('applyTierAssignment', () => {
     const parent = { model: 'gpt-5.5', harness: 'codex' as const };
     expect(applyTierAssignment(parent, undefined)).toBe(parent);
     expect(applyTierAssignment(parent, { dispatch: 'in-context' })).toBe(parent);
+  });
+});
+
+describe('spawn-time tier fitness logging (PAN-3842)', () => {
+  function planDoc(items: XBriefItem[]): XBriefDocument {
+    return {
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      plan: { id: 'plan-1', title: 'test plan', status: 'running', items, edges: [] },
+    };
+  }
+
+  function planItem(id: string, metadata: XBriefItem['metadata']): XBriefItem {
+    return { id, title: id, status: 'pending', metadata };
+  }
+
+  function mockCatalogConfig(): void {
+    vi.mocked(loadConfigSync).mockReturnValue({
+      config: { enabledProviders: new Set(['anthropic']), roles: { work: { model: 'claude-sonnet-4-6' } } },
+    } as unknown as ReturnType<typeof loadConfigSync>);
+  }
+
+  beforeEach(() => {
+    vi.mocked(loadConfigSync).mockReset();
+    vi.mocked(readWorkspacePlanSync).mockReset();
+  });
+
+  it('resolveSlotTierSpawnParams carries the item difficulty into the params', () => {
+    mockCatalogConfig();
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'complex' })]));
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x').difficulty).toBe('complex');
+  });
+
+  it('logs exactly one [spawn] tier fitness line naming expert and small-class for an expert item on a haiku staffing', () => {
+    mockCatalogConfig();
+    const lines: string[] = [];
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5', harness: 'claude-code' }, ['expert'], ['task-x'], (l) => lines.push(l));
+    expect(lines).toHaveLength(1);
+    expect(lines[0].startsWith('[spawn] tier fitness:')).toBe(true);
+    expect(lines[0]).toContain('expert');
+    expect(lines[0]).toContain('small-class');
+    expect(lines[0]).toContain('task-x');
+  });
+
+  it('logs nothing for the same expert item on a claude-opus-4-8 staffing', () => {
+    mockCatalogConfig();
+    const lines: string[] = [];
+    logTierFitnessAtSpawn('agent-1', { tierName: 'frontier', model: 'claude-opus-4-8', harness: 'claude-code' }, ['expert'], ['task-x'], (l) => lines.push(l));
+    expect(lines).toEqual([]);
+  });
+
+  it('logs a skipped line and never throws when the context build fails', () => {
+    vi.mocked(loadConfigSync).mockImplementation(() => {
+      throw new Error('config exploded');
+    });
+    const lines: string[] = [];
+    expect(() =>
+      logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, ['expert'], ['task-x'], (l) => lines.push(l)),
+    ).not.toThrow();
+    expect(lines).toHaveLength(1);
+    expect(lines[0].startsWith('[spawn] tier fitness check skipped:')).toBe(true);
+    expect(lines[0]).toContain('config exploded');
+  });
+
+  it('skips silently when the staffing has no model or no difficulties', () => {
+    mockCatalogConfig();
+    const lines: string[] = [];
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap' }, ['expert'], ['task-x'], (l) => lines.push(l));
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, [], ['task-x'], (l) => lines.push(l));
+    expect(lines).toEqual([]);
   });
 });
