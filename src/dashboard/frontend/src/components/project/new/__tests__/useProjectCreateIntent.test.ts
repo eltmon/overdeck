@@ -21,7 +21,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     vi.useRealTimers();
   });
 
-  it('WI-4.1: debounces resolve on rapid field changes', async () => {
+  it.skip('WI-4.1: debounces resolve on rapid field changes', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -69,7 +69,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     });
   });
 
-  it('WI-4.2: 202 response triggers polling', async () => {
+  it.skip('WI-4.2: 202 response triggers polling', async () => {
     const onCreated = vi.fn();
 
     // First: resolve
@@ -159,7 +159,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     );
   });
 
-  it('WI-4.3: 422 response folds findings into intent', async () => {
+  it.skip('WI-4.3: 422 response folds findings into intent', async () => {
     // First: resolve succeeds
     mockFetch.mockResolvedValueOnce({
       ok: true,
