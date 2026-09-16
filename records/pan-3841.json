@@ -132,7 +132,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T22:37:36.883Z",
+  "updated": "2026-09-16T22:43:02.210Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -318,7 +318,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
