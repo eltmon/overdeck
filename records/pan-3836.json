@@ -392,19 +392,21 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T21:13:21.288Z",
+  "updated": "2026-09-16T21:17:32.435Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-09-16T20:31:57.742Z",
-    "testNotes": "Head 9e039c178b3. Automated gates: GitHub CI fully green on this commit (build, lint, test, smoke, guard); locally in the workspace, frontend suites for NewProjectPage, no-loss audit, and useProjectCreateIntent 22/22 passed, frontend tsc --noEmit clean, eslint clean on the four changed files. The only diff since the last verification-gate pass (fcad7fae) is the frontend-only react-router removal plus tests. Verdict recorded by the shepherding conversation (conv 20260916-7665) because the 19:54 test-specialist spawn died (jsonl-missing) and the green-CI reconciler flipped testStatus before re-dispatch could happen (PAN-3843).",
+    "readyForMerge": false,
+    "updatedAt": "2026-09-16T21:16:49.392Z",
+    "reviewNotes": "Cycle 8: one-commit UAT fix to read /projects/new mode preset via window.location (was crashing on react-router's useSearchParams). Cycle diff is bounded to NewProjectPage + tests; standing advisories from cycles 6/7 demoted under the convergence gate.",
+    "testNotes": "Verdict re-gated: evidence=9e039c17 row=29c8eff1 writer=quick-signal",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "9e039c178b33101935250217c8f51dbfeb167e0f",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
@@ -530,6 +532,46 @@
             "cacheWrite": 191855
           }
         },
+        "review": {
+          "custom/MiniMax-M3": {
+            "input": 1364252,
+            "output": 48472,
+            "cacheRead": 11440384,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "custom/MiniMax-M3": {
+            "input": 373520,
+            "output": 8917,
+            "cacheRead": 6816478,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "custom/MiniMax-M3": {
+            "input": 397950,
+            "output": 17126,
+            "cacheRead": 6135040,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "custom/MiniMax-M3": {
+            "input": 328329,
+            "output": 8078,
+            "cacheRead": 6422912,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "custom/MiniMax-M3": {
+            "input": 546409,
+            "output": 27902,
+            "cacheRead": 3975808,
+            "cacheWrite": 0
+          }
+        },
         "test": {
           "anthropic/claude-sonnet-5": {
             "input": 168,
@@ -554,6 +596,12 @@
           "cacheRead": 19836989,
           "cacheWrite": 246599
         },
+        "custom/MiniMax-M3": {
+          "input": 3010460,
+          "output": 110495,
+          "cacheRead": 34790622,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 168,
           "output": 39389,
@@ -568,8 +616,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 45.185016,
-        "pricingAsOf": "2026-09-16T20:31:57.762Z"
+        "usd": 46.220743,
+        "pricingAsOf": "2026-09-16T21:17:22.167Z"
       }
     },
     "merges": [
@@ -578,7 +626,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
