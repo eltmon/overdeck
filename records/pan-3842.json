@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:14:52.806Z",
+  "updated": "2026-09-16T21:14:56.224Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -72,7 +72,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
