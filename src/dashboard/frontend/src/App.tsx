@@ -46,6 +46,7 @@ import {
   getCockpitRouteFromPath,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
+  getProjectCreatedNavigation,
   getIssueIdFromPath,
   getLastTab,
   getSessionKeyFromSearch,
@@ -234,12 +235,10 @@ export default function App() {
     void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
     setSelectedProjectKey(project.key);
-    setActiveTabState('command-deck');
-    const path = `/command-deck/${encodeURIComponent(project.key)}`;
-    commandDeckPathRef.current = path;
-    if (window.location.pathname !== path) {
-      window.history.pushState({ tab: 'command-deck', project: project.key }, '', path);
-    }
+    const target = getProjectCreatedNavigation(project.key); // PAN-3836: honors returnTo=/workspaces/new from the chips
+    setActiveTabState(target.tab);
+    if (target.tab === 'command-deck') commandDeckPathRef.current = target.path;
+    if (window.location.pathname !== target.path) window.history.pushState(target.state, '', target.path);
     // Same reason as handleSelectProject: the new project is newer intent than a
     // lingering conversation route, which would flip the deck away on remount.
     setConversationRoute(null);

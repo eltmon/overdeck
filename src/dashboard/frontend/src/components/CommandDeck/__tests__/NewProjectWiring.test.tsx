@@ -17,6 +17,7 @@ vi.mock('../../../lib/panesStore', () => ({
 }));
 
 import { usePanesStore } from '../../../lib/panesStore';
+import { getProjectCreatedNavigation } from '../../../App/routes';
 
 describe('handleProjectCreated wiring', () => {
   let queryClient: QueryClient;
@@ -47,5 +48,12 @@ describe('handleProjectCreated wiring', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['registered-projects'] });
     expect(setSelectedProjectKey).toHaveBeenCalledWith('my-app');
     expect(usePanesStore.getState().ensureHome).toHaveBeenCalledWith('my-app');
+  });
+
+  it('returns to /workspaces/new with the new project preselected when returnTo is set (PAN-3836)', () => {
+    window.history.replaceState(null, '', '/projects/new?mode=clone&returnTo=%2Fworkspaces%2Fnew');
+    expect(getProjectCreatedNavigation('my-app')).toEqual({ tab: 'workspace-new', path: '/workspaces/new?project=my-app', state: { tab: 'workspace-new' } });
+    window.history.replaceState(null, '', '/projects/new');
+    expect(getProjectCreatedNavigation('my-app')).toEqual({ tab: 'command-deck', path: '/command-deck/my-app', state: { tab: 'command-deck', project: 'my-app' } });
   });
 });

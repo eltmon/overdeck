@@ -128,6 +128,26 @@ export function getNewProjectModeFromSearch(search = window.location.search): 'c
   return mode === 'clone' || mode === 'existing' || mode === 'new' ? mode : null;
 }
 
+/**
+ * Optional same-origin path to return to after a project is created from another
+ * page (the workspace page passes `returnTo=/workspaces/new`). Only a plain
+ * absolute path is accepted; protocol-relative or external values are dropped.
+ */
+export function getNewProjectReturnToFromSearch(search = window.location.search): string | null {
+  const raw = new URLSearchParams(search).get('returnTo');
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
+/** Where App lands after a project is created: back to the workspace page when it asked for it, else the command deck. */
+export function getProjectCreatedNavigation(projectKey: string): { tab: Extract<Tab, 'workspace-new' | 'command-deck'>; path: string; state: Record<string, unknown> } {
+  const returnTo = getNewProjectReturnToFromSearch();
+  if (returnTo?.startsWith('/workspaces/new')) {
+    return { tab: 'workspace-new', path: `/workspaces/new?project=${encodeURIComponent(projectKey)}`, state: { tab: 'workspace-new' } };
+  }
+  return { tab: 'command-deck', path: `/command-deck/${encodeURIComponent(projectKey)}`, state: { tab: 'command-deck', project: projectKey } };
+}
+
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
   const view = new URLSearchParams(search).get('view');
   return view === 'terminal' ? 'terminal' : 'conversation';

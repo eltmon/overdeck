@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NewProjectPage } from '../NewProjectPage';
+import { getNewProjectModeFromSearch, getNewProjectReturnToFromSearch } from '../../App/routes';
 
 // No dashboard state mock needed for this component
 
@@ -128,5 +129,20 @@ describe('NewProjectPage (WI-4)', () => {
     window.history.replaceState(null, '', '/projects/new?mode=bogus');
     render(<NewProjectPage onCancel={() => {}} onCreated={() => {}} />);
     expect(hookOptionsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ initialMode: 'clone' }));
+  });
+});
+
+describe('new-project search helpers (PAN-3836 returnTo round trip)', () => {
+  it('reads a valid mode and rejects unknown values', () => {
+    expect(getNewProjectModeFromSearch('?mode=existing')).toBe('existing');
+    expect(getNewProjectModeFromSearch('?mode=bogus')).toBeNull();
+    expect(getNewProjectModeFromSearch('')).toBeNull();
+  });
+
+  it('accepts only a same-origin absolute path for returnTo', () => {
+    expect(getNewProjectReturnToFromSearch('?mode=clone&returnTo=%2Fworkspaces%2Fnew')).toBe('/workspaces/new');
+    expect(getNewProjectReturnToFromSearch('?returnTo=https%3A%2F%2Fevil.example')).toBeNull();
+    expect(getNewProjectReturnToFromSearch('?returnTo=%2F%2Fevil.example')).toBeNull();
+    expect(getNewProjectReturnToFromSearch('?mode=clone')).toBeNull();
   });
 });

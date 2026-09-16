@@ -179,7 +179,7 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
         >
           <button
             type="button"
-            onClick={() => window.location.href = '/projects/new?mode=clone'}
+            onClick={() => window.location.href = `/projects/new?mode=clone&returnTo=${encodeURIComponent('/workspaces/new')}`}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
@@ -187,7 +187,7 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
           </button>
           <button
             type="button"
-            onClick={() => window.location.href = '/projects/new?mode=existing'}
+            onClick={() => window.location.href = `/projects/new?mode=existing&returnTo=${encodeURIComponent('/workspaces/new')}`}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
@@ -195,7 +195,7 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
           </button>
           <button
             type="button"
-            onClick={() => window.location.href = '/projects/new?mode=new'}
+            onClick={() => window.location.href = `/projects/new?mode=new&returnTo=${encodeURIComponent('/workspaces/new')}`}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <FolderPlus className="h-4 w-4" />
