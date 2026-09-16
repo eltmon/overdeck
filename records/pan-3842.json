@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T20:07:43.370Z",
+  "updated": "2026-09-16T20:11:04.600Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "spawn-single-log": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3586608,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:07:43.370Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -150,6 +142,17 @@
         "outcome": "completed",
         "reason": "spawn-prep carries item difficulty in SlotTierSpawnParams and exports logTierFitnessAtSpawn (never throws, one [spawn] tier fitness line per warning); spawn.ts calls it after slot tier resolution; 24 dispatch-tier tests pass, typecheck green.",
         "releasedAt": "2026-09-16T20:06:58.713Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3586608,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:07:43.370Z",
+        "itemId": "spawn-single-log",
+        "outcome": "completed",
+        "reason": "Single-work spawn now logs fitness against deduped plan-wide difficulties with offending item ids; helper reworked to item pairs; 28 dispatch-tier tests pass, typecheck green.",
+        "releasedAt": "2026-09-16T20:11:04.600Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "spawn-slot-log": {
         "reason": "spawn-prep carries item difficulty in SlotTierSpawnParams and exports logTierFitnessAtSpawn (never throws, one [spawn] tier fitness line per warning); spawn.ts calls it after slot tier resolution; 24 dispatch-tier tests pass, typecheck green.",
         "updatedAt": "2026-09-16T20:06:58.713Z"
+      },
+      "spawn-single-log": {
+        "reason": "Single-work spawn now logs fitness against deduped plan-wide difficulties with offending item ids; helper reworked to item pairs; 28 dispatch-tier tests pass, typecheck green.",
+        "updatedAt": "2026-09-16T20:11:04.600Z"
       }
     }
   },
@@ -203,6 +210,10 @@
     "spawn-slot-log.ac2": "completed",
     "spawn-slot-log.ac3": "completed",
     "spawn-slot-log.ac4": "completed",
-    "spawn-single-log": "running"
+    "spawn-single-log": "completed",
+    "spawn-single-log.ac1": "completed",
+    "spawn-single-log.ac2": "completed",
+    "spawn-single-log.ac3": "completed",
+    "spawn-single-log.ac4": "completed"
   }
 }
