@@ -367,7 +367,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:22:47.045Z",
+  "updated": "2026-09-16T19:46:18.479Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -567,8 +567,16 @@
     }
   ],
   "tasks": {
-    "sequence": 29,
-    "claims": {},
+    "sequence": 30,
+    "claims": {
+      "new-project-page": {
+        "writerId": "conv-20260916-7665",
+        "agentId": "conv-20260916-7665",
+        "pid": 3203410,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T19:46:18.479Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -763,8 +771,8 @@
         "updatedAt": "2026-09-16T15:51:14.944Z"
       },
       "new-project-page": {
-        "reason": "UAT failed: NewProjectPage uses react-router useSearchParams with no Router mounted; page throws on every entry point. Rework required per PRD WI-4/D-14 (hand-rolled getNewProjectModeFromSearch).",
-        "updatedAt": "2026-09-16T19:22:47.044Z",
+        "reason": "Shepherding conversation applied the UAT rework after the work agent declined it twice",
+        "updatedAt": "2026-09-16T19:46:18.479Z",
         "forced": true
       },
       "wire-entry-points-no-loss": {
@@ -836,7 +844,7 @@
     "use-project-create-intent-hook.ac3": "completed",
     "use-project-create-intent-hook.ac4": "completed",
     "use-project-create-intent-hook.ac5": "completed",
-    "new-project-page": "pending",
+    "new-project-page": "running",
     "new-project-page.ac1": "pending",
     "new-project-page.ac2": "pending",
     "new-project-page.ac3": "pending",
