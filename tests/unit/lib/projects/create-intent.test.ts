@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, mkdtempSync, symlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -58,6 +58,10 @@ import {
   promptGuardGitEnv,
 } from '../../../../src/lib/projects/create.js';
 import { getProjectSync, PROJECTS_CONFIG_FILE, invalidateProjectsConfigCache } from '../../../../src/lib/projects.js';
+
+function realPathOf(p: string): string {
+  return realpathSync(p);
+}
 
 function makeProjectDir(suffix = '') {
   const dir = join(TEST_HOME, `proj-${suffix}-${Math.random().toString(36).slice(2)}`);
@@ -386,6 +390,178 @@ describe('resolveProjectCreateIntent', () => {
     });
 
     expect(intent.willCreateMainWorkspace).toBe(true);
+  });
+
+  it('rejects a path reached through an in-home symlink that escapes home', async () => {
+    // The guard this core replaced canonicalized with realpath explicitly to reject
+    // this shape. `resolve()` is lexical, so without canonicalization the link below
+    // passes a prefix test while every write lands outside the boundary.
+    const outside = mkdtempSync(join(tmpdir(), 'proj-outside-'));
+    const link = join(TEST_HOME, 'escape');
+    symlinkSync(outside, link);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'escaped',
+      parentDir: link,
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({ field: 'parentDir', code: 'path-outside-home' }),
+    );
+    rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('accepts an in-home symlink and reports the canonical path', async () => {
+    const realParent = join(TEST_HOME, 'real-projects');
+    mkdirSync(realParent, { recursive: true });
+    const link = join(TEST_HOME, 'linked-projects');
+    symlinkSync(realParent, link);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'canonical',
+      parentDir: link,
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toHaveLength(0);
+    expect(intent.path).toBe(join(realPathOf(realParent), 'canonical'));
+  });
+
+  it('skips the ls-remote probe for a half-typed URL', async () => {
+    let callCount = 0;
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        callCount++;
+        cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'clone',
+      url: 'https://github.com/eltmon',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(callCount).toBe(0);
+    expect(intent.remoteChecked).toBe(false);
+  });
+
+  it('skips the ls-remote probe when the form already has a finding', async () => {
+    let callCount = 0;
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        callCount++;
+        cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+
+    // A non-empty target directory is a finding raised before detection runs.
+    const target = join(TEST_HOME, 'Projects', 'taken');
+    mkdirSync(target, { recursive: true });
+    writeFileSync(join(target, 'file.txt'), 'x');
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'clone',
+      url: 'owner/taken',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({ code: 'target-exists' }),
+    );
+    expect(callCount).toBe(0);
+  });
+
+  it('coalesces concurrent probes for the same URL onto one child process', async () => {
+    let callCount = 0;
+    // Hold every ls-remote answer so the first resolve is still in the probe when
+    // the second arrives. Firing on a timer instead would make the overlap a race.
+    const held: Array<() => void> = [];
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        callCount++;
+        held.push(() => cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' }));
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+
+    const input = {
+      mode: 'clone' as const,
+      url: 'o/concurrent',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+      refreshRemote: true,
+    };
+    const pA = resolveProjectCreateIntent(input);
+    const pB = resolveProjectCreateIntent(input);
+
+    // Drain enough event-loop turns for the second resolve to finish its own
+    // filesystem reads and reach the probe; the first cannot advance past it.
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setImmediate(r));
+    }
+    for (const fire of held) fire();
+
+    const [a, b] = await Promise.all([pA, pB]);
+
+    expect(callCount).toBe(1);
+    expect(a.defaultBranch).toBe('main');
+    expect(b.defaultBranch).toBe('main');
+  });
+
+  it('expires a failed probe faster than a successful one', async () => {
+    let callCount = 0;
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        callCount++;
+        cb(new Error('Network error'));
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+
+    const input = {
+      mode: 'clone' as const,
+      url: 'o/flaky',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    };
+
+    await resolveProjectCreateIntent(input);
+    expect(callCount).toBe(1);
+
+    // Within the 5 s failure TTL the memo still answers.
+    await resolveProjectCreateIntent(input);
+    expect(callCount).toBe(1);
+
+    // Past it, the URL is probed again instead of staying pinned as unreachable.
+    // Fake timers so the TTL is crossed by advancing the clock, never by sleeping.
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(6_000);
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        callCount++;
+        cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+    const recovered = await resolveProjectCreateIntent(input);
+    expect(callCount).toBe(2);
+    expect(recovered.defaultBranch).toBe('main');
+    vi.useRealTimers();
   });
 
   it('promptGuardGitEnv sets correct environment variables', () => {

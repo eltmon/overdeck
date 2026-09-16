@@ -22,10 +22,17 @@
  * none, so the caller passes explicit `parentDir` or `path`; when either is
  * invalid, that surfaces as a `findings`, never a guess.
  *
- * Every filesystem and config read here is asynchronous. Resolution runs on
- * the dashboard's single event loop once per settled keystroke, so a sync
- * `statSync`/`readFileSync` on a slow or network-mounted path would stall
- * unrelated HTTP, WebSocket and terminal traffic (PAN-3330 review).
+ * Filesystem work here is asynchronous. Resolution runs on the dashboard's single
+ * event loop once per settled keystroke, so a sync `statSync`/`readFileSync` on a
+ * slow or network-mounted path would stall unrelated HTTP, WebSocket and terminal
+ * traffic (PAN-3330 review). The two exceptions are the registry and workspace
+ * lookups (`getProjectSync`, `getMainWorkspace`): both are mtime-cached or
+ * better-sqlite3 reads against local state, microsecond-scale, and they are the
+ * canonical read doors — a parallel async door would be the worse trade.
+ *
+ * Paths are canonicalized (`realpath` on the nearest existing ancestor) before the
+ * home-boundary check and before registration, so a symlink cannot carry a project
+ * outside the boundary the dashboard enforces.
  *
  * NOTE: `child_process`/`util` are imported unprefixed (not `node:`) because
  * the CLI suites mock those specifiers to assert the argument-vector spawn.
@@ -34,8 +41,8 @@
  */
 
 import { execFile, spawn } from 'child_process';
-import { mkdir, rm, stat, readFile, appendFile, readdir } from 'fs/promises';
-import { join, resolve, dirname, basename, isAbsolute } from 'path';
+import { mkdir, rm, stat, readFile, appendFile, readdir, realpath } from 'fs/promises';
+import { join, resolve, dirname, basename, isAbsolute, sep } from 'path';
 import { homedir } from 'os';
 import { promisify } from 'util';
 
@@ -133,6 +140,11 @@ export function promptGuardGitEnv(base: NodeJS.ProcessEnv = process.env): NodeJS
 }
 
 const REMOTE_PROBE_TTL_MS = 60_000;
+/**
+ * Failed probes expire fast. A 60 s failure memo would pin `remote-unreachable`
+ * on a URL that came back a second later, and the operator cannot clear it.
+ */
+const REMOTE_PROBE_FAILURE_TTL_MS = 5_000;
 const REMOTE_PROBE_TIMEOUT_MS = 15_000;
 
 interface RemoteProbeResult {
@@ -142,58 +154,116 @@ interface RemoteProbeResult {
 }
 
 const remoteProbeMemo = new Map<string, { at: number; result: RemoteProbeResult }>();
+const remoteProbeInFlight = new Map<string, Promise<RemoteProbeResult>>();
+
+function remoteProbeTtl(result: RemoteProbeResult): number {
+  return result.ok ? REMOTE_PROBE_TTL_MS : REMOTE_PROBE_FAILURE_TTL_MS;
+}
+
+/**
+ * Drop expired entries. The memo is consulted only on the read path, so without
+ * this the Map gains a permanent entry per distinct clone URL for the life of a
+ * dashboard process that never restarts.
+ */
+function pruneRemoteProbeMemo(now: number): void {
+  for (const [url, entry] of remoteProbeMemo) {
+    if (now - entry.at >= remoteProbeTtl(entry.result)) remoteProbeMemo.delete(url);
+  }
+}
+
+/** True when a clone URL names both an owner and a repository, not a half-typed path. */
+function hasCompleteRepoPath(cloneUrl: string): boolean {
+  const afterHost = cloneUrl.replace(/^[a-z+]+:\/\/[^/]+\//i, '');
+  const segments = afterHost.replace(/\.git$/, '').split('/').filter(Boolean);
+  return segments.length >= 2;
+}
 
 /** Probe a remote repository for its default branch via git ls-remote. Memoized. */
 async function probeRemote(
   cloneUrl: string,
   opts: { refresh?: boolean } = {},
 ): Promise<RemoteProbeResult> {
+  pruneRemoteProbeMemo(Date.now());
+
   const hit = remoteProbeMemo.get(cloneUrl);
-  if (!opts.refresh && hit && Date.now() - hit.at < REMOTE_PROBE_TTL_MS) {
+  if (!opts.refresh && hit) {
     return hit.result;
   }
 
-  let result: RemoteProbeResult;
-  try {
-    const { stdout } = await execFileAsync(
-      'git',
-      ['ls-remote', '--symref', '--', cloneUrl, 'HEAD'],
-      {
-        env: promptGuardGitEnv(),
-        timeout: REMOTE_PROBE_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
-      },
-    );
-    const match = stdout.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD$/m);
-    result = { ok: true, defaultBranch: match?.[1] ?? null };
-  } catch (err) {
-    result = { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  // Coalesce concurrent probes for the same URL onto one child process: two
+  // resolves racing on the same field must not each hold a 15 s `git ls-remote`.
+  const pending = remoteProbeInFlight.get(cloneUrl);
+  if (pending) return pending;
 
-  remoteProbeMemo.set(cloneUrl, { at: Date.now(), result });
-  return result;
+  const run = (async (): Promise<RemoteProbeResult> => {
+    let result: RemoteProbeResult;
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['ls-remote', '--symref', '--', cloneUrl, 'HEAD'],
+        {
+          env: promptGuardGitEnv(),
+          timeout: REMOTE_PROBE_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+        },
+      );
+      const match = stdout.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD$/m);
+      result = { ok: true, defaultBranch: match?.[1] ?? null };
+    } catch (err) {
+      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+
+    remoteProbeMemo.set(cloneUrl, { at: Date.now(), result });
+    return result;
+  })();
+
+  remoteProbeInFlight.set(cloneUrl, run);
+  try {
+    return await run;
+  } finally {
+    remoteProbeInFlight.delete(cloneUrl);
+  }
 }
 
 /** Reset the remote probe memo for tests. */
 export function __resetRemoteProbeMemoForTests(): void {
   remoteProbeMemo.clear();
+  remoteProbeInFlight.clear();
 }
 
-/** Check if path is within home directory. Uses nearest existing ancestor. */
-async function isWithinHome(filePath: string, home: string): Promise<boolean> {
-  let current = filePath;
-  const homeAbs = resolve(home);
+/**
+ * Canonicalize a path: `realpath` its nearest existing ancestor and re-anchor the
+ * not-yet-created tail onto the result.
+ *
+ * `resolve()` alone is lexical — it collapses `..` but never expands a symlink, so
+ * an in-home link pointing outside the tree passes a naive prefix test. The
+ * dashboard route this core replaced canonicalized with `realpath` for exactly that
+ * reason ("rejects symlink escapes"); that property lives here now. The tail comes
+ * from an already-resolved absolute path, so it carries no `.` or `..` segment and
+ * cannot walk back out of the canonical ancestor.
+ */
+async function canonicalizePath(filePath: string): Promise<string> {
+  const abs = resolve(filePath);
+  const tail: string[] = [];
+  let current = abs;
 
-  while (current !== dirname(current)) {
+  for (;;) {
     try {
-      await stat(current);
-      return resolve(current).startsWith(homeAbs + '/') || resolve(current) === homeAbs;
+      const real = await realpath(current);
+      return tail.length > 0 ? join(real, ...tail) : real;
     } catch {
-      current = dirname(current);
+      const parent = dirname(current);
+      if (parent === current) return abs; // reached the root with nothing existing
+      tail.unshift(basename(current));
+      current = parent;
     }
   }
+}
 
-  return false;
+/** True when an already-canonical path is the home directory or below it. */
+async function isWithinHome(canonicalPath: string, home: string): Promise<boolean> {
+  const homeReal = await canonicalizePath(home);
+  return canonicalPath === homeReal || canonicalPath.startsWith(homeReal + sep);
 }
 
 /**
@@ -284,10 +354,12 @@ export async function resolveProjectCreateIntent(
 
   // 3. Path + home boundary + fs checks
   if (input.mode === 'clone' || input.mode === 'new') {
-    intent.path = join(parentDir, key);
+    // Canonical from here on: the boundary check below and the registration that
+    // follows must agree on one path, not on a symlink and its target.
+    intent.path = await canonicalizePath(join(parentDir, key));
   } else {
     try {
-      intent.path = resolve(input.path!);
+      intent.path = await canonicalizePath(input.path!);
       await stat(intent.path);
     } catch {
       findings.push({
@@ -337,17 +409,22 @@ export async function resolveProjectCreateIntent(
 
   // 4. Detection
   if (input.mode === 'clone' && intent.cloneUrl) {
-    const probe = await probeRemote(intent.cloneUrl, { refresh: input.refreshRemote });
-    intent.remoteChecked = true;
-    if (probe.ok) {
-      intent.defaultBranch = probe.defaultBranch ?? null;
-    } else {
-      findings.push({
-        field: 'url',
-        code: 'remote-unreachable',
-        message: 'Could not reach the remote repository.',
-        detail: probe.error,
-      });
+    // Each probe is a real `git ls-remote` child process, so skip it while the form
+    // already has something to fix and while the URL is still half-typed — otherwise
+    // every settled keystroke after the first slash spawns one.
+    if (findings.length === 0 && hasCompleteRepoPath(intent.cloneUrl)) {
+      const probe = await probeRemote(intent.cloneUrl, { refresh: input.refreshRemote });
+      intent.remoteChecked = true;
+      if (probe.ok) {
+        intent.defaultBranch = probe.defaultBranch ?? null;
+      } else {
+        findings.push({
+          field: 'url',
+          code: 'remote-unreachable',
+          message: 'Could not reach the remote repository.',
+          detail: probe.error,
+        });
+      }
     }
   } else if (input.mode === 'existing' && intent.path) {
     const gitDir = join(intent.path, '.git');
