@@ -198,6 +198,7 @@ export function useProjectCreateIntent({
     setCreating(true);
     setProgress(null);
     const seq = ++submitSeq.current;
+    let jobStarted = false;
     try {
       const response = await fetchWithTimeout('/api/projects', {
         method: 'POST',
@@ -221,6 +222,7 @@ export function useProjectCreateIntent({
 
       if (response.status === 202) {
         // Clone job created
+        jobStarted = true;
         const json = (await response.json().catch(() => ({}))) as { jobId?: string };
         if (seq !== submitSeq.current) return null;
         if (json.jobId) {
@@ -249,7 +251,7 @@ export function useProjectCreateIntent({
       }
       return null;
     } finally {
-      if (seq === submitSeq.current) setCreating(false);
+      if (seq === submitSeq.current && !jobStarted) setCreating(false);
     }
   }, [requestBody, pollJob, onCreated]);
 
