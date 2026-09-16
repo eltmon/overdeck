@@ -1,4 +1,6 @@
 import { MODELS_BY_PROVIDER, type ModelDef } from '../modelCatalog';
+import { checkTierFitness, type TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
+import { capabilityClassOf } from '../../../../../../lib/model-capability-class.js';
 import type {
   Harness,
   ModelId,
@@ -202,6 +204,21 @@ function yamlLines(value: unknown, indent: number): string[] {
     });
   }
   return [`${prefix}${yamlScalar(value)}`];
+}
+
+
+/** PAN-3842: fitness warnings for the current (unsaved) draft. Frontend
+ * context: catalog = MODELS_BY_PROVIDER, provider = catalog group key,
+ * enabled providers = settings.models.providers. */
+export function tierFitnessWarnings(
+  config: TieredExecutionConfig,
+  settings: Pick<SettingsConfig, 'models'>,
+  catalog = MODELS_BY_PROVIDER,
+): TierFitnessWarning[] {
+  const knownModelIds = new Set(Object.values(catalog).flatMap((provider) => provider.models.map((model) => model.id as string)));
+  const providerOf = (model: string) => Object.entries(catalog).find(([, provider]) => provider.models.some((candidate) => candidate.id === model))?.[0];
+  const enabledProviders = new Set(Object.entries(settings.models.providers).filter(([, on]) => on).map(([name]) => name));
+  return checkTierFitness(config, { knownModelIds, classOf: capabilityClassOf, providerOf, enabledProviders });
 }
 
 export function renderYamlPreview(config: TieredExecutionConfig): string {
