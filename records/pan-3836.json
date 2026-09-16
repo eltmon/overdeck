@@ -193,18 +193,18 @@
     "recordedAt": "2026-09-16T16:51:08.216Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:54:22.258Z",
+  "updated": "2026-09-16T16:55:14.468Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T16:51:47.407Z",
-    "updatedAt": "2026-09-16T16:52:21.364Z",
-    "reviewNotes": "Cycle-1 blockers still at committed HEAD: fixes uncommitted; blocker-2 fix as written is ineffective (submit finally must gate on job-started)",
+    "updatedAt": "2026-09-16T16:55:14.421Z",
+    "reviewNotes": "creating race fix ineffective: submit() finally still clears creating after first poll; gate it on !jobStarted (cycle-2 caveat unheeded)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "1e4ae61d5e9eb370b4e25bfc936ba1f5198056db",
@@ -344,7 +344,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.577633,
-        "pricingAsOf": "2026-09-16T16:53:24.459Z"
+        "pricingAsOf": "2026-09-16T16:55:14.439Z"
       }
     },
     "merges": [
