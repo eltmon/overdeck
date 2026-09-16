@@ -1,17 +1,36 @@
 /**
  * Shared project-creation core (PAN-3836 WI-1).
  *
- * `resolveProjectCreateIntent()` validates a project creation request and
- * returns a fully computed preview with findings, writing nothing.
- * `performProjectCreate()` executes a resolved intent: clones or inits,
- * registers with detected extras, excludes workspaces/, and bootstraps main.
+ * `pan project clone` / `pan project add` / `pan project new` and the dashboard's project
+ * registry routes must resolve an operator's creation intent through literally
+ * the same code, so the dialog's resolve-before-create preview can never
+ * disagree with what confirming actually does.
  *
- * Both functions use the resolve-before-create pattern from PAN-3330:
- * the dashboard's dry-run preview and the real create call the same resolve
- * function, so the preview cannot disagree with what confirming does.
+ * Two functions, deliberately split along the write boundary:
  *
- * Two functions, deliberately split along the write boundary, so resolve
- * is safe to call on every keystroke.
+ *   - `resolveProjectCreateIntent()` — resolution and validation only. It
+ *     checks remote reachability (for clone/existing), detects the git remote,
+ *     default branch, and proposed issue_prefix; it writes nothing and spawns
+ *     no mutating git command, so it is safe to call on every keystroke. Invalid
+ *     input comes back as `findings`, never as a throw, so a UI can render each
+ *     problem against the field that caused it.
+ *   - `performProjectCreate()` — the writes: the optional clone/init, optional
+ *     .gitignore worktrees/ addition, project registration with auto-detected
+ *     fields (remote, tracker, issue_prefix), and the main workspace creation.
+ *
+ * This module never reads the ambient working directory. A browser request has
+ * none, so the caller passes explicit `parentDir` or `path`; when either is
+ * invalid, that surfaces as a `findings`, never a guess.
+ *
+ * Every filesystem and config read here is asynchronous. Resolution runs on
+ * the dashboard's single event loop once per settled keystroke, so a sync
+ * `statSync`/`readFileSync` on a slow or network-mounted path would stall
+ * unrelated HTTP, WebSocket and terminal traffic (PAN-3330 review).
+ *
+ * NOTE: `child_process`/`util` are imported unprefixed (not `node:`) because
+ * the CLI suites mock those specifiers to assert the argument-vector spawn.
+ * Long-running clones are handed off to a job store with TTL-based cleanup
+ * (see Dashboard routes: POST /api/projects returns 202 {jobId} for polling).
  */
 
 import { execFile, spawn } from 'child_process';

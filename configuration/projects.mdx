@@ -34,15 +34,61 @@ While `projects.yaml` is the source of truth, much of this configuration is also
 
 ## Registering Projects
 
-```bash
-# Register a project
-pan project add /path/to/your/project --name myproject --linear-team PRJ
+### Clone a repository
 
+Clone a repository directly into Overdeck:
+
+```bash
+pan project clone https://github.com/owner/repo
+# or
+pan project clone owner/repo
+```
+
+The clone detects the GitHub/GitLab remote, default branch, and proposes an issue prefix based on the repository name. It then creates the main workspace, allowing you to start working immediately.
+
+### Add existing
+
+Register a repository that already exists on your machine:
+
+```bash
+pan project add /path/to/your/project
+```
+
+Registration detects:
+- `github_repo` / `gitlab_repo` — the remote URL and slug
+- `tracker` — the issue tracker type (GitHub, GitLab, or Linear when configured)
+- `workspace.default_branch` — the repository's default branch
+- `issue_prefix` — automatically proposed (first 10 characters of the repo name, or customizable)
+- Main workspace creation — the initial workspace is created automatically
+
+### Dashboard
+
+Register projects through the dashboard at `/projects/new`:
+
+- **Clone repository** — Clone from GitHub/GitLab or any git remote
+- **Add existing** — Register a local repository
+- **New project** — Initialize a new repository in Overdeck
+
+All three options create the main workspace and detect configuration automatically.
+
+### Project or workspace?
+
+**A project is a repository with its own issues and pipeline.** Use projects to register separate codebases. If you already have a project registered and want another checkout of it (e.g., for a feature branch, a long-lived testing branch, or a release branch), **create a workspace** instead. Workspaces share the same project registry entry and codebase but isolate development state per branch.
+
+### Rename and list
+
+```bash
 # List registered projects
 pan project list
 
 # Remove a project
 pan project remove myproject
+
+# Rename a project
+pan project rename <key> <newName>
+
+# Example: keep the stable `myn` key and change its display name
+pan project rename myn "Mind Your Now"
 ```
 
 ### Rename a project
@@ -88,7 +134,7 @@ projects:
 |-------|----------|-------------|
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
-| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN") |
+| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`. Set it explicitly when the code host and issue tracker differ. |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |

@@ -4,6 +4,8 @@ description: >
   Complete setup for registering a new project with Overdeck. Handles
   project registration, issue prefix, workspace config, trust setup,
   xBRIEF task support init, tracker config, and validates against working projects.
+  Three entry points: CLI (pan project clone/add/new), dashboard (/projects/new),
+  and workspace-page chips for quick registration.
 triggers:
   - new project
   - add new project
@@ -11,6 +13,8 @@ triggers:
   - setup new project
   - onboard project
   - pan new project
+  - create a project
+  - clone a repository
 allowed-tools:
   - Bash
   - Read
@@ -26,12 +30,47 @@ license: "MIT"
 
 # New Project Setup
 
-**Trigger:** `/pan-new-project`
+**Triggers:** `/pan-new-project`, or start from dashboard at `/projects/new`
 
 Sets up a new project for Overdeck management. This is the ONLY correct
 way to add a new project. Do NOT just run `pan project add` alone — it
 creates a skeleton entry that breaks planning agents, workspace creation,
 issue routing, and xBRIEF task support.
+
+Users can register projects three ways:
+1. **CLI:** `pan project clone <url>`, `pan project add <path>`, or `pan project new <name>`
+2. **Dashboard:** Navigate to `/projects/new` (via sidebar `+`, workspace-page chips, or HomePage button)
+3. **Workspace page:** Click "clone repo", "add existing", or "new project" chips
+
+---
+
+## DASHBOARD FLOW
+
+The dashboard at `/projects/new` (PAN-3836) offers three tabs for project registration, each with inline resolve-before-create preview:
+
+**Clone Repository**
+- Paste a git URL (GitHub, GitLab, Bitbucket, or any git remote)
+- Dashboard resolves: detects remote provider, fetches default branch, proposes issue_prefix based on repo name
+- Shows findings inline (validation errors, warnings)
+- Confirm to clone into Overdeck and register
+
+**Add Existing**
+- Select a local directory containing a git repository
+- Dashboard detects remote, default branch, proposes issue_prefix
+- Confirm to register without cloning
+
+**New Project**
+- Specify a project name and parent directory
+- Dashboard initializes a new git repository there
+- Confirm to init and register
+
+All three modes:
+- Return 202 {jobId} for long-running clones, supporting polling via GET /api/projects/create-jobs/:jobId
+- Display `findings` inline (e.g. "remote unreachable", "already registered")
+- Auto-create the main workspace on success
+- Integrate with the same `resolveProjectCreateIntent` / `performProjectCreate` core as CLI
+
+For details, see [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) "Creating a project".
 
 ---
 

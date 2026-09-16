@@ -179,6 +179,32 @@ waiting out the rail's 10s poll.
 workspaces stay pipeline-owned. Deleting a workspace and purging memory remain
 CLI-only, behind their typed confirmations.
 
+## Creating a project (PAN-3836)
+
+**Registration detects the remote.** When you clone or add a repository, registration reads the git remote, detects the provider (GitHub, GitLab), and proposes an `issue_prefix` automatically. The flow mirrors workspace creation: resolve-before-create, inline findings, and the same shared core (`src/lib/projects/create.ts`).
+
+**The shared core.** Two functions live in `src/lib/projects/create.ts`:
+
+- `resolveProjectCreateIntent(input)` — resolution and validation. Detects the remote, default branch, and proposes an issue prefix. Returns `findings` like workspace resolution, and never mutates state.
+- `performProjectCreate(intent)` — the writes: the optional clone/init, registration into `projects.yaml`, and main workspace creation.
+
+`pan project clone` and `pan project add` wrap these; CLI keeps flag parsing and console output.
+
+**Routes** (same pattern: resolver/writer doors for state access):
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/projects/resolve` | Dry-run resolve. Returns intent plus `findings`. Write-free. |
+| `POST /api/projects` | Resolve server-side, then create. Clone is long-running: 202 with `{jobId}` for polling, else 201 with the created project, or 422 with `findings`. |
+| `GET /api/projects/create-jobs/:jobId` | Poll a running clone job. Returns `{status, phase, percent, result?, error?}`. |
+| `GET /api/registered-projects` | List all registered projects (detection fallback when a job's 404 indicates a crash). |
+
+Long-running clones (D-5) return 202 immediately and hand off to a job store with TTL-based cleanup. The frontend polls every 750ms until done, then either calls `onCreated` or shows an error.
+
+**Entry points.** The sidebar `+`, the workspace-page chips ("clone repo", "add existing", "new project"), and the HomePage `New project` button all navigate to `/projects/new`; the `?mode=` query param preselects a tab. The no-loss audit (`NewProjectPage.no-loss.test.tsx`) ensures every affordance the old modal had is now on the page.
+
+**Project vs. workspace.** A project is a repository. A workspace is a checkout of that repository on a specific branch. Register a project once, then create multiple workspaces from it (e.g., one per long-lived branch, feature, or environment). Both support the same intent resolution and findings, so the UI patterns stay consistent.
+
 ## Memory homes
 
 Memory storage is keyed by **workspace UUID**, not issue id:
