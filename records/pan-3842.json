@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T20:26:49.166Z",
+  "updated": "2026-09-16T20:27:26.202Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-fitness": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3990649,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:26:49.165Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -172,6 +164,17 @@
         "outcome": "completed",
         "reason": "Settings crew rows and supervisor block render draft-computed fitness badges via tierFitnessWarnings in tiered-crews.ts; 32 section tests pass incl. 6 new PAN-3842 cases; typecheck+lint green (cycle and introspection guards fixed via doctor CheckResult re-declare and audited baseline accept).",
         "releasedAt": "2026-09-16T20:25:42.223Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3990649,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:26:49.165Z",
+        "itemId": "docs-fitness",
+        "outcome": "completed",
+        "reason": "Added Tier fitness warnings to TIERED-EXECUTION.md, Capability classes to MODEL_ROUTING.md, and the doctor-row sentence to troubleshooting.mdx; all four verify greps print matches.",
+        "releasedAt": "2026-09-16T20:27:26.202Z"
       }
     ],
     "statusReasons": {
@@ -202,6 +205,10 @@
       "settings-badges": {
         "reason": "Settings crew rows and supervisor block render draft-computed fitness badges via tierFitnessWarnings in tiered-crews.ts; 32 section tests pass incl. 6 new PAN-3842 cases; typecheck+lint green (cycle and introspection guards fixed via doctor CheckResult re-declare and audited baseline accept).",
         "updatedAt": "2026-09-16T20:25:42.223Z"
+      },
+      "docs-fitness": {
+        "reason": "Added Tier fitness warnings to TIERED-EXECUTION.md, Capability classes to MODEL_ROUTING.md, and the doctor-row sentence to troubleshooting.mdx; all four verify greps print matches.",
+        "updatedAt": "2026-09-16T20:27:26.202Z"
       }
     }
   },
@@ -244,6 +251,10 @@
     "settings-badges.ac3": "completed",
     "settings-badges.ac4": "completed",
     "settings-badges.ac5": "completed",
-    "docs-fitness": "running"
+    "docs-fitness": "completed",
+    "docs-fitness.ac1": "completed",
+    "docs-fitness.ac2": "completed",
+    "docs-fitness.ac3": "completed",
+    "docs-fitness.ac4": "completed"
   }
 }
