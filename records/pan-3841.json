@@ -72,10 +72,10 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T20:56:23.723Z",
+  "updated": "2026-09-16T20:56:26.007Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -83,7 +83,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T20:56:23.683Z",
+    "updatedAt": "2026-09-16T20:56:24.343Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3841-review",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "lastVerifiedCommit": "497a66ea5ca99722e1dbae78e60100560c1ddf97",
@@ -177,7 +178,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.667491,
-        "pricingAsOf": "2026-09-16T20:56:23.710Z"
+        "pricingAsOf": "2026-09-16T20:56:25.998Z"
       }
     },
     "merges": [
