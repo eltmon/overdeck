@@ -57,6 +57,26 @@
       "reason": "resume",
       "agentModel": "MiniMax-M3",
       "timestamp": "2026-09-16T22:28:39.784Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:28:46.701Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:28:46.783Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:28:46.795Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:28:46.807Z"
     }
   ],
   "feedback": [],
@@ -112,7 +132,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T22:28:39.804Z",
+  "updated": "2026-09-16T22:28:46.842Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "blocked",
@@ -297,7 +317,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
