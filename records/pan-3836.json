@@ -131,19 +131,19 @@
     "recordedAt": "2026-09-16T16:30:07.994Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:41:08.559Z",
+  "updated": "2026-09-16T16:41:11.125Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T16:35:07.892Z",
     "updatedAt": "2026-09-16T16:41:02.520Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
-    "verificationNotes": "Verification FAILED at lint (175195ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
+    "verificationNotes": "Verification FAILED at lint (185958ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-16T16:35:07.892Z",
     "reviewSpawnedAt": "2026-09-16T16:32:47.875Z",
@@ -258,10 +258,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3443,
-            "output": 165133,
-            "cacheRead": 52054032,
-            "cacheWrite": 721150
+            "input": 3451,
+            "output": 165276,
+            "cacheRead": 52154624,
+            "cacheWrite": 721567
           }
         }
       },
@@ -273,15 +273,15 @@
           "cacheWrite": 191855
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3443,
-          "output": 165133,
-          "cacheRead": 52054032,
-          "cacheWrite": 721150
+          "input": 3451,
+          "output": 165276,
+          "cacheRead": 52154624,
+          "cacheWrite": 721567
         }
       },
       "costAtCloseOut": {
-        "usd": 15.989842,
-        "pricingAsOf": "2026-09-16T16:41:08.550Z"
+        "usd": 16.001145,
+        "pricingAsOf": "2026-09-16T16:41:11.110Z"
       }
     },
     "merges": [
