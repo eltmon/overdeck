@@ -35,7 +35,24 @@ export interface RetrospectiveProjectLine {
 }
 
 export function isRetrospectiveWindow(value: unknown): value is RetrospectiveWindow {
-  return typeof value === 'string' && value in RETROSPECTIVE_WINDOWS;
+  // Use an own-property check instead of `in`: every string key on the
+  // Object prototype (constructor / toString / __proto__ / hasOwnProperty…)
+  // is a valid `in` lookup, so accepting inherited properties would let a
+  // hostile body POST `{ window: 'constructor' }` through validation and
+  // crash the renderer on `new Date(NaN)` — variety of malformed shapes.
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(RETROSPECTIVE_WINDOWS, value)
+  );
+}
+
+export function isRetrospectiveRequestBody(value: unknown): value is Record<string, unknown> {
+  // Reject non-object bodies (null, arrays, primitives) before the window
+  // lookup. The route's readJsonBody defaults malformed JSON to `{}`, but a
+  // caller that POSTs `null` or `"constructor"` would otherwise reach
+  // `body.window ?? DEFAULT_RETROSPECTIVE_WINDOW` and create a conversation
+  // with the silent default — clearly not what an explicit `null` asked for.
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // Same frontmatter regex as runtime-command.ts roleSystemPromptInjectionSync.
@@ -101,7 +118,7 @@ export async function collectRetrospectiveProjects(): Promise<RetrospectiveProje
 }
 
 export async function handleRetrospectiveConversationCreate(
-  body: Record<string, unknown>,
+  body: unknown,
   deps: {
     createConversation: (body: Record<string, unknown>) => Promise<ReturnType<typeof jsonResponse>>;
     loadTemplate?: () => Promise<string>;
@@ -110,6 +127,9 @@ export async function handleRetrospectiveConversationCreate(
     overdeckHome?: () => string;
   },
 ): Promise<ReturnType<typeof jsonResponse>> {
+  if (!isRetrospectiveRequestBody(body)) {
+    return jsonResponse({ error: 'Invalid body' }, { status: 400 });
+  }
   const window = body.window ?? DEFAULT_RETROSPECTIVE_WINDOW;
   if (!isRetrospectiveWindow(window)) {
     return jsonResponse({ error: 'Invalid window' }, { status: 400 });

@@ -94,6 +94,17 @@ describe('isRetrospectiveWindow', () => {
     expect(isRetrospectiveWindow(24)).toBe(false);
     expect(DEFAULT_RETROSPECTIVE_WINDOW).toBe('24h');
   });
+
+  it('rejects inherited Object prototype keys (operator review P2 / 497a66ea)', () => {
+    // The original `value in RETROSPECTIVE_WINDOWS` check walked the
+    // prototype chain, so any of these would have returned true and then
+    // crashed the renderer on `new Date(NaN)`. Own-property check fixes it.
+    expect(isRetrospectiveWindow('constructor')).toBe(false);
+    expect(isRetrospectiveWindow('toString')).toBe(false);
+    expect(isRetrospectiveWindow('__proto__')).toBe(false);
+    expect(isRetrospectiveWindow('hasOwnProperty')).toBe(false);
+    expect(isRetrospectiveWindow('valueOf')).toBe(false);
+  });
 });
 
 describe('handleRetrospectiveConversationCreate', () => {
@@ -106,6 +117,39 @@ describe('handleRetrospectiveConversationCreate', () => {
     expect(res.status).toBe(400);
     const payload = res.body as { body?: Uint8Array } | null;
     expect(JSON.parse(new TextDecoder().decode(payload?.body))).toEqual({ error: 'Invalid window' });
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for prototype-inherited window values without creating a conversation', async () => {
+    // Operator review: a POST body of { window: 'constructor' } would otherwise
+    // pass the `in RETROSPECTIVE_WINDOWS` check, then crash the renderer on
+    // `new Date(NaN)`. The own-property check must reject these before any
+    // side effect runs.
+    const createConversation = vi.fn();
+    for (const evil of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const res = await handleRetrospectiveConversationCreate(
+        { window: evil },
+        { createConversation },
+      );
+      expect(res.status).toBe(400);
+      const payload = res.body as { body?: Uint8Array } | null;
+      expect(JSON.parse(new TextDecoder().decode(payload?.body))).toEqual({
+        error: 'Invalid window',
+      });
+    }
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for non-object bodies without creating a conversation', async () => {
+    const createConversation = vi.fn();
+    for (const bad of [null, [], 'constructor', 24, true]) {
+      const res = await handleRetrospectiveConversationCreate(bad, { createConversation });
+      expect(res.status).toBe(400);
+      const payload = res.body as { body?: Uint8Array } | null;
+      expect(JSON.parse(new TextDecoder().decode(payload?.body))).toEqual({
+        error: 'Invalid body',
+      });
+    }
     expect(createConversation).not.toHaveBeenCalled();
   });
 
