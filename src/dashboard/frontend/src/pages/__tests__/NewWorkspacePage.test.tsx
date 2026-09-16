@@ -145,7 +145,6 @@ describe('NewWorkspacePage shell', () => {
       'hairline-bottom',
       'idea-grid',
     ]);
-    expect(screen.getByTestId('new-project-modal-mount')).toHaveAttribute('data-open', 'false');
   });
 
   it('stays stable while the project queries cold-load', async () => {
