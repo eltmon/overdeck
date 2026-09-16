@@ -392,7 +392,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:55:15.564Z",
+  "updated": "2026-09-16T19:55:17.773Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -570,7 +570,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.185016,
-        "pricingAsOf": "2026-09-16T19:54:55.062Z"
+        "pricingAsOf": "2026-09-16T19:55:17.763Z"
       }
     },
     "merges": [
