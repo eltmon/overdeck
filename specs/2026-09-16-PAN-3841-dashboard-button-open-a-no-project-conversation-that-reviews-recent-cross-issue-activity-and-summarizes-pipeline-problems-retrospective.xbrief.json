@@ -1,0 +1,584 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T19:27:59Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3841: Dashboard button: open a No-Project conversation that reviews recent cross-issue activity and summarizes pipeline problems (retrospective)",
+    "updated": "2026-09-16T19:37:39.669Z"
+  },
+  "plan": {
+    "id": "pan-3841",
+    "title": "Dashboard button: open a No-Project conversation that reviews recent cross-issue activity and summarizes pipeline problems (retrospective)",
+    "status": "proposed",
+    "uid": "265f75f7-9927-4cc3-94b9-c63faeea4c6a",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T19:27:59Z",
+    "updated": "2026-09-16T19:37:39.669Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3841",
+        "label": "PAN-3841",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3836",
+        "label": "PAN-3836 (the incident the reference report covers)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "command-deck",
+      "prompt-template",
+      "retrospective"
+    ],
+    "narratives": {
+      "Problem": "PAN-3836 needed eight rework cycles; half the delay was pipeline/substrate faults and half was a haiku-tier work agent, but nothing showed that as a whole. Each symptom surfaced separately in feedback files, deacon logs, and review syntheses, and a human conversation spent hours assembling the picture. The operator needs one button that asks 'what went wrong across everything in the last 24 hours (or 7 days)?' and gets a retrospective split into substrate faults and work-agent quality faults with evidence pointers and existing-issue links.",
+      "Proposal": "Add a 'Pipeline retrospective' button to the Command Deck header row (next to the New-conversation plus button) with a two-item window menu (Last 24 hours default, Last 7 days). It POSTs { window, model, harness } to a new endpoint POST /api/conversations/retrospective (new route file). The server reads a new kickoff template roles/retrospective.md from disk on every request (so it can be tuned with no build or restart, exactly like roles/handoff.md), strips its frontmatter, renders the window bounds, OVERDECK_HOME, and per-project state/repo paths, and delegates to the existing conversation write door handleConversationCreate with no projectKey, producing an unscoped conversation that lands in the No-project bucket. The frontend then hard-navigates to /conv/<name>. The template mandates read-only behavior (forbidden pan/gh/git verbs listed), names every input source (records, review syntheses, feedback files, deacon and lifecycle logs, CI runs, issues filed in the window), and prescribes the four-section output shape; a prompt-invariant test pins the read-only clause and placeholders. PRD: .pan/drafts/PAN-3841.md.",
+      "NonGoals": "- No pan retrospective CLI verb and no new skill; pan-recap is unchanged.\n- No tool-level sandboxing of the conversation; read-only is enforced by the prompt and pinned by a test only.\n- No button inside the No-project overview (ProjectHome) or the simple home.\n- No windows other than 24h and 7d; no free-form date range.\n- No persistence of the report outside the conversation transcript.\n- No changes to TalkItThrough, to project-scoped conversation creation, or to routes/conversations.ts beyond the export keyword on conversationReadDependencies.\n- No growth of routes/conversations.ts or src/lib/overdeck/conversation-runtime.ts (both at their file-size ratchet caps)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Template home is roles/retrospective.md, read from disk per request.",
+        "rationale": "The issue requires tuning without a dashboard rebuild. src/lib/cloister/prompts/*.md are build-copied to dist/dashboard/prompts (package.json:95) and cached by renderPrompt; the TalkItThrough seed is inlined in the frontend bundle. roles/handoff.md is the existing request-time conversation kickoff template (summary-fork.ts:342), so the new template sits beside it."
+      },
+      {
+        "summary": "Button placement is the Command Deck header row, not the No-project overview.",
+        "rationale": "The issue offers either. The sidebar's No-project bucket renders only once an unscoped conversation exists (Sidebar.tsx:247-250, :748), so a button living only in that deck is unreachable on a fresh install; the header row is always rendered."
+      },
+      {
+        "summary": "Window selector is a two-item menu on the button (Last 24 hours default, Last 7 days).",
+        "rationale": "The issue asks for a 24h default with a 7-day selector; a menu fits the narrow header row and mirrors the existing ActionDock overflow pattern."
+      },
+      {
+        "summary": "New endpoint POST /api/conversations/retrospective in a new route file delegating to handleConversationCreate.",
+        "rationale": "Keeps the single conversation write door, keeps the prompt server-side, and avoids growing routes/conversations.ts (1070/1070) and conversation-runtime.ts (1163/1163), both at their ratchet caps."
+      },
+      {
+        "summary": "Model and harness come from the Command Deck sidebar picker; no server default model.",
+        "rationale": "Same source as the adjacent New-conversation button; the repo forbids hardcoded model fallbacks."
+      },
+      {
+        "summary": "Read-only is a prompt contract pinned by a prompt-invariant test.",
+        "rationale": "Conversations have no per-conversation tool allowlist (conversation-runtime.ts:562); the invariant test is the mechanical guard that survives template tuning."
+      }
+    ],
+    "items": [
+      {
+        "id": "retro-template",
+        "title": "Add roles/retrospective.md kickoff template",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/retrospective.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/check-prompt-change-trailer.sh",
+            "bash scripts/lint-skills.sh",
+            "grep -c '{{WINDOW_LABEL}}\\|{{WINDOW_START}}\\|{{WINDOW_END}}\\|{{OVERDECK_HOME}}\\|{{PROJECT_LINES}}' roles/retrospective.md"
+          ],
+          "expected_outputs": [
+            "check-prompt-change-trailer.sh prints 'Prompt-Change trailer found; ok'",
+            "lint-skills.sh exits 0",
+            "grep count is at least 5"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create roles/retrospective.md exactly as specified in PRD work item WI-1: YAML frontmatter (name: retrospective, description), a first body line 'Pipeline retrospective: {{WINDOW_LABEL}}', a '## Ground rules (read-only)' section listing the forbidden pan, gh, git, and HTTP-write verbs, an '## Inputs' section using {{OVERDECK_HOME}}, {{WINDOW_START}}, {{WINDOW_END}}, and {{PROJECT_LINES}} that names records (migrated root/records vs legacy root/.pan/records), review syntheses, feedback files, the deacon log with a timestamp filter, lifecycle logs, CI runs, and issues filed in the window (labels pipeline, blocks-main, bug), and an '## Output shape' section with the four numbered sections (Headline; Pipeline and substrate faults; Work-agent quality faults; Recommended follow-ups). Use only the five placeholders named. Never place the word 'commit' within 40 characters of '.pan/' (scripts/lint-skills.sh:269). Commit this file alone with a 'Prompt-Change: new read-only pipeline retrospective kickoff template' trailer."
+        },
+        "items": [
+          {
+            "id": "retro-template.ac1",
+            "title": "Given the repo, when roles/retrospective.md is read, then it begins with YAML frontmatter containing 'name: retrospective' and its first body line is 'Pipeline retrospective: {{WINDOW_LABEL}}'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-template.ac2",
+            "title": "Given the template body, when scanned for {{...}} tokens, then the set of tokens equals exactly {WINDOW_LABEL, WINDOW_START, WINDOW_END, OVERDECK_HOME, PROJECT_LINES}.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-template.ac3",
+            "title": "Given the template, when the '## Ground rules (read-only)' section is read, then it names pan start, pan kill, pan tell, gh issue create, and git push as forbidden, and the four output headings appear in order (Headline, Pipeline and substrate faults, Work-agent quality faults, Recommended follow-ups).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-template.ac4",
+            "title": "Given the feature branch, when 'bash scripts/check-prompt-change-trailer.sh' and 'bash scripts/lint-skills.sh' run, then both exit 0 (a Prompt-Change: trailer exists on the branch and no commit-near-.pan/ phrase exists in the template).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-template-test",
+        "title": "Add prompt-invariant test for the retrospective template",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/prompts/retrospective-template.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/prompts/retrospective-template.test.ts"
+          ],
+          "expected_outputs": [
+            "retrospective-template.test.ts passes with every assertion green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/prompts/retrospective-template.test.ts modeled on tests/unit/prompts/prompt-invariants.test.ts:15-31 (read roles/retrospective.md relative to repoRoot). Assert: frontmatter has 'name: retrospective'; a '## Ground rules (read-only)' heading exists and that section mentions pan start, pan kill, pan tell, gh issue create, git push; each of the five placeholders occurs at least once; the set of all {{...}} tokens equals exactly those five; the headings Headline, Pipeline and substrate faults, Work-agent quality faults, Recommended follow-ups appear in that order. Reuse the existing RAIL_MESSAGE style string telling editors that a deliberate change must update this test and carry a Prompt-Change trailer. See PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "retro-template-test.ac1",
+            "title": "Given the committed template, when 'npx vitest run tests/unit/prompts/retrospective-template.test.ts' runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-template-test.ac2",
+            "title": "Given a copy of the template with the '## Ground rules (read-only)' heading removed, when the test's section assertion runs against it, then the assertion fails (the test rejects a template that drops the read-only clause).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-template-test.ac3",
+            "title": "Given a template containing an extra token such as {{UNKNOWN}}, when the substitution-token-set assertion runs, then it fails.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-lib",
+        "title": "Add conversation-retrospective renderer and handler module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3841",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "retro-route"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-retrospective.ts",
+            "src/lib/overdeck/__tests__/conversation-retrospective.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-retrospective.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/overdeck/conversation-runtime.ts"
+          ],
+          "expected_outputs": [
+            "conversation-retrospective.test.ts passes",
+            "typecheck completes without errors",
+            "conversation-runtime.ts line count prints 1163 (unchanged)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/conversation-retrospective.ts with the exports listed in PRD WI-3: RETROSPECTIVE_WINDOWS ('24h' label 'last 24 hours', '7d' label 'last 7 days'), DEFAULT_RETROSPECTIVE_WINDOW = '24h', isRetrospectiveWindow, stripFrontmatter (regex /^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?/ from runtime-command.ts:857), formatProjectLines, renderRetrospectiveKickoff({ template, window, now, overdeckHome, projects }) which strips frontmatter, substitutes WINDOW_LABEL / WINDOW_START (now minus window) / WINDOW_END (now) / OVERDECK_HOME / PROJECT_LINES via split().join() and trims, loadRetrospectiveTemplate(path = join(packageRoot, 'roles', 'retrospective.md')) = readFile(path, 'utf-8') from node:fs/promises with no caching (the optional path parameter exists so tests can use a temp file instead of editing the tracked template), collectRetrospectiveProjects() built from listProjectsAsync() and resolveStateReadHomeAsync(config, key) (state root, migrated flag, github_repo), and handleRetrospectiveConversationCreate(body, deps) which defaults window to '24h', returns jsonResponse({ error: 'Invalid window' }, { status: 400 }) for any other value, renders the message, and calls deps.createConversation({ message, model, harness, effort }) forwarding only string model/harness/effort and never projectKey or issueId. Import jsonResponse from '../../dashboard/server/http-helpers.js' as conversation-runtime.ts:70 does. Do not edit conversation-runtime.ts. Write the unit tests listed in PRD WI-3 (renderer for both windows, frontmatter stripped, no {{ left, formatProjectLines variants, 400 on bad window with createConversation not called, delegation without projectKey/issueId, loadRetrospectiveTemplate with no argument reads the real roles/retrospective.md, and with a temp-file path returns edited content on a second call)."
+        },
+        "items": [
+          {
+            "id": "retro-lib.ac1",
+            "title": "Given an inline template with all five substitution tokens and window '24h' at a fixed now, when renderRetrospectiveKickoff runs, then it returns a string whose first line is 'Pipeline retrospective: last 24 hours', that contains the ISO timestamp exactly 24 hours before now, contains no '{{', and contains no 'name: retrospective'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-lib.ac2",
+            "title": "Given body { window: '30d' }, when handleRetrospectiveConversationCreate runs, then it returns HTTP 400 with { error: 'Invalid window' } and deps.createConversation is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-lib.ac3",
+            "title": "Given body { window: '7d', model: 'm', harness: 'claude-code', projectKey: 'panopticon-cli', issueId: 'PAN-1' }, when the handler runs with an injected template and empty projects, then deps.createConversation is called once with message starting 'Pipeline retrospective: last 7 days', model 'm', harness 'claude-code', and with no projectKey and no issueId keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-lib.ac4",
+            "title": "Given a temporary template file, when loadRetrospectiveTemplate(tmpPath) is called, the file is edited, and it is called again with the same path, then the second call returns the edited content (no module-level cache), and calling it with no argument returns the contents of roles/retrospective.md containing '{{WINDOW_LABEL}}'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-lib.ac5",
+            "title": "Given two projects (one migrated, one legacy) and the empty list, when formatProjectLines runs, then it renders one '- <key>: repo <path>; state root <root> (...)' line per project naming 'migrated layout' or 'legacy .pan layout', and '- (no registered projects)' for the empty list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-route",
+        "title": "Add POST /api/conversations/retrospective route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations-retrospective.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/dashboard/server/routes/conversations.ts"
+          ],
+          "expected_outputs": [
+            "conversations-retrospective.test.ts passes",
+            "typecheck completes without errors",
+            "lint-file-size.sh prints the passed line",
+            "conversations.ts line count prints 1070 (unchanged)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/conversations-retrospective.ts with the route body given verbatim in PRD WI-4: HttpRouter.add('POST', '/api/conversations/retrospective', ...) that runs validateOrigin (403 on failure), reads the body with readJsonBody imported from './specialists/shared.js' (cast to Record<string, unknown>), and calls handleRetrospectiveConversationCreate(body, { createConversation: (b) => handleConversationCreate(b, { generateAiTitle: (name, message) => generateAiTitle(name, message, conversationReadDependencies) }) }); export conversationsRetrospectiveRouteLayer = Layer.mergeAll(route). In src/dashboard/server/routes/conversations.ts change line 182 'const conversationReadDependencies' to 'export const conversationReadDependencies' and nothing else (file must stay 1070 lines). In src/dashboard/server/server.ts add the import beside line 59 and 'conversationsRetrospectiveRouteLayer,' immediately after 'conversationsRouteLayer,' at line 361. Add routes/__tests__/conversations-retrospective.test.ts using the HttpRouter.toHttpEffect + Effect.provideService(HttpServerRequest) harness from routes/__tests__/conversations.test.ts:207-221, mocking BOTH '../../../../lib/overdeck/conversation-runtime.js' (handleConversationCreate is a spy returning a 201 jsonResponse) AND '../conversations.js' via vi.mock('../conversations.js', () => ({ conversationReadDependencies: {} })) so the 1070-line routes/conversations.ts module body (which calls startConversationModelBackfill at load, line 192) never runs in the test; the test never exercises title generation: valid body -> 201 and spy message starts 'Pipeline retrospective: last 7 days' with no projectKey; { window: 'bad' } -> 400 Invalid window and spy not called; foreign Origin -> 403."
+        },
+        "items": [
+          {
+            "id": "retro-route.ac1",
+            "title": "Given a POST to /api/conversations/retrospective with Origin http://localhost:3011 and body { window: '7d', model: 'm' }, when the route runs with handleConversationCreate mocked, then it returns 201 and the mock receives a body whose message starts with 'Pipeline retrospective: last 7 days' and which has no projectKey.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-route.ac2",
+            "title": "Given body { window: 'bad' }, when the route runs, then it returns 400 with { error: 'Invalid window' } and handleConversationCreate is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-route.ac3",
+            "title": "Given a request with a non-allowed Origin header, when the route runs, then it returns 403.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-route.ac4",
+            "title": "Given the built dashboard, when it boots, then server.ts merges conversationsRetrospectiveRouteLayer and 'wc -l src/dashboard/server/routes/conversations.ts' still prints 1070 while 'bash scripts/lint-file-size.sh' exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-button",
+        "title": "Add RetrospectiveButton component with window menu",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RetrospectiveButton.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx per PRD WI-5: props { model: string; harness?: Harness; disabled?: boolean } (Harness from '../chat/ModelPicker'); an icon button (lucide History, size 13) with className styles.conversationAddBtn, title and aria-label 'Pipeline retrospective', aria-haspopup='menu', aria-expanded, disabled when disabled || !model || pending; on click toggles a div role='menu' with two role='menuitem' buttons 'Last 24 hours' (24h) and 'Last 7 days' (7d); choosing one POSTs { window, model, harness } as JSON to /api/conversations/retrospective, on ok calls window.location.assign('/conv/' + encodeURIComponent(name)), on failure calls toast.error with the server error (fallback 'Failed to start the retrospective (<status>)') and re-enables the button; Escape and outside mousedown close the menu. Append .retroMenuHost { position: relative }, .retroMenu, and .retroMenuItem to command-deck.module.css after .conversationAddBtn:hover (line 2320), copying .actionOverflow/.actionOverflowItem from Stage/stage.module.css:410-442 with right: 0; left: auto. Follow pan-style-guide (no pill badges, no decorative color). Write the RTL test listed in PRD WI-5 with a fetch stub modeled on simple/TalkItThrough.test.tsx:38-60, a stubbed window.location.assign, and a mocked sonner toast."
+        },
+        "items": [
+          {
+            "id": "retro-button.ac1",
+            "title": "Given the component with model 'claude-opus-4-6', when rendered, then a button named 'Pipeline retrospective' renders and no menu is present; when clicked, then menu items 'Last 24 hours' and 'Last 7 days' render.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-button.ac2",
+            "title": "Given the menu is open and fetch is stubbed to return { name: 'conv-test-42' }, when 'Last 7 days' is chosen, then fetch is called with POST /api/conversations/retrospective and JSON body { window: '7d', model: 'claude-opus-4-6', harness: 'claude-code' }, and window.location.assign is called with '/conv/conv-test-42'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-button.ac3",
+            "title": "Given fetch returns status 500 with { error: 'boom' }, when an item is chosen, then toast.error is called with 'boom', no navigation occurs, and the button is enabled again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-button.ac4",
+            "title": "Given model is an empty string, when rendered, then the 'Pipeline retrospective' button is disabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-mount",
+        "title": "Mount RetrospectiveButton in the Command Deck header row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck",
+            "wc -l src/dashboard/frontend/src/components/CommandDeck/index.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-file-size.sh prints the passed line",
+            "CommandDeck tests pass",
+            "index.tsx line count is at most 1612 or an allowlist row referencing PAN-3841 exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx add one import line `import { RetrospectiveButton } from './RetrospectiveButton';` beside the other CommandDeck-local imports and one JSX line `<RetrospectiveButton model={sidebarModel} harness={sidebarHarness} />` inside the div.sidebarHeaderGroup (lines 1350-1370) between the ModelPicker and the New-conversation plus button. Net growth must be at most 9 lines (file is 1603, allowlist cap 1612); if it ends above 1612 add a row '<lines> src/dashboard/frontend/src/components/CommandDeck/index.tsx # PAN-3841' to scripts/file-size-allowlist.txt in the same commit. Browser UAT (isolated Playwright profile): open /command-deck/panopticon-cli, click 'Pipeline retrospective', choose 'Last 24 hours', confirm navigation to /conv/<name>, the conversation under the sidebar 'No project' bucket, and a first user message beginning 'Pipeline retrospective: last 24 hours'. Also verify at the narrowest sidebar width that the picker, the retrospective button, and the plus button do not overlap and each remains clickable (PAN-3834 shipped a controls-overlap regression in the analogous header; if they overlap, shrink the picker's max width rather than the buttons)."
+        },
+        "items": [
+          {
+            "id": "retro-mount.ac1",
+            "title": "Given the Command Deck at /command-deck/<project>, when the header row renders, then a button named 'Pipeline retrospective' appears between the sidebar model picker and the 'New conversation' button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-mount.ac2",
+            "title": "Given a running dashboard in an isolated Playwright browser, when the operator clicks 'Pipeline retrospective' and chooses 'Last 24 hours', then the browser navigates to /conv/<name>, the sidebar shows the conversation under 'No project', and the conversation's first user message begins 'Pipeline retrospective: last 24 hours'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-mount.ac3",
+            "title": "Given the edited index.tsx, when 'bash scripts/lint-file-size.sh' runs, then it exits 0 (line count at most 1612, or an allowlist row referencing PAN-3841 was added in the same commit).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-mount.ac4",
+            "title": "Given the Command Deck sidebar dragged to its narrowest width, when the header row renders, then the model picker, the 'Pipeline retrospective' button, and the 'New conversation' button do not overlap (bounding boxes disjoint) and each remains clickable.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retro-docs",
+        "title": "Document the retrospective button, endpoint, and kickoff template",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T19:27:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/ROLES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Pipeline retrospective button' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'roles/retrospective.md' docs/ROLES.md"
+          ],
+          "expected_outputs": [
+            "each grep prints exactly one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: in docs/DASHBOARD-ARCHITECTURE.md, directly after the 'Simple home conversation composer' paragraph (lines 46-53), add a paragraph headed '**Pipeline retrospective button:**' stating that the Command Deck header's RetrospectiveButton POSTs { window: '24h' | '7d', model, harness } to POST /api/conversations/retrospective (routes/conversations-retrospective.ts); that the server reads roles/retrospective.md on every request so editing it tunes the prompt with no rebuild or restart; that it renders the window bounds and per-project state/repo paths and creates an unscoped conversation through handleConversationCreate, which therefore appears under the sidebar's 'No project' bucket; and that read-only is a prompt contract pinned by tests/unit/prompts/retrospective-template.test.ts. In docs/ROLES.md, after the active-role-files table (line 19), add a subsection '### Conversation kickoff templates (not roles)' listing roles/handoff.md, roles/handoff-external.md, roles/handoff-external-pi.md, and roles/retrospective.md, stating they are read at request time by the server and rendered into a conversation's first message, are never spawned as agents, and that changing any of them requires a Prompt-Change: commit trailer."
+        },
+        "items": [
+          {
+            "id": "retro-docs.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then a paragraph headed 'Pipeline retrospective button' states the endpoint path POST /api/conversations/retrospective, names roles/retrospective.md as the per-request template, and says the conversation appears under the 'No project' bucket.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retro-docs.ac2",
+            "title": "Given docs/ROLES.md, when read, then a subsection 'Conversation kickoff templates (not roles)' lists roles/retrospective.md alongside the handoff templates and states that changing them requires a Prompt-Change: trailer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "retro-template",
+        "to": "retro-template-test",
+        "type": "blocks"
+      },
+      {
+        "from": "retro-template",
+        "to": "retro-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "retro-lib",
+        "to": "retro-route",
+        "type": "blocks"
+      },
+      {
+        "from": "retro-button",
+        "to": "retro-mount",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical slice: a kickoff template (roles/), the lib renderer/handler and route that serve it (src/lib, src/dashboard/server), the button that calls it (src/dashboard/frontend), a prompt-invariant test (tests/), the file-size allowlist (scripts/) only as a contingency, and docs. Sibling issues would ship a button with no endpoint or an endpoint with no template; 15 files across 7 top-level directories is the minimum surface for the feature to be observable end to end.",
+      "canonicalFilename": "2026-09-16-PAN-3841-dashboard-button-open-a-no-project-conversation-that-reviews-recent-cross-issue-activity-and-summarizes-pipeline-problems-retrospective.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
