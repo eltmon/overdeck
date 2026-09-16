@@ -9,16 +9,26 @@
     "overdeckHome": "/home/eltmon/.overdeck"
   },
   "launch": {
-    "harness": null,
-    "model": "pending-work-spawn",
+    "harness": "claude-code",
+    "model": "claude-haiku-4-5",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3836",
     "branch": null
   },
-  "sessions": [],
+  "sessions": [
+    {
+      "id": "ce1915ba-d702-4ce6-b4ab-b22f1c386966",
+      "startedAt": "2026-09-16T14:31:48.041Z",
+      "reason": "spawn"
+    }
+  ],
   "lifecycle": [
     {
       "at": "2026-09-16T14:31:21.738Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-09-16T14:31:48.041Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
