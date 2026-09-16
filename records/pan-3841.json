@@ -32,11 +32,6 @@
       "reason": "resume",
       "agentModel": "k3",
       "timestamp": "2026-09-16T21:13:31.797Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "MiniMax-M3",
-      "timestamp": "2026-09-16T21:18:01.748Z"
     }
   ],
   "feedback": [],
@@ -92,10 +87,10 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:18:01.748Z",
+  "updated": "2026-09-16T21:18:10.890Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -103,11 +98,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:16:45.132Z",
+    "updatedAt": "2026-09-16T21:18:00.159Z",
     "reviewNotes": "Review role spawn failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3841.lock is held by process-2417835@eltmon-z790 pid=2417835 acquiredAt=2026-09-16T21:16:19.904Z. Retry the command after that writer finishes.",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
-    "reviewSpawnedAt": "2026-09-16T21:16:19.399Z",
+    "reviewSpawnedAt": "2026-09-16T21:18:00.158Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -210,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.8333154,
-        "pricingAsOf": "2026-09-16T21:17:46.957Z"
+        "pricingAsOf": "2026-09-16T21:18:00.444Z"
       }
     },
     "merges": [
