@@ -98,7 +98,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:57:20.180Z",
+  "updated": "2026-09-16T21:57:26.318Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "blocked",
@@ -109,10 +109,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T21:57:19.262Z",
+    "updatedAt": "2026-09-16T21:57:26.304Z",
     "reviewNotes": "41be7f9 slot path: fitness checks pre-staffing model (spawn.ts:139) and explicit --model slot spawn can now abort on plan desync (spawn-prep.ts:274-286)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
+    "reviewedAtCommit": "44ab8dd5c85979d5d9989524fb423b3140021293",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
     "reviewSpawnedAt": "2026-09-16T21:40:03.265Z",
     "scopeDrift": {
@@ -230,7 +231,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.768893,
-        "pricingAsOf": "2026-09-16T21:57:19.282Z"
+        "pricingAsOf": "2026-09-16T21:57:26.307Z"
       }
     },
     "merges": [
