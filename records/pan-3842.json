@@ -115,23 +115,21 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:31:30.337Z",
+  "updated": "2026-09-16T22:33:06.671Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:31:30.315Z",
-    "reviewNotes": "Both cycle-1 blockers verified fixed; 4/4 reviewers zero blockers at dfe7305. Caveat: an uncommitted resolveSlotSpawnFitness refactor (+157/-81, green 37/37) sits in the tree and is NOT covered by this approval",
+    "updatedAt": "2026-09-16T22:33:06.245Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
-    "reviewedAtCommit": "f755231de2d0ae8f0970d6ce6d52adaa35e3f7ac",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
     "reviewSpawnedAt": "2026-09-16T22:09:54.870Z",
     "scopeDrift": {
@@ -218,11 +216,19 @@
             "cacheWrite": 270975
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 12,
+            "output": 3528,
+            "cacheRead": 642614,
+            "cacheWrite": 113542
+          }
+        },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 464769,
-            "output": 82549,
-            "cacheRead": 45366920,
+            "input": 471263,
+            "output": 85617,
+            "cacheRead": 50661846,
             "cacheWrite": 0
           }
         }
@@ -240,16 +246,22 @@
           "cacheRead": 6423929,
           "cacheWrite": 270975
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 12,
+          "output": 3528,
+          "cacheRead": 642614,
+          "cacheWrite": 113542
+        },
         "custom/MiniMax-M3": {
-          "input": 464769,
-          "output": 82549,
-          "cacheRead": 45366920,
+          "input": 471263,
+          "output": 85617,
+          "cacheRead": 50661846,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.862629,
-        "pricingAsOf": "2026-09-16T22:31:30.318Z"
+        "usd": 14.31594,
+        "pricingAsOf": "2026-09-16T22:33:06.300Z"
       }
     },
     "merges": [
