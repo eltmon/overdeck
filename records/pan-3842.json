@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T19:43:43.631Z",
+  "updated": "2026-09-16T19:45:11.805Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T19:43:43.616Z",
-    "inspectNotes": "Inspecting item fitness-checker"
+    "updatedAt": "2026-09-16T19:45:11.723Z",
+    "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7)."
   },
   "closeOut": {
     "usage": {
@@ -65,7 +65,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.610192,
-        "pricingAsOf": "2026-09-16T19:43:43.620Z"
+        "pricingAsOf": "2026-09-16T19:45:11.773Z"
       }
     },
     "merges": [],
