@@ -57,6 +57,46 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-09-16T22:33:08.915Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:14.127Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:14.151Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:14.163Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:14.174Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:15.788Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:15.884Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:15.900Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-16T22:33:16.032Z"
     }
   ],
   "feedback": [],
@@ -125,7 +165,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:33:13.009Z",
+  "updated": "2026-09-16T22:33:16.032Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "reviewing",
@@ -280,7 +320,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
