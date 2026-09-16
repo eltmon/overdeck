@@ -1,0 +1,1094 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T21:36:47.000Z",
+    "author": "overdeck/0.50.4",
+    "description": "Plan for PAN-3847: Substrate Phase 2: verdict and anchor are one write; gates are honest and immutable",
+    "updated": "2026-09-16T21:40:13.005Z"
+  },
+  "plan": {
+    "id": "pan-3847",
+    "title": "Substrate Phase 2: verdict and anchor are one write; gates are honest and immutable",
+    "status": "proposed",
+    "uid": "880bc0d4-5e6a-478b-a81f-5795848cbc80",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T21:36:47.000Z",
+    "updated": "2026-09-16T21:40:13.005Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3847",
+        "label": "PAN-3847",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3847.md",
+        "label": "PRD drafts/pan-3847.md (phase 2 of PAN-3845)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3845.md",
+        "label": "Epic PRD drafts/pan-3845.md (wins on disagreement)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pipeline-reliability-review.md",
+        "label": "Evidence: pipeline reliability review (F1..F17, patrols #1..#78)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "review",
+      "verification",
+      "ci",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "A terminal review verdict can land without an evidence anchor, so the drift patrol later resets a passed review to pending and re-dispatches with force:true. Equal anchors auto-pass the test role (191 of 290 corpus test verdicts are that skip), the review-passed CLI silently writes verificationStatus passed, verification overwrites its single artifact each run, CI can skip vitest on an overdeck/test stamp, the lint ratchet misattributes findings, branches are cut from a local main that drifts, re-review accepts dirty trees, and the verification cycle counter resets on every request.",
+      "Proposal": "Make the verdict door refuse anchorless verdicts and write blocked verdicts with their anchor in one write; mark drifted passed reviews stale instead of resetting; delete the anchor-equality test skip and the review-command verification override; keep immutable per-run verification artifacts; add a test-skip gate and allowOnly:false; run vitest on every CI push and bind the stamp to the tested sha; ratchet by per-file counts; fetch and branch from origin/<target>; refuse re-review on dirty or unchanged HEAD; make the cycle counter per issue; audit, then delete patrols #35 and #41; document.",
+      "NonGoals": "- No change to the branch-protection context name overdeck/test (epic Decision 7).\n- No new review roles or changes to reviewer prompts.\n- No rewrite of the verification runner beyond the named insertion points.\n- No deletion of patrols outside #35 and #41."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "sizeJustification": "Phase of epic PAN-3845; the work items are the PRD work items and cannot be split without losing the audit-before-delete ordering. Subsystem count is inflated by single docs files (each counts as its own subsystem).",
+      "codeReadAt": "3d5051040a2",
+      "epic": "PAN-3845",
+      "phase": 2,
+      "canonicalFilename": "2026-09-16-PAN-3847-substrate-phase-2-verdict-and-anchor-are-one-write-gates-are-honest-and-immutable.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w9-verdict-door-refuses-anchorless",
+        "title": "The verdict write door refuses anchorless terminal verdicts; blocked verdicts carry their anchor in one write",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-writer.ts",
+            "src/cli/commands/specialists/done.ts",
+            "src/lib/cloister/deacon-review-status.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/cloister/deacon-review-unsignaled.ts",
+            "src/lib/cloister/verdict-restore.ts",
+            "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+            "tests/unit/cli/specialists-done-anchor.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+            "npx vitest run tests/unit/cli/specialists-done-anchor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-verdict-writer.test.ts exits 0",
+            "specialists-done-anchor.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "foundationFor": [
+            "w10-review-stale-since",
+            "w12-review-command-never-writes-verification",
+            "w21-verdict-gate-no-loss-audit"
+          ],
+          "parallelSafeReason": "Wave-1 item; the items that read the anchor contract sit behind blocks edges from it, and its deacon.ts touch is limited to the recordReviewVerdict call at line 1553."
+        },
+        "narrative": {
+          "Action": "Follow PRD W9 in drafts/pan-3847.md. In review-verdict-writer.ts:146-153 replace the no-evidence landing: refuse when input.evidenceHead is missing (return landed:false, reason no-evidence-head, emit a warn activity entry); when the row has no lastVerifiedCommit, land verdict plus reviewedAtCommit together with classification no-verification-anchor; treat the !status branch (131-138) the same way and extend the VerdictOutcome types. In specialists/done.ts:140-164 snapshot the workspace head for passed and blocked, exit 1 when no head is available, and delete the second blocked write at done.ts:333-356. Checkpoint: every other recordReviewVerdict caller (deacon-review-status.ts:579, deacon.ts:1553, deacon-review-signals.ts:213, deacon-review-unsignaled.ts, verdict-restore.ts) must pass an anchor or log and skip; never fabricate one."
+        },
+        "items": [
+          {
+            "id": "w9-verdict-door-refuses-anchorless.ac1",
+            "title": "Given evidenceHead is undefined, when recordReviewVerdict runs, then it returns landed false with reason no-evidence-head and writes no row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-verdict-door-refuses-anchorless.ac2",
+            "title": "Given evidenceHead is present and lastVerifiedCommit is absent, when recordReviewVerdict runs, then the row has reviewedAtCommit equal to evidenceHead.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-verdict-door-refuses-anchorless.ac3",
+            "title": "Given pan admin specialists done review --status blocked, when it runs, then exactly one setReviewStatusSync call contains both reviewStatus blocked and reviewedAtCommit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-verdict-door-refuses-anchorless.ac4",
+            "title": "When grep -n no-evidence runs on src/lib/cloister/review-verdict-writer.ts, then only the refusal branch matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-review-stale-since",
+        "title": "Post-review drift marks a passed review stale; blocked re-dispatch drops force: true",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/review-status-types.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/review-status.ts",
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/cloister/deacon-post-review-commits.ts",
+            "src/cli/commands/done.ts",
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "tests/unit/lib/cloister/deacon-post-review-commits.test.ts",
+            "tests/unit/lib/review-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-post-review-commits.test.ts",
+            "npx vitest run tests/unit/lib/review-status.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-post-review-commits.test.ts exits 0",
+            "review-status.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-16"
+          ],
+          "foundationFor": [
+            "w18-rereview-refuses-dirty-or-unchanged",
+            "w21-verdict-gate-no-loss-audit"
+          ],
+          "parallelSafeReason": "Every later item that shares review-status.ts, done.ts or review-pipeline.ts with this one is behind a blocks edge, so its writes land first."
+        },
+        "narrative": {
+          "Action": "Follow PRD W10 in drafts/pan-3847.md. Add reviewStaleSince?: string to review-status-types.ts:48, the record pipeline type (record.ts near line 205) and both explicit mirror field lists (review-status-record-sync.ts, records.ts:112-115). In review-status-reconcile.ts:73-82 add && !status.reviewStaleSince to reviewGatesPassedSync. In deacon-post-review-commits.ts:140-158 replace the pending reset with a single stale-marking write (reviewStaleSince, readyForMerge false, mergeNotes) followed by continue, and change force: true to force: false at 191-196. Clear reviewStaleSince in pan done (done.ts:580 mutator) and in the review-pipeline.ts reviewReset object. Checkpoint: confirm the merge door is blocked through reviewGatesPassedSync without a code change."
+        },
+        "items": [
+          {
+            "id": "w10-review-stale-since.ac1",
+            "title": "Given a passed review whose anchor differs from HEAD, when checkPostReviewCommits runs, then the row gets reviewStaleSince, readyForMerge false, reviewStatus still passed, and spawnReviewRoleForIssue is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-review-stale-since.ac2",
+            "title": "Given a blocked review whose anchor differs from HEAD, when checkPostReviewCommits runs, then spawnReviewRoleForIssue is called with force false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-review-stale-since.ac3",
+            "title": "Given all verdicts passed and reviewStaleSince set, when readyForMerge derives, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-review-stale-since.ac4",
+            "title": "When grep \"force: true\" and grep \"Reset review for\" run on src/lib/cloister/deacon-post-review-commits.ts, then both return nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-delete-anchor-equality-test-skip",
+        "title": "Delete the anchor-equality test skip; the test role always runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "tests/unit/lib/review-status.test.ts",
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/review-status.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-status.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W11 in drafts/pan-3847.md. Replace review-status.ts:475-497 so a newly passed or skipped review with testStatus pending always emits review.approved and never writes testStatus passed or verificationStatus passed. Update the Verification Gate wording in docs/PIPELINE-GATES.md to say the test role always runs."
+        },
+        "items": [
+          {
+            "id": "w11-delete-anchor-equality-test-skip.ac1",
+            "title": "Given a passed review with reviewedAtCommit equal to lastVerifiedCommit, when setReviewStatusSync applies it, then review.approved is emitted, test.passed is not, and testStatus stays pending.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-delete-anchor-equality-test-skip.ac2",
+            "title": "When grep \"no code changed since pre-review\" runs over src, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-review-command-never-writes-verification",
+        "title": "The review verdict command never writes verificationStatus; a verification pass clears verification_stuck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/cli/specialists-done-anchor.test.ts",
+            "tests/unit/lib/cloister/verification-runner-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/specialists-done-anchor.test.ts",
+            "npx vitest run tests/unit/lib/cloister/verification-runner-reconcile.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "specialists-done-anchor.test.ts exits 0",
+            "verification-runner-reconcile.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W12 in drafts/pan-3847.md. Delete the PAN-1215 override at specialists/done.ts:165-171. In verification-runner.ts after the verificationStatus passed write (909-914) clear a verification_stuck flag with clearWorkspaceStuck and unpause the agent only when pausedReason starts with needs-you: verification stuck. Checkpoint: read setAgentPaused to use its unpause form."
+        },
+        "items": [
+          {
+            "id": "w12-review-command-never-writes-verification.ac1",
+            "title": "Given pan admin specialists done review --status passed, when it runs, then the update carries no verificationStatus and grep PAN-1215 on src/cli/commands/specialists/done.ts returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-review-command-never-writes-verification.ac2",
+            "title": "Given a row with stuck true and stuckReason verification_stuck, when verification passes, then clearWorkspaceStuck is called and the escalateVerificationStuck pause is cleared.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w13-per-run-verification-artifacts",
+        "title": "Immutable per-run verification artifacts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-artifact.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/verification-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/verification-artifact.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verification-artifact.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W13 in drafts/pan-3847.md. In verification-artifact.ts add verificationRunArtifactPath(workspacePath, ranAt, head8) under .overdeck/verification and make writeVerificationArtifact write the per-run file, copy it to verification-latest.json, and return the per-run path. In verification-runner.ts capture ranAt at run start and head8 via execAsync git rev-parse --short=8 HEAD, pass them at 661-670, set fullOutputPath to the per-run path so the feedback at line 688 names the immutable file; keep running-progress writes on verification-latest.json only. Checkpoint: add a 30-day prune of per-run files to cleanupStaleAgentState, or to reconcileIdleWorkspaceStacks if the former does not enumerate workspaces; grep readVerificationArtifact( under src/dashboard to keep the Lint node reader working."
+        },
+        "items": [
+          {
+            "id": "w13-per-run-verification-artifacts.ac1",
+            "title": "Given two consecutive writeVerificationArtifact calls in a temp workspace, when they finish, then .overdeck/verification contains two files and verification-latest.json equals the second.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w13-per-run-verification-artifacts.ac2",
+            "title": "Given a failed gate, when the per-run file is read, then it contains the gate output and the feedback string names a path under .overdeck/verification.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w13-per-run-verification-artifacts.ac3",
+            "title": "Given per-run files older than 30 days, when the retention patrol runs, then it deletes them and preserves newer files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w14-test-skip-gate",
+        "title": "Test-skip gate before the quality gates; allowOnly false",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/test-skip-gate.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "vitest.config.ts",
+            "src/dashboard/frontend/vitest.config.ts",
+            "tests/unit/lib/cloister/test-skip-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/test-skip-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "test-skip-gate.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W14 in drafts/pan-3847.md. Create src/lib/cloister/test-skip-gate.ts with findTestSkipViolations(unifiedDiff) and runTestSkipGate(workspacePath, changedBase) exactly as specified (skip, only and removed-test kinds). In verification-runner.ts call runTestSkipGate before the quality gates and, on violations, prepend a failed required QualityGateResult named test-skip so the existing failed-gate handling, artifact, feedback and cycle count apply. Add allowOnly: false to vitest.config.ts and the frontend vitest config."
+        },
+        "items": [
+          {
+            "id": "w14-test-skip-gate.ac1",
+            "title": "Given a diff that adds it.skip( in a.test.ts, when findTestSkipViolations runs, then it returns one skip violation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w14-test-skip-gate.ac2",
+            "title": "Given a diff that removes two it( calls and adds one in a test file, when findTestSkipViolations runs, then it returns one removed-test violation for that file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w14-test-skip-gate.ac3",
+            "title": "Given a diff touching only src/foo.ts, when findTestSkipViolations runs, then it returns no violations.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w14-test-skip-gate.ac4",
+            "title": "When grep allowOnly runs on vitest.config.ts, then it shows false, and a violation produces a failed required gate named test-skip in gateResults.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w15-ci-never-skips-vitest",
+        "title": "CI never skips vitest; the overdeck/test stamp binds to the tested sha",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml",
+            "src/lib/github-app.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "tests/unit/lib/github-app-status-sha.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/github-app-status-sha.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "github-app-status-sha.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W15 in drafts/pan-3847.md. Delete the Check for Overdeck test validation step (ci.yml:134-158) and the two skip_vitest conditions (186, 190); note the 7 to 8 minute runner cost in the PR. Add an optional sha parameter to postOverdeckTestsStatus (github-app.ts:813-818) that replaces the git rev-parse, pass lastVerifiedCommit from verification-runner.ts:927 (primary repo sha for composite anchors, see parseCompositeSnapshot) and change the description to Verification gate passed (changed-file scope). Change the merge-ops.ts:1087 description to Merge path: CI green; keep workspaces.ts:1622 as Test specialist passed. Push the workflow edit over SSH because the gh OAuth token lacks the workflow scope."
+        },
+        "items": [
+          {
+            "id": "w15-ci-never-skips-vitest.ac1",
+            "title": "When grep skip_vitest runs on .github/workflows/ci.yml, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w15-ci-never-skips-vitest.ac2",
+            "title": "Given a sha argument, when postOverdeckTestsStatus runs, then it posts to /statuses/<sha> without invoking git.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w15-ci-never-skips-vitest.ac3",
+            "title": "When the Phase 2 PR CI run completes, then the Test step shows vitest executed on a sha that also carries overdeck/test success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w16-lint-ratchet-per-file",
+        "title": "Lint ratchet attributes new findings by per-file count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effect-diagnostics.sh",
+            "tests/unit/scripts/lint-effect-diagnostics.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/scripts/lint-effect-diagnostics.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-effect-diagnostics.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W16 in drafts/pan-3847.md. In scripts/lint-effect-diagnostics.sh:87-113 replace the norm function and both comm lines with the per_file function and the join/awk comparison from the PRD, print a note for rows without a file position, and keep the count > baseline_count gate. Add tests/unit/scripts/lint-effect-diagnostics.test.ts that runs the script against fixture baseline and output files in a temp dir."
+        },
+        "items": [
+          {
+            "id": "w16-lint-ratchet-per-file.ac1",
+            "title": "Given a baseline with settings.ts x10 and projects.ts x6 and current output with projects.ts x8, when the script runs, then it exits 1 and prints NEW: for projects.ts with 8 and baseline 6 and nothing for settings.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w16-lint-ratchet-per-file.ac2",
+            "title": "When grep \"comm -\" runs on scripts/lint-effect-diagnostics.sh, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w17-branch-from-origin-target",
+        "title": "Branches are cut from origin/<target> after a fetch; scope drift fetches first",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/create.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/done.ts",
+            "tests/unit/lib/workspaces/create-from-origin.test.ts",
+            "tests/unit/cli/done-scope-drift.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspaces/create-from-origin.test.ts",
+            "npx vitest run tests/unit/cli/done-scope-drift.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "create-from-origin.test.ts exits 0",
+            "done-scope-drift.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W17 in drafts/pan-3847.md. In workspaces/create.ts:376-379 fetch origin <parent> with execFileAsync and add the worktree from origin/<parent>, falling back to the local ref with a warning when the fetch fails. Checkpoint: grep parentBranch and worktree add in start.ts, workspace.ts and workspaces/*.ts and apply the same shape wherever a branch is created from local main. In done.ts:291 fetch origin <target> (non-fatal) before changedFilesVsMain and replace the hardcoded origin/main with origin/<target> resolved the way getSyncTargetBranch does in verification-runner.ts:522."
+        },
+        "items": [
+          {
+            "id": "w17-branch-from-origin-target.ac1",
+            "title": "Given workspace creation, when the worktree is added, then execFileAsync receives fetch origin main before worktree add with origin/main as the start point.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w17-branch-from-origin-target.ac2",
+            "title": "Given local main one commit ahead of origin/main in a temp repo, when a workspace is created, then the new branch first commit parent is origin/main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w17-branch-from-origin-target.ac3",
+            "title": "Given pan done runs, when it computes scope drift, then it fetches origin first and diffs against origin/<target>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w18-rereview-refuses-dirty-or-unchanged",
+        "title": "Re-review refuses a dirty tree or an unchanged approved HEAD",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/cli/commands/review-subcommands.ts",
+            "tests/unit/dashboard/routes/review-pipeline-request-guards.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/review-pipeline-request-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-pipeline-request-guards.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W18 in drafts/pan-3847.md. In review-pipeline.ts, before the status reset in both the request handler (line 468 onward) and the trigger path (before setPendingOperation at 257), return 409 with a hint when git status --porcelain is non-empty, and 409 HEAD already approved when the snapshot head equals a passed reviewedAtCommit with no reviewStaleSince. Checkpoint: find the pan review request CLI handler (grep for the request route under src/cli, likely review-subcommands.ts) and make it print the hint and exit 1 on 409."
+        },
+        "items": [
+          {
+            "id": "w18-rereview-refuses-dirty-or-unchanged.ac1",
+            "title": "Given a dirty working tree, when a review request is posted, then it returns 409 with a hint that reviewers only see committed HEAD.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w18-rereview-refuses-dirty-or-unchanged.ac2",
+            "title": "Given a clean tree whose HEAD equals the approved anchor with no reviewStaleSince, when a review request is posted, then it returns 409 HEAD already approved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w18-rereview-refuses-dirty-or-unchanged.ac3",
+            "title": "Given a clean tree with a new HEAD, when a review request is posted, then it proceeds to the status reset.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w18-rereview-refuses-dirty-or-unchanged.ac4",
+            "title": "Given a 409 response, when pan review request runs, then it prints the hint and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w19-cycle-counter-per-issue",
+        "title": "The verification cycle counter is per issue and reset only by the operator reset door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/cli/commands/done.ts",
+            "src/dashboard/server/routes/workspaces/review-control.ts",
+            "docs/PIPELINE-GATES.md",
+            "tests/unit/dashboard/routes/review-pipeline-request-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/review-pipeline-request-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-pipeline-request-guards.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W19 in drafts/pan-3847.md. Delete verificationCycleCount: 0 from both reviewReset objects in review-pipeline.ts (262, 561) and from the pan done reset at done.ts:859. Keep the reset in review-status.ts:762 (the operator reset door), reopen.ts:81 (a fresh start) and, checkpoint, review-control.ts:146 only if it is the operator reset route. Replace the bypass sentence in the Verification Gate paragraph of docs/PIPELINE-GATES.md with the verification_stuck wording from the PRD."
+        },
+        "items": [
+          {
+            "id": "w19-cycle-counter-per-issue.ac1",
+            "title": "Given two failed verification cycles, when a review request is posted, then verificationCycleCount stays 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w19-cycle-counter-per-issue.ac2",
+            "title": "When grep \"verificationCycleCount: 0\" runs over src, then only the operator reset door in review-status.ts, reopen.ts and the confirmed operator route match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w19-cycle-counter-per-issue.ac3",
+            "title": "When docs/PIPELINE-GATES.md is read, then the Verification Gate paragraph states that after 3 failed cycles the issue is marked verification_stuck and the counter resets only by pan review reset.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w21-verdict-gate-no-loss-audit",
+        "title": "No-loss audit for verdicts and gates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/verdict-gate-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/verdict-gate-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verdict-gate-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W21 in drafts/pan-3847.md. Create tests/unit/lib/cloister/verdict-gate-no-loss-audit.test.ts with replay fixtures built from the corpus shapes: equal anchors with a passed review dispatch the test role; a passed review whose anchor differs from HEAD is marked stale with no reset; an anchorless verdict from each of the six caller sites is refused; a verification pass clears verification_stuck. Also assert the states the W20 patrols repaired are unreachable."
+        },
+        "items": [
+          {
+            "id": "w21-verdict-gate-no-loss-audit.ac1",
+            "title": "Given a row whose reviewedAtCommit equals lastVerifiedCommit and a passed review, when the audit replays it, then review.approved is emitted and the test role is dispatched.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w21-verdict-gate-no-loss-audit.ac2",
+            "title": "Given a verdict with no evidence head from each of the six caller sites, when the audit replays them, then each is refused with no row write.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w21-verdict-gate-no-loss-audit.ac3",
+            "title": "Given a green CI run alone, when the audit replays it, then testStatus does not become passed without the test specialist verdict.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w21-verdict-gate-no-loss-audit.ac4",
+            "title": "Given a passed review written by the review command, when the audit checks the row, then verificationStatus is not written by that command.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w20-delete-patrols-35-41",
+        "title": "Delete patrols #35 reconcileTestStatusFromGreenCi and #41 checkVerificationReviewContradiction",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/test-status-green-ci-reconciler.ts",
+            "tests/unit/lib/cloister/verdict-gate-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/verdict-gate-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verdict-gate-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W20 in drafts/pan-3847.md, only after w21 is green. Remove the registrations at deacon.ts:2917 and 2954, delete src/lib/cloister/test-status-green-ci-reconciler.ts and checkVerificationReviewContradiction (deacon.ts near 1553) together with their tests."
+        },
+        "items": [
+          {
+            "id": "w20-delete-patrols-35-41.ac1",
+            "title": "When grep reconcileTestStatusFromGreenCi and grep checkVerificationReviewContradiction run over src, then both return nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w20-delete-patrols-35-41.ac2",
+            "title": "When npm test runs after the deletion, then the verdict-gate no-loss audit exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w22-phase2-docs",
+        "title": "Phase 2 documentation: honest gates and immutable verdicts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/MERGE-WORKFLOW.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "CLAUDE.md",
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:prompts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W22 in drafts/pan-3847.md. Add the Immutable run artifacts and Test-skip gate paragraphs to docs/PIPELINE-GATES.md; replace the indeterminate-evidence sentence in docs/REVIEW-AGENT-ARCHITECTURE.md Verdict of record with the refusal rule and add reviewStaleSince to Review convergence; state in docs/MERGE-WORKFLOW.md that a stale review blocks merge until re-review; remove the anchor-equality skip language from DoD row 2; add the anchor invariant to CLAUDE.md Key Invariants; add the W15 comment to ci.yml."
+        },
+        "items": [
+          {
+            "id": "w22-phase2-docs.ac1",
+            "title": "When grep PAN-3847 runs over the five named docs files, then each contains the string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w22-phase2-docs.ac2",
+            "title": "When docs/REVIEW-AGENT-ARCHITECTURE.md is read, then Verdict of record states that a verdict without an evidence head is refused and Review convergence mentions reviewStaleSince.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w22-phase2-docs.ac3",
+            "title": "When CLAUDE.md Key Invariants is read, then it contains the sentence that a terminal review verdict always carries its anchor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w9-verdict-door-refuses-anchorless",
+        "to": "w10-review-stale-since",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-verdict-door-refuses-anchorless",
+        "to": "w12-review-command-never-writes-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-review-stale-since",
+        "to": "w11-delete-anchor-equality-test-skip",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-review-command-never-writes-verification",
+        "to": "w13-per-run-verification-artifacts",
+        "type": "blocks"
+      },
+      {
+        "from": "w13-per-run-verification-artifacts",
+        "to": "w14-test-skip-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w14-test-skip-gate",
+        "to": "w15-ci-never-skips-vitest",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-review-stale-since",
+        "to": "w17-branch-from-origin-target",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-review-stale-since",
+        "to": "w18-rereview-refuses-dirty-or-unchanged",
+        "type": "blocks"
+      },
+      {
+        "from": "w18-rereview-refuses-dirty-or-unchanged",
+        "to": "w19-cycle-counter-per-issue",
+        "type": "blocks"
+      },
+      {
+        "from": "w17-branch-from-origin-target",
+        "to": "w19-cycle-counter-per-issue",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-verdict-door-refuses-anchorless",
+        "to": "w21-verdict-gate-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-review-stale-since",
+        "to": "w21-verdict-gate-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w11-delete-anchor-equality-test-skip",
+        "to": "w21-verdict-gate-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-review-command-never-writes-verification",
+        "to": "w21-verdict-gate-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w21-verdict-gate-no-loss-audit",
+        "to": "w20-delete-patrols-35-41",
+        "type": "blocks"
+      },
+      {
+        "from": "w13-per-run-verification-artifacts",
+        "to": "w20-delete-patrols-35-41",
+        "type": "blocks"
+      },
+      {
+        "from": "w11-delete-anchor-equality-test-skip",
+        "to": "w22-phase2-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w19-cycle-counter-per-issue",
+        "to": "w22-phase2-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w15-ci-never-skips-vitest",
+        "to": "w22-phase2-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-review-stale-since",
+        "to": "w19-cycle-counter-per-issue",
+        "type": "blocks"
+      },
+      {
+        "from": "w11-delete-anchor-equality-test-skip",
+        "to": "w19-cycle-counter-per-issue",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-review-command-never-writes-verification",
+        "to": "w14-test-skip-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-review-command-never-writes-verification",
+        "to": "w15-ci-never-skips-vitest",
+        "type": "blocks"
+      },
+      {
+        "from": "w13-per-run-verification-artifacts",
+        "to": "w15-ci-never-skips-vitest",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
