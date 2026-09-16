@@ -307,6 +307,11 @@
       "reason": "feedback",
       "note": "[2026-09-16T21:51Z] test-agent → FAILED — seq 2",
       "timestamp": "2026-09-16T21:51:11.048Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-09-16T22:36:46.293Z"
     }
   ],
   "feedback": [
@@ -427,20 +432,20 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T21:54:39.579Z",
+  "updated": "2026-09-16T22:36:46.294Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "testing",
-    "uatStatus": "passed",
+    "testStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T21:54:39.541Z",
+    "updatedAt": "2026-09-16T22:36:46.046Z",
     "reviewNotes": "Operator-authorized override: three reproduced correctness blockers (SSH port corruption repo-url.ts:58, dotted-repo rejection repo-url.ts:45, partial-registration blocks retry create.ts:574-593) plus non-duplicate 409 mapping at projects.ts:1041. Cycle 8 cycle-diff itself (the routing fix) is clean — blockers are in PR-introduced code previously passed under the convergence gate. Work agent is manually stopped (operator note); orchestrator cannot dispatch rework until un-paused.",
-    "testNotes": "Dispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3836.lock is held by conv-20260916-7665 pid=1494526 acquiredAt=2026-09-16T21:50:46.244Z. Retry the command after that writer finishes.",
-    "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
+    "testNotes": "typecheck clean; lint clean; npm test 14365/14429 passed, 6 failed in agent-targeting.test.ts + app-server-host.test.ts confirmed pre-existing/unrelated (diff-scope empty, both pass 27/27 in isolation)",
+    "uatNotes": "wire-entry-points-no-loss.ac1/ac2 unmet: /workspaces/new chips never append returnTo=/workspaces/new (NewWorkspacePage.tsx:182,190,198), zero returnTo handling anywhere in frontend, App.tsx handleProjectCreated always redirects to command-deck. Separately ac5 live clone flow blocked by pre-existing 403 on POST /api/dashboard/session (workspace stack trusted-origin issue, confirmed on both frontend and api hosts). Page renders correctly otherwise (no react-router crash); resolve/job-poll routes verified correct directly against api host. Full evidence in .pan/test/result.json.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "9e039c178b33101935250217c8f51dbfeb167e0f",
@@ -569,9 +574,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 2666412,
-            "output": 72168,
-            "cacheRead": 15569280,
+            "input": 3090050,
+            "output": 73996,
+            "cacheRead": 15987328,
             "cacheWrite": 0
           }
         },
@@ -609,10 +614,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 168,
-            "output": 39389,
-            "cacheRead": 19245200,
-            "cacheWrite": 303129
+            "input": 350,
+            "output": 89973,
+            "cacheRead": 42396745,
+            "cacheWrite": 600170
           }
         },
         "work": {
@@ -632,16 +637,16 @@
           "cacheWrite": 246599
         },
         "custom/MiniMax-M3": {
-          "input": 4337520,
-          "output": 158214,
-          "cacheRead": 44936544,
+          "input": 4761158,
+          "output": 160042,
+          "cacheRead": 45354592,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 168,
-          "output": 39389,
-          "cacheRead": 19245200,
-          "cacheWrite": 303129
+          "input": 350,
+          "output": 89973,
+          "cacheRead": 42396745,
+          "cacheWrite": 600170
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 7014,
@@ -651,8 +656,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.97209,
-        "pricingAsOf": "2026-09-16T21:54:39.561Z"
+        "usd": 52.980488,
+        "pricingAsOf": "2026-09-16T22:36:46.117Z"
       }
     },
     "merges": [
