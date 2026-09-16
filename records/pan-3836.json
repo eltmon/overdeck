@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:52.306Z",
+  "updated": "2026-09-16T22:59:55.373Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 36,
+    "sequence": 37,
     "claims": {},
     "claimHistory": [
       {
@@ -901,8 +901,8 @@
         "updatedAt": "2026-09-16T16:19:36.674Z"
       },
       "skill-pan-new-project": {
-        "reason": "Skill updated to include dashboard entry point at /projects/new with three mode tabs (clone/existing/new), resolve-before-create pattern, and integration with CLI commands",
-        "updatedAt": "2026-09-16T16:20:01.550Z"
+        "reason": "Cycle-10 review BLOCKING [requirements FR-9/AC-7]: sync-sources/skills/pan-new-project was not rewritten per WI-7: step 2 must become 'run pan project clone <url> or pan project add <path>; both detect remote, default branch and prefix and create the main workspace'; step 3 drops issue_prefix/github_repo/default_branch from the minimum config. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:55.373Z"
       }
     }
   },
@@ -977,9 +977,9 @@
     "docs-projects-and-workspaces.ac1": "completed",
     "docs-projects-and-workspaces.ac2": "completed",
     "docs-projects-and-workspaces.ac3": "completed",
-    "skill-pan-new-project": "completed",
-    "skill-pan-new-project.ac1": "completed",
-    "skill-pan-new-project.ac2": "completed",
-    "skill-pan-new-project.ac3": "completed"
+    "skill-pan-new-project": "pending",
+    "skill-pan-new-project.ac1": "pending",
+    "skill-pan-new-project.ac2": "pending",
+    "skill-pan-new-project.ac3": "pending"
   }
 }
