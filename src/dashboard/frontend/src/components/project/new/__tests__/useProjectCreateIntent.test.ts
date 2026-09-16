@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 
 // Mock API fetches — mock fetchWithTimeout to avoid AbortSignal.timeout() blocking under fake timers
 vi.mock('../../../../lib/apiFetch.js', () => ({
@@ -76,9 +76,11 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
       expect.objectContaining({ method: 'POST' })
     );
 
-    await waitFor(() => {
-      expect(result.current.intent?.key).toBe('test-proj');
+    // Advance timers to allow json() promise to settle
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
     });
+    expect(result.current.intent?.key).toBe('test-proj');
   });
 
   it('WI-4.2: 202 response triggers polling', async () => {
@@ -150,7 +152,6 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
     });
-    await waitFor(() => expect(result.current.intent).not.toBeNull());
 
     // Submit WITHOUT awaiting — start async call, advance timers, THEN await
     const submitPromise = result.current.submit();
@@ -161,7 +162,6 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
 
     // Advance for first poll (running) at 750ms
     await vi.advanceTimersByTimeAsync(760);
-    await waitFor(() => expect(result.current.progress).not.toBeNull());
     expect(result.current.progress?.phase).toBe('Receiving objects');
     expect(result.current.progress?.percent).toBe(50);
 
@@ -171,7 +171,10 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     // NOW await the submit promise which has been progressing in the background
     await submitPromise;
 
-    await waitFor(() => expect(onCreated).toHaveBeenCalled());
+    // Advance for final state update
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
     expect(onCreated).toHaveBeenCalledWith(
       expect.objectContaining({
         key: 'orca',
@@ -229,7 +232,6 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
     });
-    await waitFor(() => expect(result.current.intent).not.toBeNull());
 
     // Submit WITHOUT awaiting — start async call, advance timers, THEN await
     const submitPromise = result.current.submit();
@@ -240,10 +242,11 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     // Await the submit promise which has been progressing
     await submitPromise;
 
-    // Findings should be folded into intent
-    await waitFor(() => {
-      expect(result.current.intent?.findings.length).toBeGreaterThan(0);
+    // Advance for final state update
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
     });
+    expect(result.current.intent?.findings.length).toBeGreaterThan(0);
     expect(result.current.intent?.findings[0].code).toBe('project-exists');
     expect(result.current.error).toContain('already exists');
   });

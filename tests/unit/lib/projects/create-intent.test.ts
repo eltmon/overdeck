@@ -6,16 +6,28 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
-const { TEST_HOME } = vi.hoisted(() => {
+const { TEST_HOME, execFileMock } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { join: j } = require('node:path') as typeof import('node:path');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { tmpdir: t } = require('node:os') as typeof import('node:os');
-  return { TEST_HOME: j(t(), `proj-create-intent-test-${process.pid}`) };
+  return {
+    TEST_HOME: j(t(), `proj-create-intent-test-${process.pid}`),
+    execFileMock: vi.fn(),
+  };
+});
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: execFileMock,
+  };
 });
 
 vi.mock('../../../src/lib/paths.js', async () => {
@@ -69,15 +81,15 @@ afterEach(() => {
 
 describe('resolveProjectCreateIntent', () => {
   it('resolves clone mode with shorthand URL and mocked ls-remote', async () => {
-    vi.mocked('child_process').execFile = vi.fn(
+    execFileMock.mockImplementation(
       (cmd, args, opts, cb) => {
         if (cmd === 'git' && args[0] === 'ls-remote') {
-          cb(null, { stdout: 'ref: refs/heads/main HEAD\n', stderr: '' });
+          cb(null, 'ref: refs/heads/main\tHEAD\n');
         } else {
           cb(new Error('Unknown command'));
         }
       }
-    ) as any;
+    );
 
     const intent = await resolveProjectCreateIntent({
       mode: 'clone',
@@ -115,11 +127,11 @@ describe('resolveProjectCreateIntent', () => {
   });
 
   it('returns remote-unreachable finding when ls-remote fails', async () => {
-    vi.mocked('child_process').execFile = vi.fn((cmd, args, opts, cb) => {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         cb(new Error('Network error'));
       }
-    }) as any;
+    });
 
     const intent = await resolveProjectCreateIntent({
       mode: 'clone',
@@ -137,12 +149,12 @@ describe('resolveProjectCreateIntent', () => {
 
   it('memoizes ls-remote probe for 60s and respects refreshRemote', async () => {
     let callCount = 0;
-    vi.mocked('child_process').execFile = vi.fn((cmd, args, opts, cb) => {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         callCount++;
-        cb(null, { stdout: 'ref: refs/heads/main HEAD\n', stderr: '' });
+        cb(null, 'ref: refs/heads/main\tHEAD\n');
       }
-    }) as any;
+    });
 
     await resolveProjectCreateIntent({
       mode: 'clone',
@@ -172,20 +184,19 @@ describe('resolveProjectCreateIntent', () => {
 
   it('resolves existing mode with a real temp git repo', async () => {
     const dir = makeProjectDir('existing');
-    writeFileSync(join(dir, '.git'), 'gitdir: /tmp/worktree\n');
-    mkdirSync(join(dir, '.git'), { recursive: true });
+    execFileSync('git', ['init', '--quiet', '-b', 'main'], { cwd: dir });
 
-    vi.mocked('child_process').execFile = vi.fn((cmd, args, opts, cb) => {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'remote') {
-        cb(null, { stdout: 'git@github.com:o/r.git\n', stderr: '' });
+        cb(null, 'git@github.com:o/r.git\n');
       } else if (cmd === 'git' && args[0] === 'symbolic-ref') {
         cb(new Error('Not a symbolic ref'));
       } else if (cmd === 'git' && args[0] === 'rev-parse') {
-        cb(null, { stdout: 'main\n', stderr: '' });
+        cb(null, 'main\n');
       } else {
         cb(new Error('Unknown command'));
       }
-    }) as any;
+    });
 
     const intent = await resolveProjectCreateIntent({
       mode: 'existing',
@@ -327,7 +338,7 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.name).toBe('my-new-project');
     expect(intent.wouldGitInit).toBe(true);
     expect(intent.isGitRepository).toBe(true);
-    expect(intent.proposedIssuePrefix).toBe('MYNEWPROJECT'); // truncated to 10
+    expect(intent.proposedIssuePrefix).toBe('MYNEWPROJE'); // truncated to 10
     expect(intent.findings).toHaveLength(0);
   });
 
