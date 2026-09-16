@@ -19,6 +19,7 @@ const routeMocks = vi.hoisted(() => ({
   resolveProjectCreateIntent: vi.fn(),
   performProjectCreate: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects/create.js', () => ({
@@ -28,7 +29,7 @@ vi.mock('../../../../src/lib/projects/create.js', () => ({
 
 vi.mock('../../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
-  rejectUnauthorizedDashboardRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { projectsRouteLayer } from '../../../../src/dashboard/server/routes/projects.js';
@@ -84,6 +85,7 @@ beforeEach(() => {
   }
   __resetProjectCreateJobsForTests();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   vi.useFakeTimers();
 });
 
@@ -154,7 +156,7 @@ describe('project-create routes', () => {
       expect((body as any).findings).toHaveLength(1);
     });
 
-    it('AC1.5: respects homeBoundary=true and refreshRemote=true in call', async () => {
+    it('AC1.5: enforces homeBoundary and reads the probe memo instead of refreshing', async () => {
       const intent = makeResolvedIntent('existing');
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
 
@@ -163,18 +165,28 @@ describe('project-create routes', () => {
         body: JSON.stringify({ mode: 'existing', path: '/home/user/proj' }),
       });
 
-      expect(routeMocks.resolveProjectCreateIntent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          homeBoundary: true,
-          refreshRemote: true,
-        }),
-      );
+      const input = routeMocks.resolveProjectCreateIntent.mock.calls[0][0];
+      expect(input).toEqual(expect.objectContaining({ homeBoundary: true }));
+      // This route runs once per settled keystroke; forcing a refresh here would
+      // spawn a `git ls-remote` per character typed.
+      expect(input.refreshRemote).toBeFalsy();
     });
   });
 
   // ─── GET /api/projects/create-jobs/:jobId ───────────────────────────────
 
   describe('GET /api/projects/create-jobs/:jobId', () => {
+    it('rejects an unauthenticated poll before it can read a job', async () => {
+      // The job payload carries a filesystem path and up to 20 lines of git stderr.
+      routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(
+        new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
+      );
+
+      const { status } = await requestProjectsRoute('/api/projects/create-jobs/any-id');
+
+      expect(status).toBe(401);
+    });
+
     it('AC2.1: returns 404 when job does not exist', async () => {
       const { status, body } = await requestProjectsRoute('/api/projects/create-jobs/nonexistent-id');
 
@@ -385,7 +397,7 @@ describe('project-create routes', () => {
       expect(body).toHaveProperty('existingPath', '/existing/path');
     });
 
-    it('AC3.7: returns 409 on other errors', async () => {
+    it('AC3.7: returns 500 on a genuine create failure, reserving 409 for duplicates', async () => {
       const intent = makeResolvedIntent('existing');
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
       routeMocks.performProjectCreate.mockRejectedValue(new Error('Filesystem error'));
@@ -395,7 +407,7 @@ describe('project-create routes', () => {
         body: JSON.stringify({ mode: 'existing', path: '/home/user/proj' }),
       });
 
-      expect(status).toBe(409);
+      expect(status).toBe(500);
       expect(body).toHaveProperty('error');
       expect((body as any).error).toMatch(/Filesystem error/);
     });

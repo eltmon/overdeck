@@ -947,7 +947,9 @@ const postProjectsResolveRoute = HttpRouter.add(
       name: typeof body.name === 'string' ? body.name : undefined,
       issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
       homeBoundary: true,
-      refreshRemote: true,
+      // No refreshRemote: this route is called once per settled keystroke, so it
+      // must read the 60 s probe memo rather than force a fresh `git ls-remote`
+      // every time. POST /api/projects still refreshes before it writes.
     };
 
     const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
@@ -963,6 +965,10 @@ const getProjectCreateJobRoute = HttpRouter.add(
   'GET',
   '/api/projects/create-jobs/:jobId',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const jobId = params['jobId'] ?? '';
 
@@ -1038,7 +1044,9 @@ const postProjectsRoute = HttpRouter.add(
           if (err instanceof DuplicateProjectError) {
             return { ok: false as const, status: 409, error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath };
           }
-          return { ok: false as const, status: 409, error: err instanceof Error ? err.message : String(err) };
+          // 409 means "already registered"; a permission error or a failed git init
+          // is a server-side failure, and the UI renders the two differently.
+          return { ok: false as const, status: 500, error: err instanceof Error ? err.message : String(err) };
         }),
     );
     if (!created.ok) {
