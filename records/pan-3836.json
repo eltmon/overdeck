@@ -417,20 +417,22 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:44:58.429Z",
+  "updated": "2026-09-16T22:55:02.793Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T22:44:43.373Z",
+    "updatedAt": "2026-09-16T22:55:02.764Z",
+    "reviewNotes": "[security] Home-boundary guard no longer resolves symlinks, so `POST /api/projects` can write outside `$HOME` — `src/lib/projects/create.ts:183`",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
+    "reviewedAtCommit": "437d88d5986ffffc940cad012c3559c3674b42ca",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
     "reviewSpawnedAt": "2026-09-16T22:44:43.372Z",
     "scopeDrift": {
@@ -639,7 +641,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.186512,
-        "pricingAsOf": "2026-09-16T22:44:45.397Z"
+        "pricingAsOf": "2026-09-16T22:55:02.770Z"
       }
     },
     "merges": [
@@ -648,7 +650,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
