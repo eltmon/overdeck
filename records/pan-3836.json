@@ -342,18 +342,20 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:45:52.420Z",
+  "updated": "2026-09-16T18:46:14.212Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "failed",
     "testStatus": "passed",
-    "verificationStatus": "failed",
+    "uatStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:45:41.794Z",
-    "testNotes": "Reconciled from green GitHub Actions CI on fcad7fae: build (22) (https://github.com/eltmon/overdeck/actions/runs/35134130718/job/104922116379)",
+    "updatedAt": "2026-09-16T18:46:14.081Z",
+    "testNotes": "typecheck PASS, lint PASS, npm test PASS (1528 test files/14371 tests passed, 4/51 skipped; plus frontend suite 4 files/64 tests passed), exit 0.",
+    "uatNotes": "BLOCKING: /projects/new crashes on every entry point (sidebar +, HomePage + New project) — NewProjectPage.tsx uses react-router-dom's useSearchParams() but the app mounts no <Router> anywhere; masked in unit tests only because NewProjectPage.test.tsx wraps it in <BrowserRouter>. Full evidence and repro in .pan/test/result.json.",
     "verificationNotes": "Verification FAILED at test (814354ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-16T18:25:42.317Z",
@@ -481,10 +483,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 158,
-            "output": 36309,
-            "cacheRead": 17782862,
-            "cacheWrite": 288903
+            "input": 162,
+            "output": 38619,
+            "cacheRead": 18353319,
+            "cacheWrite": 298701
           }
         },
         "work": {
@@ -504,10 +506,10 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-sonnet-5": {
-          "input": 158,
-          "output": 36309,
-          "cacheRead": 17782862,
-          "cacheWrite": 288903
+          "input": 162,
+          "output": 38619,
+          "cacheRead": 18353319,
+          "cacheWrite": 298701
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 6722,
@@ -517,8 +519,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.894928,
-        "pricingAsOf": "2026-09-16T18:45:51.362Z"
+        "usd": 37.056622,
+        "pricingAsOf": "2026-09-16T18:46:14.158Z"
       }
     },
     "merges": [
