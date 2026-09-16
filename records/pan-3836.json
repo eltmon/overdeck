@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:43.377Z",
+  "updated": "2026-09-16T22:59:46.214Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 33,
+    "sequence": 34,
     "claims": {},
     "claimHistory": [
       {
@@ -869,8 +869,8 @@
         "updatedAt": "2026-09-16T14:53:17.289Z"
       },
       "project-create-routes": {
-        "reason": "Implemented three new routes: POST /projects/resolve (dry-run), GET /projects/create-jobs/:jobId (polling), refactored POST /projects. Added 9 comprehensive acceptance-criteria tests. Registered in no-loss-matrix.",
-        "updatedAt": "2026-09-16T15:35:34.624Z"
+        "reason": "Cycle-10 review BLOCKING [performance]: POST /api/projects/resolve passes refreshRemote: true (src/dashboard/server/routes/projects.ts:950) so the 60s probe memo never serves and every settled keystroke spawns git ls-remote. Drop refreshRemote from the resolve route (keep it only for the final create if needed), skip the probe while url findings exist. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:46.214Z"
       },
       "cli-project-add-dry-run": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-5/AC-3 + correctness]: (1) --dry-run must print the resolved intent as JSON (console.log(JSON.stringify(intent,null,2))) for both add and clone, not decorated prose; update CLI tests to parse it. (2) pan project add (src/cli/commands/project.ts:95) stubs regResult so the detected tracker/github_repo/issue_prefix/default_branch just written by performProjectCreate get wiped; return the real registration result instead of a stub. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -935,12 +935,12 @@
     "create-job-store.ac2": "completed",
     "create-job-store.ac3": "completed",
     "create-job-store.ac4": "completed",
-    "project-create-routes": "completed",
-    "project-create-routes.ac1": "completed",
-    "project-create-routes.ac2": "completed",
-    "project-create-routes.ac3": "completed",
-    "project-create-routes.ac4": "completed",
-    "project-create-routes.ac5": "completed",
+    "project-create-routes": "pending",
+    "project-create-routes.ac1": "pending",
+    "project-create-routes.ac2": "pending",
+    "project-create-routes.ac3": "pending",
+    "project-create-routes.ac4": "pending",
+    "project-create-routes.ac5": "pending",
     "cli-project-add-dry-run": "pending",
     "cli-project-add-dry-run.ac1": "pending",
     "cli-project-add-dry-run.ac2": "pending",
