@@ -12,6 +12,11 @@
       "timestamp": "2026-09-16T19:35:12.559Z",
       "reason": "start",
       "agentModel": "k3"
+    },
+    {
+      "timestamp": "2026-09-16T21:34:59.558Z",
+      "reason": "end",
+      "note": "Tier fitness warnings landed across all three surfaces (pan doctor, Settings crew/supervisor badges, spawn log on both registered-slot and single-work paths). Pure checker + node-side context builder share one capability-class table that lives next to the model catalog. Cost mismatches warn rather than block. Docs cover classes, bands, and the three surfaces."
     }
   ],
   "feedback": [],
@@ -80,7 +85,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:34:58.761Z",
+  "updated": "2026-09-16T21:34:59.558Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
