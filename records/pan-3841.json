@@ -2,7 +2,7 @@
   "issueId": "PAN-3841",
   "schemaVersion": 2,
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T19:17:07.053Z",
+  "updated": "2026-09-16T19:17:07.915Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3841: Dashboard button: open a No-Project conversation that reviews recent cross-issue activity and summarizes pipeline problems (retrospective)",
       "timestamp": "2026-09-16T19:17:07.053Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5-1"
 }
