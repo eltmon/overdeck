@@ -367,23 +367,20 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:46:21.453Z",
+  "updated": "2026-09-16T19:50:12.117Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:56:44.540Z",
-    "reviewNotes": "Approved cycle 7: pure origin/main merge with zero feature-file changes; all prior fixes re-verified at head (72/72 unit, 20/20 frontend green); 0 blockers from all four reviewers.",
-    "testNotes": "typecheck PASS, lint PASS, npm test PASS (1528 test files/14371 tests passed, 4/51 skipped; plus frontend suite 4 files/64 tests passed), exit 0.",
+    "updatedAt": "2026-09-16T19:50:11.639Z",
     "uatNotes": "BLOCKING: /projects/new crashes on every entry point (sidebar +, HomePage + New project) — NewProjectPage.tsx uses react-router-dom's useSearchParams() but the app mounts no <Router> anywhere; masked in unit tests only because NewProjectPage.test.tsx wraps it in <BrowserRouter>. Full evidence and repro in .pan/test/result.json.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
-    "reviewedAtCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
     "reviewSpawnedAt": "2026-09-16T18:53:51.051Z",
     "scopeDrift": {
@@ -493,10 +490,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5-1": {
-            "input": 392,
-            "output": 14086,
-            "cacheRead": 8598556,
-            "cacheWrite": 35463
+            "input": 556,
+            "output": 19115,
+            "cacheRead": 13988088,
+            "cacheWrite": 48894
           }
         },
         "plan": {
@@ -517,19 +514,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 6722,
-            "output": 294789,
-            "cacheRead": 101475589,
-            "cacheWrite": 1456394
+            "input": 6948,
+            "output": 303397,
+            "cacheRead": 104360974,
+            "cacheWrite": 1552750
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5-1": {
-          "input": 1198,
-          "output": 61236,
-          "cacheRead": 12888696,
-          "cacheWrite": 227318
+          "input": 1362,
+          "output": 66265,
+          "cacheRead": 18278228,
+          "cacheWrite": 240749
         },
         "anthropic/claude-sonnet-5": {
           "input": 168,
@@ -538,15 +535,15 @@
           "cacheWrite": 303129
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 6722,
-          "output": 294789,
-          "cacheRead": 101475589,
-          "cacheWrite": 1456394
+          "input": 6948,
+          "output": 303397,
+          "cacheRead": 104360974,
+          "cacheWrite": 1552750
         }
       },
       "costAtCloseOut": {
-        "usd": 37.253781000000004,
-        "pricingAsOf": "2026-09-16T18:56:44.588Z"
+        "usd": 43.516539,
+        "pricingAsOf": "2026-09-16T19:50:11.714Z"
       }
     },
     "merges": [
