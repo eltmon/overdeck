@@ -17,6 +17,7 @@ import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
+import { RetrospectiveButton } from './RetrospectiveButton';
 import { type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
@@ -1360,6 +1361,7 @@ export function CommandDeck({
                     saveStoredHarness(harness);
                   }}
                 />
+                <RetrospectiveButton model={sidebarModel} harness={sidebarHarness} />
                 <button
                   className={styles.conversationAddBtn}
                   onClick={handleNewConversation}
