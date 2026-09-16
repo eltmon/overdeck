@@ -7,10 +7,18 @@
  * window validation and kickoff rendering are exercised end to end.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../../http-helpers.js';
+import {
+  DASHBOARD_SESSION_COOKIE,
+  DASHBOARD_CSRF_HEADER,
+  _resetDashboardSessionTokenForTests,
+  dashboardCsrfToken,
+  dashboardSessionCookieHeader,
+} from '../dashboard-auth.js';
+import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 
 const handleConversationCreate = vi.fn(
   async () => jsonResponse({ name: 'conv-x', id: 1 }, { status: 201 }),
@@ -29,12 +37,23 @@ function decodeTextResponse(response: { body: unknown }): string {
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
 }
 
-async function postRetrospective(body: unknown, origin = 'http://localhost:3011') {
+async function postRetrospective(
+  body: unknown,
+  options: { origin?: string; cookie?: string; csrf?: string; internal?: string } = {},
+) {
   const { conversationsRetrospectiveRouteLayer } = await import('../conversations-retrospective.js');
+  const origin = options.origin ?? 'http://localhost:3011';
+  const headers: Record<string, string> = {
+    Origin: origin,
+    'Content-Type': 'application/json',
+  };
+  if (options.cookie) headers['Cookie'] = options.cookie;
+  if (options.csrf) headers[DASHBOARD_CSRF_HEADER] = options.csrf;
+  if (options.internal) headers['x-overdeck-internal-token'] = options.internal;
   const request = HttpServerRequest.fromWeb(
     new Request('http://localhost/api/conversations/retrospective', {
       method: 'POST',
-      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     }),
   );
@@ -47,13 +66,31 @@ async function postRetrospective(body: unknown, origin = 'http://localhost:3011'
   );
 }
 
+function sessionCookie(): string {
+  return dashboardSessionCookieHeader().split(';')[0] ?? `${DASHBOARD_SESSION_COOKIE}=`;
+}
+
 describe('POST /api/conversations/retrospective', () => {
   beforeEach(() => {
     handleConversationCreate.mockClear();
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
+    process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
   });
 
   it('creates the conversation for a valid window and forwards no projectKey', async () => {
-    const response = await postRetrospective({ window: '7d', model: 'm' });
+    const response = await postRetrospective({ window: '7d', model: 'm' }, {
+      cookie: sessionCookie(),
+      csrf: dashboardCsrfToken(),
+    });
     expect(response.status).toBe(201);
     expect(handleConversationCreate).toHaveBeenCalledTimes(1);
     const arg = handleConversationCreate.mock.calls[0][0] as Record<string, unknown>;
@@ -64,15 +101,47 @@ describe('POST /api/conversations/retrospective', () => {
   });
 
   it('returns 400 for an invalid window and never touches the write door', async () => {
-    const response = await postRetrospective({ window: 'bad' });
+    const response = await postRetrospective({ window: 'bad' }, {
+      cookie: sessionCookie(),
+      csrf: dashboardCsrfToken(),
+    });
     expect(response.status).toBe(400);
     expect(JSON.parse(decodeTextResponse(response))).toEqual({ error: 'Invalid window' });
     expect(handleConversationCreate).not.toHaveBeenCalled();
   });
 
-  it('returns 403 for a foreign Origin', async () => {
-    const response = await postRetrospective({ window: '7d' }, 'https://evil.example.com');
+  it('returns 403 for a foreign Origin even with a valid session', async () => {
+    const response = await postRetrospective(
+      { window: '7d' },
+      { origin: 'https://evil.example.com', cookie: sessionCookie(), csrf: dashboardCsrfToken() },
+    );
     expect(response.status).toBe(403);
     expect(handleConversationCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a trusted Origin without credentials (no session, no CSRF, no internal token)', async () => {
+    const response = await postRetrospective({ window: '7d' }, { origin: 'http://localhost:3011' });
+    expect(response.status).toBe(401);
+    expect(JSON.parse(decodeTextResponse(response))).toEqual({ error: 'unauthorized' });
+    expect(handleConversationCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a trusted Origin with session cookie but no CSRF header', async () => {
+    const response = await postRetrospective(
+      { window: '7d' },
+      { origin: 'http://localhost:3011', cookie: sessionCookie() },
+    );
+    expect(response.status).toBe(403);
+    expect(JSON.parse(decodeTextResponse(response))).toEqual({ error: 'Invalid CSRF token' });
+    expect(handleConversationCreate).not.toHaveBeenCalled();
+  });
+
+  it('accepts a trusted Origin with the internal token alone (no CSRF)', async () => {
+    const response = await postRetrospective(
+      { window: '24h' },
+      { origin: 'http://localhost:3011', internal: 'test-dashboard-token' },
+    );
+    expect(response.status).toBe(201);
+    expect(handleConversationCreate).toHaveBeenCalledTimes(1);
   });
 });

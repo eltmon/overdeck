@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { History } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Harness } from '../chat/ModelPicker';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import styles from './styles/command-deck.module.css';
 
 interface RetrospectiveButtonProps {
@@ -52,7 +53,7 @@ export function RetrospectiveButton({ model, harness, disabled }: RetrospectiveB
     try {
       const res = await fetch('/api/conversations/retrospective', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders('/api/conversations/retrospective'),
         body: JSON.stringify({ window: window_, model, harness }),
       });
       if (res.ok) {

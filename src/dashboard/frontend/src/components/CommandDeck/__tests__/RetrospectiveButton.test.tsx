@@ -1,6 +1,11 @@
 /**
  * RetrospectiveButton tests (PAN-3841): menu behavior, POST shape,
  * navigation on success, toast + re-enable on failure, disabled state.
+ *
+ * The dashboard's established mutation contract requires the companion
+ * route to receive a session cookie + CSRF header (or an internal token).
+ * We mock dashboardMutationJsonHeaders so the test doesn't need to bootstrap
+ * a real wsTransport session, and assert the button goes through that path.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -12,11 +17,20 @@ vi.mock('sonner', () => ({
   toast: { error: (...args: unknown[]) => toastError(...args) },
 }));
 
+const dashboardMutationJsonHeaders = vi.fn(async () => ({
+  'Content-Type': 'application/json',
+  'x-overdeck-csrf-token': 'test-csrf',
+}));
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: (...args: unknown[]) => dashboardMutationJsonHeaders(...args),
+}));
+
 const assignMock = vi.fn();
 
 beforeEach(() => {
   toastError.mockClear();
   assignMock.mockClear();
+  dashboardMutationJsonHeaders.mockClear();
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: { ...window.location, assign: assignMock },
@@ -38,7 +52,7 @@ describe('RetrospectiveButton', () => {
     expect(screen.getByRole('menuitem', { name: 'Last 7 days' })).toBeTruthy();
   });
 
-  it('POSTs the chosen window and navigates to the new conversation', async () => {
+  it('POSTs the chosen window with dashboard mutation headers and navigates to the new conversation', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Response.json({ id: 42, name: 'conv-test-42' })),
@@ -48,9 +62,13 @@ describe('RetrospectiveButton', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Last 7 days' }));
 
     await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/conv/conv-test-42'));
+    expect(dashboardMutationJsonHeaders).toHaveBeenCalledWith('/api/conversations/retrospective');
     expect(fetch).toHaveBeenCalledWith('/api/conversations/retrospective', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-overdeck-csrf-token': 'test-csrf',
+      },
       body: JSON.stringify({ window: '7d', model: 'claude-opus-4-6', harness: 'claude-code' }),
     });
   });

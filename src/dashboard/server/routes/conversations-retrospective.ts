@@ -11,7 +11,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
-import { validateOrigin } from './origin-validation.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { readJsonBody } from './specialists/shared.js';
 import { conversationReadDependencies } from './conversations.js';
 import { generateAiTitle } from '../../../lib/overdeck/conversation-reads.js';
@@ -23,11 +23,17 @@ const postConversationRetrospectiveRoute = HttpRouter.add(
   '/api/conversations/retrospective',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    // Established mutation contract: a trusted Origin alone is not enough to
+    // launch a model session. Callers must additionally present either the
+    // server-side internal token OR a browser session cookie with a matching
+    // CSRF header. The companion button sends the CSRF header via
+    // dashboardMutationJsonHeaders(); non-browser callers without the internal
+    // token get rejected here before any work runs.
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const body = yield* readJsonBody;
     return yield* Effect.promise(() =>
-      handleRetrospectiveConversationCreate(body as Record<string, unknown>, {
+      handleRetrospectiveConversationCreate(body, {
         createConversation: (createBody) =>
           handleConversationCreate(createBody, {
             generateAiTitle: (name, message) =>
