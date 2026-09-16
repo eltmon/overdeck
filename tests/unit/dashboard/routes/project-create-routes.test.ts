@@ -434,14 +434,16 @@ describe('project-create routes', () => {
       };
 
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
-      let finish: () => void;
+      let finish: (() => void) | undefined;
+      let jobPromise: Promise<ProjectCreateResult> | undefined;
       routeMocks.performProjectCreate.mockImplementation((_, hooks) => {
         // Simulate progress callback
         hooks.onProgress?.({ phase: 'cloning', percent: 50 });
         // Return deferred promise that resolves when test calls finish()
-        return new Promise((res) => {
+        jobPromise = new Promise<ProjectCreateResult>((res) => {
           finish = () => res(result);
         });
+        return jobPromise;
       });
 
       // Step 1: POST /api/projects → 202 with jobId
@@ -462,10 +464,18 @@ describe('project-create routes', () => {
         percent: 50,
       });
 
-      // Step 3: Finish the deferred promise
-      finish!();
-      // Allow promise chain to settle
-      await new Promise((r) => setImmediate(r));
+      // Step 3: Finish the deferred promise and await the job-store .then() callback
+      if (!finish) throw new Error('finish was not set by mock');
+      finish();
+      // The job-store registers a .then() callback on the promise. Await it directly
+      // (no fake timers — the real microtask queue will settle it).
+      if (jobPromise) {
+        try {
+          await jobPromise;
+        } catch {
+          // ignore errors from the job itself
+        }
+      }
 
       // Step 4: Poll again → 200 done
       const doneRes = await requestProjectsRoute(`/api/projects/create-jobs/${jobId}`);

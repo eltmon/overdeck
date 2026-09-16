@@ -57,7 +57,7 @@ import {
   __resetRemoteProbeMemoForTests,
   promptGuardGitEnv,
 } from '../../../../src/lib/projects/create.js';
-import { getProjectSync, PROJECTS_CONFIG_FILE } from '../../../../src/lib/projects.js';
+import { getProjectSync, PROJECTS_CONFIG_FILE, invalidateProjectsConfigCache } from '../../../../src/lib/projects.js';
 
 function makeProjectDir(suffix = '') {
   const dir = join(TEST_HOME, `proj-${suffix}-${Math.random().toString(36).slice(2)}`);
@@ -239,9 +239,15 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent1.key).toBe('my-proj');
     expect(intent1.findings).toHaveLength(0);
 
-    // Manually register to create a duplicate by creating the path
-    // When a project path exists, it's considered a duplicate
-    mkdirSync(intent1.path, { recursive: true });
+    // Register the project in the projects registry by writing to the config file
+    const projectsYaml = `projects:
+  my-proj:
+    name: my-proj
+    path: ${intent1.path}
+    issue_prefix: MYPROJ
+`;
+    writeFileSync(PROJECTS_CONFIG_FILE, projectsYaml);
+    invalidateProjectsConfigCache();
 
     const intent2 = await resolveProjectCreateIntent({
       mode: 'new',

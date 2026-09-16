@@ -228,7 +228,7 @@ export async function resolveProjectCreateIntent(
   // 1. Mode-specific source validation
   if (input.mode === 'clone') {
     const parsed = input.url ? parseRepoUrl(input.url.trim()) : null;
-    if (!parsed) {
+    if (!parsed || !parsed.cloneUrl) {
       findings.push({
         field: 'url',
         code: 'url-invalid',
