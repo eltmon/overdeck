@@ -342,17 +342,18 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:32:24.369Z",
+  "updated": "2026-09-16T18:39:49.398Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:29:52.719Z",
+    "updatedAt": "2026-09-16T18:39:49.202Z",
+    "testNotes": "Reconciled from green GitHub Actions CI on fcad7fae: build (22) (https://github.com/eltmon/overdeck/actions/runs/35134130718/job/104922116379)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-16T18:25:42.317Z",
@@ -480,10 +481,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 20,
-            "output": 2465,
-            "cacheRead": 1194168,
-            "cacheWrite": 177909
+            "input": 50,
+            "output": 8443,
+            "cacheRead": 4146834,
+            "cacheWrite": 213333
           }
         },
         "work": {
@@ -503,10 +504,10 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 2465,
-          "cacheRead": 1194168,
-          "cacheWrite": 177909
+          "input": 50,
+          "output": 8443,
+          "cacheRead": 4146834,
+          "cacheWrite": 213333
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 6722,
@@ -516,8 +517,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 32.960987,
-        "pricingAsOf": "2026-09-16T18:29:55.097Z"
+        "usd": 33.69992,
+        "pricingAsOf": "2026-09-16T18:39:49.382Z"
       }
     },
     "merges": [
@@ -526,7 +527,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
