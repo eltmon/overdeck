@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T19:35:48.153Z",
+  "updated": "2026-09-16T19:38:50.258Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -69,18 +69,34 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "class-table": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3842",
         "agentId": "agent-pan-3842",
         "pid": 2985867,
         "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T19:35:48.153Z"
+        "claimedAt": "2026-09-16T19:35:48.153Z",
+        "itemId": "class-table",
+        "outcome": "completed",
+        "reason": "Added src/lib/model-capability-class.ts (§5.1 table verbatim, deprecation-resolving capabilityClassOf) and its test file; all 7 tests pass, completeness covers every catalog id, typecheck green, purity grep clean.",
+        "releasedAt": "2026-09-16T19:38:50.258Z"
+      }
+    ],
+    "statusReasons": {
+      "class-table": {
+        "reason": "Added src/lib/model-capability-class.ts (§5.1 table verbatim, deprecation-resolving capabilityClassOf) and its test file; all 7 tests pass, completeness covers every catalog id, typecheck green, purity grep clean.",
+        "updatedAt": "2026-09-16T19:38:50.258Z"
       }
     }
   },
   "statusOverrides": {
-    "class-table": "running"
+    "class-table": "completed",
+    "class-table.ac1": "completed",
+    "class-table.ac2": "completed",
+    "class-table.ac3": "completed",
+    "class-table.ac4": "completed",
+    "class-table.ac5": "completed"
   }
 }
