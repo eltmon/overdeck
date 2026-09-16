@@ -16,12 +16,18 @@ import {
 } from '../../lib/projects.js';
 import { registerProjectFromPath, installGitHooksInDir, DuplicateProjectError } from '../../lib/project-registration.js';
 import { addProjectTarget, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
+import {
+  resolveProjectCreateIntent,
+  performProjectCreate,
+  type ProjectCreateInput,
+} from '../../lib/projects/create.js';
 
 interface AddOptions {
   name?: string;
   type?: 'standalone' | 'monorepo';
   linearTeam?: string;
   rallyProject?: string;
+  dryRun?: boolean;
 }
 
 export async function projectAddCommand(
@@ -50,14 +56,50 @@ export async function projectAddCommand(
     }
   }
 
+  // Step 1: Resolve intent (dry-run validation)
+  const input: ProjectCreateInput = {
+    mode: 'existing',
+    path: fullPath,
+    name: options.name,
+    issuePrefix: linearTeam,
+    homeBoundary: false, // CLI does not enforce home directory boundary
+  };
+
+  const intent = await resolveProjectCreateIntent(input);
+
+  // Show findings if there are any
+  if (intent.findings.length > 0) {
+    console.log(chalk.yellow('\nValidation issues:'));
+    for (const finding of intent.findings) {
+      console.log(chalk.red(`  ✗ ${finding.field}: ${finding.message}`));
+      if (finding.detail) {
+        console.log(chalk.dim(`    ${finding.detail}`));
+      }
+    }
+    console.log('');
+    return;
+  }
+
+  // Step 2: Dry-run mode - stop after validation
+  if (options.dryRun) {
+    console.log(chalk.blue('\n✓ Validation passed (dry-run mode)'));
+    console.log(chalk.dim(`  Key: ${intent.key}`));
+    console.log(chalk.dim(`  Path: ${intent.path}`));
+    console.log(chalk.dim(`  Name: ${intent.name}`));
+    console.log('');
+    return;
+  }
+
+  // Step 3: Perform the actual create
   let regResult: Awaited<ReturnType<typeof registerProjectFromPath>>;
   try {
-    regResult = await registerProjectFromPath({ path: fullPath, name });
+    const result = await performProjectCreate(intent);
+    regResult = { key: result.key, config: { name: result.name, path: result.path }, hooksInstalled: 0, seededContextLayer: false };
   } catch (err) {
     if (err instanceof DuplicateProjectError) {
       console.log(chalk.yellow(`Project already registered with key: ${err.key}`));
       console.log(chalk.dim(`Existing path: ${err.existingPath}`));
-      console.log(chalk.dim(`To update, first run: pan projects remove ${err.key}`));
+      console.log(chalk.dim(`To update, first run: pan project remove ${err.key}`));
       return;
     }
     throw err;
@@ -378,6 +420,7 @@ export function registerProjectCommands(command: Command): void {
     .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
     .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
     .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
+    .option('--dry-run', 'Validate without creating (resolve-before-create pattern)')
     .action(projectAddCommand);
 
   command

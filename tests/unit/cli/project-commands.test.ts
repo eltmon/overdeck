@@ -4,14 +4,23 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
-const { mockGetProjectSync } = vi.hoisted(() => ({ mockGetProjectSync: vi.fn() }));
+const { mockGetProjectSync, mockResolveProjectCreateIntent, mockPerformProjectCreate } = vi.hoisted(() => ({
+  mockGetProjectSync: vi.fn(),
+  mockResolveProjectCreateIntent: vi.fn(),
+  mockPerformProjectCreate: vi.fn(),
+}));
 
 vi.mock('../../../src/lib/projects.js', async () => {
   const actual = await vi.importActual<typeof import('../../../src/lib/projects.js')>('../../../src/lib/projects.js');
   return { ...actual, getProjectSync: mockGetProjectSync };
 });
 
-import { projectAddTargetCommand } from '../../../src/cli/commands/project.js';
+vi.mock('../../../src/lib/projects/create.js', () => ({
+  resolveProjectCreateIntent: mockResolveProjectCreateIntent,
+  performProjectCreate: mockPerformProjectCreate,
+}));
+
+import { projectAddTargetCommand, projectAddCommand } from '../../../src/cli/commands/project.js';
 import { getProjectByKey, listProjectTargets } from '../../../src/lib/workspaces/resolver.js';
 
 let odb: OverdeckTestDb;
@@ -27,6 +36,114 @@ beforeEach(() => {
 afterEach(() => {
   teardownOverdeckTestDb(odb);
   rmSync(projectRoot, { recursive: true, force: true });
+});
+
+describe('pan project add (PAN-3836: resolve-before-create)', () => {
+  let consoleLogSpy: any;
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'pan-3836-project-add-'));
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockResolveProjectCreateIntent.mockClear();
+    mockPerformProjectCreate.mockClear();
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('AC1.1: --dry-run validates without creating', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'existing',
+      key: 'test-proj',
+      name: 'Test Project',
+      path: projectDir,
+      findings: [],
+      isGitRepository: true,
+      wouldClone: false,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: null,
+      provider: null,
+      repoSlug: null,
+      defaultBranch: null,
+      remoteChecked: false,
+      proposedIssuePrefix: 'TP',
+    });
+
+    await projectAddCommand(projectDir, { dryRun: true });
+
+    expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
+    expect(mockPerformProjectCreate).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('dry-run'));
+  });
+
+  it('AC1.2: shows findings if validation fails', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'existing',
+      key: null,
+      name: '',
+      path: projectDir,
+      findings: [
+        {
+          field: 'path',
+          code: 'path-not-a-directory',
+          message: 'Path is not a directory',
+        },
+      ],
+      isGitRepository: false,
+      wouldClone: false,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: null,
+      provider: null,
+      repoSlug: null,
+      defaultBranch: null,
+      remoteChecked: false,
+      proposedIssuePrefix: null,
+    });
+
+    await projectAddCommand(projectDir);
+
+    expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
+    expect(mockPerformProjectCreate).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Validation issues'));
+  });
+
+  it('AC1.3: creates project when validation passes and not --dry-run', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'existing',
+      key: 'test-proj',
+      name: 'Test Project',
+      path: projectDir,
+      findings: [],
+      isGitRepository: true,
+      wouldClone: false,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: null,
+      provider: null,
+      repoSlug: null,
+      defaultBranch: null,
+      remoteChecked: false,
+      proposedIssuePrefix: 'TP',
+    });
+
+    mockPerformProjectCreate.mockResolvedValue({
+      key: 'test-proj',
+      name: 'Test Project',
+      path: projectDir,
+      mainWorkspaceId: 'ws-123',
+    });
+
+    await projectAddCommand(projectDir);
+
+    expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
+    expect(mockPerformProjectCreate).toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('✓ Added project'));
+  });
 });
 
 describe('pan project add-target (PAN-1990)', () => {
