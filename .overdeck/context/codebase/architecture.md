@@ -63,7 +63,11 @@ server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 4. Restart — `agents.ts` `restartAgent` (~:4736)
 5. Dashboard start route — `dashboard/server/routes/agents.ts` (~:3156, shells to `pan start`)
 
-Conversations pin harness at creation (`routes/conversations.ts` ~:2741) — not a spawn site.
+Conversations pin harness at creation in `handleConversationCreate`
+(`src/lib/overdeck/conversation-runtime.ts` ~:918, called from `POST /api/conversations` in
+`routes/conversations.ts` ~:303) — not a spawn site. Conversation kickoff templates read at
+request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
+are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
 
 ## Remote (Fly.io) work agents
 
@@ -76,4 +80,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-07-05 -->
+<!-- last-verified: 2026-09-16 -->
