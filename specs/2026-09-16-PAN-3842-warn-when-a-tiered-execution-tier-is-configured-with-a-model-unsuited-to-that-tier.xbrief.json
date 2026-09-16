@@ -1,0 +1,725 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T19:24:56Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3842: Warn when a tiered-execution tier is configured with a model unsuited to that tier",
+    "updated": "2026-09-16T19:34:34.473Z"
+  },
+  "plan": {
+    "id": "pan-3842",
+    "title": "Warn when a tiered-execution tier is configured with a model unsuited to that tier",
+    "status": "proposed",
+    "uid": "61a15d48-83e7-4f13-b240-071e38be3223",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T19:24:56Z",
+    "updated": "2026-09-16T19:34:34.473Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3842",
+        "label": "PAN-3842",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3836",
+        "label": "PAN-3836 (incident)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tiered-execution",
+      "doctor",
+      "settings",
+      "model-catalog",
+      "spawn"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-3842.md",
+      "canonicalFilename": "2026-09-16-PAN-3842-warn-when-a-tiered-execution-tier-is-configured-with-a-model-unsuited-to-that-tier.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-3836 ran a 14-item feature on claude-haiku-4-5 because its first xBRIEF item was rated simple and the trivial-simple tier mapped to haiku; six review cycles followed. The tier-table loader validates model ids, harnesses, and ToS policy but has no notion of model capability, pan doctor never inspects tiered_execution at all, the Settings crew row shows only the PAN-1865 harness badge, and the spawn paths log nothing about fit. Nothing told the operator the mapping was risky before an issue paid for it.",
+      "Proposal": "Add a capability-class table (frontier / workhorse / small) beside the model catalog with a completeness test, and one pure checker (checkTierFitness) that turns a tier table plus a context object into structured, never-blocking warnings: underpowered, overpowered (cost), unknown-model, provider-not-enabled, supervisor-underpowered. Surface the same checker in three places: a pan doctor row (which also validates the loader and, when tiered execution is off, checks the implicit roles.work tier), a badge on each affected crew row and the supervisor block in Settings computed from the unsaved draft, and one [spawn] tier fitness: log line per work-agent spawn. The single-work spawn check compares the staffed model against the maximum difficulty across all pending plan items, which is the check that would have caught PAN-3836. Full detail, class table, bands, message templates, and before/after snippets are in .pan/drafts/PAN-3842.md.",
+      "NonGoals": "- No hard error for any fitness condition; warnings never block save or spawn (D8)\n- No harness-subagent capability table or check; the code enum reserves 'harness-unverified' only (D7)\n- No per-provider API-key probing; the credential signal is config.enabledProviders / models.providers (D6)\n- No reconciliation of the frontend modelCatalog.ts tier field with the class table (D12, hazard H3)\n- No change to tier resolution in resolve-tier.ts or staffing.ts; the single-work path still staffs from the first dispatchable item and this issue only warns about it\n- No dashboard banner or notification for the spawn-time warning; it is a log line only\n- No pan doctor --strict promotion of fitness warnings to errors"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Class table lives in its own pure module src/lib/model-capability-class.ts, importing only MODEL_DEPRECATIONS.",
+        "rationale": "The issue asks for a table beside the catalog; model-capabilities.ts imports effect and would break the direct frontend import that lets Settings check the unsaved draft."
+      },
+      {
+        "summary": "Class assignments and difficulty bands are fixed in PRD sections 5.1 and 5.2.",
+        "rationale": "prd-authoring rule: the executor must not make judgment calls; the completeness test catches any id the table misses."
+      },
+      {
+        "summary": "Overpowered fires only when every owned difficulty caps below the model's class.",
+        "rationale": "A tier owning trivial through medium on Opus is a legitimate choice; medium allows frontier."
+      },
+      {
+        "summary": "Credential check uses config.enabledProviders (server) and models.providers (frontend).",
+        "rationale": "It is the one canonical provider-usable signal already exposed by the settings GET; API keys live in three fragmented sources and getProviderAuthMode returns undefined for most providers."
+      },
+      {
+        "summary": "No harness-subagent check ships.",
+        "rationale": "HarnessBehavior has no subagent field and no code records the fact; inventing it violates facts-not-guessing. canUseHarnessSync hard errors and the PAN-1865 badge already cover the verifiable subset."
+      },
+      {
+        "summary": "Single-work spawn compares the staffed class against the plan's maximum pending difficulty.",
+        "rationale": "The issue's listed heuristics alone would not flag simple->haiku (that is the intended mapping); the incident was the whole issue running on the first item's tier."
+      },
+      {
+        "summary": "When tiered execution is off, doctor checks the implicit roles.work tier as pseudo-tier 'default' owning all difficulties.",
+        "rationale": "The issue names 'a role model that feeds a tier'; PAN-2397 makes roles.work the implicit tier."
+      },
+      {
+        "summary": "Frontend badges reuse the existing amber PAN-1865 span styling and sit on the crew row, not in a section-level banner.",
+        "rationale": "Style guide forbids new colors; the row already names the crew so the path prefix is stripped from the badge text."
+      }
+    ],
+    "items": [
+      {
+        "id": "class-table",
+        "title": "Add the model capability-class table module with a catalog completeness test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capability-class.ts",
+            "src/lib/__tests__/model-capability-class.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capability-class.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "model-capability-class.test.ts passes all 5 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/model-capability-class.ts exporting ModelCapabilityClass, MODEL_CAPABILITY_CLASSES (copy PRD section 5.1 verbatim), and capabilityClassOf(modelId) which resolves through MODEL_DEPRECATIONS first. Import only MODEL_DEPRECATIONS from ./model-deprecations.js; never import model-capabilities.ts, fs, path, or effect. Write src/lib/__tests__/model-capability-class.test.ts with the five cases in PRD WI-1: every PROVIDERS[*].models id has a class, every non-deprecated MODEL_CAPABILITIES key has a class (same filter as settings-model-catalog.ts:58-59), a deprecated alias resolves to its replacement's class, an opencode/ id returns undefined, and the module's source text contains no node or effect import. If the completeness test names an id the table misses, classify it by the PRD rule of thumb and add it to both the module and PRD 5.1 in the same commit."
+        },
+        "items": [
+          {
+            "id": "class-table.ac1",
+            "title": "Given any id in PROVIDERS[*].models, when the completeness test runs, then capabilityClassOf returns a class and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "class-table.ac2",
+            "title": "Given the id 'gpt-5.5' (deprecated), capabilityClassOf resolves it and returns 'frontier'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "class-table.ac3",
+            "title": "Given 'opencode/anything', capabilityClassOf returns undefined without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "class-table.ac4",
+            "title": "When deleting one PROVIDERS id from MODEL_CAPABILITY_CLASSES, the test fails and its message contains that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "class-table.ac5",
+            "title": "grep -E \"from '(fs|path|effect)'|model-capabilities.js\" src/lib/model-capability-class.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fitness-checker",
+        "title": "Add the pure checkTierFitness / checkStaffingFitness checker with band constants",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fitness-context",
+            "doctor-row",
+            "spawn-slot-log",
+            "spawn-single-log",
+            "settings-badges"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-fitness.ts",
+            "src/lib/agents/__tests__/tier-fitness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-fitness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-fitness.test.ts passes every WI-2 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-fitness.ts exporting CAPABILITY_CLASS_RANK and DIFFICULTY_CLASS_BANDS (PRD 5.2), the TierFitnessCode / TierFitnessWarning / TierFitnessContext types and message templates (PRD 5.3), the structural TierFitnessConfig input, checkTierFitness(config, ctx), and checkStaffingFitness(staffing, difficulties, ctx). Use import type only from ./tier-table.js and ../xbrief/types.js so no fs-reaching module is pulled in. Implement the per-entry algorithm in PRD WI-2 exactly: unknown-model short-circuits band checks, provider-not-enabled only when ctx.enabledProviders is defined, unclassified models stop after the provider check, underpowered lists only the offending difficulties, overpowered only when every owned difficulty caps below the class, supervisor-underpowered when the supervisor class is small. Output order is tiers in Object.entries order then supervisor. Write src/lib/agents/__tests__/tier-fitness.test.ts covering every case listed in PRD WI-2 with a literal ctx (Set and Map), never the real catalog."
+        },
+        "items": [
+          {
+            "id": "fitness-checker.ac1",
+            "title": "Given a tier owning expert staffed with a small-class model, checkTierFitness returns one 'underpowered' warning whose difficulties equal ['expert'] and whose message starts with 'tiered_execution.tiers.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-checker.ac2",
+            "title": "Given a tier owning trivial and simple on a frontier-class model, checkTierFitness returns 'overpowered'; given the same model also owning medium, it returns no warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-checker.ac3",
+            "title": "Given a model id absent from knownModelIds, checkTierFitness returns only 'unknown-model' for that entry and no band warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-checker.ac4",
+            "title": "Given enabledProviders lacking the model's provider, the checker returns 'provider-not-enabled'; given enabledProviders undefined, it returns no provider warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-checker.ac5",
+            "title": "Given checkStaffingFitness with difficulties ['simple','complex'] on a small-class model, it returns one 'underpowered' warning whose difficulties equal ['complex']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fitness-context",
+        "title": "Add buildTierFitnessContextSync, the node-side context builder over the real catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-fitness-context.ts",
+            "src/lib/agents/__tests__/tier-fitness-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-fitness-context.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-fitness-context.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-fitness-context.ts exporting buildTierFitnessContextSync(config: Pick<NormalizedConfig,'enabledProviders'>): TierFitnessContext as written in PRD WI-3. knownModelIds is the union of Object.keys(MODEL_CAPABILITIES) and every PROVIDERS[*].models id; classOf is capabilityClassOf; providerOf uses getProviderForModelSync(model).name; enabledProviders copies the config Set. This module may import providers.ts and model-capabilities.ts; the frontend never imports it. Write the sibling test asserting knownModelIds contains claude-haiku-4-5 and every PROVIDERS.anthropic.models id, providerOf('gpt-5.6-luna') returns 'openai', and enabledProviders mirrors the input."
+        },
+        "items": [
+          {
+            "id": "fitness-context.ac1",
+            "title": "Given the real catalog, buildTierFitnessContextSync returns knownModelIds that contains every PROVIDERS.anthropic.models id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-context.ac2",
+            "title": "Given 'gpt-5.6-luna', ctx.providerOf returns 'openai'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fitness-context.ac3",
+            "title": "Given enabledProviders new Set(['anthropic','zai']), ctx.enabledProviders contains exactly those two names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-row",
+        "title": "Add the pan doctor 'Tiered execution' row that validates the loader and reports fitness warnings",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-tier-fitness.ts",
+            "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
+            "src/cli/commands/doctor.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js doctor | grep -A2 'Tiered execution'"
+          ],
+          "expected_outputs": [
+            "doctor-tier-fitness.test.ts passes all 5 cases",
+            "typecheck completes without errors",
+            "the freshly built CLI prints a 'Tiered execution' row (the deployed pan binary shows it only after a reload)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/doctor-tier-fitness.ts exporting checkTierFitnessConfig(deps) as written in PRD WI-4 with an injectable loadConfig. First, if config.tieredExecutionInvalid is set (mergeConfigs degrades an invalid block to disabled and surfaces the reason there, PAN-2395, src/lib/config-yaml/merge.ts:95-105; it never throws), return status 'error' with that reason. Otherwise, when config.tieredExecution.enabled is true run checkTierFitness on it (it is already validated; do not re-validate) with buildTierFitnessContextSync; when disabled, resolve roles.work via requireModelOverrideSync(resolveModel('work', undefined, config)) (the pair resolveImplicitStaffing uses at staffing.ts:82; a throw becomes status 'error') and check it as pseudo-tier 'default' owning TIERED_EXECUTION_DIFFICULTIES, rewriting the path prefix to roles.work.model. Warnings become status 'warn' with messages joined by newline plus four spaces and the FIX text from the PRD; otherwise 'ok'. Register it in doctorCommand with checks.push(checkTierFitnessConfig()) directly after checks.push(checkOrphanProposedSpecs()) at src/cli/commands/doctor.ts:855. Write the sibling test with the five cases in PRD WI-4, building configs through mergeConfigs, including the disabled-path workhorse-warns-about-expert case named so nobody removes it."
+        },
+        "items": [
+          {
+            "id": "doctor-row.ac1",
+            "title": "Given an enabled config mapping expert to claude-haiku-4-5, checkTierFitnessConfig returns status 'warn' and its message contains 'tiered_execution.tiers.' and 'expert'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac2",
+            "title": "Given the tier-table.test.ts validConfig shape (haiku trivial/simple, sonnet-5 medium/complex, opus-4-8 expert), the check returns status 'ok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac3",
+            "title": "Given the PAN-2395 incident-shaped config (feed.callouts false) loaded through mergeConfigs, the check returns status 'error' whose message contains config.tieredExecutionInvalid.reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac4",
+            "title": "Given tiered execution disabled and roles.work.model claude-haiku-4-5, the check returns 'warn' with a message that starts with 'roles.work.model'; given roles.work unresolvable, it returns 'error'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac5",
+            "title": "When pan doctor runs, its output prints a row named 'Tiered execution' after the orphan-proposed-specs row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-slot-log",
+        "title": "Log a [spawn] tier fitness line on the registered-slot spawn path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/__tests__/dispatch-tier.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/dispatch-tier.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dispatch-tier.test.ts passes including the new slot-path fitness cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/spawn-prep.ts add difficulty?: XBriefDifficulty to SlotTierSpawnParams and set it from item.metadata?.difficulty in resolveSlotTierSpawnParams. Add the exported helper logTierFitnessAtSpawn(label, staffing, difficulties, itemIds, log = console.warn) exactly as in PRD WI-5: skip when model is undefined or difficulties is empty, build the context with buildTierFitnessContextSync(loadYamlConfig().config), call checkStaffingFitness with path `tier '<tierName>'`, log one line per warning prefixed '[spawn] tier fitness:' and suffixed '— PAN-3842', and wrap the body in try/catch that logs '[spawn] tier fitness check skipped: <message>' so the spawn never fails. In src/lib/agents/spawn.ts call the helper as logTierFitnessAtSpawn(slot.agentId, ...) directly after const tierParams = resolveSlotTierSpawnParams(...) at line 137 with [slot.slotItemId] as the item ids (slot.agentId comes from resolveRegisteredSlotSpawn, spawn-prep.ts:189). Extend src/lib/agents/__tests__/dispatch-tier.test.ts using its existing loadConfigSync and readWorkspacePlanSync mocks and an injected log spy: expert item on a haiku tier logs one line containing 'expert' and 'small-class'; expert item on an opus-4-8 tier logs nothing."
+        },
+        "items": [
+          {
+            "id": "spawn-slot-log.ac1",
+            "title": "Given a slot item of difficulty expert and a tier staffed with claude-haiku-4-5, logTierFitnessAtSpawn logs exactly one line that starts with '[spawn] tier fitness:' and contains 'expert'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-slot-log.ac2",
+            "title": "Given the same item on a claude-opus-4-8 tier, the helper logs nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-slot-log.ac3",
+            "title": "Given resolveSlotTierSpawnParams for an item with metadata.difficulty 'complex', the returned params contain difficulty 'complex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-slot-log.ac4",
+            "title": "Given buildTierFitnessContextSync throws inside the helper, the helper logs a line starting '[spawn] tier fitness check skipped:' and returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-single-log",
+        "title": "Log a [spawn] tier fitness line on the single-work path against the plan's maximum difficulty",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/__tests__/dispatch-tier.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/dispatch-tier.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dispatch-tier.test.ts passes including the single-work max-difficulty cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In resolveSingleWorkTierSpawnParams (src/lib/agents/spawn-prep.ts:299) compute the pending items (status not completed or cancelled), their deduplicated difficulties, and the ids of items that carry a difficulty, and return them as planDifficulties and planItemIds on SlotTierSpawnParams (both optional). In src/lib/agents/spawn.ts, directly after the '[DEBUG] Selected model' log at line 633, when singleTierParams.model is set call logTierFitnessAtSpawn(agentId, { tierName, model: selectedModel, harness }, planDifficulties, planItemIds). Make the helper list only the item ids whose difficulty is in the warning's difficulties (pass items as {id, difficulty} pairs if that is simpler; either shape is acceptable). Extend dispatch-tier.test.ts: a plan with simple, medium, complex items and a config mapping trivial-simple to claude-haiku-4-5 and medium-complex to claude-sonnet-5 resolves haiku, returns all three planDifficulties, and the log spy receives one line naming 'medium, complex' and only the medium and complex item ids; the same plan with a complex first item resolves sonnet-5 and logs nothing."
+        },
+        "items": [
+          {
+            "id": "spawn-single-log.ac1",
+            "title": "Given a plan whose first dispatchable item is simple and a later item is complex, resolveSingleWorkTierSpawnParams returns planDifficulties containing 'simple' and 'complex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-single-log.ac2",
+            "title": "Given that plan staffed on claude-haiku-4-5, the helper logs one '[spawn] tier fitness:' line that contains 'complex' and the complex item's id and does not contain the simple item's id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-single-log.ac3",
+            "title": "Given the same plan with a complex first item staffed on claude-sonnet-5, the helper logs nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-single-log.ac4",
+            "title": "Given an explicit per-spawn model override, resolveSingleWorkTierSpawnParams returns {} and no fitness line is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-badges",
+        "title": "Render fitness badges on Settings crew rows and the supervisor block from the unsaved draft",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx passes every WI-7 case",
+            "typecheck completes without errors with the frontend importing tier-fitness.js and model-capability-class.js",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In tiered-crews.ts add tierFitnessWarnings(config, settings, catalog = MODELS_BY_PROVIDER) as written in PRD WI-7: knownModelIds from the catalog, providerOf from the catalog group, enabledProviders from settings.models.providers, classOf = capabilityClassOf imported from src/lib/model-capability-class.js, and checkTierFitness imported from src/lib/agents/tier-fitness.js (six ../ levels; ProgressPanel.tsx:5 is the precedent). In TieredExecutionSection.tsx compute const fitness = tierFitnessWarnings(outgoingConfig, formData) right after outgoingConfig (line 147); pass warnings filtered by tierName === deriveTierName(ownedDifficulties) to each CrewRow at line 523, and render warnings with tierName 'supervisor' as a badge inside the supervisor disclosure near the 'Supervisor owns inspection' control. In CrewRow.tsx accept warnings?: TierFitnessWarning[] and render one span per warning after the PAN-1865 span at line 54 with the identical class string, data-testid='tier-fitness-warning', title={warning.message}, and text '⚠ ' plus the message with its 'tiered_execution.tiers.<name>: ' prefix stripped. Extend TieredExecutionSection.test.tsx with the six testing-library cases in PRD WI-7."
+        },
+        "items": [
+          {
+            "id": "settings-badges.ac1",
+            "title": "Given a crew on claude-haiku-4-5 that owns expert, the section renders one element with data-testid 'tier-fitness-warning' whose text contains 'small-class' and 'expert'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-badges.ac2",
+            "title": "Given the same crew owning only trivial and simple, the section renders no tier-fitness-warning element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-badges.ac3",
+            "title": "Given a claude-opus-5 crew owning only trivial, the badge text contains 'would cost less'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-badges.ac4",
+            "title": "Given a supervisor on claude-haiku-4-5, the supervisor block renders a badge whose text contains 'supervisor'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-badges.ac5",
+            "title": "When the operator changes the crew's Model select to a fitting model, the section re-renders without the badge before any save occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fitness",
+        "title": "Document capability classes, difficulty bands, and the three warning surfaces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T19:24:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md",
+            "docs/MODEL_ROUTING.md",
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Tier fitness warnings' docs/TIERED-EXECUTION.md",
+            "grep -c 'Fitness warnings never block a save or a spawn' docs/TIERED-EXECUTION.md",
+            "grep -n '^## Capability classes' docs/MODEL_ROUTING.md",
+            "grep -n 'Tiered execution' reference/troubleshooting.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/TIERED-EXECUTION.md insert a '## Tier fitness warnings' section between '## Settings UI' (line 64) and '## Resolution Chain' (line 78) that names the three classes and the module src/lib/model-capability-class.ts, renders the PRD 5.2 band table as markdown, lists the five warning codes with one-line meanings, describes the three surfaces (the pan doctor 'Tiered execution' row, crew-row and supervisor badges, the '[spawn] tier fitness:' log line), explains the single-work maximum-difficulty rule and its PAN-3836 origin, and states verbatim 'Fitness warnings never block a save or a spawn; a cheap model may be a deliberate choice.' Extend the Settings UI paragraph ending 'known routing hazard.' with the fitness-badge sentence from PRD WI-8. In docs/MODEL_ROUTING.md add '## Capability classes' before '## Model Capability Matching' (line 181). In reference/troubleshooting.mdx append the one-sentence 'Tiered execution' row mention inside the pan doctor Tip block (lines 482-486)."
+        },
+        "items": [
+          {
+            "id": "docs-fitness.ac1",
+            "title": "docs/TIERED-EXECUTION.md contains a '## Tier fitness warnings' heading and the sentence 'Fitness warnings never block a save or a spawn'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fitness.ac2",
+            "title": "docs/TIERED-EXECUTION.md contains all five code names: underpowered, overpowered, unknown-model, provider-not-enabled, supervisor-underpowered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fitness.ac3",
+            "title": "docs/MODEL_ROUTING.md contains a '## Capability classes' heading that names src/lib/model-capability-class.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fitness.ac4",
+            "title": "reference/troubleshooting.mdx contains 'Tiered execution' inside the pan doctor Tip block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "class-table",
+        "to": "fitness-checker",
+        "type": "blocks"
+      },
+      {
+        "from": "fitness-checker",
+        "to": "fitness-context",
+        "type": "blocks"
+      },
+      {
+        "from": "fitness-context",
+        "to": "doctor-row",
+        "type": "blocks"
+      },
+      {
+        "from": "fitness-context",
+        "to": "spawn-slot-log",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-slot-log",
+        "to": "spawn-single-log",
+        "type": "blocks"
+      },
+      {
+        "from": "fitness-checker",
+        "to": "settings-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "fitness-checker",
+        "to": "docs-fitness",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
