@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3841-review-security",
+  "issueId": "PAN-3841",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "k3",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3841",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "ae68f817-e6ba-4bbd-a9f5-bcf6be22c98e",
+      "startedAt": "2026-09-16T20:47:58.982Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-09-16T20:47:58.982Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
