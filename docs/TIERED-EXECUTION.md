@@ -63,7 +63,7 @@ tiered_execution:
 
 ## Settings UI
 
-The dashboard Settings -> Tiered Execution panel presents the tier table as crews, so operators edit the routing decision rather than YAML tier names. Its five-column board maps every difficulty to exactly one crew, making missing and duplicate difficulty coverage impossible. The crew roster labels each crew by its staffing (for example, `Kimi K2.7 Code` or `4-model mix`), shows blended cost, and expands into single-model or weighted-distribution editors. Harness selectors default to the provider route and warn when an explicit override creates a known routing hazard.
+The dashboard Settings -> Tiered Execution panel presents the tier table as crews, so operators edit the routing decision rather than YAML tier names. Its five-column board maps every difficulty to exactly one crew, making missing and duplicate difficulty coverage impossible. The crew roster labels each crew by its staffing (for example, `Kimi K2.7 Code` or `4-model mix`), shows blended cost, and expands into single-model or weighted-distribution editors. Harness selectors default to the provider route and warn when an explicit override creates a known routing hazard, and each crew row and the supervisor block show a fitness badge when the staffed model's capability class does not match the difficulties it owns (see Tier fitness warnings).
 
 The roster's **+ Add crew** control opens an inline difficulty prompt, so creating a crew and assigning its first difficulty remain one gesture. From an empty roster, the first crew takes every difficulty immediately. Each collapsed row exposes **× remove**; when the crew owns difficulties, the hand-off prompt chooses another crew to inherit them and emits the reassignment and removal in one settings write. The board's **+ new crew…** shortcut remains available and uses the same create-and-assign path.
 
@@ -74,6 +74,36 @@ On load, tiers with identical staffing merge into one crew and own the union of 
 Every crew must retain at least one difficulty because runtime tiers reject an empty `difficulties` list. Removal performs the required reassignment through the hand-off prompt before deleting the crew. A crew with kind overrides remains blocked with `Move or remove these kind overrides before removing this crew.`; the last crew remains blocked with `This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.` Moving the final difficulty of a kind-routed crew is also blocked until those overrides are explicitly moved or removed, so an unrelated routing edit cannot silently delete kind-routed work.
 
 The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the xBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
+
+## Tier fitness warnings
+
+Every catalog model carries a **capability class** — `frontier`, `workhorse`, or `small` — assigned in `src/lib/model-capability-class.ts` (`MODEL_CAPABILITY_CLASSES`). That table is the only place model ids are classified; deprecated ids resolve through `MODEL_DEPRECATIONS` first. The fitness checker (`src/lib/agents/tier-fitness.ts`) compares each tier's staffed class against the band its owned difficulties need:
+
+| Difficulty | Minimum class | Maximum class |
+| --- | --- | --- |
+| `trivial` | small | workhorse |
+| `simple` | small | workhorse |
+| `medium` | workhorse | frontier |
+| `complex` | workhorse | frontier |
+| `expert` | frontier | frontier |
+
+It emits five warning codes:
+
+- `underpowered` — the staffed class is below the band minimum for at least one owned difficulty.
+- `overpowered` — the staffed class is above the band maximum for every owned difficulty (a cost warning).
+- `unknown-model` — the model id is not in the model catalog.
+- `provider-not-enabled` — the model's provider is disabled in Settings > Providers.
+- `supervisor-underpowered` — the supervisor is a small-class model; it reviews every tier's commits and should be workhorse-class or better.
+
+The same warnings surface in three places:
+
+1. **`pan doctor`** prints a `Tiered execution` row: `error` when the `tiered_execution` block is invalid (the PAN-2395 degraded-load reason), `warn` listing every fitness warning, `ok` otherwise. With tiered execution disabled, the row checks the implicit `roles.work` tier against every difficulty.
+2. **Settings > Tiered Execution** renders a `⚠` badge on each crew row and on the supervisor block, computed from the unsaved draft so the badge appears and disappears as you edit.
+3. **Spawn time** logs one `[spawn] tier fitness:` line per warning. Slot spawns check the slot item's difficulty; single-work spawns check the maximum difficulty across every pending plan item, naming the items that exceed the staffed class.
+
+The single-work rule exists because of PAN-3836 (2026-09-16): a 14-item feature whose first xBRIEF item was rated `simple` staffed the whole run on a small-class model — the first item selects the tier, but the agent works every item. Six review cycles followed. The spawn log now calls that out before the issue pays for it.
+
+Fitness warnings never block a save or a spawn; a cheap model may be a deliberate choice.
 
 ## Resolution Chain
 

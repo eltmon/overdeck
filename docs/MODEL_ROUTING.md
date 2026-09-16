@@ -178,6 +178,10 @@ Parallel review lanes are spawned by the review-agent and resolve their models t
 
 Subagents (`explore`, `plan`, `bash`, `general-purpose`) are spawned via the Agent tool and resolve their models through the work-type router using their `subagent:*` work type ID.
 
+## Capability classes
+
+Separately from per-skill capability matching, every catalog model also carries a coarse **capability class** — `frontier`, `workhorse`, or `small` — that answers "how strong is this model overall". The class table in `src/lib/model-capability-class.ts` (`MODEL_CAPABILITY_CLASSES`) is the only place model ids are classified; nothing else in the routing stack hardcodes a model's strength. Tiered execution's fitness check reads it to warn when a tier's staffed class does not fit the difficulties the tier owns (see `docs/TIERED-EXECUTION.md`, "Tier fitness warnings").
+
 ## Model Capability Matching
 
 Each work type declares the capabilities it needs:
