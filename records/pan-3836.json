@@ -262,6 +262,11 @@
       "reason": "resume",
       "agentModel": "k3",
       "timestamp": "2026-09-16T18:53:58.723Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T19:50:13.582Z"
     }
   ],
   "feedback": [],
@@ -367,22 +372,22 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:50:12.117Z",
+  "updated": "2026-09-16T19:50:14.109Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T19:50:11.639Z",
+    "updatedAt": "2026-09-16T19:50:12.131Z",
     "uatNotes": "BLOCKING: /projects/new crashes on every entry point (sidebar +, HomePage + New project) — NewProjectPage.tsx uses react-router-dom's useSearchParams() but the app mounts no <Router> anywhere; masked in unit tests only because NewProjectPage.test.tsx wraps it in <BrowserRouter>. Full evidence and repro in .pan/test/result.json.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
-    "reviewSpawnedAt": "2026-09-16T18:53:51.051Z",
+    "reviewSpawnedAt": "2026-09-16T19:50:12.130Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -543,7 +548,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.516539,
-        "pricingAsOf": "2026-09-16T19:50:11.714Z"
+        "pricingAsOf": "2026-09-16T19:50:14.097Z"
       }
     },
     "merges": [
