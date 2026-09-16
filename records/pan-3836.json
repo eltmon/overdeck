@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:55.373Z",
+  "updated": "2026-09-16T23:00:10.489Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 37,
+    "sequence": 38,
     "claims": {},
     "claimHistory": [
       {
@@ -857,8 +857,8 @@
         "updatedAt": "2026-09-16T14:41:54.603Z"
       },
       "create-core-resolve": {
-        "reason": "Implemented resolveProjectCreateIntent with full validation, detection, and memoized remote probing. Comprehensive tests included.",
-        "updatedAt": "2026-09-16T14:46:39.389Z"
+        "reason": "Cycle-10 review BLOCKING [security+correctness]: isWithinHome in src/lib/projects/create.ts:183 lost realpath canonicalization; a symlink under $HOME pointing outside passes the lexical startsWith check. Fix: realpath the nearest existing ancestor, re-anchor the non-existent tail, use the canonical path for both the boundary test and intent.path. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T23:00:10.489Z"
       },
       "create-core-perform": {
         "reason": "Implemented performProjectCreate with clone/init, registration with extras, workspaces exclusion, and main workspace bootstrap. Already included in create.ts from previous task.",
@@ -918,12 +918,12 @@
     "registration-extras.ac2": "completed",
     "registration-extras.ac3": "completed",
     "registration-extras.ac4": "completed",
-    "create-core-resolve": "completed",
-    "create-core-resolve.ac1": "completed",
-    "create-core-resolve.ac2": "completed",
-    "create-core-resolve.ac3": "completed",
-    "create-core-resolve.ac4": "completed",
-    "create-core-resolve.ac5": "completed",
+    "create-core-resolve": "pending",
+    "create-core-resolve.ac1": "pending",
+    "create-core-resolve.ac2": "pending",
+    "create-core-resolve.ac3": "pending",
+    "create-core-resolve.ac4": "pending",
+    "create-core-resolve.ac5": "pending",
     "create-core-perform": "completed",
     "create-core-perform.ac1": "completed",
     "create-core-perform.ac2": "completed",
