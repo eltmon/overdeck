@@ -137,34 +137,31 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-09-16T17:29:30.398Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "k3",
-      "timestamp": "2026-09-16T17:30:05.478Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "k3",
-      "timestamp": "2026-09-16T17:30:11.671Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "k3",
-      "timestamp": "2026-09-16T17:30:11.682Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "k3",
-      "timestamp": "2026-09-16T17:30:11.694Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "k3",
-      "timestamp": "2026-09-16T17:30:11.718Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-09-16T16:55:15Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3836\n\n# Review Synthesis — PAN-3836 — 2026-09-16T16:57Z (cycle 3)\n\n## Verdict: CHANGES REQUESTED — `creating` still resets after the first poll: fix commit added terminal-branch clears but never touched the `finally` that fires first (the exact caveat cycle 2 called out)\n\n## Context\n- Manifest: `.pan/review/agent-pan-3836-review-591e9a2c/context.json`\n- Branch: feature/pan-3836\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836\n- HEAD reviewed: 591e9a2c9dce1f416de36efb302cac64e710ee46\n- Cycle number: 3\n- Prior cycle SHA: 1e4ae61d5e9eb370b4e25bfc936ba1f5198056db\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | security.md | 0 |\n| correctness | ready | correctness.md | 1 |\n| performance | ready | performance.md | 0 |\n| requirements | ready | requirements.md | 0 (COMPLETE: 14/14 in-scope items implemented) |\n\n## Blocking Findings\n\n### [correctness] `creating` still resets after the first poll on the 202 clone path — `src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts:222-253`\n**Evidence tier:** Tier 1, verified against committed HEAD `591e9a2c9dc`. The fix commit's message says \"Move setCreating(false) from finally block,\" but the move never happened: `setCreating(false)` was added to `pollJob`'s `done`/`failed`/404/error branches while the unconditional `finally { if (seq === submitSeq.current) setCreating(false); }` in `submit()` was left intact (line ~252). `pollJob` returns after one status fetch while the job is `running`, so the `finally` executes ~100ms into a minutes-long clone and clears `creating`; the new terminal-branch calls fire long afterwards and are no-ops. Every input and the Create button re-enable for the entire clone, and a second click races a second `git clone` into the same target path.\n**Fix (one-line shape):** track `let jobStarted = false`, set it in the 202 branch, and gate the finally: `finally { if (seq === submitSeq.current && !jobStarted) setCreating(false); }`. The terminal-branch clears in `pollJob` then become the real clear points.\n**Cycle-diff scope:** this finding is on the exact region the `591e9a2c9dc` commit edited and claims to have fixed — it survives the cycle-3 convergence gate as a failed fix, not a re-litigation. (Note: the requirements reviewer marked this resolved based on the commit message; the correctness reviewer's line-level read of committed HEAD is the accurate one — the `finally` was never gated.)\n\n## Non-blocking Findings\n\n### requirements\n- `~` **Committed red test contradicts the implementation: `NewProjectPage.test.tsx > \"Cancel button navigates to knowledge tab\"`** (Tier 2, confirmed failing at head: 1 failed / 16 passed across the two page test files). The test expects a `setActiveTabState('knowledge')` call the component never makes; Cancel invokes the `onCancel` prop, wired to `onTabChange('home')` in `AppRoutes.tsx:150`. Defective test, not missing functionality — the cancel requirement is delivered and covered by the green no-loss audit. **Heads-up: this will show as a red frontend suite for the test role** — fix the test to pass `onCancel` and assert the prop fires.\n- `~` `pan project clone --dry-run` help promises JSON but prints chalk text — `src/cli/commands/project.ts:508`.\n- `~` `pan project add` hook-install/context-layer messages silently dropped — `src/cli/commands/project.ts:97`.\n- `≉` TalkItThrough composer changes are outside every traced xBRIEF item — deliberate-looking absorbed scope; flagged for operator awareness.\n- `?` Job-store TTL timers not `unref`'d.\n\n### security (unchanged, no blockers)\n- `~` `GET /api/projects/create-jobs/:jobId` has no auth guard — bounded info disclosure; add `rejectUnauthorizedDashboardRequest`.\n- `?` Unbounded `remoteProbeMemo` map; `?` arbitrary-host probes (acceptable in the single-operator model).\n\n### correctness (advisories, unchanged)\n- `~` `excludeWorkspacesDir` trailing-newline corruption — `create.ts:480-486`.\n- `~` Home-boundary check lost symlink `realpath` canonicalization — `create.ts:183-197`.\n- `~` CLI reporting regression (hooks/context-layer lines unreachable); `~` lowercase `--linear-team` hard-fails; `~` partial state on bootstrap failure after registration.\n- `≉` `refreshRemote: true` defeats the probe memo on the keystroke path (dup of performance).\n- `≉` SCP-like regex folds SSH port into repo path — `repo-url.ts:58`.\n- `?` `Effect.tryPromise` → `Effect.promise` converts typed failures into defects on the routes — small behavioral delta, acceptable.\n- `?` `runClone` on `exit` not `close`; `?` mode `existing` accepts a regular file; `?` job-poll GET unauthenticated.\n- **Effect-diagnostics ratchet: PASS** (308 known findings, none new) — the cycle-1/2 baseline-drift `NEW:` is resolved.\n\n### performance\n- `~` SHOULD-fix: `refreshRemote: true` on `/api/projects/resolve` defeats the 60s memo — one `git ls-remote` per settled keystroke. Use the memo on resolve; freshness only on POST.\n- `≉` Serial git detection per keystroke in `existing` mode.\n- `?` No abort/timeout on the clone itself.\n\n## Clean Sub-roles\n- security — no blocking findings; the 591e9a2c Effect-idiom route refactor preserves validation order, auth guards, status codes, and error payloads.\n- performance — no MUST-level regressions; the delta is performance-neutral.\n- requirements — COMPLETE (14/14 in-scope items); both cycle-1/2 findings verified resolved at head, no-loss audit 11/11 green at head.\n\n## Cycle Note\nThird blocked verdict on this issue. The top finding is **not newly raised** — it is the cycle-1 `creating`-race blocker: the cycle-2 verdict warned explicitly that the then-uncommitted fix was ineffective without gating the `finally`, and the `591e9a2c9dc` commit shipped exactly that ineffective fix (terminal-branch clears added, `finally` untouched). Blocking again on a fix that demonstrably does not work is the convergence gate working as intended; the remaining repair is a one-condition change.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.pan/review/agent-pan-3836-review-591e9a2c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3836 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-16T17:16:12Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3836 (attempt 2/3):\n\nFailed check: test\n\nVerification FAILED at test (449190ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3836 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    },
+    {
+      "seq": 4,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-16T17:29:30Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3836 (attempt 3/3):\n\nFailed check: test\n\nVerification FAILED at test (435542ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3836 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -263,18 +260,18 @@
     "recordedAt": "2026-09-16T17:26:25.189Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:30:11.718Z",
+  "updated": "2026-09-16T17:30:21.261Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T17:28:56.410Z",
-    "updatedAt": "2026-09-16T17:28:56.865Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-09-16T17:29:38.666Z",
+    "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
     "reviewRequestedAt": "2026-09-16T17:28:56.410Z",
@@ -413,7 +410,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.610113,
-        "pricingAsOf": "2026-09-16T17:28:59.508Z"
+        "pricingAsOf": "2026-09-16T17:30:00.779Z"
       }
     },
     "merges": [
@@ -422,7 +419,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
