@@ -115,22 +115,23 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:23:39.062Z",
+  "updated": "2026-09-16T22:31:15.711Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:23:38.962Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
-    "verificationNotes": "Verification FAILED at test (990529ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3842/.overdeck/verification-latest.json",
+    "updatedAt": "2026-09-16T22:31:15.637Z",
+    "reviewNotes": "Both cycle-1 blockers verified fixed; 4/4 reviewers zero blockers at dfe7305. Caveat: an uncommitted resolveSlotSpawnFitness refactor (+157/-81, green 37/37) sits in the tree and is NOT covered by this approval",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
+    "reviewedAtCommit": "f755231de2d0ae8f0970d6ce6d52adaa35e3f7ac",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
     "reviewSpawnedAt": "2026-09-16T22:09:54.870Z",
     "scopeDrift": {
@@ -219,9 +220,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 426322,
-            "output": 68048,
-            "cacheRead": 31585811,
+            "input": 463545,
+            "output": 82046,
+            "cacheRead": 44276988,
             "cacheWrite": 0
           }
         }
@@ -240,15 +241,15 @@
           "cacheWrite": 270975
         },
         "custom/MiniMax-M3": {
-          "input": 426322,
-          "output": 68048,
-          "cacheRead": 31585811,
+          "input": 463545,
+          "output": 82046,
+          "cacheRead": 44276988,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.833696,
-        "pricingAsOf": "2026-09-16T22:23:38.992Z"
+        "usd": 13.861657,
+        "pricingAsOf": "2026-09-16T22:31:15.686Z"
       }
     },
     "merges": [
