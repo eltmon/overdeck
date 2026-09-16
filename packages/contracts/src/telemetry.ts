@@ -116,6 +116,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
     "sessions",
     "awaiting-merge",
     "workspace-new",
+    "project-new",
     "workspace",
   ],
   decision_subject: ["agent", "conversation"],

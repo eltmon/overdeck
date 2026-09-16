@@ -27,6 +27,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   sessions: '/sessions',
   'awaiting-merge': '/awaiting-merge',
   'workspace-new': '/workspaces/new',
+  'project-new': '/projects/new',
   workspace: '/workspace',
 };
 

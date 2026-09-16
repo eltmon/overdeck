@@ -28,6 +28,7 @@ import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
 import { NewWorkspacePage } from '../pages/NewWorkspacePage';
+import { NewProjectPage } from '../pages/NewProjectPage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
 import type { Issue } from '../types';
@@ -139,6 +140,14 @@ export function AppRoutes({
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
           <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
+        </div>
+      )}
+      {activeTab === 'project-new' && (
+        <div className="w-full h-full overflow-hidden">
+          <NewProjectPage
+            onCancel={() => onTabChange('home')}
+            onCreated={() => onTabChange('knowledge')}
+          />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (
