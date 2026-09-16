@@ -85,10 +85,10 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:53:08.313Z",
+  "updated": "2026-09-16T21:57:19.310Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -96,8 +96,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T21:52:09.448Z",
-    "reviewNotes": "Agent re-review request (1/25): Addressed PAN-3842 P2 from the independent quality review: explicit model override no longer suppresses the spawn-time fitness check.\n\nCommit: 44ab8dd5c85979d5d9989524fb423b3140021293 on origin/feature/pan-3842\nTests: dispatch-tier (32 passed), tier-fitness, tier-fitness-context, doctor-tier-fitness (59 passed total).\nTypecheck: green (no new errors).\n\nWhat changed:\n- resolveSingleWorkTierSpawnParams / resolveSlotTierSpawnParams no longer return {} on an explicit override; they preserve override precedence by leaving model/harness unset but now surface plan difficulty info (planDifficulties/planItems or difficulty) plus an explicitOverride marker.\n- spawn callers pass the FINAL selected model into logTierFitnessAtSpawn (slotModel in the slot path, selectedModel in single-work). The slot path now also threads harness from options through the fitness call.\n- Replaced the override-suppresses-warning tests with two pinning the new surface (override precedence preserved + difficulty surfaced).\n- Added 4 new regressions: explicit haiku/expert-plan warns on single-work; explicit opus/expert-plan does not warn on single-work; explicit haiku/expert-slot-item warns; explicit opus/expert-slot-item does not warn. Warnings never block.",
+    "updatedAt": "2026-09-16T21:57:19.262Z",
+    "reviewNotes": "41be7f9 slot path: fitness checks pre-staffing model (spawn.ts:139) and explicit --model slot spawn can now abort on plan desync (spawn-prep.ts:274-286)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
@@ -217,7 +217,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.768893,
-        "pricingAsOf": "2026-09-16T21:52:12.414Z"
+        "pricingAsOf": "2026-09-16T21:57:19.282Z"
       }
     },
     "merges": [
@@ -226,7 +226,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
