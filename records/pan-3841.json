@@ -105,19 +105,19 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:58:49.250Z",
+  "updated": "2026-09-16T21:58:51.874Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:58:49.145Z",
+    "updatedAt": "2026-09-16T21:58:49.853Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues (PAN-3841 operator review): applied authenticated mutation guard (rejectUnsafeDashboardMutationRequest) to the retrospective launch route and CSRF header to the button; replaced prototype-chain window check with Object.hasOwn + added body-shape validation; expanded roles/retrospective.md to read every current review report form (review.md + correctness/security/performance/requirements.md) and routed canonical record reads through pan records show / pan show. SHAs: 6372ffff562, a6f02a76011, 0dedaa83d95.",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -246,9 +246,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 2916899,
-            "output": 64356,
-            "cacheRead": 32413312,
+            "input": 2917265,
+            "output": 64740,
+            "cacheRead": 32827520,
             "cacheWrite": 0
           }
         }
@@ -267,9 +267,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 5751669,
-          "output": 188979,
-          "cacheRead": 72395349,
+          "input": 5752035,
+          "output": 189363,
+          "cacheRead": 72809557,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -280,8 +280,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.4621144,
-        "pricingAsOf": "2026-09-16T21:58:49.210Z"
+        "usd": 24.4626844,
+        "pricingAsOf": "2026-09-16T21:58:51.858Z"
       }
     },
     "merges": [
