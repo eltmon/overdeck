@@ -18,6 +18,14 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
 
+### Conversation kickoff templates (not roles)
+
+`roles/handoff.md`, `roles/handoff-external.md`, `roles/handoff-external-pi.md`,
+and `roles/retrospective.md` live alongside the role files but are **not**
+roles: the server reads them at request time and renders them into a
+conversation's first message. They are never spawned as agents. Changing any
+of them requires a `Prompt-Change:` commit trailer.
+
 There is no spawned `ship` role file. Shipping is server-side: the dashboard runs
 `rebaseFeatureBranch()`, PAN-1650's review-status gate derives `readyForMerge`,
 and the human Merge button performs the final GitHub squash. The `ship` token

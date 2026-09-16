@@ -52,6 +52,19 @@ Enter share a pending-launch guard. Launch errors appear below the controls;
 the draft stays available for retry. Browser coverage lives in
 `src/dashboard/frontend/tests/talk-it-through.spec.ts`.
 
+**Pipeline retrospective button:** the Command Deck header's
+`RetrospectiveButton` (`components/CommandDeck/RetrospectiveButton.tsx`) POSTs
+`{ window: '24h' | '7d', model, harness }` to
+`POST /api/conversations/retrospective`
+(`routes/conversations-retrospective.ts`). The server reads
+`roles/retrospective.md` on every request — edit it to tune the prompt, no
+rebuild or restart — renders the window bounds and per-project state/repo
+paths into the kickoff message, and creates an **unscoped** conversation
+through `handleConversationCreate`, so it appears under the sidebar's
+`No project` bucket. The conversation is read-only by prompt contract only
+(no tool sandbox); `tests/unit/prompts/retrospective-template.test.ts` pins
+the read-only clause and the placeholder set.
+
 **DB job worker lanes:**
 - The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
   reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
