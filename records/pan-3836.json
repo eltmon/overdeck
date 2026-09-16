@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T15:47:03.749Z",
+  "updated": "2026-09-16T15:47:11.035Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "cli-project-clone": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3246878,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T15:47:11.035Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -214,6 +222,7 @@
     "cli-project-add-dry-run.ac1": "completed",
     "cli-project-add-dry-run.ac2": "completed",
     "cli-project-add-dry-run.ac3": "completed",
-    "cli-project-add-dry-run.ac4": "completed"
+    "cli-project-add-dry-run.ac4": "completed",
+    "cli-project-clone": "running"
   }
 }
