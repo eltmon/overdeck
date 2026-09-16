@@ -92,19 +92,20 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:18:46.803Z",
+  "updated": "2026-09-16T21:21:02.740Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:18:00.159Z",
-    "reviewNotes": "Review role spawn failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3841.lock is held by process-2417835@eltmon-z790 pid=2417835 acquiredAt=2026-09-16T21:16:19.904Z. Retry the command after that writer finishes.",
+    "updatedAt": "2026-09-16T21:21:02.647Z",
+    "reviewNotes": "Retrospective feature: pure renderer, origin-validated route, body allowlist omits projectKey/issueId, 24h/7d windows enforced, prompt read-only pinned by tests, CommandDeck mount respects non-goal (no ProjectHome button).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "reviewSpawnedAt": "2026-09-16T21:18:00.158Z",
@@ -179,11 +180,51 @@
             "cacheWrite": 249772
           }
         },
+        "review": {
+          "custom/MiniMax-M3": {
+            "input": 1290474,
+            "output": 35673,
+            "cacheRead": 6917120,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "custom/MiniMax-M3": {
+            "input": 234700,
+            "output": 3969,
+            "cacheRead": 4367650,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "custom/MiniMax-M3": {
+            "input": 221820,
+            "output": 1798,
+            "cacheRead": 741760,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "custom/MiniMax-M3": {
+            "input": 600460,
+            "output": 3359,
+            "cacheRead": 2850432,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "custom/MiniMax-M3": {
+            "input": 224565,
+            "output": 3149,
+            "cacheRead": 2812672,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 479345,
-            "output": 4427,
-            "cacheRead": 1426688,
+            "input": 905075,
+            "output": 15724,
+            "cacheRead": 6291328,
             "cacheWrite": 0
           }
         }
@@ -202,15 +243,15 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 479345,
-          "output": 4427,
-          "cacheRead": 1426688,
+          "input": 3477094,
+          "output": 63672,
+          "cacheRead": 23980962,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.8333154,
-        "pricingAsOf": "2026-09-16T21:18:00.444Z"
+        "usd": 16.8037344,
+        "pricingAsOf": "2026-09-16T21:21:02.723Z"
       }
     },
     "merges": [
