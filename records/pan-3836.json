@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:40.321Z",
+  "updated": "2026-09-16T22:59:43.377Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 32,
+    "sequence": 33,
     "claims": {},
     "claimHistory": [
       {
@@ -877,8 +877,8 @@
         "updatedAt": "2026-09-16T22:59:40.321Z"
       },
       "cli-project-clone": {
-        "reason": "Implemented pan project clone command with resolve-before-create pattern, progress reporting, and comprehensive tests for URL validation and dry-run mode",
-        "updatedAt": "2026-09-16T15:49:47.996Z"
+        "reason": "Cycle-10 review BLOCKING [requirements FR-5/AC-3]: pan project clone --dry-run must print JSON containing wouldClone: true (src/cli/commands/project.ts:270-278 prints prose). Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:43.376Z"
       },
       "use-project-create-intent-hook": {
         "reason": "Implemented useProjectCreateIntent React hook with resolve debouncing, 202 clone job polling, 404 fallback, and 422 finding handling with comprehensive tests",
@@ -946,11 +946,11 @@
     "cli-project-add-dry-run.ac2": "pending",
     "cli-project-add-dry-run.ac3": "pending",
     "cli-project-add-dry-run.ac4": "pending",
-    "cli-project-clone": "completed",
-    "cli-project-clone.ac1": "completed",
-    "cli-project-clone.ac2": "completed",
-    "cli-project-clone.ac3": "completed",
-    "cli-project-clone.ac4": "completed",
+    "cli-project-clone": "pending",
+    "cli-project-clone.ac1": "pending",
+    "cli-project-clone.ac2": "pending",
+    "cli-project-clone.ac3": "pending",
+    "cli-project-clone.ac4": "pending",
     "use-project-create-intent-hook": "completed",
     "use-project-create-intent-hook.ac1": "completed",
     "use-project-create-intent-hook.ac2": "completed",
