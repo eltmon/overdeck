@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T19:57:18.432Z",
+  "updated": "2026-09-16T20:01:53.922Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "doctor-row": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3419093,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T19:57:18.432Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Added src/lib/agents/tier-fitness-context.ts per WI-3 verbatim plus 4-case test; all pass, typecheck green.",
         "releasedAt": "2026-09-16T19:56:56.469Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3419093,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T19:57:18.432Z",
+        "itemId": "doctor-row",
+        "outcome": "completed",
+        "reason": "Added doctor-tier-fitness.ts (error on tieredExecutionInvalid, warn listing fitness warnings, ok otherwise; disabled path checks roles.work pseudo-tier) registered in doctor.ts after orphan-proposed-specs; 6 tests pass; built CLI shows the row.",
+        "releasedAt": "2026-09-16T20:01:53.922Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "fitness-context": {
         "reason": "Added src/lib/agents/tier-fitness-context.ts per WI-3 verbatim plus 4-case test; all pass, typecheck green.",
         "updatedAt": "2026-09-16T19:56:56.469Z"
+      },
+      "doctor-row": {
+        "reason": "Added doctor-tier-fitness.ts (error on tieredExecutionInvalid, warn listing fitness warnings, ok otherwise; disabled path checks roles.work pseudo-tier) registered in doctor.ts after orphan-proposed-specs; 6 tests pass; built CLI shows the row.",
+        "updatedAt": "2026-09-16T20:01:53.922Z"
       }
     }
   },
@@ -162,6 +169,11 @@
     "fitness-context.ac1": "completed",
     "fitness-context.ac2": "completed",
     "fitness-context.ac3": "completed",
-    "doctor-row": "running"
+    "doctor-row": "completed",
+    "doctor-row.ac1": "completed",
+    "doctor-row.ac2": "completed",
+    "doctor-row.ac3": "completed",
+    "doctor-row.ac4": "completed",
+    "doctor-row.ac5": "completed"
   }
 }
