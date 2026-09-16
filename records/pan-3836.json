@@ -142,6 +142,26 @@
       "reason": "resume",
       "agentModel": "k3",
       "timestamp": "2026-09-16T17:30:05.478Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T17:30:11.671Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T17:30:11.682Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T17:30:11.694Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T17:30:11.718Z"
     }
   ],
   "feedback": [],
@@ -243,7 +263,7 @@
     "recordedAt": "2026-09-16T17:26:25.189Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:30:05.491Z",
+  "updated": "2026-09-16T17:30:11.718Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
