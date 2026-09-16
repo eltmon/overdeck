@@ -392,19 +392,19 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T21:18:32.550Z",
+  "updated": "2026-09-16T21:19:35.660Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-09-16T21:16:49.392Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-09-16T21:19:35.510Z",
     "reviewNotes": "Cycle 8: one-commit UAT fix to read /projects/new mode preset via window.location (was crashing on react-router's useSearchParams). Cycle diff is bounded to NewProjectPage + tests; standing advisories from cycles 6/7 demoted under the convergence gate.",
-    "testNotes": "Verdict re-gated: evidence=9e039c17 row=29c8eff1 writer=quick-signal",
+    "testNotes": "Reconciled from green GitHub Actions CI on 9e039c17: lint (https://github.com/eltmon/overdeck/actions/runs/35142550786/job/104950389383)",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -534,17 +534,17 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 1364252,
-            "output": 48472,
-            "cacheRead": 11440384,
+            "input": 1372282,
+            "output": 49427,
+            "cacheRead": 12350208,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "custom/MiniMax-M3": {
-            "input": 373520,
-            "output": 8917,
-            "cacheRead": 6816478,
+            "input": 376875,
+            "output": 15092,
+            "cacheRead": 7484512,
             "cacheWrite": 0
           }
         },
@@ -558,9 +558,9 @@
         },
         "review.requirements": {
           "custom/MiniMax-M3": {
-            "input": 328329,
-            "output": 8078,
-            "cacheRead": 6422912,
+            "input": 349874,
+            "output": 25926,
+            "cacheRead": 11771904,
             "cacheWrite": 0
           }
         },
@@ -597,9 +597,9 @@
           "cacheWrite": 246599
         },
         "custom/MiniMax-M3": {
-          "input": 3010460,
-          "output": 110495,
-          "cacheRead": 34790622,
+          "input": 3043390,
+          "output": 135473,
+          "cacheRead": 41717472,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -616,8 +616,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.220743,
-        "pricingAsOf": "2026-09-16T21:17:22.167Z"
+        "usd": 46.2606,
+        "pricingAsOf": "2026-09-16T21:19:35.640Z"
       }
     },
     "merges": [
@@ -626,7 +626,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
