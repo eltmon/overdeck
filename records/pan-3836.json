@@ -171,7 +171,7 @@
     "recordedAt": "2026-09-16T16:41:41.823Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:50:21.474Z",
+  "updated": "2026-09-16T16:51:04.637Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -180,7 +180,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-09-16T16:43:14.459Z",
     "updatedAt": "2026-09-16T16:49:52.550Z",
     "reviewNotes": "Cycle-1 blockers still at committed HEAD: fixes uncommitted; blocker-2 fix as written is ineffective (submit finally must gate on job-started)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
