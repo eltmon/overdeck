@@ -171,16 +171,16 @@
     "recordedAt": "2026-09-16T16:51:08.216Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:51:08.219Z",
+  "updated": "2026-09-16T16:51:09.107Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T16:49:52.550Z",
+    "updatedAt": "2026-09-16T16:51:09.106Z",
     "reviewNotes": "Cycle-1 blockers still at committed HEAD: fixes uncommitted; blocker-2 fix as written is ineffective (submit finally must gate on job-started)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -281,8 +281,9 @@
         "tests/unit/lib/projects/create-intent.test.ts",
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
-      "recordedAt": "2026-09-16T16:41:41.823Z"
-    }
+      "recordedAt": "2026-09-16T16:51:08.216Z"
+    },
+    "reviewRequestedAt": "2026-09-16T16:51:09.106Z"
   },
   "closeOut": {
     "usage": {
