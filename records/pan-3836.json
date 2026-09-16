@@ -171,20 +171,21 @@
     "recordedAt": "2026-09-16T16:51:08.216Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:51:09.107Z",
+  "updated": "2026-09-16T16:51:13.237Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T16:51:09.106Z",
+    "updatedAt": "2026-09-16T16:51:12.572Z",
     "reviewNotes": "Cycle-1 blockers still at committed HEAD: fixes uncommitted; blocker-2 fix as written is ineffective (submit finally must gate on job-started)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "1e4ae61d5e9eb370b4e25bfc936ba1f5198056db",
+    "reviewRequestedAt": "2026-09-16T16:51:09.106Z",
     "reviewSpawnedAt": "2026-09-16T16:45:53.799Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -282,8 +283,7 @@
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
       "recordedAt": "2026-09-16T16:51:08.216Z"
-    },
-    "reviewRequestedAt": "2026-09-16T16:51:09.106Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -298,10 +298,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3711,
-            "output": 175213,
-            "cacheRead": 55973685,
-            "cacheWrite": 767010
+            "input": 3743,
+            "output": 176252,
+            "cacheRead": 56572273,
+            "cacheWrite": 771965
           }
         }
       },
@@ -313,15 +313,15 @@
           "cacheWrite": 191855
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3711,
-          "output": 175213,
-          "cacheRead": 55973685,
-          "cacheWrite": 767010
+          "input": 3743,
+          "output": 176252,
+          "cacheRead": 56572273,
+          "cacheWrite": 771965
         }
       },
       "costAtCloseOut": {
-        "usd": 16.489802,
-        "pricingAsOf": "2026-09-16T16:49:52.552Z"
+        "usd": 16.561082,
+        "pricingAsOf": "2026-09-16T16:51:12.588Z"
       }
     },
     "merges": [
@@ -330,7 +330,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
