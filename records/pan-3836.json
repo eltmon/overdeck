@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T14:53:26.100Z",
+  "updated": "2026-09-16T15:35:34.624Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "project-create-routes": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 2613678,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T14:53:26.100Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Job store implementation complete with all acceptance criteria and tests passing",
         "releasedAt": "2026-09-16T14:53:17.289Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2613678,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T14:53:26.100Z",
+        "itemId": "project-create-routes",
+        "outcome": "completed",
+        "reason": "Implemented three new routes: POST /projects/resolve (dry-run), GET /projects/create-jobs/:jobId (polling), refactored POST /projects. Added 9 comprehensive acceptance-criteria tests. Registered in no-loss-matrix.",
+        "releasedAt": "2026-09-16T15:35:34.624Z"
       }
     ],
     "statusReasons": {
@@ -150,6 +153,10 @@
       "create-job-store": {
         "reason": "Job store implementation complete with all acceptance criteria and tests passing",
         "updatedAt": "2026-09-16T14:53:17.289Z"
+      },
+      "project-create-routes": {
+        "reason": "Implemented three new routes: POST /projects/resolve (dry-run), GET /projects/create-jobs/:jobId (polling), refactored POST /projects. Added 9 comprehensive acceptance-criteria tests. Registered in no-loss-matrix.",
+        "updatedAt": "2026-09-16T15:35:34.624Z"
       }
     }
   },
@@ -182,6 +189,11 @@
     "create-job-store.ac2": "completed",
     "create-job-store.ac3": "completed",
     "create-job-store.ac4": "completed",
-    "project-create-routes": "running"
+    "project-create-routes": "completed",
+    "project-create-routes.ac1": "completed",
+    "project-create-routes.ac2": "completed",
+    "project-create-routes.ac3": "completed",
+    "project-create-routes.ac4": "completed",
+    "project-create-routes.ac5": "completed"
   }
 }
