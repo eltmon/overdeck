@@ -82,7 +82,7 @@ About half the faults are ordinary gate and tooling bugs that no state refactor 
 | Wall clock to first approval | 4 h 12 min | 14:16 to 18:28 |
 | State at 19:20 | unmerged | UAT rework in progress in a fresh session |
 
-Twelve of the sixteen verification runs and five of the seven review cycles were spent on fixes that were either uncommitted when re-review was requested or were flake-masking (`it.skip`) rather than fixes. That is a work-agent quality problem and out of scope, but the substrate let every one of those cycles cost a full convoy and a full gate run.
+Most of the sixteen verification runs and five of the seven review cycles were spent on fixes that were either uncommitted when re-review was requested or were flake-masking (`it.skip`) rather than fixes. (Runs cannot be attributed to cycles precisely because the dashboard log carries no timestamps.) That is a work-agent quality problem and out of scope, but the substrate let every one of those cycles cost a full convoy and a full gate run.
 
 ---
 
@@ -99,7 +99,7 @@ Each fault has: what happened (with evidence), root cause (with code), the small
 1. The lock is per-project, not per-issue, despite its error text. `stateGitLockPath` hashes the state worktree root (`src/lib/pan-dir/state-git-lock.ts:24-27`), so every record write in `panopticon-cli` serializes on one file.
 2. The lock is held across a git commit and push, bounded by a 30-second durability budget (`src/lib/pan-dir/record-update.ts:34, :520-536`).
 3. The waiter's backoff ladder sums to 30.7 seconds (`state-git-lock.ts:7-20`) and then throws (`src/lib/pan-dir/fs-lock.ts:82-108`). A 30-second hold against a 30.7-second wait is a coin flip.
-4. The holder was the deacon's strike-salvage patrol. It pushed 28 strike branches at 14:29:34 and then wrote 28 record commits serially from 14:29:38 to 14:30:41 (state branch `git log`, one `chore(records): update PAN-… per-issue record` every 2 to 3 seconds). The spawn's 30-second window fell entirely inside that burst.
+4. The holder was the deacon's strike-salvage patrol. It pushed 28 strike branches at 14:29:34, and the state branch then received 23 record commits in 70 seconds (14:29:31 to 14:30:41), 18 of them for issues on that push list, one `chore(records): update PAN-… per-issue record` every 2 to 3 seconds. The spawn's 30-second window fell entirely inside that burst.
 
 Nothing retried above the lock: `state-reconcile` is `fail-fast` (`src/cli/commands/start-prep-progress.ts:92-97, :140-146`) and `start.ts:1268-1270` exits 1. The step only exists because the dashboard always passes `--model`, and persisting that override goes through the record write door (`start-policy-overrides.ts:22, :52`). The spawn did not need a durable record write to proceed.
 
@@ -259,7 +259,7 @@ The same class: the PTY supervisor log is truncated at respawn; the `mail/` dire
 
 **Guardrail.** `messageAgent` returns success only after the transcript shows a new turn that contains the message, or it fails and the caller escalates. `resumeAgent` already implements this contract (`src/lib/agents/resume.ts:608-613`).
 
-**Recurrence.** Nine issues are parked as "review/test feedback could not be delivered — the work agent is not running and nothing resumed it" for 7 to 34 days (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810, 3814, and now 3836 under a different reason). PAN-3703 is parked as `uat-failed` with "no work agent is live to rework it" for 26 days, the exact PAN-3836 shape.
+**Recurrence.** Eight issues are parked as "review/test feedback could not be delivered — the work agent is not running and nothing resumed it" for 7 to 34 days (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810, 3814). PAN-3836 is parked under a different stuck reason (Section 1). PAN-3703 is parked as `uat-failed` with "no work agent is live to rework it" for 26 days, the exact PAN-3836 shape.
 
 ### F13. The pipeline committed a merge of `origin/main` into the branch under the bot identity (18:45:42)
 
@@ -285,7 +285,7 @@ The same class: the PTY supervisor log is truncated at respawn; the `mail/` dire
 
 - 93 × "Recovered orphaned agent agent-pan-3836-review-* (running→stopped) — tmux session missing". Each is a reviewer that finished and exited normally. Nothing writes `stopped` when a reviewer exits; the orphan patrol is the completion path (`deacon-auto-resume.ts:147-158, :198-202, :235-241`).
 - 8 × "checkOrphanedCompletions: recovered PAN-3836 (PR open but review never dispatched)" at 16:35, 16:43, 16:51, 17:00, 17:19, 17:28, 18:00, 18:25, while a convoy was running each time. The predicate has no convoy-liveness guard (`deacon.ts:1181-1206`); its sibling does (`deacon-review-status.ts:635-662`). Its re-fire brake is a tombstone written in a second record write whose failure is swallowed (`deacon.ts:1207-1221`). Corpus-wide, 104 of 256 PR-bearing records carry that tombstone; the code comment at `src/lib/pan-dir/records.ts:112-115` records "36x on PAN-399".
-- 8 × "Drained stranded verdict fallback for PAN-3836", one after each of the above. A fallback exists only when a verdict write lost the record lock (`deacon-verdict-fallback-sweep.ts:1-9`). Eight drains means eight lost lock acquisitions for one issue in three hours.
+- 8 × "Drained stranded verdict fallback for PAN-3836", each 2 to 3 seconds after one of the above (16:35:10.606 then 16:35:13.305; 16:43:18.295 then 16:43:20.844; and so on for all eight). A fallback exists only when a verdict write lost the record lock (`deacon-verdict-fallback-sweep.ts:1-9`). The timing says the orphan-completion patrol's own two-write sequence, `setReviewStatusSync` followed by `updateIssueRecord` for the tombstone (`deacon.ts:1207-1213`), contended with itself: the second write took the lock while the first write's journal flush still held it, the verdict fell back to the file, and the sweeper folded it back three seconds later. The patrol manufactures the contention it then repairs.
 - "Reconciled journaled advancing verdict for PAN-3836" on every patrol cycle from 14:36 to the end of the log (2,791 such lines on 09-16 across issues; 5,450 on 09-09). It compares a raw DB row against an enriched read that overlays record fields and never writes them back, so the two can never agree (`advancing-selfheal.ts:55-57, :96-105`; `review-status-read.ts:80-83`; `review-status-record-sync.ts:139-151`). Each firing also runs two dispatch hooks.
 - Status flaps: `lifecycle.log` shows the work agent cycling `running → stopped → running` about twenty times; `handleAgentStoppedEvent` and `handleAgentHeartbeatDeadEvent` are inverses keyed on the same tmux probe (`deacon-auto-resume.ts:719-727` versus `:200-202`).
 - Cadence: 78 patrols run in one sequential pass (`deacon.ts:2611-3168`) on a 60-second timer (`:221`); overlapping ticks are dropped (`:3434-3437`; log 14:29:17 "patrol interval skipped — previous patrol still in flight"). Observed: cycles 11683 to 11738 span 14:29 to 19:11, about 5 minutes per cycle. `checkOrphanedCompletions` alone shells out to `gh pr list` per candidate with a 15-second timeout (`deacon.ts:1196-1199`).
@@ -321,7 +321,7 @@ Also: `docs/PIPELINE-GATES.md` says "After 3 consecutive failures, verification 
 | Fault class | PAN-3836 | Elsewhere (evidence) |
 | --- | --- | --- |
 | Planning auto-handoff spawn failure | F1, F2 | PAN-1641 parked 33 days with `planning_auto_handoff_failed` |
-| Feedback delivered but no turn; issue parks | F12 | 9 issues parked "feedback could not be delivered": PAN-3679, 3677, 3685, 3689, 3690, 3740 (31 to 34 days), PAN-3810, 3814 (7 days); PAN-3703 `uat-failed` 26 days |
+| Feedback delivered but no turn; issue parks | F12 | 8 issues parked "feedback could not be delivered": PAN-3679, 3677, 3685, 3689, 3690, 3740 (31 to 34 days), PAN-3810, 3814 (7 days); PAN-3703 `uat-failed` 26 days |
 | Review cycles without converging on committed code | F4 | MIN-889: 16 run directories; PAN-3668: 10; PAN-2203 (memory note) |
 | `pan done` to review hand-off "recovered" by patrol | F15 | 104 of 256 PR-bearing records carry `panDoneRecoveredAt` |
 | Verdict writes losing the record lock | F15 | "Drained stranded verdict fallback": PAN-3668 ×2, PAN-3344 ×1 in the log window |
@@ -329,7 +329,7 @@ Also: `docs/PIPELINE-GATES.md` says "After 3 consecutive failures, verification 
 | Anchor disagreement between review and verification | F10 | 51 records have `reviewedAtCommit != lastVerifiedCommit` |
 | Dead-end recovery firing | F6 | 53 firings on 09-09; PAN-3690, 3740, 3810 hit the 25/25 circuit breaker and are permanently parked |
 | Orphan pickup escalations that went silent | — | 82 records with `orphan-proposed-pickup-gate` trips, 98 open trips; 28 issues parked `needs-you` for 45 days |
-| Strike-landing patrol writing records in bursts | F1 | 28 record commits in 63 seconds at 14:29 |
+| Strike-landing patrol writing records in bursts | F1 | 23 record commits in 70 seconds at 14:29 |
 | Green pipeline that still does not merge | — | PAN-3668 and MIN-889: review, test, UAT, verification all `passed`, `mergeStatus: pending`, open recovery trips |
 
 The parked population is 39 issues in 80 orbits: operator-gate 28, needs-you 28, stuck-flag 10, merge-failed 7, circuit-breaker 3, zombie-session 1, uat-failed 1, deacon-ignored 1. Only 17 records were created since September 1, so most of the pipeline's current population is residue of these faults rather than live work.
@@ -373,7 +373,7 @@ Yes, in the substrate; no, in the stages. The evidence:
 
 - **Patrols run the happy path.** 93 orphan recoveries for normal reviewer exits and 104 of 256 PRs needing the `pan done` hand-off "recovered" mean two ordinary transitions have no synchronous writer. A patrol that fires on every normal completion is the completion path implemented as a scavenger, with a 5-minute latency and a race against every other patrol.
 - **Copies drift by construction.** `reconcileInFlightJournals` cannot ever converge because its two readers apply different transforms. The advancing-verdict line fired thousands of times per day on issues whose state did not change.
-- **The lock serializes everything and starves the critical path.** One project-wide lock, held across a network push, taken by patrols in bursts of 28, and required to spawn an agent.
+- **The lock serializes everything and starves the critical path.** One project-wide lock, held across a network push, taken by patrols in bursts of 23, and required to spawn an agent.
 - **Recovery has replaced completion in the docs too.** The DoD table's rule "every row must name a live owner" is right, but for several rows the named owner is a patrol.
 - **The churn is incident-driven.** Half of 688 cloister commits in 90 days are fixes; 239 issue numbers are inlined as special cases. The memory notes catalogue a "latch family" (PAN-2725, 2731, 2735, 2743) and an "anchor family" (MIN-901, PAN-3254) that keep recurring because each fix adds a classifier rather than removing a holder.
 - **The last simplification held.** `docs/REVIEW-AGENT-ARCHITECTURE.md`'s "Removed layers" table shows the review convoy was simplified (no discovery phase, no fork tree, no selective reruns) and the review stages worked correctly today. That is evidence the stages are the right shape and that removal, not addition, is what has worked.
@@ -412,9 +412,9 @@ Per-run artifact files; the full suite stamps `overdeck/test`, nothing else does
 
 **8.6 Patrols become alarms with budgets.**
 Keep: memory/disk pressure, deploy, close-out reaper, main-divergence health, mass-death detection, and a single "invariant checker" that compares record versus row versus liveness and *reports* (never writes) mismatches with a count. Every remaining patrol gets a per-day firing budget in config; exceeding it opens a needs-you with the patrol's name, because a patrol firing repeatedly is a transition bug.
-*Deletes:* roughly 40 of the 78 patrols in the table in the review trace (everything named `reconcile*`, `checkOrphaned*`, `checkStuck*`, `checkCompletedButUnsignaled*`, `recoverStalled*`, `nudge*`, `redeliver*`, `cleanupOrphaned*`), each after its transition writes its own state.
+*Deletes:* 37 of the 78 patrols, each only after its transition writes its own state; 5 more are kept but rewired. Appendix C lists every patrol with its `deacon.ts` line, its disposition, and the phase in which it goes, so the deletion can be argued row by row.
 
-**Would this have carried PAN-3836?** Walk the day: the spawn does not take the lock (F1 gone); no placeholder, no adopted transcript (F2 gone); branch cut from `origin/main` (F3 gone); re-review refused on a dirty tree (F4: five cycles become two); ratchet names `projects.ts` (F5); nudges use transcript idle (F6); `it.skip` fails the gate (F7); 16 immutable artifacts (F8); CI would have caught the red main a week earlier (F9); no anchorless verdict, no reset (F10, F11); UAT feedback is a confirmed turn or a loud failure that resurrects the agent (F12); `pan tell` exits with the truth (F14); zero happy-path recoveries (F15); review cannot un-fail verification (F16). The same review, test, and UAT verdicts would have been produced. The four manual interventions would have been zero, and the strike for PAN-3839 would have been unnecessary because main would not have been red.
+**Would this have carried PAN-3836?** Walk the day: the spawn does not take the lock (F1 gone); no placeholder, no adopted transcript (F2 gone); branch cut from `origin/main` (F3 gone); re-review refused on a dirty tree (F4: five cycles become two); ratchet names `projects.ts` (F5); nudges use transcript idle (F6); `it.skip` fails the gate (F7); 16 immutable artifacts (F8); CI would have caught the red main before PAN-3836's diff reached that test (F9); no anchorless verdict, no reset (F10, F11); UAT feedback is a confirmed turn or a loud failure that resurrects the agent (F12); `pan tell` exits with the truth (F14); zero happy-path recoveries (F15); review cannot un-fail verification (F16). The same review, test, and UAT verdicts would have been produced. The four manual interventions would have been zero, and the strike for PAN-3839 would have been unnecessary because main would not have been red.
 
 ---
 
@@ -424,7 +424,7 @@ The additive-refactor rule applies: enumerate what the old surface provides, the
 
 **Phase 1: Delivery is a confirmed turn (1 to 2 weeks).**
 Build the transcript-confirmed `messageAgent`; route feedback, nudges, kickoff, and `pan tell` through it; make it throw. Then remove the monitor tier from the automatic cascade. Add `uatStatus === 'failed'` to owes-rework. Fix `pan tell` exit code and timers.
-*No-loss audit:* a fixture test enumerating every caller of `messageAgent`, `sendKeys`, `queueAgentMail`, and `deliverAgentMessage` (there are about ten) and asserting each now either gets a confirmed turn or a thrown error in a harness that simulates an idle session, a dead pane, a stopped agent, and a paused agent. The stuck-flag orbit's exit becomes "resurrect through the work-resume door and deliver", and the audit asserts the nine currently parked issues would exit.
+*No-loss audit:* a fixture test enumerating every caller of `messageAgent`, `sendKeys`, `queueAgentMail`, and `deliverAgentMessage` (there are about ten) and asserting each now either gets a confirmed turn or a thrown error in a harness that simulates an idle session, a dead pane, a stopped agent, and a paused agent. The stuck-flag orbit's exit becomes "resurrect through the work-resume door and deliver", and the audit asserts the eight currently parked issues would exit.
 
 **Phase 2: Verdict and anchor are one write; verification is honest (1 to 2 weeks).**
 Refuse anchorless verdicts; drift patrol marks stale instead of resetting; delete `canSkipTests`; review command stops touching verification; per-run verification artifacts; `.skip`/`.only` lint; CI stops skipping vitest; ratchet per-file counts; branch cut from `origin/main`.
@@ -452,7 +452,7 @@ Total: roughly 8 to 10 weeks of one senior engineer, or a supervised pipeline-by
 | --- | --- | --- | --- | --- |
 | 1 | Add `uatStatus === 'failed'` to `issueOwesReworkSync`; make `pan tell` pass `owesRework` when any verdict is failed | `work-agent-lifecycle.ts:30-40`, `tell.ts`, `messaging.ts:233-249` | hours | the "nothing to resume" dead end after UAT failure |
 | 2 | `pan tell`: `unref()` watcher timers; exit non-zero when `delivered` is false | `eaten-message-watcher.ts:37-39`, `tell.ts:29-31` | hours | hangs and false green |
-| 3 | Delete `skip_vitest` from CI | `.github/workflows/ci.yml:139-158, :186, :190` | hours | invisible red main |
+| 3 | Delete `skip_vitest` from CI (cost: the full vitest suite runs on every push again, about 7 to 8 minutes of runner time per push based on today's gate durations; that is the trade-off being accepted) | `.github/workflows/ci.yml:139-158, :186, :190` | hours | invisible red main |
 | 4 | `.skip`/`.only`/`xit` diff lint in the verification gate; `allowOnly: false` | `projects.yaml` gate, `vitest.config.ts` | half day | skipped tests passing the gate |
 | 5 | Per-run verification artifacts | `verification-artifact.ts:38, :70-73`; `verification-runner.ts:669, :688` | half day | lost gate output |
 | 6 | Refuse anchorless terminal verdicts; drift patrol marks stale, never resets | `review-verdict-writer.ts:146-153`; `deacon-post-review-commits.ts:152-158` | 1 day | approved-then-reset, MIN-901 family |
@@ -562,3 +562,91 @@ The operator asked for this explanation. It is what delivered the UAT feedback a
 **Why it was reached at all.** The tier is taken *before* the PTY supervisor whenever the monitor is live, and the monitor is live whenever a work agent followed its prompt. So for every Claude Code work agent that obeyed `roles/work.md`, this became the default path for operator tells and pipeline feedback, not a fallback. The operator's stated intent was a future use case; the ordering in `messageAgent` made it the everyday one.
 
 **What to do.** Keep `pan inbox` and the mail directory as a manual, durable channel an operator can read. Remove the tier from `messageAgent`'s automatic cascade so every automatic message goes through the PTY supervisor and is confirmed against the transcript (Phase 1). If a future use case needs pull-based delivery, it should be opt-in per message, with its own turn confirmation.
+
+## Appendix C: every deacon patrol, with disposition
+
+All 78 steps run in one sequential pass in `runPatrol()` (`src/lib/cloister/deacon.ts:2611`), scheduled every `patrolIntervalMs` (60,000 ms, `deacon.ts:221`); overlapping ticks are dropped (`deacon.ts:3434-3437`). Observed cadence today was about 5 minutes per pass. Disposition: **Keep** (alarm, resource, or cleanup that owns a real job), **Rewire** (kept, but its input or its side effect changes), **Delete** (a scavenger for a transition that Phase N makes write its own state). Every Delete row is gated by that phase's no-loss audit (Section 9).
+
+| # | Patrol | `deacon.ts` line | Cadence | Disposition | Phase / note |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `patrolStaleTaskClaims` | 2668 | every pass | Keep | task claims are leases; expiry is a real job |
+| 2 | `checkStuckAgentRemediation` | 2669 | every pass | Delete | 4: one liveness oracle |
+| 3 | `runStallSweeperPatrol` | 2676 | every pass | Keep | alarm only; gets a firing budget |
+| 4 | `reconcileInFlightJournals` | 2685 | every pass | Delete | 3: compares enriched read with raw row (F15) |
+| 5 | `retireResolvedFeedbackDeliveryStuckFlags` | 2686 | every pass | Delete | 1: no delivery-stuck flag once delivery confirms |
+| 6 | `processPendingLifecycleForPatrol` | 2694 | every pass | Keep | post-merge lifecycle queue |
+| 7 | `runScheduledDeployPatrol` | 2699 | every 5 passes | Keep | deploy is a DoD row |
+| 8 | `reconcileAgentLiveness` | 2712 | every pass | Delete | 4: supervisor emits lifecycle events |
+| 9 | `reconcileOrphanProposedSpecs` | 2716 | every pass | Keep | budgeted; source of the 82 pickup-gate trips |
+| 10 | `reconcilePendingPromotions` | 2717 | every pass | Delete | 3: complete-planning becomes one write with its own retry |
+| 11 | `reconcileClosedIssueAgents` | 2719 | every pass | Keep | reaper for closed issues |
+| 12 | `reapMergedStrikeWorkspaces` | 2726 | every pass | Keep | cleanup |
+| 13 | `reconcileIdleWorkspaceStacks` | 2733 | every pass | Keep | resource |
+| 14 | `patrolDockerBridgePool` | 2738 | every pass | Keep | resource |
+| 15 | `nudgeStalledResumeWorkAgents` | 2742 | every pass | Delete | 1: resume confirms its own turn |
+| 16 | `redeliverUndeliveredKickoffs` | 2746 | every pass | Delete | 1: kickoff confirms its own turn |
+| 17 | `nudgeIdleWorkAgentsWithOpenBeads` | 2754 | every pass | Rewire | 1: transcript idle, through `messageAgent` |
+| 18 | `checkThinkingSignatureCorruption` | 2761 | every pass | Keep | harness-bug detector |
+| 19 | `checkAndSuspendIdleAgents` | 2766 | every pass | Keep | resource |
+| 20 | workspace-missing `readyForMerge` clear (inline) | 2770-2790 | every pass | Delete | 3: merge door checks the workspace when it acts |
+| 21 | `checkMergedWorkSessions` | 2802 | every pass | Keep | post-merge cleanup |
+| 22 | `checkMergedAdvancingSessions` | 2806 | every pass | Keep | post-merge cleanup |
+| 23 | `refreshClaudeCredentialsForActiveRemoteAgents` | 2817 | every pass | Keep | remote substrate |
+| 24 | `refreshHostHeartbeatForEphemeralVms` | 2829 | every pass | Keep | remote substrate |
+| 25 | `reapCompletedRemoteAgents` | 2843 | every pass | Keep | remote substrate |
+| 26 | `checkAwaitingTestWorkSessions` | 2860 | every pass | Delete | 3: review pass writes the test request |
+| 27 | `checkOrphanedReviewStatuses` | 2867 | every pass | Delete | 3: `pan done` writes the review request |
+| 28 | `checkInspectAgentTimeouts` | 2872 | every pass | Keep | timeout alarm |
+| 29 | `cleanupOrphanedInspectSessions` | 2879 | every pass | Delete | 4: exit writes stopped |
+| 30 | `checkPostReviewCommits` | 2885 | every pass | Rewire | 2: marks stale, never resets a passed verdict (F10) |
+| 31 | `recoverStalledReviewConvoys` | 2889 | every pass | Delete | 3: reviewer exit writes stopped; synthesis is deterministic |
+| 32 | `checkMissingReviewStatuses` | 2895 | every pass | Delete | 3 |
+| 33 | `checkOrphanedCompletions` | 2902 | every pass | Delete | 3: `pan done` single write (F15) |
+| 34 | `checkCompletedButUnsignaledTests` | 2910 | every pass | Delete | 3: test verdict is one write |
+| 35 | `reconcileTestStatusFromGreenCi` | 2917 | every pass | Delete | 2: a second path to "tests passed" (F9) |
+| 36 | `checkPendingTestDispatch` | 2922 | every pass | Delete | 3 |
+| 37 | `checkStuckReviewing` | 2927 | every pass | Delete | 3 |
+| 38 | `checkCompletedButUnsignaledReviews` | 2932 | every pass | Delete | 3 |
+| 39 | `reconcileUnappliedReviewVerdicts` | 2937 | every pass | Delete | 3 |
+| 40 | `sweepStrandedVerdictFallbacks` | 2946 | every pass | Delete | 3: no fallback file once the lock is per issue (F15) |
+| 41 | `checkVerificationReviewContradiction` | 2954 | every pass | Delete | 2: one actor per verdict (F16) |
+| 42 | `cleanupOrphanedPlanningSessions` | 2963 | every pass | Delete | 4: handoff stops the planner in the same step |
+| 43 | `checkStalledReviewParents` | 2969 | every pass | Delete | 3 |
+| 44 | `monitorReviewConvoySignals` | 2973 | every pass | Rewire | 3: deterministic synthesis becomes the only synthesizer (PAN-1864) |
+| 45 | `cleanupOrphanedReviewSessions` | 2980 | every pass | Delete | 4 |
+| 46 | `checkWorkspaceContainerHealth` | 2985 | every pass | Keep | resource |
+| 47 | `checkReadyForMergeStuck` | 2995 | every pass | Delete | 3 |
+| 48 | `checkFailedMergeRetry` | 3000 | every pass | Keep | explicit retry policy for the merge door |
+| 49 | `patrolStrikeLandings` | 3003 | every pass | Rewire | 3: yields the lock between records (F1) |
+| 50 | `swarmJanitorPass` | 3007 | every pass | Keep | swarm |
+| 51 | `reconcileStaleMergeStatus` | 3012 | every pass | Delete | 3 |
+| 52 | `reconcileStuckMergingStates` | 3013 | every pass | Delete | 3 |
+| 53 | `reconcileFalseMerged` | 3019 | every pass | Delete | 3 |
+| 54 | `reconcileMergedButReviewing` | 3026 | every pass | Delete | 3 |
+| 55 | `autoCloseOut` | 3030 | every pass | Keep | DoD row |
+| 56 | `reconcileClosedPrReadyForMerge` | 3037 | every pass | Delete | 3 |
+| 57 | `reconcileAutoMergeRows` | 3039 | every pass | Keep | auto-merge policy |
+| 58 | `reconcileStaleMergeBlockers` | 3047 | every pass | Delete | 3 |
+| 59 | `reconcileStuckReadyForMerge` | 3054 | every pass | Delete | 3 |
+| 60 | `checkDeadEndAgents` | 3061 | every pass | Rewire | 1: transcript idle, through `messageAgent` (F6) |
+| 61 | `checkFirstCompletionAgents` | 3068 | every pass | Delete | 3 |
+| 62 | `reconcileTraefikNetworks` | 3076 | every pass | Keep | network |
+| 63 | `checkStuckWorkAgents` | 3088 | every pass | Delete | 4 |
+| 64 | `checkApiErrorAgents` | 3092 | every pass | Keep | alarm |
+| 65 | `reconcilePipelineLabelsPatrol` | 3095 | every 10 passes | Keep | GitHub label projection |
+| 66 | `reapOrphanedDashboardServers` | 3100 | ~10 min | Keep | process hygiene |
+| 67 | `reapLeftoverPlaywrightBrowsers` | 3109 | ~10 min | Keep | process hygiene |
+| 68 | `reconcileProjectStatePlanes` | 3114 | ~hourly | Keep | state-branch health |
+| 69 | `reconcileTerminalIssueResidue` | 3118 | ~hourly | Keep | close-out backstop |
+| 70 | `recreatedStateWarnings` | 3119 | every pass | Keep | alarm |
+| 71 | `recordMainDivergenceHealth` | 3120 | every pass | Keep | alarm |
+| 72 | `cleanupStaleAgentState` | 3123 | every 60 passes | Keep | garbage collection |
+| 73 | `sweepTranscriptRetention` | 3129 | every 60 passes | Keep | retention |
+| 74 | `pruneTerminalStoppedAgents` | 3136 | every 60 passes | Keep | garbage collection |
+| 75 | `cleanupAbandonedFeedback` | 3142 | every 5 passes | Delete | 1: feedback lifetime is tied to its verdict |
+| 76 | `cleanupOrphanReviewerSessions` | 3151 | every 60 passes | Delete | 4 |
+| 77 | `checkMassDeath` | 3157 | every pass | Keep | alarm |
+| 78 | per-project ephemeral specialist patrol | 3168 | every pass | Keep | specialist reaper |
+| — | `patrolResourcePressure` | 3479 | separate 15 s timer | Keep | memory governor |
+
+Totals: 36 Keep, 5 Rewire, 37 Delete. The Delete rows by phase: Phase 1 removes 5, Phase 2 removes 2, Phase 3 removes 23, Phase 4 removes 7.
