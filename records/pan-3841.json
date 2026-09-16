@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T20:07:36.343Z",
+  "updated": "2026-09-16T20:13:54.637Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "retro-mount": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 3585408,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:07:36.343Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -150,6 +142,17 @@
         "outcome": "completed",
         "reason": "Created RetrospectiveButton.tsx per WI-5: lucide History icon button on styles.conversationAddBtn with title/aria-label 'Pipeline retrospective', aria-haspopup/aria-expanded, disabled when disabled||!model||pending; role=menu with 'Last 24 hours'/'Last 7 days' menuitems; POSTs {window, model, harness} to /api/conversations/retrospective, navigates via window.location.assign('/conv/'+encodeURIComponent(name)) on ok, toast.error(server error or 'Failed to start the retrospective (<status>)') + re-enable on failure; Escape and outside mousedown close. CSS appended after .conversationAddBtn:hover: .retroMenuHost + .retroMenu/.retroMenuItem copied from stage.module.css actionOverflow with right:0/left:auto. RTL tests (frontend vitest config): menu open, POST shape + navigation, 500 -> toast.error('boom') + re-enabled + no navigation, disabled on empty model — 4/4 green; typecheck passes. Commit 9c2c394cb9c pushed.",
         "releasedAt": "2026-09-16T20:07:21.418Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 3585408,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:07:36.343Z",
+        "itemId": "retro-mount",
+        "outcome": "completed",
+        "reason": "Mounted RetrospectiveButton in index.tsx sidebarHeaderGroup between ModelPicker and the New-conversation plus button (one import + one JSX line; file 1605 lines, under the 1612 allowlist cap — no allowlist row needed). Typecheck passes; lint-file-size passes; full CommandDeck frontend suite 477/477 green. Browser UAT on the workspace endpoint (Playwright, isolated profile): button renders between picker and plus; menu opens; 'Last 24 hours' navigates to /conv/20260916-5096; first user message begins 'Pipeline retrospective: last 24 hours'; conversation listed under the No project bucket; at narrowest sidebar width the picker/retrospective/plus bounding boxes are disjoint and each clickable (screenshot self-verified). Also verified AC-8 live: editing the template title line and POSTing again produced a conversation titled 'Pipeline retrospective (edited): last 24 hours' with no rebuild or restart; template reverted. Commit 315a7916d4e pushed.",
+        "releasedAt": "2026-09-16T20:13:54.637Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "retro-button": {
         "reason": "Created RetrospectiveButton.tsx per WI-5: lucide History icon button on styles.conversationAddBtn with title/aria-label 'Pipeline retrospective', aria-haspopup/aria-expanded, disabled when disabled||!model||pending; role=menu with 'Last 24 hours'/'Last 7 days' menuitems; POSTs {window, model, harness} to /api/conversations/retrospective, navigates via window.location.assign('/conv/'+encodeURIComponent(name)) on ok, toast.error(server error or 'Failed to start the retrospective (<status>)') + re-enable on failure; Escape and outside mousedown close. CSS appended after .conversationAddBtn:hover: .retroMenuHost + .retroMenu/.retroMenuItem copied from stage.module.css actionOverflow with right:0/left:auto. RTL tests (frontend vitest config): menu open, POST shape + navigation, 500 -> toast.error('boom') + re-enabled + no navigation, disabled on empty model — 4/4 green; typecheck passes. Commit 9c2c394cb9c pushed.",
         "updatedAt": "2026-09-16T20:07:21.418Z"
+      },
+      "retro-mount": {
+        "reason": "Mounted RetrospectiveButton in index.tsx sidebarHeaderGroup between ModelPicker and the New-conversation plus button (one import + one JSX line; file 1605 lines, under the 1612 allowlist cap — no allowlist row needed). Typecheck passes; lint-file-size passes; full CommandDeck frontend suite 477/477 green. Browser UAT on the workspace endpoint (Playwright, isolated profile): button renders between picker and plus; menu opens; 'Last 24 hours' navigates to /conv/20260916-5096; first user message begins 'Pipeline retrospective: last 24 hours'; conversation listed under the No project bucket; at narrowest sidebar width the picker/retrospective/plus bounding boxes are disjoint and each clickable (screenshot self-verified). Also verified AC-8 live: editing the template title line and POSTing again produced a conversation titled 'Pipeline retrospective (edited): last 24 hours' with no rebuild or restart; template reverted. Commit 315a7916d4e pushed.",
+        "updatedAt": "2026-09-16T20:13:54.637Z"
       }
     }
   },
@@ -201,6 +208,10 @@
     "retro-button.ac2": "completed",
     "retro-button.ac3": "completed",
     "retro-button.ac4": "completed",
-    "retro-mount": "running"
+    "retro-mount": "completed",
+    "retro-mount.ac1": "completed",
+    "retro-mount.ac2": "completed",
+    "retro-mount.ac3": "completed",
+    "retro-mount.ac4": "completed"
   }
 }
