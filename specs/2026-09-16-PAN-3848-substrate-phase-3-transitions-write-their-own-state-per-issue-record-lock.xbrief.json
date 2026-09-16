@@ -1,0 +1,718 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T21:36:47.000Z",
+    "author": "overdeck/0.50.4",
+    "description": "Plan for PAN-3848: Substrate Phase 3: transitions write their own state; per-issue record lock",
+    "updated": "2026-09-16T21:40:16.850Z"
+  },
+  "plan": {
+    "id": "pan-3848",
+    "title": "Substrate Phase 3: transitions write their own state; per-issue record lock",
+    "status": "proposed",
+    "uid": "e352e5c4-4ddf-47a2-a6c3-b6f777158fce",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T21:36:47.000Z",
+    "updated": "2026-09-16T21:40:16.850Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3848",
+        "label": "PAN-3848",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3848.md",
+        "label": "PRD drafts/pan-3848.md (phase 3 of PAN-3845)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3845.md",
+        "label": "Epic PRD drafts/pan-3845.md (wins on disagreement)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pipeline-reliability-review.md",
+        "label": "Evidence: pipeline reliability review (F1..F17, patrols #1..#78)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "deacon",
+      "state",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "One project-wide record lock is held across a network push and taken in bursts by patrols, so an auto-handoff spawn starved on it (F1). Spawning takes the lock for a policy override it does not need. pan done leaves its review request for a patrol to guess at (104 of 256 PR-bearing records carry panDoneRecoveredAt). Reviewer exit is inferred by patrols instead of written by the reviewer. A dozen scavenger patrols and a verdict fallback file exist to repair states that a synchronous write would never produce.",
+      "Proposal": "Key the record lock per issue and release it before the push; take no lock at spawn; make pan done write prUrl and reviewRequestedAt in one record write with a loud escalation when the write fails; have the reviewer launcher write stopped through pan admin agents exited; add would-have-fired counters and a shadow soak; delete reconcileInFlightJournals, the verdict fallback, checkOrphanedCompletions and the remaining Phase 3 scavenger patrols one commit each behind their audits; keep reconcilePendingPromotions; document.",
+      "NonGoals": "- No change to complete-planning retry semantics; patrol #10 reconcilePendingPromotions stays.\n- No deletion of any patrol whose would-fire counter is non-zero during the soak.\n- No change to the merge door or post-merge lifecycle."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "sizeJustification": "Phase of epic PAN-3845; the work items are the PRD work items and cannot be split without losing the audit-before-delete ordering. Subsystem count is inflated by single docs files (each counts as its own subsystem).",
+      "codeReadAt": "3d5051040a2",
+      "epic": "PAN-3845",
+      "phase": 3,
+      "canonicalFilename": "2026-09-16-PAN-3848-substrate-phase-3-transitions-write-their-own-state-per-issue-record-lock.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w23-per-issue-record-lock",
+        "title": "Per-issue record lock, released before the push",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3848",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/pan-dir/state-git-lock.ts",
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/fs-lock.ts",
+            "src/lib/pan-dir/auto-commit.ts",
+            "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts",
+            "tests/unit/lib/pan-dir/state-git-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/pan-dir/record-update-durability-budget.test.ts",
+            "npx vitest run tests/unit/lib/pan-dir/state-git-lock.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "record-update-durability-budget.test.ts exits 0",
+            "state-git-lock.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ],
+          "foundationFor": [
+            "w25-pan-done-writes-review-request-once",
+            "w28-delete-verdict-fallback-file"
+          ],
+          "parallelSafeReason": "Only pan-dir lock files are touched; w24 (start.ts) and w26 (launcher) share no files with it, and the deacon-side items are behind edges."
+        },
+        "narrative": {
+          "Action": "Follow PRD W23 in drafts/pan-3848.md. Key stateGitLockPath on gitRoot plus the uppercase issue id and thread issueId through withStateGitLock (caller record-update.ts:608) and the processQueues map. Checkpoint: split flushAutoCommits in auto-commit.ts into commitAutoCommits (inside the lock) and pushAutoCommits (after withRecordFsLock returns, under withRecordDurabilityDeadline with the reconcile-on-race handling moved after the lock); if the split is not feasible in one item, keep the flush under the lock, ship the per-issue key, and file a follow-up. Fix the fs-lock.ts:27 error text to name the issue."
+        },
+        "items": [
+          {
+            "id": "w23-per-issue-record-lock.ac1",
+            "title": "Given two concurrent updateIssueRecord calls on different issues, when they run under fake timers, then both complete before the first push resolves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w23-per-issue-record-lock.ac2",
+            "title": "Given two updateIssueRecord calls on the same issue, when they run, then they serialize.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w23-per-issue-record-lock.ac3",
+            "title": "Given a held lock for issue B with a push in flight, when the record commit for issue A runs, then it completes without RecordLockError.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w23-per-issue-record-lock.ac4",
+            "title": "When the fs-lock.ts error text is read, then it names the issue the lock belongs to.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w24-spawn-never-takes-record-lock",
+        "title": "Spawning never takes the record lock",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/start-policy-overrides.ts",
+            "src/cli/commands/start-prep-progress.ts",
+            "tests/unit/cli/start-prep-wiring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/start-prep-wiring.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "start-prep-wiring.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W24 in drafts/pan-3848.md. Remove applyStartPolicyOptions from reconcileState at start.ts:869-874 (keep requireAutomaticStateMigration), call it after the spawn step succeeds inside try/catch with a warning on failure, and change START_PREP_STEP_POLICIES state-reconcile at start-prep-progress.ts:93 from fail-fast to degrade with an undefined timeoutFallback."
+        },
+        "items": [
+          {
+            "id": "w24-spawn-never-takes-record-lock.ac1",
+            "title": "When the state-reconcile prep step runs, then it does not call updateIssueRecord.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w24-spawn-never-takes-record-lock.ac2",
+            "title": "Given the post-spawn override write throws RecordLockError, when pan start runs, then it prints a warning and the start still succeeds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w24-spawn-never-takes-record-lock.ac3",
+            "title": "Given a held record lock in a fixture, when pan start runs, then it reaches the spawn step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w30-would-fire-counters-and-soak",
+        "title": "Would-have-fired counters, shadow mode, and the pan doctor table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3848",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/patrol-would-fire.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/lib/cloister/patrol-would-fire.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/patrol-would-fire.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "patrol-would-fire.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "w25-pan-done-writes-review-request-once",
+            "w27-delete-reconcile-in-flight-journals",
+            "w28-delete-verdict-fallback-file",
+            "w29-delete-phase3-scavenger-patrols"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W30 in drafts/pan-3848.md. Create src/lib/cloister/patrol-would-fire.ts with recordWouldFire (appends to ~/.overdeck/deacon/would-fire.jsonl and increments an in-memory counter) and readWouldFireCounts(sinceIso). In runPatrol wrap every patrol slated for deletion in W25 to W29 so it records when it would act and does not act when OVERDECK_PATROL_SHADOW=1 is set. Checkpoint: find the pan doctor section list under src/cli/commands/doctor.ts and print the last 7 days of counts per patrol."
+        },
+        "items": [
+          {
+            "id": "w30-would-fire-counters-and-soak.ac1",
+            "title": "When recordWouldFire runs, then the in-memory counter increments and the would-fire.jsonl file grows by one line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w30-would-fire-counters-and-soak.ac2",
+            "title": "Given OVERDECK_PATROL_SHADOW=1, when a wrapped patrol would act, then its action function is not called and the counter records it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w30-would-fire-counters-and-soak.ac3",
+            "title": "When pan doctor runs, then it prints a per-patrol would-fire table for the last 7 days.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w25-pan-done-writes-review-request-once",
+        "title": "pan done writes its review request in one record write; delete checkOrphanedCompletions and panDoneRecoveredAt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/done.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/cloister/request-review-pipeline.ts",
+            "tests/unit/cli/done-review-request-write.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/done-review-request-write.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "done-review-request-write.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-22"
+          ],
+          "parallelSafeReason": "Starts only after w30 (edge); the remaining deacon.ts editors w27, w29 and w28 are chained behind it."
+        },
+        "narrative": {
+          "Action": "Follow PRD W25 in drafts/pan-3848.md, after w30 is merged. Checkpoint: grep reviewRequestedAt in done.ts and request-review-pipeline.ts to find the current write. After the PR is created perform one updateIssueRecord mutator setting pipeline.prUrl, pipeline.reviewRequestedAt, clearing reviewStaleSince and noting completedAt; write the completion marker afterwards. On a throwing writer retry three times with STATE_GIT_LOCK_RETRY_DELAYS_MS, then write the marker anyway, print the error, record a review-request-unrecorded needs-you via recordDeadEndNeedsYou and exit 1. Delete checkOrphanedCompletions (deacon.ts:1171-1225, registration 2902) and the panDoneRecoveredAt field everywhere (record.ts:205, records.ts:112-115, done.ts:578-588) with their tests."
+        },
+        "items": [
+          {
+            "id": "w25-pan-done-writes-review-request-once.ac1",
+            "title": "Given a working record writer, when pan done runs, then one mutator call contains prUrl and reviewRequestedAt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w25-pan-done-writes-review-request-once.ac2",
+            "title": "Given a record writer that throws on every attempt, when pan done runs, then it retries three times under fake timers, writes the completion marker, records a review-request-unrecorded needs-you, and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w25-pan-done-writes-review-request-once.ac3",
+            "title": "When grep panDoneRecoveredAt and grep checkOrphanedCompletions run over src, then both return nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w26-reviewer-exit-writes-stopped",
+        "title": "Reviewer exit writes stopped through a CLI verb in the launcher",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/cli/commands/admin/agents-exited.ts",
+            "src/cli/commands/admin/index.ts",
+            "src/lib/agents/agent-state.ts",
+            "src/lib/__tests__/launcher-generator.test.ts",
+            "tests/unit/cli/admin-agents-exited.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "npx vitest run tests/unit/cli/admin-agents-exited.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator.test.ts exits 0",
+            "admin-agents-exited.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W26 in drafts/pan-3848.md. In launcher-generator.ts after the fi that follows the three pan tell lines and before touch of the signal marker, add pan admin agents exited <agentId> --code \"$CLAUDE_EXIT\" || true (checkpoint: confirm sig carries the reviewer agent id, else add it where synthesisAgentId is populated). Create the verb under src/cli/commands/admin/ that reads state.json, calls markAgentStoppedState(state, \"system\"), saveAgentStateSync, and appends the exit code to lifecycle.log (checkpoint: rely on saveAgentStateSync also writing the agents row per agent-state.ts:377). Apply the same line to the synthesis parent and to the test and UAT specialist launchers when the same builder generates them."
+        },
+        "items": [
+          {
+            "id": "w26-reviewer-exit-writes-stopped.ac1",
+            "title": "When the reviewer launcher is generated, then its text contains pan admin agents exited after the fi that follows the pan tell lines and before the signal marker touch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w26-reviewer-exit-writes-stopped.ac2",
+            "title": "Given a state.json with status running, when pan admin agents exited runs with --code 0, then status becomes stopped, stoppedByUser stays unset, and lifecycle.log records the exit code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w26-reviewer-exit-writes-stopped.ac3",
+            "title": "Given a reviewer exits in a fixture tmux session, when no patrol runs, then its state.json reads stopped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w27-delete-reconcile-in-flight-journals",
+        "title": "Delete reconcileInFlightJournals (patrol #4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/advancing-selfheal.ts",
+            "tests/unit/lib/cloister/reconcile-in-flight-journals-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/reconcile-in-flight-journals-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "reconcile-in-flight-journals-no-loss.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W27 in drafts/pan-3848.md, after w30 soak evidence. Remove the registration at deacon.ts:2685 and delete reconcileInFlightJournals from advancing-selfheal.ts, keeping runBootAdvancingSelfHeal if it is a separate boot-time function (checkpoint). Delete its tests and add the no-loss test that a journaled advancing verdict reconciles inside getReviewStatusSync."
+        },
+        "items": [
+          {
+            "id": "w27-delete-reconcile-in-flight-journals.ac1",
+            "title": "When grep reconcileInFlightJournals runs over src, then it returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w27-delete-reconcile-in-flight-journals.ac2",
+            "title": "Given a journaled advancing verdict, when getReviewStatusSync reads the row, then the journal is reconciled into the read without a patrol.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w27-delete-reconcile-in-flight-journals.ac3",
+            "title": "When the deacon log is read after a 24-hour soak, then it contains no Reconciled journaled advancing verdict line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w29-delete-phase3-scavenger-patrols",
+        "title": "Delete the remaining Phase 3 scavenger patrols, one commit each, after their soak",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "tests/unit/lib/cloister/*-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deterministic-patrol-cadence.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deterministic-patrol-cadence.test.ts exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W29 in drafts/pan-3848.md. For each Appendix C Phase 3 Delete row (#20, #26, #27, #31, #32, #34, #36, #37, #38, #39, #43, #47, #51, #52, #53, #54, #56, #58, #59, #61): confirm the w30 counter stayed zero over the soak, write tests/unit/lib/cloister/<patrol-name>-no-loss.test.ts that constructs the repaired state and asserts the synchronous write makes it unreachable, then delete the registration, the function and its tests in one commit whose message names the audit test and the counter value. Keep #10 reconcilePendingPromotions registered (epic decision: it is the only retry for a failed complete-planning request). Stop on any non-zero counter and report the triggering issue."
+        },
+        "items": [
+          {
+            "id": "w29-delete-phase3-scavenger-patrols.ac1",
+            "title": "Given a patrol slated for deletion, when its would-fire counter is non-zero during the soak, then the patrol stays registered and the PR names the triggering issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w29-delete-phase3-scavenger-patrols.ac2",
+            "title": "Given a patrol with a zero counter, when it is deleted, then the commit message names its no-loss audit test and the soak counter value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w29-delete-phase3-scavenger-patrols.ac3",
+            "title": "When the twenty Appendix C Phase 3 rows are processed, then reconcilePendingPromotions remains registered in runPatrol.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w28-delete-verdict-fallback-file",
+        "title": "Delete the verdict fallback file and its sweeper (patrol #40) after a clean 7-day soak",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/parked/resolver.ts",
+            "tests/unit/lib/cloister/verdict-fallback-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/verdict-fallback-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verdict-fallback-no-loss.test.ts exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W28 in drafts/pan-3848.md. Only when the soak shows zero Drained stranded verdict fallback lines for 7 days: delete deacon-verdict-fallback-sweep.ts and its registration (deacon.ts:2946), readWorkspaceVerdictFallback and drainWorkspaceVerdictFallback, the fallback write in the record writer (grep pipeline-verdict.json) and the verdict-fallback-conflict and verdict-fallback-contention paths in parked/resolver.ts. If the soak shows any fallback, defer the item and attach the evidence to the PR."
+        },
+        "items": [
+          {
+            "id": "w28-delete-verdict-fallback-file.ac1",
+            "title": "Given the soak shows zero Drained stranded verdict fallback lines for 7 days, when the deletion lands, then grep pipeline-verdict.json over src returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w28-delete-verdict-fallback-file.ac2",
+            "title": "Given the soak shows any fallback drain, when the item is evaluated, then the deletion is deferred and the PR contains the soak evidence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w31-phase3-docs",
+        "title": "Phase 3 documentation: transitions write their own state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3848",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/MERGE-WORKFLOW.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:prompts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W31 in drafts/pan-3848.md. Rewrite the record-lock paragraph in docs/AGENT-STATE-PLANES.md for the per-issue lock released before push; in docs/REVIEW-AGENT-ARCHITECTURE.md Recovery state that reviewer exit is written by the launcher and drop the dead-parent-fallback sentence if #31 and #43 were deleted; fix DoD row 1 owner text; remove panDoneRecoveredAt references from docs/MERGE-WORKFLOW.md; add the pan done invariant to CLAUDE.md Key Invariants."
+        },
+        "items": [
+          {
+            "id": "w31-phase3-docs.ac1",
+            "title": "When grep PAN-3848 runs over the four docs files and CLAUDE.md, then each contains the string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w31-phase3-docs.ac2",
+            "title": "When docs/AGENT-STATE-PLANES.md is read, then the record-lock paragraph states the lock is per issue and released before the push.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w31-phase3-docs.ac3",
+            "title": "When CLAUDE.md Key Invariants is read, then it contains pan done writes its review request; no patrol re-creates it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w30-would-fire-counters-and-soak",
+        "to": "w25-pan-done-writes-review-request-once",
+        "type": "blocks"
+      },
+      {
+        "from": "w25-pan-done-writes-review-request-once",
+        "to": "w27-delete-reconcile-in-flight-journals",
+        "type": "blocks"
+      },
+      {
+        "from": "w27-delete-reconcile-in-flight-journals",
+        "to": "w29-delete-phase3-scavenger-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w29-delete-phase3-scavenger-patrols",
+        "to": "w28-delete-verdict-fallback-file",
+        "type": "blocks"
+      },
+      {
+        "from": "w23-per-issue-record-lock",
+        "to": "w28-delete-verdict-fallback-file",
+        "type": "blocks"
+      },
+      {
+        "from": "w27-delete-reconcile-in-flight-journals",
+        "to": "w28-delete-verdict-fallback-file",
+        "type": "blocks"
+      },
+      {
+        "from": "w25-pan-done-writes-review-request-once",
+        "to": "w31-phase3-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w26-reviewer-exit-writes-stopped",
+        "to": "w31-phase3-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w29-delete-phase3-scavenger-patrols",
+        "to": "w31-phase3-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w30-would-fire-counters-and-soak",
+        "to": "w27-delete-reconcile-in-flight-journals",
+        "type": "blocks"
+      },
+      {
+        "from": "w30-would-fire-counters-and-soak",
+        "to": "w29-delete-phase3-scavenger-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w30-would-fire-counters-and-soak",
+        "to": "w28-delete-verdict-fallback-file",
+        "type": "blocks"
+      },
+      {
+        "from": "w25-pan-done-writes-review-request-once",
+        "to": "w29-delete-phase3-scavenger-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w25-pan-done-writes-review-request-once",
+        "to": "w28-delete-verdict-fallback-file",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
