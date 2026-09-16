@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T20:06:58.714Z",
+  "updated": "2026-09-16T20:07:43.370Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "spawn-single-log": {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3586608,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:07:43.370Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -194,6 +202,7 @@
     "spawn-slot-log.ac1": "completed",
     "spawn-slot-log.ac2": "completed",
     "spawn-slot-log.ac3": "completed",
-    "spawn-slot-log.ac4": "completed"
+    "spawn-slot-log.ac4": "completed",
+    "spawn-single-log": "running"
   }
 }
