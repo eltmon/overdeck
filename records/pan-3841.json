@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T20:00:51.647Z",
+  "updated": "2026-09-16T20:03:41.648Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "retro-route": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 3452293,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:00:51.647Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Created src/lib/overdeck/conversation-retrospective.ts per WI-3: RETROSPECTIVE_WINDOWS (24h/7d), isRetrospectiveWindow, stripFrontmatter (same regex as runtime-command.ts), formatProjectLines (migrated/legacy/empty variants), renderRetrospectiveKickoff (split/join substitution + trim), loadRetrospectiveTemplate (no cache, path param for temp-file tests), collectRetrospectiveProjects (listProjectsAsync + resolveStateReadHomeAsync), handleRetrospectiveConversationCreate (400 on invalid window, forwards only model/harness/effort strings, never projectKey/issueId). 11/11 unit tests green; typecheck passes; conversation-runtime.ts untouched (1163 lines). Commit 0a259e2a4a7 pushed.",
         "releasedAt": "2026-09-16T19:48:31.891Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 3452293,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:00:51.647Z",
+        "itemId": "retro-route",
+        "outcome": "completed",
+        "reason": "Added POST /api/conversations/retrospective per WI-4: new routes/conversations-retrospective.ts (validateOrigin 403, readJsonBody from specialists/shared.js, delegates to handleRetrospectiveConversationCreate funneling into handleConversationCreate with generateAiTitle wired to conversationReadDependencies); conversations.ts line 182 now exports conversationReadDependencies (file still 1070 lines); server.ts imports + merges conversationsRetrospectiveRouteLayer after conversationsRouteLayer. Route tests mock the write door and the conversations.js module body: valid 7d body -> 201 with message starting 'Pipeline retrospective: last 7 days' and no projectKey; bad window -> 400 Invalid window; foreign Origin -> 403. 3/3 green; typecheck + lint-file-size pass. Commit f60c7b3efab pushed.",
+        "releasedAt": "2026-09-16T20:03:41.648Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "retro-lib": {
         "reason": "Created src/lib/overdeck/conversation-retrospective.ts per WI-3: RETROSPECTIVE_WINDOWS (24h/7d), isRetrospectiveWindow, stripFrontmatter (same regex as runtime-command.ts), formatProjectLines (migrated/legacy/empty variants), renderRetrospectiveKickoff (split/join substitution + trim), loadRetrospectiveTemplate (no cache, path param for temp-file tests), collectRetrospectiveProjects (listProjectsAsync + resolveStateReadHomeAsync), handleRetrospectiveConversationCreate (400 on invalid window, forwards only model/harness/effort strings, never projectKey/issueId). 11/11 unit tests green; typecheck passes; conversation-runtime.ts untouched (1163 lines). Commit 0a259e2a4a7 pushed.",
         "updatedAt": "2026-09-16T19:48:31.891Z"
+      },
+      "retro-route": {
+        "reason": "Added POST /api/conversations/retrospective per WI-4: new routes/conversations-retrospective.ts (validateOrigin 403, readJsonBody from specialists/shared.js, delegates to handleRetrospectiveConversationCreate funneling into handleConversationCreate with generateAiTitle wired to conversationReadDependencies); conversations.ts line 182 now exports conversationReadDependencies (file still 1070 lines); server.ts imports + merges conversationsRetrospectiveRouteLayer after conversationsRouteLayer. Route tests mock the write door and the conversations.js module body: valid 7d body -> 201 with message starting 'Pipeline retrospective: last 7 days' and no projectKey; bad window -> 400 Invalid window; foreign Origin -> 403. 3/3 green; typecheck + lint-file-size pass. Commit f60c7b3efab pushed.",
+        "updatedAt": "2026-09-16T20:03:41.648Z"
       }
     }
   },
@@ -161,6 +168,10 @@
     "retro-lib.ac3": "completed",
     "retro-lib.ac4": "completed",
     "retro-lib.ac5": "completed",
-    "retro-route": "running"
+    "retro-route": "completed",
+    "retro-route.ac1": "completed",
+    "retro-route.ac2": "completed",
+    "retro-route.ac3": "completed",
+    "retro-route.ac4": "completed"
   }
 }
