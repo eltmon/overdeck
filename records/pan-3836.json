@@ -265,16 +265,16 @@
     "recordedAt": "2026-09-16T17:31:53.759Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:32:00.647Z",
+  "updated": "2026-09-16T17:32:05.760Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:32:00.556Z",
+    "updatedAt": "2026-09-16T17:32:03.270Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
@@ -414,7 +414,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.033075,
-        "pricingAsOf": "2026-09-16T17:32:00.595Z"
+        "pricingAsOf": "2026-09-16T17:32:05.742Z"
       }
     },
     "merges": [
@@ -423,7 +423,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
