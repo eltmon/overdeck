@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T15:35:34.624Z",
+  "updated": "2026-09-16T15:35:40.475Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "cli-project-add-dry-run": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2968724,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T15:35:40.475Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -194,6 +202,7 @@
     "project-create-routes.ac2": "completed",
     "project-create-routes.ac3": "completed",
     "project-create-routes.ac4": "completed",
-    "project-create-routes.ac5": "completed"
+    "project-create-routes.ac5": "completed",
+    "cli-project-add-dry-run": "running"
   }
 }
