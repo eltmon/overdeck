@@ -412,7 +412,7 @@ Per-run artifact files; the full suite stamps `overdeck/test`, nothing else does
 
 **8.6 Patrols become alarms with budgets.**
 Keep: memory/disk pressure, deploy, close-out reaper, main-divergence health, mass-death detection, and a single "invariant checker" that compares record versus row versus liveness and *reports* (never writes) mismatches with a count. Every remaining patrol gets a per-day firing budget in config; exceeding it opens a needs-you with the patrol's name, because a patrol firing repeatedly is a transition bug.
-*Deletes:* 37 of the 78 patrols, each only after its transition writes its own state; 5 more are kept but rewired. Appendix C lists every patrol with its `deacon.ts` line, its disposition, and the phase in which it goes, so the deletion can be argued row by row.
+*Deletes:* 36 of the 78 patrols, each only after its transition writes its own state; 5 more are kept but rewired. Appendix C lists every patrol with its `deacon.ts` line, its disposition, and the phase in which it goes, so the deletion can be argued row by row.
 
 **Would this have carried PAN-3836?** Walk the day: the spawn does not take the lock (F1 gone); no placeholder, no adopted transcript (F2 gone); branch cut from `origin/main` (F3 gone); re-review refused on a dirty tree (F4: five cycles become two); ratchet names `projects.ts` (F5); nudges use transcript idle (F6); `it.skip` fails the gate (F7); 16 immutable artifacts (F8); CI would have caught the red main before PAN-3836's diff reached that test (F9); no anchorless verdict, no reset (F10, F11); UAT feedback is a confirmed turn or a loud failure that resurrects the agent (F12); `pan tell` exits with the truth (F14); zero happy-path recoveries (F15); review cannot un-fail verification (F16). The same review, test, and UAT verdicts would have been produced. The four manual interventions would have been zero, and the strike for PAN-3839 would have been unnecessary because main would not have been red.
 
@@ -578,7 +578,7 @@ All 78 steps run in one sequential pass in `runPatrol()` (`src/lib/cloister/deac
 | 7 | `runScheduledDeployPatrol` | 2699 | every 5 passes | Keep | deploy is a DoD row |
 | 8 | `reconcileAgentLiveness` | 2712 | every pass | Delete | 4: supervisor emits lifecycle events |
 | 9 | `reconcileOrphanProposedSpecs` | 2716 | every pass | Keep | budgeted; source of the 82 pickup-gate trips |
-| 10 | `reconcilePendingPromotions` | 2717 | every pass | Delete | 3: complete-planning becomes one write with its own retry |
+| 10 | `reconcilePendingPromotions` | 2717 | every pass | Keep | budgeted; the only retry for a failed complete-planning request until that request retries in-request (PRD PAN-3845, W29 decision) |
 | 11 | `reconcileClosedIssueAgents` | 2719 | every pass | Keep | reaper for closed issues |
 | 12 | `reapMergedStrikeWorkspaces` | 2726 | every pass | Keep | cleanup |
 | 13 | `reconcileIdleWorkspaceStacks` | 2733 | every pass | Keep | resource |
@@ -649,4 +649,4 @@ All 78 steps run in one sequential pass in `runPatrol()` (`src/lib/cloister/deac
 | 78 | per-project ephemeral specialist patrol | 3168 | every pass | Keep | specialist reaper |
 | — | `patrolResourcePressure` | 3479 | separate 15 s timer | Keep | memory governor |
 
-Totals: 36 Keep, 5 Rewire, 37 Delete. The Delete rows by phase: Phase 1 removes 5, Phase 2 removes 2, Phase 3 removes 23, Phase 4 removes 7.
+Totals: 37 Keep, 5 Rewire, 36 Delete. The Delete rows by phase: Phase 1 removes 5, Phase 2 removes 2, Phase 3 removes 22, Phase 4 removes 7.
