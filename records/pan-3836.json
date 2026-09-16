@@ -206,21 +206,21 @@
     "recordedAt": "2026-09-16T16:59:55.905Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:59:55.908Z",
+  "updated": "2026-09-16T16:59:56.831Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T16:55:21.321Z",
+    "updatedAt": "2026-09-16T16:59:56.828Z",
     "reviewNotes": "creating race fix ineffective: submit() finally still clears creating after first poll; gate it on !jobStarted (cycle-2 caveat unheeded)",
     "verificationNotes": "Verification FAILED at lint (163081ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
-    "reviewRequestedAt": "2026-09-16T16:51:47.407Z",
+    "reviewRequestedAt": "2026-09-16T16:59:56.828Z",
     "reviewSpawnedAt": "2026-09-16T16:51:13.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -317,7 +317,7 @@
         "tests/unit/lib/projects/create-intent.test.ts",
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
-      "recordedAt": "2026-09-16T16:51:08.216Z"
+      "recordedAt": "2026-09-16T16:59:55.905Z"
     }
   },
   "closeOut": {
