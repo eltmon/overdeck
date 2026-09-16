@@ -342,16 +342,16 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:24:28.784Z",
+  "updated": "2026-09-16T18:24:33.964Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:24:28.725Z",
+    "updatedAt": "2026-09-16T18:24:30.601Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -504,7 +504,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.208504,
-        "pricingAsOf": "2026-09-16T18:24:28.755Z"
+        "pricingAsOf": "2026-09-16T18:24:33.956Z"
       }
     },
     "merges": [
