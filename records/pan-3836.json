@@ -342,17 +342,17 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:27:57.761Z",
+  "updated": "2026-09-16T18:28:05.528Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:27:56.685Z",
+    "updatedAt": "2026-09-16T18:28:05.513Z",
     "reviewNotes": "Approved cycle 6: both c5 blockers verified fixed at head (url-invalid guard + acceptance suites 72/72 unit, 20/20 frontend green); 0 blockers from all four reviewers; advisories recorded for follow-up.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -505,7 +505,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.25269,
-        "pricingAsOf": "2026-09-16T18:27:56.759Z"
+        "pricingAsOf": "2026-09-16T18:28:05.517Z"
       }
     },
     "merges": [
@@ -514,7 +514,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
