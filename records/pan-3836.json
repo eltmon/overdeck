@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T14:46:51.108Z",
+  "updated": "2026-09-16T14:46:59.057Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "create-core-perform": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 2408305,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T14:46:51.108Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -106,6 +98,17 @@
         "outcome": "completed",
         "reason": "Implemented resolveProjectCreateIntent with full validation, detection, and memoized remote probing. Comprehensive tests included.",
         "releasedAt": "2026-09-16T14:46:39.389Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2408305,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T14:46:51.108Z",
+        "itemId": "create-core-perform",
+        "outcome": "completed",
+        "reason": "Implemented performProjectCreate with clone/init, registration with extras, workspaces exclusion, and main workspace bootstrap. Already included in create.ts from previous task.",
+        "releasedAt": "2026-09-16T14:46:59.057Z"
       }
     ],
     "statusReasons": {
@@ -120,6 +123,10 @@
       "create-core-resolve": {
         "reason": "Implemented resolveProjectCreateIntent with full validation, detection, and memoized remote probing. Comprehensive tests included.",
         "updatedAt": "2026-09-16T14:46:39.389Z"
+      },
+      "create-core-perform": {
+        "reason": "Implemented performProjectCreate with clone/init, registration with extras, workspaces exclusion, and main workspace bootstrap. Already included in create.ts from previous task.",
+        "updatedAt": "2026-09-16T14:46:59.057Z"
       }
     }
   },
@@ -141,6 +148,11 @@
     "create-core-resolve.ac3": "completed",
     "create-core-resolve.ac4": "completed",
     "create-core-resolve.ac5": "completed",
-    "create-core-perform": "running"
+    "create-core-perform": "completed",
+    "create-core-perform.ac1": "completed",
+    "create-core-perform.ac2": "completed",
+    "create-core-perform.ac3": "completed",
+    "create-core-perform.ac4": "completed",
+    "create-core-perform.ac5": "completed"
   }
 }
