@@ -30,8 +30,8 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../src/lib/paths.js', async () => {
-  const real = await vi.importActual<typeof import('../../../src/lib/paths.js')>('../../../src/lib/paths.js');
+vi.mock('../../../../src/lib/paths.js', async () => {
+  const real = await vi.importActual<typeof import('../../../../src/lib/paths.js')>('../../../../src/lib/paths.js');
   return {
     ...real,
     OVERDECK_HOME: TEST_HOME,
@@ -39,16 +39,16 @@ vi.mock('../../../src/lib/paths.js', async () => {
   };
 });
 
-vi.mock('../../../src/lib/workspace-manager.js', () => ({
+vi.mock('../../../../src/lib/workspace-manager.js', () => ({
   preTrustDirectorySync: vi.fn(),
   preTrustDirectory: vi.fn(),
 }));
 
-vi.mock('../../../src/lib/context-layers/index.js', () => ({
+vi.mock('../../../../src/lib/context-layers/index.js', () => ({
   ensureProjectLayer: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
+vi.mock('../../../../src/lib/workspaces/resolver.js', () => ({
   getMainWorkspace: vi.fn().mockReturnValue(null),
 }));
 
@@ -84,7 +84,7 @@ describe('resolveProjectCreateIntent', () => {
     execFileMock.mockImplementation(
       (cmd, args, opts, cb) => {
         if (cmd === 'git' && args[0] === 'ls-remote') {
-          cb(null, 'ref: refs/heads/main\tHEAD\n');
+          cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
         } else {
           cb(new Error('Unknown command'));
         }
@@ -130,6 +130,8 @@ describe('resolveProjectCreateIntent', () => {
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         cb(new Error('Network error'));
+      } else {
+        cb(new Error('Unknown command'));
       }
     });
 
@@ -152,7 +154,9 @@ describe('resolveProjectCreateIntent', () => {
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         callCount++;
-        cb(null, 'ref: refs/heads/main\tHEAD\n');
+        cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
       }
     });
 
@@ -188,11 +192,11 @@ describe('resolveProjectCreateIntent', () => {
 
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'remote') {
-        cb(null, 'git@github.com:o/r.git\n');
+        cb(null, { stdout: 'git@github.com:o/r.git\n', stderr: '' });
       } else if (cmd === 'git' && args[0] === 'symbolic-ref') {
         cb(new Error('Not a symbolic ref'));
       } else if (cmd === 'git' && args[0] === 'rev-parse') {
-        cb(null, 'main\n');
+        cb(null, { stdout: 'main\n', stderr: '' });
       } else {
         cb(new Error('Unknown command'));
       }
@@ -235,11 +239,9 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent1.key).toBe('my-proj');
     expect(intent1.findings).toHaveLength(0);
 
-    // Manually register to create a duplicate
-    const existing = getProjectSync('my-proj');
-    if (!existing) {
-      // Write it to projects.yaml via the sync function (mock would be needed in real test)
-    }
+    // Manually register to create a duplicate by creating the path
+    // When a project path exists, it's considered a duplicate
+    mkdirSync(intent1.path, { recursive: true });
 
     const intent2 = await resolveProjectCreateIntent({
       mode: 'new',
@@ -272,18 +274,25 @@ describe('resolveProjectCreateIntent', () => {
   });
 
   it('returns path-outside-home finding when homeBoundary=true and path escapes $HOME', async () => {
-    const intent = await resolveProjectCreateIntent({
-      mode: 'existing',
-      path: '/tmp/outside',
-      homeBoundary: true,
-      homeDir: TEST_HOME,
-    });
+    const outsideDir = join(tmpdir(), `proj-outside-${process.pid}`);
+    mkdirSync(outsideDir, { recursive: true });
 
-    expect(intent.findings).toContainEqual(
-      expect.objectContaining({
-        code: 'path-outside-home',
-      }),
-    );
+    try {
+      const intent = await resolveProjectCreateIntent({
+        mode: 'existing',
+        path: outsideDir,
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings).toContainEqual(
+        expect.objectContaining({
+          code: 'path-outside-home',
+        }),
+      );
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   it('allows paths outside $HOME when homeBoundary=false', async () => {
@@ -306,9 +315,18 @@ describe('resolveProjectCreateIntent', () => {
 
   it('returns target-exists finding for non-empty clone target', async () => {
     const parentDir = makeProjectDir('parent');
-    const targetDir = join(parentDir, 'my-proj');
+    // For URL 'o/r', parseRepoUrl returns folderName='r', so key='r', and path=join(parentDir, 'r')
+    const targetDir = join(parentDir, 'r');
     mkdirSync(targetDir, { recursive: true });
     writeFileSync(join(targetDir, 'file.txt'), 'content');
+
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'ls-remote') {
+        cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
 
     const intent = await resolveProjectCreateIntent({
       mode: 'clone',
