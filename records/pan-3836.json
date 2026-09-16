@@ -205,6 +205,7 @@
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
       "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
       "packages/contracts/src/composer-commands.generated.ts",
       "packages/contracts/src/telemetry.ts",
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
@@ -212,6 +213,7 @@
       "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
       "src/dashboard/frontend/tests/talk-it-through.spec.ts",
       "tests/unit/cli/project-commands.test.ts",
+      "tests/unit/dashboard/no-loss-audit.test.ts",
       "tests/unit/dashboard/routes/project-create-routes.test.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
@@ -259,6 +261,7 @@
       "CLAUDE.md",
       "configuration/projects.mdx",
       "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/TELEMETRY.md",
       "docs/WORKSPACES-AND-PROJECTS.md",
       "packages/contracts/src/composer-commands.generated.ts",
       "packages/contracts/src/telemetry.ts",
@@ -289,6 +292,7 @@
       "src/lib/projects/repo-url.ts",
       "sync-sources/skills/pan-new-project/SKILL.md",
       "tests/unit/cli/project-commands.test.ts",
+      "tests/unit/dashboard/no-loss-audit.test.ts",
       "tests/unit/dashboard/routes/project-create-jobs.test.ts",
       "tests/unit/dashboard/routes/project-create-routes.test.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
@@ -296,10 +300,10 @@
       "tests/unit/lib/projects/create-intent.test.ts",
       "tests/unit/lib/projects/repo-url.test.ts"
     ],
-    "recordedAt": "2026-09-16T17:31:53.759Z"
+    "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:09:37.386Z",
+  "updated": "2026-09-16T18:09:41.591Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
