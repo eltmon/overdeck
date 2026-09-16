@@ -392,19 +392,19 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T20:25:39.353Z",
+  "updated": "2026-09-16T20:31:57.785Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "uatStatus": "failed",
+    "uatStatus": "passed",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-09-16T20:25:39.278Z",
-    "testNotes": "Reconciled from green GitHub Actions CI on 9e039c17: lint (https://github.com/eltmon/overdeck/actions/runs/35142550786/job/104950389383)",
-    "uatNotes": "BLOCKING: /projects/new crashes on every entry point (sidebar +, HomePage + New project) — NewProjectPage.tsx uses react-router-dom's useSearchParams() but the app mounts no <Router> anywhere; masked in unit tests only because NewProjectPage.test.tsx wraps it in <BrowserRouter>. Full evidence and repro in .pan/test/result.json.",
+    "readyForMerge": true,
+    "updatedAt": "2026-09-16T20:31:57.742Z",
+    "testNotes": "Head 9e039c178b3. Automated gates: GitHub CI fully green on this commit (build, lint, test, smoke, guard); locally in the workspace, frontend suites for NewProjectPage, no-loss audit, and useProjectCreateIntent 22/22 passed, frontend tsc --noEmit clean, eslint clean on the four changed files. The only diff since the last verification-gate pass (fcad7fae) is the frontend-only react-router removal plus tests. Verdict recorded by the shepherding conversation (conv 20260916-7665) because the 19:54 test-specialist spawn died (jsonl-missing) and the green-CI reconciler flipped testStatus before re-dispatch could happen (PAN-3843).",
+    "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "9e039c178b33101935250217c8f51dbfeb167e0f",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
@@ -569,7 +569,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.185016,
-        "pricingAsOf": "2026-09-16T20:25:39.344Z"
+        "pricingAsOf": "2026-09-16T20:31:57.762Z"
       }
     },
     "merges": [
