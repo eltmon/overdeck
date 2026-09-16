@@ -43,6 +43,15 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
+**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
+starts a discuss-first conversation through `POST /api/conversations` and opens
+`/conv/:name`. The description uses a full row, with the project selector, model
+picker, and action wrapping below it. The model picker follows the configured
+provider harness unless explicit harness permutations are enabled. Click and
+Enter share a pending-launch guard. Launch errors appear below the controls;
+the draft stays available for retry. Browser coverage lives in
+`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+
 **DB job worker lanes:**
 - The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
   reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
