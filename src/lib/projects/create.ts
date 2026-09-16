@@ -408,7 +408,7 @@ export async function resolveProjectCreateIntent(
       intent.proposedIssuePrefix = proposed;
       const projectConfigs = await listProjectsAsync();
       if (
-        projectConfigs.some((config: any) => config.issue_prefix === proposed || config.issue_prefixes?.includes(proposed))
+        projectConfigs.some((config) => config.issue_prefix === proposed || config.issue_prefixes?.includes(proposed))
       ) {
         findings.push({
           field: 'issuePrefix',
@@ -430,7 +430,7 @@ export async function resolveProjectCreateIntent(
 
 /** Build extras from resolved intent. */
 function buildExtras(intent: ResolvedProjectIntent) {
-  const extras: Record<string, any> = {};
+  const extras: Record<string, string | object> = {};
 
   if (intent.provider === 'github' && intent.repoSlug) {
     extras.tracker = 'github';
