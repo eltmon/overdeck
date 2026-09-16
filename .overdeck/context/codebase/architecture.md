@@ -18,14 +18,22 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 ## Key src/lib modules
 
-- `agents.ts` (~5k lines) — agent lifecycle: `spawnAgent`, `spawnRun` (role runs),
-  `restartAgent`, `resumeAgent`, `buildAgentLaunchConfig`, runtime state
-  (`claudeSessionId` snapshot), harness resolution (`resolveEffectiveHarness`).
-- `runtimes/` — harness adapters: `claude-code.ts`, `pi.ts` (+ `pi-fifo.ts` rpc.in
-  named pipe), `codex.ts`. `RuntimeName = 'claude-code' | 'pi' | 'codex'` in `types.ts`.
-- `harness-policy.ts` — ToS gate `canUseHarnessSync()` (Pi + Anthropic + subscription
+- `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
+  `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
+  `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +
+  `tier-table.ts` (tiered execution), `runtime-command.ts` (`getProviderAuthMode`),
+  `delivery.ts`, `health.ts`, `resume.ts`, `termination.ts`. Harness resolution lives in
+  `src/lib/harness-resolve.ts`.
+- `runtimes/` — harness adapters: `claude-code.ts`, `ohmypi.ts` (+ `ohmypi-fifo.ts`),
+  `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
+  'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
+  legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`.
+- `harness-policy.ts` — ToS gate `canUseHarnessSync()` (ohmypi + Anthropic + subscription
   is the only blocked combo). Never weaken.
-- `providers.ts` — `PROVIDERS` registry (10 providers), `getProviderForModelSync()`.
+- `providers.ts` — `PROVIDERS` registry (18 providers incl. opencode/meta),
+  `getProviderForModelSync()`, per-provider `tierModels` (opus/sonnet/haiku slots).
+- `model-capabilities.ts` — `MODEL_CAPABILITIES` skill/cost matrix; `model-deprecations.ts`
+  alias table; `model-capability-class.ts` (PAN-3842) frontier/workhorse/small classes.
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
@@ -58,9 +66,9 @@ server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 ## Spawn sites (harness decision points)
 
 1. Plan kickoff — `planning/spawn-planning-session.ts` (~:558)
-2. Work agent — `agents.ts` `spawnAgent` (~:3339)
-3. Role runs — `agents.ts` `spawnRun` (~:3011)
-4. Restart — `agents.ts` `restartAgent` (~:4736)
+2. Work agent — `agents/spawn.ts` `spawnAgent` (~:600; single-work tier staffing ~:629)
+3. Role runs — `agents/spawn.ts` `spawnRun` (~:120; slot tier staffing ~:137)
+4. Restart — `agents/resume.ts` / `agents/recovery.ts`
 5. Dashboard start route — `dashboard/server/routes/agents.ts` (~:3156, shells to `pan start`)
 
 Conversations pin harness at creation (`routes/conversations.ts` ~:2741) — not a spawn site.
@@ -76,4 +84,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-07-05 -->
+<!-- last-verified: 2026-09-16 -->
