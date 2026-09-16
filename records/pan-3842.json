@@ -115,19 +115,20 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:10:01.846Z",
+  "updated": "2026-09-16T22:23:32.854Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:09:54.870Z",
+    "updatedAt": "2026-09-16T22:23:32.743Z",
     "reviewNotes": "41be7f9 slot path: fitness checks pre-staffing model (spawn.ts:139) and explicit --model slot spawn can now abort on plan desync (spawn-prep.ts:274-286)",
+    "verificationNotes": "Verification FAILED at test (990529ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3842/.overdeck/verification-latest.json",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
@@ -218,9 +219,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 417672,
-            "output": 66395,
-            "cacheRead": 30026276,
+            "input": 426322,
+            "output": 68048,
+            "cacheRead": 31585811,
             "cacheWrite": 0
           }
         }
@@ -239,15 +240,15 @@
           "cacheWrite": 270975
         },
         "custom/MiniMax-M3": {
-          "input": 417672,
-          "output": 66395,
-          "cacheRead": 30026276,
+          "input": 426322,
+          "output": 68048,
+          "cacheRead": 31585811,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.829117,
-        "pricingAsOf": "2026-09-16T22:09:56.853Z"
+        "usd": 13.833696,
+        "pricingAsOf": "2026-09-16T22:23:32.786Z"
       }
     },
     "merges": [
@@ -256,7 +257,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
