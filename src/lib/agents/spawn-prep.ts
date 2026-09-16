@@ -223,6 +223,10 @@ export interface SlotTierSpawnParams {
   tierName?: string;
   /** The slot item's xBRIEF difficulty, when the plan item declares one. */
   difficulty?: XBriefDifficulty;
+  /** Single-work path only: deduplicated difficulties across the plan's pending items. */
+  planDifficulties?: XBriefDifficulty[];
+  /** Single-work path only: pending items that carry a difficulty, as id/difficulty pairs. */
+  planItems?: Array<{ id: string; difficulty?: XBriefDifficulty }>;
   /** PAN-2397: true when staffing came from the implicit roles.work tier.
    * Implicit staffing intentionally omits `harness` so the spawn keeps its
    * historical harness handling (provider-default derived from the model). */
@@ -303,7 +307,7 @@ export function logTierFitnessAtSpawn(
   label: string,
   staffing: { tierName: string; model?: string; harness?: RuntimeName },
   difficulties: XBriefDifficulty[],
-  itemIds: string[],
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>,
   log: (line: string) => void = console.warn,
 ): void {
   if (!staffing.model || difficulties.length === 0) return;
@@ -314,7 +318,13 @@ export function logTierFitnessAtSpawn(
       difficulties,
       ctx,
     );
-    for (const w of warnings) log(`[spawn] tier fitness: ${label} — ${w.message} (items: ${itemIds.join(', ')}) — PAN-3842`);
+    for (const w of warnings) {
+      // List only the items whose difficulty the warning names; fall back to
+      // every item so the line never reads "(items: )".
+      const offending = items.filter((i) => i.difficulty !== undefined && w.difficulties.includes(i.difficulty));
+      const ids = (offending.length > 0 ? offending : items).map((i) => i.id);
+      log(`[spawn] tier fitness: ${label} — ${w.message} (items: ${ids.join(', ')}) — PAN-3842`);
+    }
   } catch (error) {
     log(`[spawn] tier fitness check skipped: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -362,11 +372,21 @@ export function resolveSingleWorkTierSpawnParams(
     issueId: issueId ?? undefined,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
+  // PAN-3842: the single agent works the WHOLE plan, so its fitness check runs
+  // against the maximum difficulty across every pending item (FR-6), not just
+  // the first dispatchable item that selected the tier.
+  const pending = doc.plan.items.filter((candidate) => !['completed', 'cancelled'].includes(candidate.status));
+  const planDifficulties = [...new Set(pending.map((candidate) => candidate.metadata?.difficulty).filter((d): d is XBriefDifficulty => Boolean(d)))];
+  const planItems = pending
+    .filter((candidate) => candidate.metadata?.difficulty)
+    .map((candidate) => ({ id: candidate.id, difficulty: candidate.metadata?.difficulty as XBriefDifficulty | undefined }));
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    planDifficulties,
+    planItems,
   };
 }
 

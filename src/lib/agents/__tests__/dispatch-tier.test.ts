@@ -262,6 +262,11 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'cheap',
       implicit: false,
+      planDifficulties: ['simple', 'expert'],
+      planItems: [
+        { id: 'cheap', difficulty: 'simple' },
+        { id: 'frontier', difficulty: 'expert' },
+      ],
     });
   });
 
@@ -271,7 +276,11 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       planItem('frontier', { difficulty: 'expert' }),
     ], { tiered_execution: 'off' }));
 
-    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual(IMPLICIT_PARAMS);
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      ...IMPLICIT_PARAMS,
+      planDifficulties: ['expert'],
+      planItems: [{ id: 'frontier', difficulty: 'expert' }],
+    });
   });
 
   it('leaves ordinary single work-agent starts untouched when no xBRIEF plan is readable', () => {
@@ -293,6 +302,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'frontier',
       implicit: false,
+      planDifficulties: ['expert'],
+      planItems: [{ id: 'frontier', difficulty: 'expert' }],
     });
   });
 
@@ -353,7 +364,7 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
   it('logs exactly one [spawn] tier fitness line naming expert and small-class for an expert item on a haiku staffing', () => {
     mockCatalogConfig();
     const lines: string[] = [];
-    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5', harness: 'claude-code' }, ['expert'], ['task-x'], (l) => lines.push(l));
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5', harness: 'claude-code' }, ['expert'], [{ id: 'task-x', difficulty: 'expert' }], (l) => lines.push(l));
     expect(lines).toHaveLength(1);
     expect(lines[0].startsWith('[spawn] tier fitness:')).toBe(true);
     expect(lines[0]).toContain('expert');
@@ -364,7 +375,7 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
   it('logs nothing for the same expert item on a claude-opus-4-8 staffing', () => {
     mockCatalogConfig();
     const lines: string[] = [];
-    logTierFitnessAtSpawn('agent-1', { tierName: 'frontier', model: 'claude-opus-4-8', harness: 'claude-code' }, ['expert'], ['task-x'], (l) => lines.push(l));
+    logTierFitnessAtSpawn('agent-1', { tierName: 'frontier', model: 'claude-opus-4-8', harness: 'claude-code' }, ['expert'], [{ id: 'task-x', difficulty: 'expert' }], (l) => lines.push(l));
     expect(lines).toEqual([]);
   });
 
@@ -374,7 +385,7 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
     });
     const lines: string[] = [];
     expect(() =>
-      logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, ['expert'], ['task-x'], (l) => lines.push(l)),
+      logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, ['expert'], [{ id: 'task-x', difficulty: 'expert' }], (l) => lines.push(l)),
     ).not.toThrow();
     expect(lines).toHaveLength(1);
     expect(lines[0].startsWith('[spawn] tier fitness check skipped:')).toBe(true);
@@ -384,8 +395,82 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
   it('skips silently when the staffing has no model or no difficulties', () => {
     mockCatalogConfig();
     const lines: string[] = [];
-    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap' }, ['expert'], ['task-x'], (l) => lines.push(l));
-    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, [], ['task-x'], (l) => lines.push(l));
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap' }, ['expert'], [{ id: 'task-x', difficulty: 'expert' }], (l) => lines.push(l));
+    logTierFitnessAtSpawn('agent-1', { tierName: 'cheap', model: 'claude-haiku-4-5' }, [], [{ id: 'task-x', difficulty: 'expert' }], (l) => lines.push(l));
     expect(lines).toEqual([]);
+  });
+
+  describe('single-work plan-max fitness (FR-6)', () => {
+    const PAN3836_CONFIG: TierAssignmentConfig = {
+      enabled: true,
+      tiers: {
+        'trivial-simple': { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        'medium-complex': { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'] },
+      },
+      difficultyToTier: {
+        trivial: 'trivial-simple',
+        simple: 'trivial-simple',
+        medium: 'medium-complex',
+        complex: 'medium-complex',
+      },
+    };
+
+    function mockPan3836Config(): void {
+      vi.mocked(loadConfigSync).mockReturnValue({
+        config: { tieredExecution: PAN3836_CONFIG, enabledProviders: new Set(['anthropic']), roles: { work: { model: 'claude-sonnet-4-6' } } },
+      } as unknown as ReturnType<typeof loadConfigSync>);
+    }
+
+    it('returns every pending item difficulty as planDifficulties when the first item is simple', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('first', { difficulty: 'simple' }),
+        planItem('mid', { difficulty: 'medium' }),
+        planItem('hard', { difficulty: 'complex' }),
+      ]));
+      const params = resolveSingleWorkTierSpawnParams('/ws');
+      expect(params.model).toBe('claude-haiku-4-5');
+      expect(params.planDifficulties).toEqual(['simple', 'medium', 'complex']);
+    });
+
+    it('logs one line naming medium, complex and only the medium/complex item ids for a haiku staffing', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('first', { difficulty: 'simple' }),
+        planItem('mid', { difficulty: 'medium' }),
+        planItem('hard', { difficulty: 'complex' }),
+      ]));
+      const params = resolveSingleWorkTierSpawnParams('/ws');
+      const lines: string[] = [];
+      logTierFitnessAtSpawn('agent-1', { tierName: params.tierName ?? 'default', model: params.model, harness: params.harness }, params.planDifficulties ?? [], params.planItems ?? [], (l) => lines.push(l));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('medium, complex');
+      expect(lines[0]).toContain('mid');
+      expect(lines[0]).toContain('hard');
+      expect(lines[0]).not.toContain('first');
+    });
+
+    it('logs nothing when the first item is complex and staffing resolves to claude-sonnet-5', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('hard', { difficulty: 'complex' }),
+        planItem('first', { difficulty: 'simple' }),
+        planItem('mid', { difficulty: 'medium' }),
+      ]));
+      const params = resolveSingleWorkTierSpawnParams('/ws');
+      expect(params.model).toBe('claude-sonnet-5');
+      const lines: string[] = [];
+      logTierFitnessAtSpawn('agent-1', { tierName: params.tierName ?? 'default', model: params.model, harness: params.harness }, params.planDifficulties ?? [], params.planItems ?? [], (l) => lines.push(l));
+      expect(lines).toEqual([]);
+    });
+
+    it('returns {} for an explicit per-spawn model override, so no fitness line is logged', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('first', { difficulty: 'simple' })]));
+      const params = resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5');
+      expect(params).toEqual({});
+      // spawn.ts guards the log call on singleTierParams.model — {} skips it.
+      expect(params.model).toBeUndefined();
+    });
   });
 });
