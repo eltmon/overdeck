@@ -10,7 +10,7 @@
   },
   "launch": {
     "harness": "claude-code",
-    "model": "MiniMax-M3",
+    "model": "claude-opus-5",
     "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3841",
     "branch": null
   },
@@ -23,6 +23,11 @@
     {
       "id": "dbda8bb1-7866-466b-bab4-c4d328901f0e",
       "startedAt": "2026-09-16T21:18:24.717Z",
+      "reason": "spawn"
+    },
+    {
+      "id": "a1682f78-96f7-481d-bb18-567a4e20cd09",
+      "startedAt": "2026-09-16T22:03:13.457Z",
       "reason": "spawn"
     }
   ],
@@ -42,6 +47,10 @@
     {
       "at": "2026-09-16T21:23:01.078Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-09-16T22:03:13.457Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
