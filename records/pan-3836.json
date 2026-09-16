@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:59:49.234Z",
+  "updated": "2026-09-16T22:59:52.306Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 35,
+    "sequence": 36,
     "claims": {},
     "claimHistory": [
       {
@@ -889,8 +889,8 @@
         "updatedAt": "2026-09-16T22:59:49.233Z"
       },
       "wire-entry-points-no-loss": {
-        "reason": "All entry points wired: sidebar +, workspace chips (3x), App.handleNewProject all navigate to /projects/new with proper mode params",
-        "updatedAt": "2026-09-16T16:04:13.456Z"
+        "reason": "Cycle-10 review BLOCKING [requirements FR-7/AC-5]: (1) capture('project_created', { mode }) is no longer emitted anywhere; call it before onCreated in the hook's success paths (200 result and job done). (2) NewProjectPage.no-loss.test.tsx asserts only 3 of the 11 WI-5 no-loss rows and two rows are mislabeled; replace the affordances array with the 11 WI-5 rows verbatim, each asserting the real affordance (FolderPicker rows, telemetry row, strip path preview with a populated mocked intent, name testid). Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:52.306Z"
       },
       "delete-new-project-modal": {
         "reason": "NewProjectModal component and all references deleted; typecheck passes",
@@ -963,12 +963,12 @@
     "new-project-page.ac3": "pending",
     "new-project-page.ac4": "pending",
     "new-project-page.ac5": "pending",
-    "wire-entry-points-no-loss": "completed",
-    "wire-entry-points-no-loss.ac1": "completed",
-    "wire-entry-points-no-loss.ac2": "completed",
-    "wire-entry-points-no-loss.ac3": "completed",
-    "wire-entry-points-no-loss.ac4": "completed",
-    "wire-entry-points-no-loss.ac5": "completed",
+    "wire-entry-points-no-loss": "pending",
+    "wire-entry-points-no-loss.ac1": "pending",
+    "wire-entry-points-no-loss.ac2": "pending",
+    "wire-entry-points-no-loss.ac3": "pending",
+    "wire-entry-points-no-loss.ac4": "pending",
+    "wire-entry-points-no-loss.ac5": "pending",
     "delete-new-project-modal": "completed",
     "delete-new-project-modal.ac1": "completed",
     "delete-new-project-modal.ac2": "completed",
