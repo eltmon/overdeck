@@ -237,6 +237,11 @@
       "timestamp": "2026-09-16T18:24:28.729Z",
       "reason": "end",
       "note": "Fixed all three review blocking findings: url-invalid reachability via guard check, project-exists test via cache invalidation, AC3.9 promise chain via direct await. All 100 tests passing."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T18:53:52.396Z"
     }
   ],
   "feedback": [],
@@ -342,7 +347,7 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:53:51.220Z",
+  "updated": "2026-09-16T18:53:52.409Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "reviewing",
@@ -529,7 +534,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "k3",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
