@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T19:44:41.315Z",
+  "updated": "2026-09-16T19:44:55.943Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "retro-lib": {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 3183579,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T19:44:55.943Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -115,6 +123,7 @@
     "retro-template-test": "completed",
     "retro-template-test.ac1": "completed",
     "retro-template-test.ac2": "completed",
-    "retro-template-test.ac3": "completed"
+    "retro-template-test.ac3": "completed",
+    "retro-lib": "running"
   }
 }
