@@ -150,7 +150,6 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
     "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
       "tests/unit/cli/project-create-commands.test.ts",
       "tests/unit/dashboard/routes/projects-create-routes.test.ts",
       "tests/unit/lib/projects/create-perform.test.ts"
@@ -205,6 +204,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewProjectModal.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
       "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
       "src/dashboard/frontend/src/components/project/new/__tests__/useProjectCreateIntent.test.ts",
       "src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts",
       "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
@@ -230,10 +230,10 @@
       "tests/unit/lib/projects/create-intent.test.ts",
       "tests/unit/lib/projects/repo-url.test.ts"
     ],
-    "recordedAt": "2026-09-16T16:59:55.905Z"
+    "recordedAt": "2026-09-16T17:17:24.960Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:17:21.309Z",
+  "updated": "2026-09-16T17:17:24.962Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
