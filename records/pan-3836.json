@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T14:31:48.099Z",
+  "updated": "2026-09-16T14:32:12.617Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -61,5 +61,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-09-16T14:28:59.065Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "repo-url-parser": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2114818,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T14:32:12.617Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "repo-url-parser": "running"
+  }
 }
