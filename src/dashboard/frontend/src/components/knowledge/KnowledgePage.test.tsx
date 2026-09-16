@@ -57,9 +57,10 @@ afterEach(() => {
 
 describe('KnowledgePage', () => {
   it('registers /knowledge without changing existing tab paths', () => {
-    const { knowledge, 'workspace-new': workspaceNew, ...legacyPaths } = TAB_PATHS;
+    const { knowledge, 'workspace-new': workspaceNew, 'project-new': projectNew, ...legacyPaths } = TAB_PATHS;
     expect(knowledge).toBe('/knowledge');
     expect(workspaceNew).toBe('/workspaces/new');
+    expect(projectNew).toBe('/projects/new');
     expect(legacyPaths).toEqual({
       home: '/',
       pipeline: '/pipeline',
