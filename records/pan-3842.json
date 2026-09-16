@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T20:03:53.015Z",
+  "updated": "2026-09-16T20:06:58.714Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "spawn-slot-log": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3527773,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T20:03:53.015Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -139,6 +131,17 @@
         "outcome": "completed",
         "reason": "Added doctor-tier-fitness.ts (error on tieredExecutionInvalid, warn listing fitness warnings, ok otherwise; disabled path checks roles.work pseudo-tier) registered in doctor.ts after orphan-proposed-specs; 6 tests pass; built CLI shows the row.",
         "releasedAt": "2026-09-16T20:01:53.922Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3527773,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T20:03:53.015Z",
+        "itemId": "spawn-slot-log",
+        "outcome": "completed",
+        "reason": "spawn-prep carries item difficulty in SlotTierSpawnParams and exports logTierFitnessAtSpawn (never throws, one [spawn] tier fitness line per warning); spawn.ts calls it after slot tier resolution; 24 dispatch-tier tests pass, typecheck green.",
+        "releasedAt": "2026-09-16T20:06:58.713Z"
       }
     ],
     "statusReasons": {
@@ -157,6 +160,10 @@
       "doctor-row": {
         "reason": "Added doctor-tier-fitness.ts (error on tieredExecutionInvalid, warn listing fitness warnings, ok otherwise; disabled path checks roles.work pseudo-tier) registered in doctor.ts after orphan-proposed-specs; 6 tests pass; built CLI shows the row.",
         "updatedAt": "2026-09-16T20:01:53.922Z"
+      },
+      "spawn-slot-log": {
+        "reason": "spawn-prep carries item difficulty in SlotTierSpawnParams and exports logTierFitnessAtSpawn (never throws, one [spawn] tier fitness line per warning); spawn.ts calls it after slot tier resolution; 24 dispatch-tier tests pass, typecheck green.",
+        "updatedAt": "2026-09-16T20:06:58.713Z"
       }
     }
   },
@@ -183,6 +190,10 @@
     "doctor-row.ac3": "completed",
     "doctor-row.ac4": "completed",
     "doctor-row.ac5": "completed",
-    "spawn-slot-log": "running"
+    "spawn-slot-log": "completed",
+    "spawn-slot-log.ac1": "completed",
+    "spawn-slot-log.ac2": "completed",
+    "spawn-slot-log.ac3": "completed",
+    "spawn-slot-log.ac4": "completed"
   }
 }
