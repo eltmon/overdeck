@@ -299,7 +299,7 @@
     "recordedAt": "2026-09-16T17:31:53.759Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:00:17.040Z",
+  "updated": "2026-09-16T18:00:24.188Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -308,7 +308,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:57:32.989Z",
+    "panDoneRecoveredAt": "2026-09-16T18:00:16.574Z",
+    "updatedAt": "2026-09-16T18:00:17.026Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (414718ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -411,18 +412,17 @@
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
       "recordedAt": "2026-09-16T17:31:53.759Z"
-    },
-    "panDoneRecoveredAt": "2026-09-16T18:00:16.574Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5-1": {
-            "input": 360,
-            "output": 12920,
-            "cacheRead": 8008120,
-            "cacheWrite": 32500
+            "input": 392,
+            "output": 14086,
+            "cacheRead": 8598556,
+            "cacheWrite": 35463
           }
         },
         "plan": {
@@ -435,30 +435,30 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5725,
-            "output": 248320,
-            "cacheRead": 87113695,
-            "cacheWrite": 1257783
+            "input": 5869,
+            "output": 255303,
+            "cacheRead": 88900668,
+            "cacheWrite": 1273128
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5-1": {
-          "input": 1166,
-          "output": 60070,
-          "cacheRead": 12298260,
-          "cacheWrite": 224355
+          "input": 1198,
+          "output": 61236,
+          "cacheRead": 12888696,
+          "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5725,
-          "output": 248320,
-          "cacheRead": 87113695,
-          "cacheWrite": 1257783
+          "input": 5869,
+          "output": 255303,
+          "cacheRead": 88900668,
+          "cacheWrite": 1273128
         }
       },
       "costAtCloseOut": {
-        "usd": 29.648797000000002,
-        "pricingAsOf": "2026-09-16T17:57:33.007Z"
+        "usd": 30.56783,
+        "pricingAsOf": "2026-09-16T18:00:23.061Z"
       }
     },
     "merges": [
