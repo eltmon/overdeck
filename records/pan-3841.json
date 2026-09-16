@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T19:38:58.469Z",
+  "updated": "2026-09-16T19:43:11.561Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -69,18 +69,33 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "retro-template": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3841",
         "agentId": "agent-pan-3841",
         "pid": 3035099,
         "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T19:38:58.469Z"
+        "claimedAt": "2026-09-16T19:38:58.469Z",
+        "itemId": "retro-template",
+        "outcome": "completed",
+        "reason": "Created roles/retrospective.md per WI-1: frontmatter name:retrospective, title-shaped first body line, read-only ground rules naming pan/gh/git/HTTP-write forbiddens, Inputs section using exactly the 5 placeholders (grep count 9 ≥ 5), Output shape with the 4 ordered headings. check-prompt-change-trailer.sh: 'Prompt-Change trailer found; ok'. lint-skills.sh: passed. Committed alone as bf294801d5a with Prompt-Change trailer and pushed.",
+        "releasedAt": "2026-09-16T19:43:11.561Z"
+      }
+    ],
+    "statusReasons": {
+      "retro-template": {
+        "reason": "Created roles/retrospective.md per WI-1: frontmatter name:retrospective, title-shaped first body line, read-only ground rules naming pan/gh/git/HTTP-write forbiddens, Inputs section using exactly the 5 placeholders (grep count 9 ≥ 5), Output shape with the 4 ordered headings. check-prompt-change-trailer.sh: 'Prompt-Change trailer found; ok'. lint-skills.sh: passed. Committed alone as bf294801d5a with Prompt-Change trailer and pushed.",
+        "updatedAt": "2026-09-16T19:43:11.561Z"
       }
     }
   },
   "statusOverrides": {
-    "retro-template": "running"
+    "retro-template": "completed",
+    "retro-template.ac1": "completed",
+    "retro-template.ac2": "completed",
+    "retro-template.ac3": "completed",
+    "retro-template.ac4": "completed"
   }
 }
