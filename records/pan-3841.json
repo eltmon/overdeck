@@ -87,10 +87,10 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:17:29.013Z",
+  "updated": "2026-09-16T21:17:44.372Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -98,9 +98,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:15:27.481Z",
+    "updatedAt": "2026-09-16T21:16:19.403Z",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
+    "reviewSpawnedAt": "2026-09-16T21:16:19.399Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -158,9 +159,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 349,
-            "output": 84,
-            "cacheRead": 0,
+            "input": 15109,
+            "output": 174,
+            "cacheRead": 15014,
             "cacheWrite": 0
           }
         },
@@ -171,13 +172,21 @@
             "cacheRead": 8540604,
             "cacheWrite": 249772
           }
+        },
+        "work": {
+          "custom/MiniMax-M3": {
+            "input": 479345,
+            "output": 4427,
+            "cacheRead": 1426688,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 349,
-          "output": 84,
-          "cacheRead": 0,
+          "input": 15109,
+          "output": 174,
+          "cacheRead": 15014,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5-1": {
@@ -185,11 +194,17 @@
           "output": 79790,
           "cacheRead": 8540604,
           "cacheWrite": 249772
+        },
+        "custom/MiniMax-M3": {
+          "input": 479345,
+          "output": 4427,
+          "cacheRead": 1426688,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.667491,
-        "pricingAsOf": "2026-09-16T21:15:27.499Z"
+        "usd": 15.8333154,
+        "pricingAsOf": "2026-09-16T21:17:23.308Z"
       }
     },
     "merges": [
@@ -198,7 +213,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
