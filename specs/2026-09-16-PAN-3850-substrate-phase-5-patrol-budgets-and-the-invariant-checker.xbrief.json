@@ -1,0 +1,396 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T21:36:47.000Z",
+    "author": "overdeck/0.50.4",
+    "description": "Plan for PAN-3850: Substrate Phase 5: patrol budgets and the invariant checker",
+    "updated": "2026-09-16T21:40:31.427Z"
+  },
+  "plan": {
+    "id": "pan-3850",
+    "title": "Substrate Phase 5: patrol budgets and the invariant checker",
+    "status": "proposed",
+    "uid": "0e03a6f9-8eaa-478e-8cd0-fd2958e7db25",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T21:36:47.000Z",
+    "updated": "2026-09-16T21:40:31.427Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3850",
+        "label": "PAN-3850",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3850.md",
+        "label": "PRD drafts/pan-3850.md (phase 5 of PAN-3845)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3845.md",
+        "label": "Epic PRD drafts/pan-3845.md (wins on disagreement)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pipeline-reliability-review.md",
+        "label": "Evidence: pipeline reliability review (F1..F17, patrols #1..#78)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "observability",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "After Phases 1 to 4 the remaining patrols are alarms and rewired reconcilers, but nothing stops a patrol from firing without bound (23 record commits in 70 seconds on 2026-09-16) and nothing reports a drift between the record pipeline block, the review-status row and agent liveness without silently fixing it, which is how recurring repairs hid real bugs.",
+      "Proposal": "Give every remaining patrol a daily action budget with a needs-you on suspension, add a report-only invariant checker with an invariant-mismatch orbit, delete the last Delete-disposition patrols behind their soak, prove the registered list matches Appendix C with an audit, and document.",
+      "NonGoals": "- No automatic repair inside the invariant checker; it only reports.\n- No budget on the alarm patrols #3, #64, #70, #71, #77.\n- No new patrols beyond the checker."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "sizeJustification": "Phase of epic PAN-3845; the work items are the PRD work items and cannot be split without losing the audit-before-delete ordering. Subsystem count is inflated by single docs files (each counts as its own subsystem).",
+      "codeReadAt": "3d5051040a2",
+      "epic": "PAN-3845",
+      "phase": 5,
+      "canonicalFilename": "2026-09-16-PAN-3850-substrate-phase-5-patrol-budgets-and-the-invariant-checker.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w39-patrol-firing-budgets",
+        "title": "Per-patrol firing budgets with a needs-you on suspension",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3850",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/patrol-budget.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/lib/cloister/patrol-budget.test.ts",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/patrol-budget.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "patrol-budget.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W39 in drafts/pan-3850.md. Add patrolBudgets to cloister config.ts (default 50 actions per UTC day per patrol; alarms #3, #64, #70, #71, #77 exempt). Create src/lib/cloister/patrol-budget.ts with recordPatrolActions, isPatrolSuspended and suspendPatrol (needs-you via recordDeadEndNeedsYou once per day). In runPatrol replace each for-loop registration with runBudgeted(name, fn) that checks suspension, runs, records actions.length and suspends when over budget. Show tallies in pan doctor. Checkpoint: document the new key where deacon/config.json keys live (grep deacon/config.json under docs)."
+        },
+        "items": [
+          {
+            "id": "w39-patrol-firing-budgets.ac1",
+            "title": "Given a patrol returning 51 actions in one UTC day under fake timers, when it is called the 52nd time, then it is suspended and exactly one needs-you is recorded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w39-patrol-firing-budgets.ac2",
+            "title": "Given the next UTC day, when the suspended patrol is called, then it runs again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w39-patrol-firing-budgets.ac3",
+            "title": "Given an exempt alarm patrol, when it exceeds 50 actions, then it is not suspended.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w39-patrol-firing-budgets.ac4",
+            "title": "When pan doctor runs, then it prints each patrol tally and budget.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w40-report-only-invariant-checker",
+        "title": "Report-only invariant checker and the invariant-mismatch orbit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3850",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/invariant-checker.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/parked/resolver.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/lib/cloister/invariant-checker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/invariant-checker.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "invariant-checker.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-27"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W40 in drafts/pan-3850.md. Create src/lib/cloister/invariant-checker.ts registered as a patrol every 10 passes: for every non-merged issue compare the record pipeline block with the review-status row field by field, and for every agent row compare status with isAliveSync; emit one activity entry per mismatching entity per day plus a summary; never write any store. Add the invariant-mismatch orbit to parked/resolver.ts with the pan review resync and pan admin agents exited recommendations, and a pan doctor section."
+        },
+        "items": [
+          {
+            "id": "w40-report-only-invariant-checker.ac1",
+            "title": "Given a fixture with one drifted pipeline field, when the checker runs, then it emits one activity entry and one invariant-mismatch orbit row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w40-report-only-invariant-checker.ac2",
+            "title": "Given a consistent fixture, when the checker runs, then it emits nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w40-report-only-invariant-checker.ac3",
+            "title": "When the checker runs, then the record writer and setReviewStatusSync are never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w40-report-only-invariant-checker.ac4",
+            "title": "When pan parked lists an invariant-mismatch row, then the recommendation names pan review resync or pan admin agents exited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w41-delete-remaining-delete-patrols",
+        "title": "Delete the remaining Delete-disposition patrols after their soak",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3850",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/*-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deterministic-patrol-cadence.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deterministic-patrol-cadence.test.ts exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W41 in drafts/pan-3850.md with the w29 protocol for any Appendix C Delete row not yet removed by W6, W20, W27 to W29 or W36, using the w30 counters showing zero for 7 days. The registered patrol count in runPatrol must equal the 42 Keep plus Rewire rows, or each exception is listed in the PR with its counter evidence."
+        },
+        "items": [
+          {
+            "id": "w41-delete-remaining-delete-patrols.ac1",
+            "title": "When runPatrol is read, then the registered patrol count equals the 42 Keep plus Rewire rows in Appendix C, or each exception is listed in the PR with its counter evidence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w41-delete-remaining-delete-patrols.ac2",
+            "title": "Given a patrol whose would-fire counter is non-zero over 7 days, when it is evaluated, then it stays registered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w42-patrol-no-loss-audit",
+        "title": "Phase 5 no-loss audit over the registered patrol list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3850",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/patrol-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/patrol-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "patrol-no-loss-audit.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W42 in drafts/pan-3850.md. Create tests/unit/lib/cloister/patrol-no-loss-audit.test.ts that reads the runPatrol source, asserts every registered step name is in the Keep or Rewire list from Appendix C, and asserts every deleted name has tests/unit/lib/cloister/<patrol-name>-no-loss.test.ts on disk."
+        },
+        "items": [
+          {
+            "id": "w42-patrol-no-loss-audit.ac1",
+            "title": "When the audit parses runPatrol, then every registered step name is in the Keep or Rewire list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w42-patrol-no-loss-audit.ac2",
+            "title": "When the audit runs, then every deleted patrol name has a file tests/unit/lib/cloister/<name>-no-loss.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w43-phase5-docs",
+        "title": "Phase 5 documentation: budgets and the invariant checker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T21:36:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3850",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/GOD-VIEW.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "CLAUDE.md",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:prompts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W43 in drafts/pan-3850.md. Add a Patrol budgets section to docs/PIPELINE-GATES.md, describe the invariant-mismatch orbit in docs/GOD-VIEW.md, fix the mechanical owners that changed in docs/DEFINITION-OF-DONE.md, add the patrols-are-alarms invariant to CLAUDE.md, and document the budget key in the deacon config reference in docs/AGENT-STATE-PLANES.md."
+        },
+        "items": [
+          {
+            "id": "w43-phase5-docs.ac1",
+            "title": "When grep PAN-3850 runs over the five files, then each contains the string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w43-phase5-docs.ac2",
+            "title": "When docs/PIPELINE-GATES.md is read, then it contains a section named Patrol budgets, and docs/GOD-VIEW.md describes the invariant-mismatch orbit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w39-patrol-firing-budgets",
+        "to": "w40-report-only-invariant-checker",
+        "type": "blocks"
+      },
+      {
+        "from": "w40-report-only-invariant-checker",
+        "to": "w41-delete-remaining-delete-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w41-delete-remaining-delete-patrols",
+        "to": "w42-patrol-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "w41-delete-remaining-delete-patrols",
+        "to": "w43-phase5-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w39-patrol-firing-budgets",
+        "to": "w41-delete-remaining-delete-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "w39-patrol-firing-budgets",
+        "to": "w43-phase5-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
