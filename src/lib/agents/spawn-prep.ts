@@ -259,6 +259,23 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
+  // PAN-3842 (review): the explicit override path must short-circuit BEFORE
+  // the missing-item throw below. Otherwise a slot whose slotItemId has been
+  // renamed/removed out from under the registration cannot spawn with an
+  // explicit --model — warning-only work must never abort a spawn (FR-7,
+  // NonGoal 1, operator P2 instruction).
+  if (explicitModel) {
+    const doc = readWorkspacePlanSync(baseWorkspace);
+    if (!doc) return { explicitOverride: explicitModel };
+    // Optional lookup so a missing item degrades to "no difficulty, no warning"
+    // rather than an exception when an override is in play.
+    const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
+    return {
+      difficulty: item?.metadata?.difficulty as XBriefDifficulty | undefined,
+      explicitOverride: explicitModel,
+    };
+  }
+
   const doc = readWorkspacePlanSync(baseWorkspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
@@ -285,17 +302,6 @@ export function resolveSlotTierSpawnParams(
       );
     }
     return {};
-  }
-
-  // PAN-3842: even with an explicit override, still surface the item's
-  // declared difficulty so the spawn caller can warn against the FINAL
-  // selected model. Override precedence is preserved by leaving model and
-  // harness unset — spawn.ts uses options.model unchanged in that case.
-  if (explicitModel) {
-    return {
-      difficulty: item.metadata?.difficulty as XBriefDifficulty | undefined,
-      explicitOverride: explicitModel,
-    };
   }
 
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table

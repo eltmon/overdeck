@@ -136,14 +136,15 @@ async function spawnRunWithoutConsentClaim(
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
       const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model, modelSpawnKey);
-      // PAN-3842: warn against the FINAL selected model (slotModel), preserving override precedence.
-      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: slotModel, harness: tierParams.harness ?? slotHarness }, tierParams.difficulty ? [tierParams.difficulty] : [], [{ id: slot.slotItemId, difficulty: tierParams.difficulty }]);
       if (tierParams.model) {
         slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
         // Implicit staffing (PAN-2397) omits harness — keep the parent's
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
+      // PAN-3842: warn against the FINAL selected model (slotModel AFTER
+      // the staffed-model assignment above), preserving override precedence.
+      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: slotModel, harness: tierParams.harness ?? slotHarness }, tierParams.difficulty ? [tierParams.difficulty] : [], [{ id: slot.slotItemId, difficulty: tierParams.difficulty }]);
       await ensureRegisteredSlotWorktree(issueId, workspace, slot);
     }
     const prompt = slot
