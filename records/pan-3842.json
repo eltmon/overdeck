@@ -165,18 +165,18 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:41:03.333Z",
+  "updated": "2026-09-16T22:41:11.059Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:41:02.181Z",
+    "updatedAt": "2026-09-16T22:41:11.046Z",
     "reviewNotes": "Cycle 3 clean: 4/4 reviewers zero blockers at 4f4d3e1a; both cycle-1 blockers now fixed structurally via resolveSlotSpawnFitness, tree clean, simulation tests replaced with production-helper regressions",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
@@ -313,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.409486,
-        "pricingAsOf": "2026-09-16T22:41:02.240Z"
+        "pricingAsOf": "2026-09-16T22:41:11.048Z"
       }
     },
     "merges": [
@@ -322,7 +322,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
