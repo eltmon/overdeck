@@ -113,16 +113,17 @@
     "recordedAt": "2026-09-16T16:30:07.994Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:33:16.708Z",
+  "updated": "2026-09-16T16:34:50.282Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T16:32:47.876Z",
+    "updatedAt": "2026-09-16T16:34:50.180Z",
+    "verificationNotes": "Verification FAILED at lint (175195ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-16T16:30:11.340Z",
     "reviewSpawnedAt": "2026-09-16T16:32:47.875Z",
@@ -237,10 +238,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3227,
-            "output": 153641,
-            "cacheRead": 48516544,
-            "cacheWrite": 642759
+            "input": 3319,
+            "output": 162116,
+            "cacheRead": 50056626,
+            "cacheWrite": 662110
           }
         }
       },
@@ -252,15 +253,15 @@
           "cacheWrite": 191855
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3227,
-          "output": 153641,
-          "cacheRead": 48516544,
-          "cacheWrite": 642759
+          "input": 3319,
+          "output": 162116,
+          "cacheRead": 50056626,
+          "cacheWrite": 662110
         }
       },
       "costAtCloseOut": {
-        "usd": 15.480427,
-        "pricingAsOf": "2026-09-16T16:32:47.902Z"
+        "usd": 15.701091,
+        "pricingAsOf": "2026-09-16T16:34:50.226Z"
       }
     },
     "merges": [
@@ -269,7 +270,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
