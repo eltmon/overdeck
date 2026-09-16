@@ -950,11 +950,7 @@ const postProjectsResolveRoute = HttpRouter.add(
       refreshRemote: true,
     };
 
-    const intent = yield* Effect.tryPromise({
-      try: () => resolveProjectCreateIntent(input),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
-
+    const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
     return jsonResponse(intent);
   })),
 );
@@ -1021,10 +1017,7 @@ const postProjectsRoute = HttpRouter.add(
     };
 
     // Resolve intent first to check for findings
-    const intent = yield* Effect.tryPromise({
-      try: () => resolveProjectCreateIntent(input),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
+    const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
 
     // If there are findings, return 422 with them
     if (intent.findings.length > 0) {
@@ -1038,23 +1031,23 @@ const postProjectsRoute = HttpRouter.add(
     }
 
     // For existing/new modes, perform the create and return the result
-    return yield* Effect.promise(async () => {
-      try {
-        const result = await performProjectCreate(intent);
-        return jsonResponse({ key: result.key, name: result.name, path: result.path });
-      } catch (err) {
-        if (err instanceof DuplicateProjectError) {
-          return jsonResponse(
-            { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
-            { status: 409 },
-          );
-        }
-        return jsonResponse(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 409 },
-        );
-      }
-    });
+    const created = yield* Effect.promise(() =>
+      performProjectCreate(intent)
+        .then((result) => ({ ok: true as const, key: result.key, name: result.name, path: result.path }))
+        .catch((err: unknown) => {
+          if (err instanceof DuplicateProjectError) {
+            return { ok: false as const, status: 409, error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath };
+          }
+          return { ok: false as const, status: 409, error: err instanceof Error ? err.message : String(err) };
+        }),
+    );
+    if (!created.ok) {
+      return jsonResponse(
+        { error: created.error, ...(created.key ? { key: created.key, existingPath: created.existingPath } : {}) },
+        { status: created.status },
+      );
+    }
+    return jsonResponse({ key: created.key, name: created.name, path: created.path });
   })),
 );
 

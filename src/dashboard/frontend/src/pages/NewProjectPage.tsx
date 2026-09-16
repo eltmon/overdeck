@@ -16,8 +16,6 @@ export function NewProjectPage({ onCancel, onCreated }: NewProjectPageProps) {
     return 'clone';
   })();
 
-  void modePreset;
-
   const {
     mode,
     setMode,
@@ -40,6 +38,7 @@ export function NewProjectPage({ onCancel, onCreated }: NewProjectPageProps) {
     findingsFor,
     submit,
   } = useProjectCreateIntent({
+    initialMode: modePreset,
     onCreated: (project) => {
       onCreated(project);
     },
@@ -75,21 +74,21 @@ export function NewProjectPage({ onCancel, onCreated }: NewProjectPageProps) {
         <div className="mb-8 inline-flex rounded-lg border border-input overflow-hidden">
           <button
             type="button"
-            className={`px-4 py-2 text-sm transition-colors ${mode === 'clone' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`tab px-4 py-2 text-sm transition-colors ${mode === 'clone' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setMode('clone')}
           >
             Clone repository
           </button>
           <button
             type="button"
-            className={`px-4 py-2 text-sm transition-colors ${mode === 'existing' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`tab px-4 py-2 text-sm transition-colors ${mode === 'existing' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setMode('existing')}
           >
             Add existing
           </button>
           <button
             type="button"
-            className={`px-4 py-2 text-sm transition-colors ${mode === 'new' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`tab px-4 py-2 text-sm transition-colors ${mode === 'new' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setMode('new')}
           >
             New project

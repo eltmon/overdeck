@@ -41,12 +41,14 @@ export interface CreatedProject {
 
 export interface UseProjectCreateIntentOptions {
   onCreated?: (project: CreatedProject) => void;
+  initialMode?: ProjectCreateMode;
 }
 
 export function useProjectCreateIntent({
   onCreated,
+  initialMode = 'clone',
 }: UseProjectCreateIntentOptions = {}) {
-  const [mode, setMode] = useState<ProjectCreateMode>('clone');
+  const [mode, setMode] = useState<ProjectCreateMode>(initialMode);
   const [url, setUrl] = useState('');
   const [path, setPath] = useState('');
   const [parentDir, setParentDir] = useState('');
@@ -141,15 +143,18 @@ export function useProjectCreateIntent({
             const created = projects.find((p) => p.key === intent?.key);
             if (created) {
               if (seq === submitSeq.current) {
+                setCreating(false);
                 onCreated?.(created);
               }
               return;
             }
           }
           if (seq === submitSeq.current) {
+            setCreating(false);
             setError('Clone was interrupted; check the target path and retry.');
           }
         } else if (seq === submitSeq.current) {
+          setCreating(false);
           setError(`Job check failed (HTTP ${response.status}).`);
         }
         return;
@@ -172,12 +177,15 @@ export function useProjectCreateIntent({
         }, 750);
       } else if (job.status === 'done' && job.result) {
         setProgress(null);
+        if (seq === submitSeq.current) setCreating(false);
         onCreated?.(job.result);
       } else if (job.status === 'failed') {
+        if (seq === submitSeq.current) setCreating(false);
         setError(job.error ?? 'Clone failed for an unknown reason.');
       }
     } catch (cause) {
       if (seq === submitSeq.current) {
+        setCreating(false);
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     }
