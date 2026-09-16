@@ -44,8 +44,8 @@ import {
   resolveProjectCreateIntent,
   __resetRemoteProbeMemoForTests,
   promptGuardGitEnv,
-} from '../../../src/lib/projects/create.js';
-import { getProjectSync, PROJECTS_CONFIG_FILE } from '../../../src/lib/projects.js';
+} from '../../../../src/lib/projects/create.js';
+import { getProjectSync, PROJECTS_CONFIG_FILE } from '../../../../src/lib/projects.js';
 
 function makeProjectDir(suffix = '') {
   const dir = join(TEST_HOME, `proj-${suffix}-${Math.random().toString(36).slice(2)}`);

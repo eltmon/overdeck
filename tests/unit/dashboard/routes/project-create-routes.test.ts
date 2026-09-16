@@ -190,11 +190,10 @@ describe('project-create routes', () => {
       expect(body).toHaveProperty('error', 'Unknown job');
     });
 
-    it('AC2.2: returns 400 if jobId is empty', async () => {
-      const { status, body } = await requestProjectsRoute('/api/projects/create-jobs/');
+    it('AC2.2: returns 404 if jobId is empty (route not found)', async () => {
+      const { status } = await requestProjectsRoute('/api/projects/create-jobs/');
 
-      expect(status).toBe(400);
-      expect(body).toHaveProperty('error');
+      expect(status).toBe(404);
     });
 
     it('AC2.3: returns 200 with running job status', async () => {

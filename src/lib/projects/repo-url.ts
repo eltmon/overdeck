@@ -76,8 +76,8 @@ export function parseRepoUrl(raw: string): ParsedRepoUrl {
 
     return {
       provider,
-      slug: cleanPath || null,
-      folderName,
+      slug: provider ? (cleanPath || null) : null,
+      folderName: provider ? folderName : null,
       cloneUrl,
     };
   }

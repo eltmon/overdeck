@@ -1,10 +1,18 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
+
+// Mock API fetches — mock fetchWithTimeout to avoid AbortSignal.timeout() blocking under fake timers
+vi.mock('../../../../lib/apiFetch.js', () => ({
+  fetchWithTimeout: vi.fn(),
+}));
+
+import { fetchWithTimeout } from '../../../../lib/apiFetch.js';
 import { useProjectCreateIntent, RESOLVE_DEBOUNCE_MS } from '../useProjectCreateIntent.js';
 
-// Mock API fetches
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+const mockFetch = fetchWithTimeout as ReturnType<typeof vi.fn>;
 
 const mockDashboardHeaders = vi.fn().mockResolvedValue({ 'Content-Type': 'application/json' });
 vi.mock('../../../../lib/wsTransport.js', () => ({
