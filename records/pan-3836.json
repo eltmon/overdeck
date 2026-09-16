@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T14:37:44.755Z",
+  "updated": "2026-09-16T14:39:06.869Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "registration-extras": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 2238681,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T14:39:06.868Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -91,6 +99,7 @@
     "repo-url-parser.ac2": "completed",
     "repo-url-parser.ac3": "completed",
     "repo-url-parser.ac4": "completed",
-    "repo-url-parser.ac5": "completed"
+    "repo-url-parser.ac5": "completed",
+    "registration-extras": "running"
   }
 }
