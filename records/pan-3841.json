@@ -15,19 +15,71 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/architecture.md",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
+      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScope": [
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/ROLES.md",
+      "roles/retrospective.md",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
+      "src/dashboard/server/routes/conversations-retrospective.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/overdeck/__tests__/conversation-retrospective.test.ts",
+      "src/lib/overdeck/conversation-retrospective.ts",
+      "tests/unit/prompts/retrospective-template.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/architecture.md",
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/ROLES.md",
+      "roles/retrospective.md",
+      "src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
+      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+      "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
+      "src/dashboard/server/routes/conversations-retrospective.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/overdeck/__tests__/conversation-retrospective.test.ts",
+      "src/lib/overdeck/conversation-retrospective.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/prompts/retrospective-template.test.ts"
+    ],
+    "recordedAt": "2026-09-16T20:37:56.228Z"
+  },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T20:37:59.584Z",
+  "updated": "2026-09-16T20:38:02.721Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T20:37:59.582Z",
+    "updatedAt": "2026-09-16T20:38:02.682Z",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "reviewRequestedAt": "2026-09-16T20:37:59.582Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -79,8 +131,7 @@
         "tests/unit/prompts/retrospective-template.test.ts"
       ],
       "recordedAt": "2026-09-16T20:37:56.228Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3844"
+    }
   },
   "closeOut": {
     "usage": {
@@ -118,10 +169,12 @@
       },
       "costAtCloseOut": {
         "usd": 15.667491,
-        "pricingAsOf": "2026-09-16T19:51:08.636Z"
+        "pricingAsOf": "2026-09-16T20:38:02.710Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3844"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -284,56 +337,5 @@
     "retro-docs": "completed",
     "retro-docs.ac1": "completed",
     "retro-docs.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".overdeck/context/codebase/architecture.md",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "declaredScopeUntouched": [
-      "scripts/file-size-allowlist.txt"
-    ],
-    "declaredScope": [
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "docs/ROLES.md",
-      "roles/retrospective.md",
-      "scripts/file-size-allowlist.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
-      "src/dashboard/server/routes/conversations-retrospective.ts",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/dashboard/server/server.ts",
-      "src/lib/overdeck/__tests__/conversation-retrospective.test.ts",
-      "src/lib/overdeck/conversation-retrospective.ts",
-      "tests/unit/prompts/retrospective-template.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".overdeck/context/codebase/architecture.md",
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "docs/ROLES.md",
-      "roles/retrospective.md",
-      "src/dashboard/frontend/src/components/CommandDeck/RetrospectiveButton.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
-      "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
-      "src/dashboard/server/routes/conversations-retrospective.ts",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/dashboard/server/server.ts",
-      "src/lib/overdeck/__tests__/conversation-retrospective.test.ts",
-      "src/lib/overdeck/conversation-retrospective.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts",
-      "tests/unit/prompts/retrospective-template.test.ts"
-    ],
-    "recordedAt": "2026-09-16T20:37:56.228Z"
   }
 }
