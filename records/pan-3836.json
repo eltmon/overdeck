@@ -136,7 +136,7 @@
     "recordedAt": "2026-09-16T16:41:41.823Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:41:47.677Z",
+  "updated": "2026-09-16T16:41:53.197Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -145,7 +145,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T16:41:47.622Z",
+    "updatedAt": "2026-09-16T16:41:49.854Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "verificationNotes": "Verification FAILED at lint (185958ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -285,7 +285,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.049238,
-        "pricingAsOf": "2026-09-16T16:41:47.648Z"
+        "pricingAsOf": "2026-09-16T16:41:53.187Z"
       }
     },
     "merges": [
