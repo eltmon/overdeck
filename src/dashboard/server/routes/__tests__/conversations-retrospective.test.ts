@@ -144,4 +144,20 @@ describe('POST /api/conversations/retrospective', () => {
     expect(response.status).toBe(201);
     expect(handleConversationCreate).toHaveBeenCalledTimes(1);
   });
+
+  it('returns a structured 500 if the write door rejects (no Effect defect)', async () => {
+    // Cycle-2 correctness advisory: handleRetrospectiveConversationCreate
+    // awaited loadRetrospectiveTemplate and collectRetrospectiveProjects, both
+    // of which can throw on a malformed roles/retrospective.md or
+    // projects.yaml. Effect.promise converts the rejection to an HTTP defect
+    // (500 with empty body); the route now catches it and surfaces a
+    // structured error so the dashboard can toast it.
+    handleConversationCreate.mockRejectedValueOnce(new Error('boom'));
+    const response = await postRetrospective({ window: '24h' }, {
+      cookie: sessionCookie(),
+      csrf: dashboardCsrfToken(),
+    });
+    expect(response.status).toBe(500);
+    expect(JSON.parse(decodeTextResponse(response))).toEqual({ error: 'boom' });
+  });
 });

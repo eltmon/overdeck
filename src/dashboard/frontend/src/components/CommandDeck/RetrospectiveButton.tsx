@@ -53,7 +53,11 @@ export function RetrospectiveButton({ model, harness, disabled }: RetrospectiveB
     try {
       const res = await fetch('/api/conversations/retrospective', {
         method: 'POST',
-        headers: await dashboardMutationJsonHeaders('/api/conversations/retrospective'),
+        // dashboardMutationJsonHeaders resolves a WebSocket RPC URL before
+        // hitting the CSRF/session bootstrap; a relative REST path has no
+        // base for `new URL(...)`. The helper is safe to call with no arg
+        // — it reuses the connection already memoized at app boot.
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ window: window_, model, harness }),
       });
       if (res.ok) {

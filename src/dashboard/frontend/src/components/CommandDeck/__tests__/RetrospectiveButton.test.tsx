@@ -62,7 +62,7 @@ describe('RetrospectiveButton', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Last 7 days' }));
 
     await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/conv/conv-test-42'));
-    expect(dashboardMutationJsonHeaders).toHaveBeenCalledWith('/api/conversations/retrospective');
+    expect(dashboardMutationJsonHeaders).toHaveBeenCalledWith();
     expect(fetch).toHaveBeenCalledWith('/api/conversations/retrospective', {
       method: 'POST',
       headers: {

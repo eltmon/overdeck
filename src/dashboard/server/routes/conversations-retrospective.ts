@@ -32,6 +32,13 @@ const postConversationRetrospectiveRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
     const body = yield* readJsonBody;
+    // Effect.promise converts handler rejections into defects (HTTP 500
+    // without a body); convert them back into a structured 500 with the
+    // underlying message so the dashboard can surface it as a toast
+    // instead of an empty error. loadTemplate reads roles/retrospective.md
+    // and collectProjects walks projects.yaml — both can throw on
+    // malformed config, and we never want a missing template to look like
+    // a transport error.
     return yield* Effect.promise(() =>
       handleRetrospectiveConversationCreate(body, {
         createConversation: (createBody) =>
@@ -39,7 +46,12 @@ const postConversationRetrospectiveRoute = HttpRouter.add(
             generateAiTitle: (name, message) =>
               generateAiTitle(name, message, conversationReadDependencies),
           }),
-      }),
+      }).catch((err: unknown) =>
+        jsonResponse(
+          { error: err instanceof Error ? err.message : String(err) },
+          { status: 500 },
+        ),
+      ),
     );
   }),
 );
