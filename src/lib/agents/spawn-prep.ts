@@ -34,6 +34,7 @@ import { buildTierFitnessContextSync } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
 import {
   buildCavemanExports,
+  determineModel,
   getProviderEnvForModel,
   getProviderExportsForModel,
 } from './provider-env.js';
@@ -314,6 +315,56 @@ export function resolveSlotTierSpawnParams(
     tierName: staffing.tierName,
     implicit: staffing.implicit,
     difficulty: item.metadata?.difficulty as XBriefDifficulty | undefined,
+  };
+}
+
+/**
+ * PAN-3842: build the fitness-check payload for a registered slot spawn.
+ *
+ * The helper centralizes the model-reassignment + harness-fallback logic
+ * that spawn.ts performs after resolveSlotTierSpawnParams so that:
+ * - the fitness check always sees the FINAL selected model (the tier-resolved
+ *   model when tierParams.model is set, otherwise the explicit override);
+ * - tests can drive the production ordering through this exported helper
+ *   rather than re-implementing it in test fixtures.
+ *
+ * Returns the exact shape logTierFitnessAtSpawn consumes: staffing +
+ * difficulties + items. Callers pass these straight through.
+ *
+ * `slotItemId` is required so the items list still names the bead that
+ * produced the difficulty, matching the spawn-time log contract.
+ */
+export function resolveSlotSpawnFitness(
+  role: Role,
+  spawnKey: string,
+  tierParams: SlotTierSpawnParams,
+  optionsModel: string | undefined,
+  optionsHarness: RuntimeName | undefined,
+  slotItemId: string,
+): {
+  staffing: { tierName: string; model?: string; harness?: RuntimeName };
+  difficulties: XBriefDifficulty[];
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>;
+} {
+  // 1. Reassign to the FINAL model — the same step spawn.ts performs after
+  //    resolveSlotTierSpawnParams so the agent genuinely spawns the
+  //    staffed model. done internally so callers cannot accidentally log
+  //    against the pre-reassignment parent default.
+  const finalModel = tierParams.model
+    ? determineModel({ model: tierParams.model, role, spawnKey })
+    : optionsModel;
+  const finalHarness: RuntimeName | undefined = tierParams.model
+    ? (tierParams.harness ?? optionsHarness)
+    : optionsHarness;
+
+  return {
+    staffing: {
+      tierName: tierParams.tierName ?? 'default',
+      model: finalModel,
+      harness: finalHarness,
+    },
+    difficulties: tierParams.difficulty ? [tierParams.difficulty] : [],
+    items: [{ id: slotItemId, difficulty: tierParams.difficulty }],
   };
 }
 

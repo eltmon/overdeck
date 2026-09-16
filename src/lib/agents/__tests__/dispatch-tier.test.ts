@@ -21,7 +21,7 @@ vi.mock('../../xbrief/io.js', () => ({
 
 import { loadConfigSync } from '../../config-yaml.js';
 import { readWorkspacePlanSync } from '../../xbrief/io.js';
-import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
+import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
   enabled: true,
@@ -588,106 +588,128 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
   });
 
   describe('slot spawn wiring (PAN-3842 review fix)', () => {
-    // These tests pin the spawn.ts call-site ordering: the staffed model
-    // must be COMPUTED before logTierFitnessAtSpawn is called, so the
-    // fitness check sees the final selected model — not the pre-staffing
-    // parent default. The pre-fix code passed slotModel BEFORE the
-    // if (tierParams.model) reassignment and so warned on the wrong model.
+    // These tests exercise the production resolveSlotSpawnFitness helper
+    // that spawn.ts calls at the slot spawn site. The helper centralizes
+    // the model reassignment + harness-fallback logic so the fitness check
+    // sees the FINAL selected model — the previous in-test simulator
+    // duplicated the intended ordering and stayed green when spawn.ts
+    // regressed. Driving the production helper closes that gap.
 
-    // Mirror the resolveSlotTierSpawnParams + reassignment sequence used by
-    // spawn.ts:138-148 so the wiring is exercised, not just the logger.
-    function simulateSlotSpawnCallSite(
-      tierParams: { tierName?: string; model?: string; harness?: 'claude-code'; difficulty?: 'trivial' | 'simple' | 'medium' | 'complex' | 'expert' },
-      optionsModel: string,
-      lines: string[],
-    ): { slotModel: string; slotHarness: 'claude-code' | undefined } {
-      let slotModel = optionsModel; // parent default from determineModel
-      let slotHarness: 'claude-code' | undefined;
-      if (tierParams.model) {
-        // determineModel on the tier-resolved model
-        slotModel = tierParams.model;
-        slotHarness = tierParams.harness;
-      }
-      logTierFitnessAtSpawn(
-        'agent-slot',
-        { tierName: tierParams.tierName ?? 'default', model: slotModel, harness: tierParams.harness ?? slotHarness },
-        tierParams.difficulty ? [tierParams.difficulty] : [],
-        [{ id: 'task-x', difficulty: tierParams.difficulty }],
-        (l) => lines.push(l),
-      );
-      return { slotModel, slotHarness };
-    }
-
-    it('checks the STAFFED model, not the parent default, on a tiered-on expert item', () => {
+    it('returns the STAFFED model in the fitness payload (not the parent default) when tierParams.model is set', () => {
       // Tiered table staffed opus-4-8 (frontier) on an expert item. Without
-      // the fix, the warn would name a parent-default workhorse, not opus.
-      mockCatalogConfig();
+      // the fix, the fitness payload would carry the parent default
+      // (claude-sonnet-4-6), producing a spurious underpowered warning.
       const tierParams = {
         tierName: 'frontier',
         model: 'claude-opus-4-8' as const,
         harness: 'claude-code' as const,
-        difficulty: 'expert' as const,
+        difficulty: 'expert' as 'expert',
       };
-      const lines: string[] = [];
-      const { slotModel } = simulateSlotSpawnCallSite(tierParams, 'claude-sonnet-4-6', lines);
-      // The agent is staffed on opus; the fitness check runs against opus.
-      expect(slotModel).toBe('claude-opus-4-8');
-      expect(lines).toEqual([]);
+      const fitness = resolveSlotSpawnFitness(
+        'work' as const,
+        'work:PAN-3842',
+        tierParams,
+        'claude-sonnet-4-6', // parent default
+        'claude-code',
+        'task-x',
+      );
+      expect(fitness.staffing.model).toBe('claude-opus-4-8');
+      expect(fitness.staffing.harness).toBe('claude-code');
+      expect(fitness.difficulties).toEqual(['expert']);
+      expect(fitness.items).toEqual([{ id: 'task-x', difficulty: 'expert' }]);
     });
 
-    it('does not warn on a tiered-on expert item whose parent default is small', () => {
-      // Inverse direction: tiered table picked haiku for an expert item is
-      // wrong — that IS a real underpowered warning. This test pins the
-      // positive case: when staffing correctly picks opus, no false alarm.
-      mockCatalogConfig();
+    it('returns the EXPLICIT override in the fitness payload when tierParams.model is undefined', () => {
+      // Override precedence preserved: the operator-supplied model wins.
       const tierParams = {
-        tierName: 'frontier',
-        model: 'claude-opus-4-8' as const,
-        harness: 'claude-code' as const,
-        difficulty: 'expert' as const,
+        tierName: 'default' as const,
+        difficulty: 'expert' as 'expert',
+        explicitOverride: 'claude-haiku-4-5',
       };
-      const lines: string[] = [];
-      simulateSlotSpawnCallSite(tierParams, 'claude-haiku-4-5', lines);
-      expect(lines).toEqual([]);
+      const fitness = resolveSlotSpawnFitness(
+        'work' as const,
+        'work:PAN-3842',
+        tierParams,
+        'claude-haiku-4-5',
+        undefined,
+        'task-x',
+      );
+      expect(fitness.staffing.model).toBe('claude-haiku-4-5');
+      expect(fitness.difficulties).toEqual(['expert']);
     });
 
-    it('explicit --model slot spawn does NOT throw when the item is missing from the plan', () => {
-      // PAN-3842 review fix: the override branch must short-circuit BEFORE
-      // the missing-item throw. Otherwise an ordinary slot/plan desync (item
-      // renamed or removed) would abort a spawn the operator explicitly
-      // chose a model for.
-      mockCatalogConfig();
-      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
-        planItem('renamed-task', { difficulty: 'expert' }),
-      ]));
-      const explicitOverride = 'claude-sonnet-5';
-      const tierParams = resolveSlotTierSpawnParams('/ws', 'task-x', explicitOverride);
-      expect(tierParams.model).toBeUndefined();
-      expect(tierParams.explicitOverride).toBe('claude-sonnet-5');
-      expect(tierParams.difficulty).toBeUndefined();
-      // No throw — and the spawn caller proceeds with the explicit model.
-    });
-
-    it('explicit --model slot spawn still surfaces difficulty when the item IS present', () => {
-      // Same desync-safe branch, but with a present item: difficulty IS
-      // surfaced so the spawn caller can warn against the explicit model.
+    it('fires a fitness warning through the real helper when an explicit small model runs an expert slot item', () => {
       mockCatalogConfig();
       vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
         planItem('task-x', { difficulty: 'expert' }),
       ]));
       const tierParams = resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-haiku-4-5');
-      expect(tierParams.difficulty).toBe('expert');
       expect(tierParams.explicitOverride).toBe('claude-haiku-4-5');
-      // The spawn caller fires the warning using the explicit model.
-      const lines: string[] = [];
-      simulateSlotSpawnCallSite(
-        { ...tierParams, difficulty: tierParams.difficulty },
+      expect(tierParams.difficulty).toBe('expert');
+      // Production helper drives the payload; the logger receives the
+      // FINAL selected model (the explicit override) and warns.
+      const fitness = resolveSlotSpawnFitness(
+        'work' as const,
+        'work:PAN-3842',
+        tierParams,
         'claude-haiku-4-5',
-        lines,
+        undefined,
+        'task-x',
       );
+      const lines: string[] = [];
+      logTierFitnessAtSpawn('agent-slot', fitness.staffing, fitness.difficulties, fitness.items, (l) => lines.push(l));
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain('expert');
       expect(lines[0]).toContain('small-class');
+      expect(lines[0]).toContain('task-x');
+    });
+
+    it('does NOT throw when an explicit --model slot spawn targets an item missing from the plan', () => {
+      // PAN-3842 review fix: override short-circuits before the missing-
+      // item throw. resolveSlotTierSpawnParams returns { explicitOverride,
+      // difficulty? } with no model/harness/tierName, and
+      // resolveSlotSpawnFitness builds a payload that does not warn
+      // (no difficulty surfaced, no model mismatch).
+      mockCatalogConfig();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('renamed-task', { difficulty: 'expert' }),
+      ]));
+      const tierParams = resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-sonnet-5');
+      expect(tierParams.model).toBeUndefined();
+      expect(tierParams.explicitOverride).toBe('claude-sonnet-5');
+      expect(tierParams.difficulty).toBeUndefined();
+      // No throw from the helper; payload carries the explicit model only.
+      const fitness = resolveSlotSpawnFitness(
+        'work' as const,
+        'work:PAN-3842',
+        tierParams,
+        'claude-sonnet-5',
+        undefined,
+        'task-x',
+      );
+      expect(fitness.staffing.model).toBe('claude-sonnet-5');
+      expect(fitness.difficulties).toEqual([]);
+    });
+
+    it('preserves override precedence end-to-end (tierParams.model undefined + explicit override + parent default present)', () => {
+      // The helper MUST NOT return the parent default when an override is
+      // active — the operator's explicit choice wins. This pins the
+      // "preserve override precedence" property the review asked for.
+      const tierParams = {
+        tierName: 'default' as const,
+        difficulty: 'simple' as 'simple',
+        explicitOverride: 'claude-sonnet-5',
+      };
+      const fitness = resolveSlotSpawnFitness(
+        'work' as const,
+        'work:PAN-3842',
+        tierParams,
+        'claude-sonnet-5', // explicit override equals optionsModel
+        'claude-code',
+        'task-x',
+      );
+      expect(fitness.staffing.model).toBe('claude-sonnet-5');
+      expect(fitness.staffing.model).not.toBe('claude-haiku-4-5'); // not the parent default
     });
   });
 });

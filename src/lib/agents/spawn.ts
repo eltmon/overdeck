@@ -64,6 +64,7 @@ import {
   resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
+  resolveSlotSpawnFitness,
   logTierFitnessAtSpawn,
   resolveSingleWorkTierSpawnParams,
   resolveFlywheelSpawnEnv,
@@ -142,9 +143,9 @@ async function spawnRunWithoutConsentClaim(
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
-      // PAN-3842: warn against the FINAL selected model (slotModel AFTER
-      // the staffed-model assignment above), preserving override precedence.
-      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: slotModel, harness: tierParams.harness ?? slotHarness }, tierParams.difficulty ? [tierParams.difficulty] : [], [{ id: slot.slotItemId, difficulty: tierParams.difficulty }]);
+      // PAN-3842: build fitness payload through the production helper (FINAL selected model).
+      const fitness = resolveSlotSpawnFitness(role, modelSpawnKey, tierParams, options.model, slotHarness, slot.slotItemId);
+      logTierFitnessAtSpawn(slot.agentId, fitness.staffing, fitness.difficulties, fitness.items);
       await ensureRegisteredSlotWorktree(issueId, workspace, slot);
     }
     const prompt = slot
