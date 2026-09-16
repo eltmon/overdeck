@@ -132,7 +132,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T22:55:29.563Z",
+  "updated": "2026-09-16T22:56:28.586Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -144,7 +144,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T22:37:32.222Z",
+    "updatedAt": "2026-09-16T22:55:47.468Z",
     "reviewNotes": "P1: roles/retrospective.md:27 instructs 'pan records show' (CLI verb does not exist; pan show does not emit the listed record fields). Test pins the broken instruction. Fix exists in working tree — commit it. Auth and window checks pass; convergence gate does not apply (cycle 2).",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -203,7 +203,10 @@
         "tests/unit/prompts/retrospective-template.test.ts"
       ],
       "recordedAt": "2026-09-16T20:37:56.228Z"
-    }
+    },
+    "deaconIgnored": true,
+    "deaconIgnoredAt": "2026-09-16T22:55:47.467Z",
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -226,9 +229,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 2312890,
-            "output": 97999,
-            "cacheRead": 17460736,
+            "input": 2313206,
+            "output": 98154,
+            "cacheRead": 17687680,
             "cacheWrite": 0
           }
         },
@@ -266,10 +269,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 402,
-            "output": 94118,
-            "cacheRead": 61869271,
-            "cacheWrite": 488191
+            "input": 468,
+            "output": 101555,
+            "cacheRead": 78779351,
+            "cacheWrite": 534453
           }
         },
         "work": {
@@ -295,21 +298,21 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 7784975,
-          "output": 262190,
-          "cacheRead": 99801685,
+          "input": 7785291,
+          "output": 262345,
+          "cacheRead": 100028629,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 402,
-          "output": 94118,
-          "cacheRead": 61869271,
-          "cacheWrite": 488191
+          "input": 468,
+          "output": 101555,
+          "cacheRead": 78779351,
+          "cacheWrite": 534453
         }
       },
       "costAtCloseOut": {
-        "usd": 32.8706354,
-        "pricingAsOf": "2026-09-16T22:37:36.868Z"
+        "usd": 36.4430924,
+        "pricingAsOf": "2026-09-16T22:55:47.531Z"
       }
     },
     "merges": [
