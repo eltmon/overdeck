@@ -137,6 +137,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-09-16T17:29:30.398Z"
+    },
+    {
+      "timestamp": "2026-09-16T17:32:00.573Z",
+      "reason": "end",
+      "note": "Fix fake-timer test pattern - tests now pass"
     }
   ],
   "feedback": [
@@ -260,7 +265,7 @@
     "recordedAt": "2026-09-16T17:31:53.759Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:31:54.637Z",
+  "updated": "2026-09-16T17:32:00.647Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -269,7 +274,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:31:54.635Z",
+    "updatedAt": "2026-09-16T17:32:00.556Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
@@ -386,10 +391,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4877,
-            "output": 219962,
-            "cacheRead": 73999354,
-            "cacheWrite": 1067437
+            "input": 4941,
+            "output": 221475,
+            "cacheRead": 75227549,
+            "cacheWrite": 1075282
           }
         }
       },
@@ -401,15 +406,15 @@
           "cacheWrite": 191855
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4877,
-          "output": 219962,
-          "cacheRead": 73999354,
-          "cacheWrite": 1067437
+          "input": 4941,
+          "output": 221475,
+          "cacheRead": 75227549,
+          "cacheWrite": 1075282
         }
       },
       "costAtCloseOut": {
-        "usd": 18.892821,
-        "pricingAsOf": "2026-09-16T17:31:24.879Z"
+        "usd": 19.033075,
+        "pricingAsOf": "2026-09-16T17:32:00.595Z"
       }
     },
     "merges": [
@@ -418,7 +423,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "k3",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
