@@ -392,7 +392,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:55:17.773Z",
+  "updated": "2026-09-16T19:55:20.000Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -402,8 +402,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T19:54:24.298Z",
-    "testNotes": "npm run typecheck: PASS (root tsc, hooks, evals, dashboard-types guard 28 known/0 new, frontend-types guard 0 known/0 new, acp). npm run lint: PASS (eslint + all sub-lints: effect, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular (55 baselined cycles, none new), ratchet-audit, quarantine-audit, effect-diagnostics (308 known findings, none new)). npm test: PASS — vitest root suite 1528 test files passed / 4 skipped (14371 tests passed / 51 skipped), plus frontend issueActions/fr7 suite 4 files / 64 tests passed. Exit code 0. (The ✗/✖ lines visible in raw log output are fixture strings printed by the guard scripts' own self-tests, not real failures.)",
+    "updatedAt": "2026-09-16T19:54:49.266Z",
     "uatNotes": "BLOCKING: /projects/new crashes on every entry point (sidebar +, HomePage + New project) — NewProjectPage.tsx uses react-router-dom's useSearchParams() but the app mounts no <Router> anywhere; masked in unit tests only because NewProjectPage.test.tsx wraps it in <BrowserRouter>. Full evidence and repro in .pan/test/result.json.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -570,7 +569,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.185016,
-        "pricingAsOf": "2026-09-16T19:55:17.763Z"
+        "pricingAsOf": "2026-09-16T19:55:19.992Z"
       }
     },
     "merges": [
