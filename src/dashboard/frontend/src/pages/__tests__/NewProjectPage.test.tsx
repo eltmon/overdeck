@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
 import { NewProjectPage } from '../NewProjectPage';
 
 // No dashboard state mock needed for this component
 
 // Mock the useProjectCreateIntent hook
 const mockSubmit = vi.fn();
+// Captures the options the page passes to the hook (mode preset from the URL).
+const hookOptionsSpy = vi.hoisted(() => vi.fn());
 vi.mock('../../components/project/new/useProjectCreateIntent.js', () => ({
-  useProjectCreateIntent: () => ({
+  useProjectCreateIntent: (options: unknown) => (hookOptionsSpy(options), {
     mode: 'clone',
     setMode: vi.fn(),
     url: '',
@@ -52,14 +53,13 @@ describe('NewProjectPage (WI-4)', () => {
   });
 
   afterEach(() => {
+    window.history.replaceState(null, '', '/projects/new');
     vi.clearAllMocks();
   });
 
   it('renders with three mode tabs', () => {
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByText('Clone repository')).toBeInTheDocument();
@@ -69,9 +69,7 @@ describe('NewProjectPage (WI-4)', () => {
 
   it('shows the guide line', () => {
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByText(/A project is a repository with its own issues and pipeline/)).toBeInTheDocument();
@@ -79,9 +77,7 @@ describe('NewProjectPage (WI-4)', () => {
 
   it('renders clone mode fields by default', () => {
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByPlaceholderText(/https:\/\/github\.com/)).toBeInTheDocument();
@@ -91,9 +87,7 @@ describe('NewProjectPage (WI-4)', () => {
 
   it('has Cancel and Create buttons', () => {
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByText('Cancel')).toBeInTheDocument();
@@ -104,9 +98,7 @@ describe('NewProjectPage (WI-4)', () => {
     const user = userEvent.setup();
     const mockOnCancel = vi.fn();
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={mockOnCancel} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     const cancelButton = screen.getByText('Cancel');
@@ -117,12 +109,24 @@ describe('NewProjectPage (WI-4)', () => {
 
   it('Create button is disabled initially', () => {
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     const createButton = screen.getByText('Create project') as HTMLButtonElement;
     expect(createButton.disabled).toBe(true);
+  });
+
+  it('renders without any <Router> and reads the ?mode= preset from window.location (PAN-3836 UAT)', () => {
+    // The dashboard uses hand-rolled routing and never mounts react-router, so the
+    // page must not depend on a Router context. UAT caught a useSearchParams crash here.
+    window.history.replaceState(null, '', '/projects/new?mode=existing');
+    expect(() => render(<NewProjectPage onCancel={() => {}} onCreated={() => {}} />)).not.toThrow();
+    expect(hookOptionsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ initialMode: 'existing' }));
+  });
+
+  it('defaults the mode preset to clone when ?mode= is absent or invalid', () => {
+    window.history.replaceState(null, '', '/projects/new?mode=bogus');
+    render(<NewProjectPage onCancel={() => {}} onCreated={() => {}} />);
+    expect(hookOptionsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ initialMode: 'clone' }));
   });
 });

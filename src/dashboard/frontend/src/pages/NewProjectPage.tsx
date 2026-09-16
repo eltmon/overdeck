@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { getNewProjectModeFromSearch } from '../App/routes.js';
 import { useProjectCreateIntent, type ProjectCreateMode } from '../components/project/new/useProjectCreateIntent.js';
 
 interface NewProjectPageProps {
@@ -8,13 +8,9 @@ interface NewProjectPageProps {
 }
 
 export function NewProjectPage({ onCancel, onCreated }: NewProjectPageProps) {
-  const [searchParams] = useSearchParams();
-
-  const modePreset: ProjectCreateMode = (() => {
-    const m = searchParams.get('mode');
-    if (m === 'clone' || m === 'existing' || m === 'new') return m;
-    return 'clone';
-  })();
+  // Hand-rolled routing: the dashboard mounts no <Router>, so the preset is
+  // read from window.location like the workspace page does (PRD D-14).
+  const modePreset: ProjectCreateMode = getNewProjectModeFromSearch() ?? 'clone';
 
   const {
     mode,

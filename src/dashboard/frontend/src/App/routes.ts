@@ -122,6 +122,12 @@ export function getNewWorkspaceProjectFromSearch(search = window.location.search
   return project || null;
 }
 
+/** Preserve the optional mode preset on the routed project creation page (PAN-3836). */
+export function getNewProjectModeFromSearch(search = window.location.search): 'clone' | 'existing' | 'new' | null {
+  const mode = new URLSearchParams(search).get('mode');
+  return mode === 'clone' || mode === 'existing' || mode === 'new' ? mode : null;
+}
+
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
   const view = new URLSearchParams(search).get('view');
   return view === 'terminal' ? 'terminal' : 'conversation';

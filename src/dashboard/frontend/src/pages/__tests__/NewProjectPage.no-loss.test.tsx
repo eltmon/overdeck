@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
 import { NewProjectPage } from '../NewProjectPage';
 
 // Mock the hook
@@ -113,9 +112,7 @@ describe('NewProjectPage no-loss audit (PAN-3836 WI-5)', () => {
   affordances.forEach(({ label, assert: assertFn }) => {
     it(`provides: ${label}`, () => {
       render(
-        <BrowserRouter>
           <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-        </BrowserRouter>
       );
 
       assertFn();
@@ -127,9 +124,7 @@ describe('NewProjectPage no-loss audit (PAN-3836 WI-5)', () => {
     const user = userEvent.setup();
 
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={onCancel} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     const cancelButton = screen.getByText('Cancel');
@@ -147,9 +142,7 @@ describe('NewProjectPage no-loss audit (PAN-3836 WI-5)', () => {
     });
 
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByText('Invalid URL')).toBeInTheDocument();
@@ -159,9 +152,7 @@ describe('NewProjectPage no-loss audit (PAN-3836 WI-5)', () => {
     // This is tested in NewProjectPage.test.tsx with full hook mock
     // This no-loss test just verifies the page structure
     render(
-      <BrowserRouter>
         <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-      </BrowserRouter>
     );
 
     expect(screen.getByText('Clone repository')).toBeInTheDocument();
