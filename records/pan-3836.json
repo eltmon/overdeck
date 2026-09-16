@@ -317,21 +317,21 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:23:47.418Z",
+  "updated": "2026-09-16T18:23:51.676Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:23:45.456Z",
+    "updatedAt": "2026-09-16T18:23:45.957Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "3cab2fdf2711dffed8eea5dedbe80926aaa35e38",
-    "reviewSpawnedAt": "2026-09-16T18:11:01.352Z",
+    "reviewSpawnedAt": "2026-09-16T18:23:45.956Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -478,7 +478,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.208504,
-        "pricingAsOf": "2026-09-16T18:23:46.557Z"
+        "pricingAsOf": "2026-09-16T18:23:51.614Z"
       }
     },
     "merges": [
@@ -487,7 +487,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
