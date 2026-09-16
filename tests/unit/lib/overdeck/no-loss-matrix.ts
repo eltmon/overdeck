@@ -170,6 +170,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:id',                               kind: 'http', disposition: 'READ',        door: 'ConversationsResolver.get' },
   { surface: 'GET /api/conversations/:name/handoff-doc',                 kind: 'http', disposition: 'READ',        door: 'ConversationsResolver.getHandoffDoc' },
   { surface: 'POST /api/conversations',                                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.create + ConversationRuntime.spawn' },
+  { surface: 'POST /api/conversations/retrospective',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationRetrospective.render → ConversationWriter.create via handleConversationCreate (PAN-3841)' },
   { surface: 'POST /api/conversations/:name/stop',                       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stop' },
   { surface: 'POST /api/conversations/:name/resume',                     kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.resume' },
   { surface: 'POST /api/conversations/:name/switch-model',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setHarness/setModel before first session only' },
