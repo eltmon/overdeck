@@ -2319,6 +2319,46 @@
   color: var(--primary);
 }
 
+/* Pipeline retrospective window menu (PAN-3841) */
+.retroMenuHost {
+  position: relative;
+}
+
+.retroMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.retroMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  border: none;
+  background: transparent;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.retroMenuItem:hover {
+  background: var(--secondary);
+}
+
 /* Wrapper around controls + list */
 .conversationListWrapper {
   display: flex;
