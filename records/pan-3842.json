@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T19:39:30.815Z",
+  "updated": "2026-09-16T19:43:22.152Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "k3",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fitness-checker": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3039936,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T19:39:30.815Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Added src/lib/model-capability-class.ts (§5.1 table verbatim, deprecation-resolving capabilityClassOf) and its test file; all 7 tests pass, completeness covers every catalog id, typecheck green, purity grep clean.",
         "releasedAt": "2026-09-16T19:38:50.258Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3039936,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T19:39:30.815Z",
+        "itemId": "fitness-checker",
+        "outcome": "completed",
+        "reason": "Added src/lib/agents/tier-fitness.ts (checkTierFitness/checkStaffingFitness, §5.2 bands, §5.3 shapes, per-entry algorithm per WI-2) plus 17-case test with injected literal ctx; typecheck green; type-only imports keep module fs-free.",
+        "releasedAt": "2026-09-16T19:43:22.151Z"
       }
     ],
     "statusReasons": {
       "class-table": {
         "reason": "Added src/lib/model-capability-class.ts (§5.1 table verbatim, deprecation-resolving capabilityClassOf) and its test file; all 7 tests pass, completeness covers every catalog id, typecheck green, purity grep clean.",
         "updatedAt": "2026-09-16T19:38:50.258Z"
+      },
+      "fitness-checker": {
+        "reason": "Added src/lib/agents/tier-fitness.ts (checkTierFitness/checkStaffingFitness, §5.2 bands, §5.3 shapes, per-entry algorithm per WI-2) plus 17-case test with injected literal ctx; typecheck green; type-only imports keep module fs-free.",
+        "updatedAt": "2026-09-16T19:43:22.151Z"
       }
     }
   },
@@ -106,6 +113,11 @@
     "class-table.ac3": "completed",
     "class-table.ac4": "completed",
     "class-table.ac5": "completed",
-    "fitness-checker": "running"
+    "fitness-checker": "completed",
+    "fitness-checker.ac1": "completed",
+    "fitness-checker.ac2": "completed",
+    "fitness-checker.ac3": "completed",
+    "fitness-checker.ac4": "completed",
+    "fitness-checker.ac5": "completed"
   }
 }
