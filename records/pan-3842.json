@@ -85,17 +85,17 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:34:59.558Z",
+  "updated": "2026-09-16T21:35:01.101Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T21:34:58.725Z",
+    "updatedAt": "2026-09-16T21:34:59.640Z",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewRequestedAt": "2026-09-16T21:34:55.855Z",
@@ -214,7 +214,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.703595,
-        "pricingAsOf": "2026-09-16T21:34:58.748Z"
+        "pricingAsOf": "2026-09-16T21:35:01.092Z"
       }
     },
     "merges": [
