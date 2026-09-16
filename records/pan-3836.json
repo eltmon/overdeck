@@ -287,22 +287,22 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:11:02.840Z",
+  "updated": "2026-09-16T18:11:07.357Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:10:59.107Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-09-16T18:11:01.353Z",
+    "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "9f068a6947b0b583d557d496badec8af9d2979f0",
     "reviewRequestedAt": "2026-09-16T18:09:42.581Z",
-    "reviewSpawnedAt": "2026-09-16T17:30:04.164Z",
+    "reviewSpawnedAt": "2026-09-16T18:11:01.352Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -426,10 +426,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 6151,
-            "output": 273586,
-            "cacheRead": 93350441,
-            "cacheWrite": 1309151
+            "input": 6175,
+            "output": 273965,
+            "cacheRead": 93790658,
+            "cacheWrite": 1312313
           }
         }
       },
@@ -441,15 +441,15 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 6151,
-          "output": 273586,
-          "cacheRead": 93350441,
-          "cacheWrite": 1309151
+          "input": 6175,
+          "output": 273965,
+          "cacheRead": 93790658,
+          "cacheWrite": 1312313
         }
       },
       "costAtCloseOut": {
-        "usd": 31.149534,
-        "pricingAsOf": "2026-09-16T18:11:01.713Z"
+        "usd": 31.199427,
+        "pricingAsOf": "2026-09-16T18:11:07.349Z"
       }
     },
     "merges": [
@@ -458,7 +458,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
