@@ -297,6 +297,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-09-16T21:48:06.928Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-09-16T21:49:53.916Z"
     }
   ],
   "feedback": [
@@ -410,7 +415,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T21:48:15.081Z",
+  "updated": "2026-09-16T21:49:53.917Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
