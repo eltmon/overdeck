@@ -260,7 +260,7 @@
     "recordedAt": "2026-09-16T17:26:25.189Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:30:45.624Z",
+  "updated": "2026-09-16T17:31:24.889Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "reviewing",
@@ -387,10 +387,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4803,
-            "output": 217123,
-            "cacheRead": 72688693,
-            "cacheWrite": 1057380
+            "input": 4877,
+            "output": 219962,
+            "cacheRead": 73999354,
+            "cacheWrite": 1067437
           }
         }
       },
@@ -402,15 +402,15 @@
           "cacheWrite": 191855
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4803,
-          "output": 217123,
-          "cacheRead": 72688693,
-          "cacheWrite": 1057380
+          "input": 4877,
+          "output": 219962,
+          "cacheRead": 73999354,
+          "cacheWrite": 1067437
         }
       },
       "costAtCloseOut": {
-        "usd": 18.734913,
-        "pricingAsOf": "2026-09-16T17:30:40.498Z"
+        "usd": 18.892821,
+        "pricingAsOf": "2026-09-16T17:31:24.879Z"
       }
     },
     "merges": [
