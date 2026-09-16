@@ -430,7 +430,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:56:33.706Z",
+  "updated": "2026-09-16T22:59:40.321Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "blocked",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 31,
+    "sequence": 32,
     "claims": {},
     "claimHistory": [
       {
@@ -873,8 +873,8 @@
         "updatedAt": "2026-09-16T15:35:34.624Z"
       },
       "cli-project-add-dry-run": {
-        "reason": "Implemented --dry-run flag for pan project add using resolve-before-create pattern with comprehensive tests covering validation, findings display, and project creation",
-        "updatedAt": "2026-09-16T15:47:03.748Z"
+        "reason": "Cycle-10 review BLOCKING [requirements FR-5/AC-3 + correctness]: (1) --dry-run must print the resolved intent as JSON (console.log(JSON.stringify(intent,null,2))) for both add and clone, not decorated prose; update CLI tests to parse it. (2) pan project add (src/cli/commands/project.ts:95) stubs regResult so the detected tracker/github_repo/issue_prefix/default_branch just written by performProjectCreate get wiped; return the real registration result instead of a stub. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
+        "updatedAt": "2026-09-16T22:59:40.321Z"
       },
       "cli-project-clone": {
         "reason": "Implemented pan project clone command with resolve-before-create pattern, progress reporting, and comprehensive tests for URL validation and dry-run mode",
@@ -941,11 +941,11 @@
     "project-create-routes.ac3": "completed",
     "project-create-routes.ac4": "completed",
     "project-create-routes.ac5": "completed",
-    "cli-project-add-dry-run": "completed",
-    "cli-project-add-dry-run.ac1": "completed",
-    "cli-project-add-dry-run.ac2": "completed",
-    "cli-project-add-dry-run.ac3": "completed",
-    "cli-project-add-dry-run.ac4": "completed",
+    "cli-project-add-dry-run": "pending",
+    "cli-project-add-dry-run.ac1": "pending",
+    "cli-project-add-dry-run.ac2": "pending",
+    "cli-project-add-dry-run.ac3": "pending",
+    "cli-project-add-dry-run.ac4": "pending",
     "cli-project-clone": "completed",
     "cli-project-clone.ac1": "completed",
     "cli-project-clone.ac2": "completed",
