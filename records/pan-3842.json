@@ -24,15 +24,7 @@
       "timestamp": "2026-09-16T21:57:20.180Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-09-16T21:57:20Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3842\n\n# Review Synthesis — PAN-3842 — 2026-09-16T21:55Z\n\n## Verdict: CHANGES REQUESTED — two slot-path regressions in `41be7f9`: fitness checks the pre-staffing model, and an explicit `--model` slot spawn can now abort\n\n## Context\n- Manifest: `.pan/review/agent-pan-3842-review-d967cb97/context.json`\n- Branch: `feature/pan-3842`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3842`\n- HEAD reviewed: `41be7f9ba97dc575a5b678e29aed38a92c5e93eb`\n- Convoy HEAD: `d967cb9716a8bcafff9f0469c71259b344bd4fe4` (the four reviewers reviewed this; `41be7f9` landed after they started and was reviewed by synthesis)\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 0 |\n| *synthesis (41be7f9 delta)* | n/a | this file | 2 |\n\nAll four reviewers returned zero blockers against `d967cb97`. Both blockers below are in\n`41be7f9`, the operator-directed explicit-override fix, which no convoy reviewer saw.\n\n## Blocking Findings\n\n### [synthesis] Slot-path fitness now checks the parent default instead of the staffed model — `src/lib/agents/spawn.ts:139`\n**Evidence tier:** Tier 1 (static, sequential assignment) + Tier 2 (existing test pins the divergent staffed value)\n\n`41be7f9` changed the slot call site from `model: tierParams.model` to `model: slotModel`. But\n`slotModel` is only assigned the staffed model on the line *after* the log call:\n\n```ts\nlet slotModel = selectedModel;                       // = determineModel({ model: options.model })  — parent default\nconst tierParams = resolveSlotTierSpawnParams(...);\nlogTierFitnessAtSpawn(..., { model: slotModel, ... }, ...);   // ← logs the PRE-staffing model\nif (tierParams.model) {\n  slotModel = determineModel({ model: tierParams.model, ... }); // ← staffed model assigned here, too late\n}\n```\n\n**Failure scenario.** Tiered execution on, slot item difficulty `expert`, no `--model`.\n`resolveSlotTierSpawnParams` returns `model: 'claude-opus-4-8'` (pinned by the existing test at\n`dispatch-tier.test.ts:171`), so the agent genuinely spawns frontier-class and is fit. The fitness\ncheck instead runs against `selectedModel` — the `roles.work` default, typically workhorse-class —\nand emits a spurious `underpowered` warning naming a model that is not being spawned, which no\noperator action can clear. The inverse is worse: when the tier table staffs a *small* model on an\nexpert item while `roles.work` is frontier-class, the real underpowered condition is now silently\nmissed. This breaks FR-5 and the documented contract that spawn-time checking evaluates the staffed\nmodel, on the ordinary (non-override) path — the primary case the feature exists for.\n\nThe explicit-override half of the fix is correct here: with an override, `tierParams.model` is\nundefined, `slotModel` stays `options.model`, and the check does hit the final model. Only the\nnon-override path regressed.\n\n**Not caught by tests.** All four new cases call `logTierFitnessAtSpawn` directly with a hardcoded\nmodel literal (`dispatch-tier.test.ts:561,580,510,535`); none exercises the `spawn.ts` wiring, so the\nsuite is green (56 passed) with the call site wrong.\n\n**Fix.** Move the `logTierFitnessAtSpawn` call below the `if (tierParams.model)` block so it sees the\nfinal `slotModel`, or pass `tierParams.model ? determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey }) : slotModel`.\nAdd one call-site test that drives the ordering and asserts the *staffed* model is the one checked —\nthe current tests cannot catch this class of defect.\n\n**Unaffected:** the single-work path (`spawn.ts:640`) is correct. `selectedModel` is computed as\n`determineModel({ model: singleTierParams.model ?? options.model })`, genuinely final in both cases,\nand slot spawns short-circuit via `singleTierParams = {}` → empty `planDifficulties` → logger\nearly-return, so there is no double-log.\n\n### [synthesis] An explicit `--model` slot spawn can now abort on a plan/slot desync — `src/lib/agents/spawn-prep.ts:274-286`\n**Evidence tier:** Tier 1 (static, control-flow reordering) + Tier 2 (existing test pins the throw)\n\nBefore `41be7f9`, `if (explicitModel) return {}` was the **first statement** of\n`resolveSlotTierSpawnParams` — an explicit override bypassed the plan read, the tier resolution, and\nthe missing-item check entirely. The fix moved that branch to **after** the item lookup, so the\noverride path now traverses this:\n\n```ts\nconst item = doc.plan.items.find((c) => c.id === slotItemId);\nif (!item) {\n  if (explicitTableActive) {\n    throw new Error(`Tiered execution is enabled but item '${slotItemId}' was not found ...`);\n  }\n  return {};\n}\nif (explicitModel) { ... }   // ← override branch now sits BELOW the throw\n```\n\n**Failure scenario.** Tiered execution enabled, a registered slot whose `slotItemId` is no longer in\nthe plan (an ordinary slot/plan desync — item renamed, removed, or the plan re-finalized while slots\nstay registered), and the operator runs a slot spawn with an explicit `--model`. Previously this\nreturned `{}` and the spawn proceeded on the explicit model. Now `resolveSlotTierSpawnParams` throws\nout of `spawnRunWithoutConsentClaim` and **the spawn aborts**. The throw is pinned by the existing\ntest at `dispatch-tier.test.ts:207-211`, which only exercises the no-override call and so stays green.\n\nThis is the one outcome FR-7 and NonGoal 1 forbid most directly — warning-only work must never abort\na spawn — and it is exactly the \"preserve override precedence\" property the operator asked me to\nverify: model-selection precedence survives, but the override's *error bypass* does not.\n\n**Fix.** Extract the difficulty without letting the throw reach the override path — hoist the\n`if (explicitModel)` branch above the `if (!item)` block and read `difficulty` from an optional\nlookup (`doc.plan.items.find(...)?.metadata?.difficulty`), so a missing item degrades to \"no\ndifficulty, no warning\" rather than an exception. If instead the team decides an override spawn\n*should* fail loudly on a desync, that is a deliberate behavior change that needs its own test and a\ndocs line — it must not arrive as a side effect of a warning feature.\n\n## Operator-Directed Item — verified\nThe operator's independent quality report (P2, `/tmp/overdeck-quality-review-20260916.md`) is\notherwise **resolved** by `41be7f9`:\n- Fitness now assessed against the final selected model on both paths — **yes on single-work, broken on slots** (blocker above).\n- Override precedence preserved — **partially.** *Model selection* precedence is intact: both resolvers still leave `model`/`harness` unset under an override, so `options.model` continues to win (`spawn-prep.ts:290-296,374-386`, `dispatch-tier.test.ts:194`). The override's *error bypass* is not — see the second blocker. The single-work resolver is unaffected (no throw in that function; `spawn-prep.ts` throws only at `:283`).\n- Warning-only preserved (NonGoal 1 / D8) — **yes.** No new throw or error path; the logger stays `console.warn` inside try/catch.\n- Explicit small-model / expert-plan tests present on both paths — **yes** (`dispatch-tier.test.ts:500,545`), plus fitting-model negative cases at `:524,572`. The old \"override suppresses the warning\" assertions were replaced, not deleted.\n\n## Non-blocking Findings\n\nRecommended for the **same pass** (the work agent is already in these files) — two reproduced\nwarning-accuracy defects that make the feature give wrong advice:\n\n- **[correctness] `~` `provider-not-enabled` fires permanently for every xAI / Groq / Cerebras / Mistral model** — `src/lib/agents/tier-fitness-context.ts:15`. Tier 2 reproduced: `config.enabledProviders` can never contain those four names on any code path, so the warning appears on all three surfaces with no setting that clears it. Make the check one-sided against representable provider names.\n- **[correctness] `~` Deprecated ids in the class table misreport `glm-4.7` / `glm-4.7-flash`** — `src/lib/model-capability-class.ts:11-14,48,69`. Tier 2 reproduced: both resolve to `glm-5.1` and report \"frontier-class … would cost less\", telling the operator to downgrade a model the table itself classes `small`. Look up the literal id before the deprecation hop.\n\nLower priority:\n\n- **[correctness/requirements] `~` Duplicate React `key` on same-code warnings** — `CrewRow.tsx:57`. A distribution tier with two small-class models yields two `underpowered` warnings keyed identically. Key on `${code}:${model}`.\n- **[requirements] `~` `pan doctor --strict` now exits 1 on ordinary configs** — mechanism pre-existing (`doctor.ts:1006`); no CI or hook gate invokes it, so nothing flips red. Noted so the operator is not surprised.\n- **[requirements] `~` `CheckResult` re-declared rather than imported** — `doctor-tier-fitness.ts:1-8`. Deliberate, documented in-file; the PRD's literal import created a module cycle. No requirement affected.\n- **[correctness] `?` `difficulties` unguarded at the frontend boundary** — `tier-fitness.ts:105,119`. Not reachable today; `?? []` removes the class.\n- **[synthesis] `~` Override branch duplicates the pending/`planDifficulties`/`planItems` aggregation** — `spawn-prep.ts:374-383` repeats the same three passes the non-override path runs at `:391-399`. Worth folding into one helper while the work agent is already in this function.\n- **[performance] `≉` Redundant config re-read per spawn** — `spawn-prep.ts:315`. Third `loadYamlConfig()` in the same path; mtime-cached, two extra `statSync`. Sub-millisecond.\n- **[performance] `?` `tierFitnessWarnings` unmemoized per Settings render** with an O(providers × models) `providerOf` scan — `TieredExecutionSection.tsx:155`, `tiered-crews.ts:213-222`. Microseconds at current catalog size.\n\nDemoted by the scope gate:\n\n- `TalkItThrough.tsx`, `TalkItThrough.test.tsx`, `talk-it-through.spec.ts`, `command-deck.module.css` — **[demoted: pre-existing]**. `git diff main...HEAD` is empty for all four; they belong to `c7e4ba6d78b` (PAN-3834), the merge base. The manifest's diff base predates it. Not this PR's scope; correctly not reviewed as such.\n\n## Scope Note\nNot a proportionality or requirements-scope event — 2 blockers against a 6-commit PR diff is well\ninside the 3x guideline. Recorded only because the reviewed tree moved\nmid-cycle: the convoy was dispatched against `d967cb97`, and the operator-directed fix `41be7f9`\nlanded while the reviewers ran. Their four reports are sound for `d967cb97` — the requirements\nreviewer's AC-6 \"Implemented\" specifically blesses the old `{}`-on-override behavior (PRD hazard H2),\nwhich `41be7f9` deliberately supersedes on operator instruction. Synthesis reviewed the `41be7f9`\ndelta directly rather than inheriting a pass on unreviewed code.\n\n## Gates Run\n- `npx vitest run dispatch-tier / tier-fitness / model-capability-class` → 56 passed, 3 files.\n- `npm run typecheck` → passes; frontend-types guard 0 known errors, none new.\n- Full `npm test` and `npm run lint` remain the test specialist's gate.\n\n## Clean Sub-roles\nsecurity (0 findings, 0 advisories), requirements (0 findings; 21/21 in-PR-scope requirements\nimplemented, all 7 non-goals respected), performance (0 findings).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3842/.pan/review/agent-pan-3842-review-d967cb97/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3842 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -98,10 +90,10 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:57:26.318Z",
+  "updated": "2026-09-16T22:09:54.840Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -109,11 +101,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T21:57:26.304Z",
+    "updatedAt": "2026-09-16T22:09:54.355Z",
     "reviewNotes": "41be7f9 slot path: fitness checks pre-staffing model (spawn.ts:139) and explicit --model slot spawn can now abort on plan desync (spawn-prep.ts:274-286)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
-    "reviewedAtCommit": "44ab8dd5c85979d5d9989524fb423b3140021293",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
     "reviewSpawnedAt": "2026-09-16T21:40:03.265Z",
     "scopeDrift": {
@@ -202,9 +193,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 342217,
-            "output": 35074,
-            "cacheRead": 17377024,
+            "input": 417672,
+            "output": 66395,
+            "cacheRead": 30026276,
             "cacheWrite": 0
           }
         }
@@ -223,15 +214,15 @@
           "cacheWrite": 270975
         },
         "custom/MiniMax-M3": {
-          "input": 342217,
-          "output": 35074,
-          "cacheRead": 17377024,
+          "input": 417672,
+          "output": 66395,
+          "cacheRead": 30026276,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.768893,
-        "pricingAsOf": "2026-09-16T21:57:26.307Z"
+        "usd": 13.829117,
+        "pricingAsOf": "2026-09-16T22:09:54.415Z"
       }
     },
     "merges": [
