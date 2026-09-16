@@ -162,6 +162,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-09-16T17:57:02.327Z"
+    },
+    {
+      "timestamp": "2026-09-16T18:09:48.904Z",
+      "reason": "end",
+      "note": "Fixed test setup and mocks per operator feedback:\n- Corrected vi.mock paths to 4 levels deep in create-intent.test.ts\n- Fixed execFile mocks to return { stdout, stderr } objects for promisify\n- Removed fake DuplicateProjectError, imported real one in project-create-routes.test.ts\n- Fixed AC2.2 to expect RouteNotFound, AC3.9 to use deferred promise"
     }
   ],
   "feedback": [
@@ -303,7 +308,7 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:09:42.586Z",
+  "updated": "2026-09-16T18:09:48.975Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -312,7 +317,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:09:42.581Z",
+    "updatedAt": "2026-09-16T18:09:48.900Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (414718ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -442,10 +447,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5869,
-            "output": 255303,
-            "cacheRead": 88900668,
-            "cacheWrite": 1273128
+            "input": 6109,
+            "output": 272402,
+            "cacheRead": 92645762,
+            "cacheWrite": 1302972
           }
         }
       },
@@ -457,15 +462,15 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5869,
-          "output": 255303,
-          "cacheRead": 88900668,
-          "cacheWrite": 1273128
+          "input": 6109,
+          "output": 272402,
+          "cacheRead": 92645762,
+          "cacheWrite": 1302972
         }
       },
       "costAtCloseOut": {
-        "usd": 30.56783,
-        "pricingAsOf": "2026-09-16T18:00:23.061Z"
+        "usd": 31.06538,
+        "pricingAsOf": "2026-09-16T18:09:48.934Z"
       }
     },
     "merges": [
