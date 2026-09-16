@@ -260,16 +260,19 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  // PAN-3842 (review): the explicit override path must short-circuit BEFORE
-  // the missing-item throw below. Otherwise a slot whose slotItemId has been
-  // renamed/removed out from under the registration cannot spawn with an
-  // explicit --model — warning-only work must never abort a spawn (FR-7,
-  // NonGoal 1, operator P2 instruction).
+  const doc = readWorkspacePlanSync(baseWorkspace);
+  if (!doc) {
+    // PAN-3842 (review): under an explicit --model a missing plan never
+    // aborts the spawn — return the override marker and let the caller
+    // proceed (FR-7 / NonGoal 1).
+    if (explicitModel) return { explicitOverride: explicitModel };
+    return {};
+  }
+
+  // PAN-3842 (review): override path short-circuits BEFORE the missing-item
+  // throw so a slot/plan desync under an explicit --model never aborts the
+  // spawn (FR-7 / NonGoal 1).
   if (explicitModel) {
-    const doc = readWorkspacePlanSync(baseWorkspace);
-    if (!doc) return { explicitOverride: explicitModel };
-    // Optional lookup so a missing item degrades to "no difficulty, no warning"
-    // rather than an exception when an override is in play.
     const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
     return {
       difficulty: item?.metadata?.difficulty as XBriefDifficulty | undefined,
@@ -277,8 +280,6 @@ export function resolveSlotTierSpawnParams(
     };
   }
 
-  const doc = readWorkspacePlanSync(baseWorkspace);
-  if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
   // Extract issueId from workspace path: feature-<issueId>
@@ -319,20 +320,10 @@ export function resolveSlotTierSpawnParams(
 }
 
 /**
- * PAN-3842: build the fitness-check payload for a registered slot spawn.
- *
- * The helper centralizes the model-reassignment + harness-fallback logic
- * that spawn.ts performs after resolveSlotTierSpawnParams so that:
- * - the fitness check always sees the FINAL selected model (the tier-resolved
- *   model when tierParams.model is set, otherwise the explicit override);
- * - tests can drive the production ordering through this exported helper
- *   rather than re-implementing it in test fixtures.
- *
- * Returns the exact shape logTierFitnessAtSpawn consumes: staffing +
- * difficulties + items. Callers pass these straight through.
- *
- * `slotItemId` is required so the items list still names the bead that
- * produced the difficulty, matching the spawn-time log contract.
+ * PAN-3842: build the fitness-check payload for a slot spawn. Centralizes
+ * the model reassignment + harness fallback so the fitness check always
+ * sees the FINAL selected model, and tests can drive the production
+ * ordering through this exported helper.
  */
 export function resolveSlotSpawnFitness(
   role: Role,
@@ -346,10 +337,9 @@ export function resolveSlotSpawnFitness(
   difficulties: XBriefDifficulty[];
   items: Array<{ id: string; difficulty?: XBriefDifficulty }>;
 } {
-  // 1. Reassign to the FINAL model — the same step spawn.ts performs after
-  //    resolveSlotTierSpawnParams so the agent genuinely spawns the
-  //    staffed model. done internally so callers cannot accidentally log
-  //    against the pre-reassignment parent default.
+  // Reassign to the FINAL model — the same step spawn.ts performs after
+  // resolveSlotTierSpawnParams so the agent genuinely spawns the staffed
+  // model, not the pre-reassignment parent default.
   const finalModel = tierParams.model
     ? determineModel({ model: tierParams.model, role, spawnKey })
     : optionsModel;

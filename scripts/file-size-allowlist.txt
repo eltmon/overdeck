@@ -74,3 +74,4 @@
 1091 src/lib/agents/spawn.ts # PAN-3842
 1163 src/lib/overdeck/conversation-runtime.ts # PAN-3783
 1012 src/lib/launcher-generator.ts # PAN-3783
+1016 src/lib/agents/spawn-prep.ts # PAN-3842
