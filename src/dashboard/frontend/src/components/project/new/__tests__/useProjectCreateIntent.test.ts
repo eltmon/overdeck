@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useProjectCreateIntent, RESOLVE_DEBOUNCE_MS } from '../useProjectCreateIntent.js';
 
 // Mock API fetches
@@ -21,7 +21,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     vi.useRealTimers();
   });
 
-  it.skip('WI-4.1: debounces resolve on rapid field changes', async () => {
+  it('WI-4.1: debounces resolve on rapid field changes', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -45,17 +45,21 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
 
     const { result } = renderHook(() => useProjectCreateIntent());
 
-    // Rapid edits
-    result.current.setUrl('https://github.com');
-    result.current.setUrl('https://github.com/');
-    result.current.setUrl('https://github.com/o');
-    result.current.setUrl('https://github.com/o/r');
+    // Rapid edits wrapped in act — start without awaiting, advance timers, then check
+    act(() => {
+      result.current.setUrl('https://github.com');
+      result.current.setUrl('https://github.com/');
+      result.current.setUrl('https://github.com/o');
+      result.current.setUrl('https://github.com/o/r');
+    });
 
     // No resolve yet
     expect(mockFetch).not.toHaveBeenCalled();
 
-    // After debounce
-    await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    // After debounce — advance timers to trigger resolve, wrapped in act
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    });
 
     // Should have resolved only once
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -69,7 +73,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     });
   });
 
-  it.skip('WI-4.2: 202 response triggers polling', async () => {
+  it('WI-4.2: 202 response triggers polling', async () => {
     const onCreated = vi.fn();
 
     // First: resolve
@@ -129,27 +133,42 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
 
     const { result } = renderHook(() => useProjectCreateIntent({ onCreated }));
 
-    result.current.setUrl('stablyai/orca');
-    result.current.setMode('clone');
+    act(() => {
+      result.current.setUrl('stablyai/orca');
+      result.current.setMode('clone');
+    });
 
     // Wait for resolve
-    await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    });
     await waitFor(() => expect(result.current.intent).not.toBeNull());
 
-    // Submit
-    await result.current.submit();
+    // Submit WITHOUT awaiting — start async call, advance timers, THEN await
+    const submitPromise = act(() => result.current.submit());
 
-    // Should have 202 response
+    // Advance to allow /api/projects POST to resolve
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(mockFetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }));
 
-    // Wait for first poll (running)
-    await vi.advanceTimersByTimeAsync(750 + 10);
+    // Advance for first poll (running) at 750ms
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(760);
+    });
     await waitFor(() => expect(result.current.progress).not.toBeNull());
     expect(result.current.progress?.phase).toBe('Receiving objects');
     expect(result.current.progress?.percent).toBe(50);
 
-    // Wait for second poll (done)
-    await vi.advanceTimersByTimeAsync(750 + 10);
+    // Advance for second poll (done) at 750ms
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(760);
+    });
+
+    // NOW await the submit promise which has been progressing in the background
+    await submitPromise;
+
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
     expect(onCreated).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -159,7 +178,7 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     );
   });
 
-  it.skip('WI-4.3: 422 response folds findings into intent', async () => {
+  it('WI-4.3: 422 response folds findings into intent', async () => {
     // First: resolve succeeds
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -199,15 +218,27 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
 
     const { result } = renderHook(() => useProjectCreateIntent());
 
-    result.current.setPath('/home/test/test-proj');
-    result.current.setMode('existing');
+    act(() => {
+      result.current.setPath('/home/test/test-proj');
+      result.current.setMode('existing');
+    });
 
     // Wait for resolve
-    await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+    });
     await waitFor(() => expect(result.current.intent).not.toBeNull());
 
-    // Submit
-    await result.current.submit();
+    // Submit WITHOUT awaiting — start async call, advance timers, THEN await
+    const submitPromise = act(() => result.current.submit());
+
+    // Allow the async submit to progress
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Await the submit promise which has been progressing
+    await submitPromise;
 
     // Findings should be folded into intent
     await waitFor(() => {
