@@ -314,22 +314,7 @@
       "timestamp": "2026-09-16T22:36:46.293Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-09-16T21:48:06Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3836\n\n# Review Synthesis — PAN-3836 — 2026-09-16T20:00Z (cycle 8)\n\n## Verdict: APPROVED\n\n## Context\n- Manifest: `.pan/review/agent-pan-3836-review-9e039c17/context.json`\n- Branch: feature/pan-3836\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836\n- HEAD reviewed: 9e039c178b33101935250217c8f51dbfeb167e0f\n- Cycle number: 8\n- Prior cycle SHA: 29c8eff1b0f282bc72dd5081a13cf1699650e1a2\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | security.md | 0 |\n| correctness | ready | correctness.md | 0 (approvable) |\n| performance | ready | performance.md | 0 |\n| requirements | ready | requirements.md | 0 (COMPLETE: 14/14 in-scope items implemented) |\n\n## Blocking Findings\n\nNone.\n\n## UAT-fix verification\n\nThe cycle diff is one UAT-driven fix commit: `NewProjectPage` called react-router's `useSearchParams`, but the dashboard mounts no `<Router>` (hand-rolled routing), so `/projects/new` threw on every entry point in production — unit tests had hidden the crash behind `BrowserRouter` wrappers. All reviewers verified the fix:\n\n- **Correctness** (Tier 1 + Tier 2): `getNewProjectModeFromSearch()` in `routes.ts:125-130` mirrors the adjacent workspace-page helper, is allowlist-validated, and preserves defaulting semantics exactly (`?? 'clone'`). Test wrappers dropped so tests now exercise the production routing reality; page test files pass 19/19 at head. No other PR-surface file imports react-router.\n- **Security**: URL input reaches only a tab-state enum validated against the closed `'clone' | 'existing' | 'new'` union — same posture as before.\n- **Performance**: one-shot `URLSearchParams` parse replaces a router-context subscription — marginally cheaper; performance-neutral or mildly positive.\n- **Requirements**: the FR-6/NFR-5 `?mode=` preselection is now *genuinely* delivered (it existed but crashed at runtime at prior heads). Tests strengthened: frontend suite grew 20 → 22 with a no-Router render test and preset-spy assertions. All suites re-run at head: **72/72 unit, 22/22 frontend green**. Effect ratchet: PASS.\n\nConvergence gate (cycle 8 ≥ 3) applied: no `!`/`⊗` findings exist in any report, so nothing required gating; all advisories carry over unchanged.\n\n## Non-blocking Findings\n\n### security (no blockers)\n- `~` `GET /api/projects/create-jobs/:jobId` has no auth guard — bounded info disclosure (128-bit job id); add `rejectUnauthorizedDashboardRequest` to match the sibling guarded GET. (Standing.)\n- `?` Unbounded `remoteProbeMemo` map growth over long uptime. (Standing.)\n- `?` Arbitrary-host outbound probes — acceptable in the single-operator model; gate to known providers if the dashboard is ever exposed. (Standing.)\n\n### correctness (no blockers)\n- `~` Cmd+Enter can fire both the keydown handler and implicit form submission → two create requests racing into the same target path (`NewProjectPage.tsx:52-66`); add `e.preventDefault()`. (Standing.)\n- `~` Clone jobs have no timeout or abort path — a network-stalled clone stays `running` forever (`project-create-jobs.ts:29-80` + `create.ts:490-531`). (Standing.)\n- `~` `excludeWorkspacesDir` trailing-newline corruption; `~` home-boundary lost symlink `realpath`; `~` CLI reporting regression (hooks/context-layer messages); `~` lowercase `--linear-team` hard-fails; `~` partial state on bootstrap failure after registration. (All standing.)\n- `≉` `refreshRemote: true` defeats the probe memo on both routes; `≉` SCP regex folds SSH port into repo path. (Standing, dup with performance.)\n- `?` 202 without `jobId` would leave `creating` stuck true; `?` POST maps every non-duplicate failure to 409; `?` progress test asserts nothing; `?` `Effect.promise` typed-failures-as-defects delta; `?` `runClone` on `exit` not `close`; `?` mode `existing` accepts a regular file; `?` job-poll GET unauthenticated (dup of security); `?` dry-run help promises JSON. (Standing.)\n\n### performance (no blockers)\n- `~` SHOULD-fix: `refreshRemote: true` on `/api/projects/resolve` defeats the 60s `git ls-remote` memo — memo on resolve, freshness only on POST. (Standing.)\n- `≉` Serial git detection per keystroke in `existing` mode; `?` no abort/timeout on the clone itself (dup of correctness). (Standing.)\n\n### requirements (no blockers)\n- `~` `pan project clone --dry-run` help promises JSON but prints chalk text. (Standing.)\n- `~` `pan project add` hook-install/context-layer messages silently dropped. (Standing, dup of correctness.)\n- `≉` TalkItThrough composer changes are outside every traced xBRIEF item — absorbed scope; operator awareness. (Standing.)\n- `?` Job-store TTL timers not `unref`'d. (Standing.)\n\n## Clean Sub-roles\n- security — 0 blockers across all eight cycles; the fix commit adds no attack surface.\n- correctness — approvable; the fix is semantically exact and pinned by crash-regression tests.\n- performance — no MUST-level regressions in any cycle; the fix is mildly positive.\n- requirements — COMPLETE: 14/14 in-scope requirements implemented, 0 partial, 0 missing; all 10 non-goals respected at head.\n\n## Cycle Note\nEighth cycle, third approval. This cycle reviewed the UAT-found react-router crash fix — the one issue that escaped six review cycles and two test rounds because unit tests wrapped the page in `BrowserRouter`, hiding the no-Router production mount. The fix removes the mismatch in both directions: production code no longer depends on react-router, and tests no longer pretend it does. Worth noting as a process point for the issue record: the convoy's static and unit-level evidence could not catch a mount-context bug; UAT did, and the fix is now pinned by a no-Router render regression test.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.pan/review/agent-pan-3836-review-9e039c17/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3836 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-09-16T21:51:11Z",
-      "markdownBody": "# Test failure\n\nDispatch failed: The per-issue record lock at /home/eltmon/.overdeck/locks/records/panopticon-cli/PAN-3836.lock is held by conv-20260916-7665 pid=1494526 acquiredAt=2026-09-16T21:50:46.244Z. Retry the command after that writer finishes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3836`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -432,23 +417,20 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:39:31.775Z",
+  "updated": "2026-09-16T22:44:43.350Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T22:36:46.069Z",
-    "reviewNotes": "Operator-authorized override: three reproduced correctness blockers (SSH port corruption repo-url.ts:58, dotted-repo rejection repo-url.ts:45, partial-registration blocks retry create.ts:574-593) plus non-duplicate 409 mapping at projects.ts:1041. Cycle 8 cycle-diff itself (the routing fix) is clean — blockers are in PR-introduced code previously passed under the convergence gate. Work agent is manually stopped (operator note); orchestrator cannot dispatch rework until un-paused.",
-    "testNotes": "npm run typecheck: clean (all lanes incl. dashboard/frontend/acp). npm run lint: clean (all guards passed, including circular/ratchet/quarantine/effect-diagnostics). npm test: 14365/14429 passed, 6 failed, 51 skipped. All 6 failures are in tests/... src/cli/commands/__tests__/agent-targeting.test.ts (overdeck.db schema-mismatch under shared-state pollution from concurrent workers) and src/lib/codex/__tests__/app-server-host.test.ts (codex effort-default assertions) -- confirmed pre-existing and unrelated: `git diff --name-only origin/main...HEAD` for both paths is empty, and both files pass 27/27 with 0 failures when run in isolation (`npx vitest run` on just those two files). Neither file is in PAN-3836's declared file scope.",
+    "updatedAt": "2026-09-16T22:44:42.976Z",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
-    "reviewedAtCommit": "9e039c178b33101935250217c8f51dbfeb167e0f",
     "lastVerifiedCommit": "29c8eff1b0f282bc72dd5081a13cf1699650e1a2",
     "reviewSpawnedAt": "2026-09-16T19:50:12.130Z",
     "scopeDrift": {
@@ -558,10 +540,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5-1": {
-            "input": 560,
-            "output": 19846,
-            "cacheRead": 15546849,
-            "cacheWrite": 54744
+            "input": 722,
+            "output": 26055,
+            "cacheRead": 21191554,
+            "cacheWrite": 68689
           }
         },
         "plan": {
@@ -614,10 +596,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 350,
-            "output": 89973,
-            "cacheRead": 42396745,
-            "cacheWrite": 600170
+            "input": 352,
+            "output": 90492,
+            "cacheRead": 42732371,
+            "cacheWrite": 601217
           }
         },
         "work": {
@@ -631,10 +613,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5-1": {
-          "input": 1366,
-          "output": 66996,
-          "cacheRead": 19836989,
-          "cacheWrite": 246599
+          "input": 1528,
+          "output": 73205,
+          "cacheRead": 25481694,
+          "cacheWrite": 260544
         },
         "custom/MiniMax-M3": {
           "input": 4761158,
@@ -643,10 +625,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 350,
-          "output": 89973,
-          "cacheRead": 42396745,
-          "cacheWrite": 600170
+          "input": 352,
+          "output": 90492,
+          "cacheRead": 42732371,
+          "cacheWrite": 601217
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 7014,
@@ -656,8 +638,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.980488,
-        "pricingAsOf": "2026-09-16T22:36:49.088Z"
+        "usd": 59.186512,
+        "pricingAsOf": "2026-09-16T22:44:43.035Z"
       }
     },
     "merges": [
