@@ -165,10 +165,10 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:33:16.032Z",
+  "updated": "2026-09-16T22:41:02.256Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -176,10 +176,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:33:07.335Z",
+    "updatedAt": "2026-09-16T22:41:02.181Z",
+    "reviewNotes": "Cycle 3 clean: 4/4 reviewers zero blockers at 4f4d3e1a; both cycle-1 blockers now fixed structurally via resolveSlotSpawnFitness, tree clean, simulation tests replaced with production-helper regressions",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
+    "reviewedAtCommit": "4f4d3e1a8d36395fbbbe8756e010055017c46b6d",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
     "reviewSpawnedAt": "2026-09-16T22:33:07.333Z",
     "scopeDrift": {
@@ -268,10 +270,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 12,
-            "output": 3528,
-            "cacheRead": 642614,
-            "cacheWrite": 113542
+            "input": 16,
+            "output": 4491,
+            "cacheRead": 961900,
+            "cacheWrite": 121562
           }
         },
         "work": {
@@ -297,10 +299,10 @@
           "cacheWrite": 270975
         },
         "anthropic/claude-sonnet-5": {
-          "input": 12,
-          "output": 3528,
-          "cacheRead": 642614,
-          "cacheWrite": 113542
+          "input": 16,
+          "output": 4491,
+          "cacheRead": 961900,
+          "cacheWrite": 121562
         },
         "custom/MiniMax-M3": {
           "input": 471263,
@@ -310,8 +312,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.31594,
-        "pricingAsOf": "2026-09-16T22:33:13.001Z"
+        "usd": 14.409486,
+        "pricingAsOf": "2026-09-16T22:41:02.240Z"
       }
     },
     "merges": [
@@ -320,7 +322,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
