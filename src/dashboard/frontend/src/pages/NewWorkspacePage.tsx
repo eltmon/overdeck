@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Plus } from 'lucide-react';
 import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
-import { NewProjectModal } from '../components/CommandDeck/NewProjectModal.js';
 import { useWorkspaceCreateIntent } from '../components/workspace/new/useWorkspaceCreateIntent.js';
 import { fetchWithTimeout } from '../lib/apiFetch.js';
 
@@ -43,9 +42,7 @@ interface NewWorkspacePageProps {
 export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps) {
   const heroRef = useRef<HTMLInputElement>(null);
   const presetAppliedRef = useRef(false);
-  const queryClient = useQueryClient();
   const [projectPreset] = useState(() => getNewWorkspaceProjectFromSearch() ?? '');
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectOverflowOpen, setProjectOverflowOpen] = useState(false);
   const [targetMenuOpen, setTargetMenuOpen] = useState(false);
   const [browsing, setBrowsing] = useState(false);
@@ -182,7 +179,15 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
         >
           <button
             type="button"
-            onClick={() => setNewProjectOpen(true)}
+            onClick={() => window.location.href = '/projects/new?mode=clone'}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <Plus className="h-4 w-4" />
+            clone repo
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.href = '/projects/new?mode=existing'}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
@@ -190,7 +195,7 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
           </button>
           <button
             type="button"
-            onClick={() => setNewProjectOpen(true)}
+            onClick={() => window.location.href = '/projects/new?mode=new'}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-input px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <FolderPlus className="h-4 w-4" />
@@ -471,23 +476,6 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
           </div>
         </div>
       </form>
-
-      <NewProjectModal
-        isOpen={newProjectOpen}
-        onClose={() => setNewProjectOpen(false)}
-        onCreated={(project) => {
-          queryClient.setQueryData<RegisteredProject[]>(['registered-projects'], (current = []) => [
-            project,
-            ...current.filter((candidate) => candidate.key !== project.key),
-          ]);
-          void queryClient.invalidateQueries({
-            queryKey: ['registered-projects'],
-            refetchType: 'none',
-          });
-          intent.setProjectKey(project.key);
-          setNewProjectOpen(false);
-        }}
-      />
     </div>
   );
 }

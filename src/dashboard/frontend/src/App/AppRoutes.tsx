@@ -59,6 +59,7 @@ interface AppRoutesProps {
   workspaceRouteId: string | null;
   onWorkspaceViewBack: () => void;
   onWorkspaceCreated: (workspaceId: string) => void;
+  onProjectCreated: (project: { key: string; name: string; path: string }) => void;
   initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
@@ -92,6 +93,7 @@ export function AppRoutes({
   workspaceRouteId,
   onWorkspaceViewBack,
   onWorkspaceCreated,
+  onProjectCreated,
   initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
@@ -146,7 +148,7 @@ export function AppRoutes({
         <div className="w-full h-full overflow-hidden">
           <NewProjectPage
             onCancel={() => onTabChange('home')}
-            onCreated={() => onTabChange('knowledge')}
+            onCreated={onProjectCreated}
           />
         </div>
       )}

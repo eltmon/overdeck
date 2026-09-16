@@ -17,7 +17,7 @@ import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
-import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
+import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -225,9 +225,11 @@ export default function App() {
   const queryClient = useQueryClient();
   const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
 
-  // PAN-1970: New Project modal
-  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
-  const handleNewProject = useCallback(() => setIsNewProjectModalOpen(true), []);
+  const handleNewProject = useCallback(() => {
+    setActiveTabState('project-new');
+    window.history.pushState({ tab: 'project-new' }, '', '/projects/new');
+  }, []);
+
   const handleProjectCreated = useCallback((project: CreatedProject) => {
     void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
@@ -841,13 +843,6 @@ export default function App() {
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
-      {/* PAN-1970: New Project modal */}
-      <NewProjectModal
-        isOpen={isNewProjectModalOpen}
-        onClose={() => setIsNewProjectModalOpen(false)}
-        onCreated={handleProjectCreated}
-      />
-
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
@@ -903,6 +898,7 @@ export default function App() {
             cockpitRoute={cockpitRoute}
             workspaceRouteId={workspaceRouteId}
             onWorkspaceViewBack={onWorkspaceViewBack} onWorkspaceCreated={onWorkspaceCreated}
+            onProjectCreated={handleProjectCreated}
             initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}
