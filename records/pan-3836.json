@@ -432,7 +432,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T22:36:49.104Z",
+  "updated": "2026-09-16T22:39:11.325Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -666,7 +666,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "claude-fable-5-1",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
