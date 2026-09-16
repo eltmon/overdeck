@@ -16,20 +16,30 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T19:48:41.681Z",
+  "updated": "2026-09-16T19:48:51.011Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T19:38:12.160Z"
+    "updatedAt": "2026-09-16T19:48:50.994Z",
+    "inspectNotes": "Inspecting item retro-lib"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 349,
+            "output": 84,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5-1": {
             "input": 1446,
@@ -40,6 +50,12 @@
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 349,
+          "output": 84,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5-1": {
           "input": 1446,
           "output": 79790,
@@ -48,15 +64,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 15.666722,
-        "pricingAsOf": "2026-09-16T19:38:12.171Z"
+        "usd": 15.667491,
+        "pricingAsOf": "2026-09-16T19:48:50.999Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "k3",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
