@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelPicker, loadStoredModel, onKnownModelsSync } from '../ModelPicker';
+import { HARNESS_OPTIONS } from '../../shared/ModelPicker/ModelPicker';
 import { applyDefaultConversationModel } from '../defaultConversationModel';
 
 vi.mock('sonner', () => ({
@@ -115,13 +116,18 @@ describe('chat ModelPicker live harness labels', () => {
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^ACP/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Kimi Code/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^Muse Code/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenCode logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(5);
+    expect(screen.getByLabelText('Muse Code logo')).toBeInTheDocument();
+    // Every harness row except the current one (claude-code) carries the
+    // experimental warning — derive the count so a new harness option does
+    // not silently break this assertion.
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(HARNESS_OPTIONS.length - 1);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 
