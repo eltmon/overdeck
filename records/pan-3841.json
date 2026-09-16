@@ -105,7 +105,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:47:42.797Z",
+  "updated": "2026-09-16T21:47:48.877Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "blocked",
@@ -117,12 +117,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T20:38:35.458Z",
-    "updatedAt": "2026-09-16T21:47:42.159Z",
+    "updatedAt": "2026-09-16T21:47:48.861Z",
     "reviewNotes": "P1: route lacks authenticated mutation guard; P2: retrospective prompt lists only synthesis.md and misses review.md + specialist reports; P2: isRetrospectiveWindow accepts inherited Object properties (constructor/toString/__proto__). Work agent has uncommitted auth/header fixes; prompt + window fixes still needed.",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
+    "reviewedAtCommit": "497a66ea5ca99722e1dbae78e60100560c1ddf97",
     "reviewSpawnedAt": "2026-09-16T21:18:00.158Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -245,9 +246,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 2102807,
-            "output": 45253,
-            "cacheRead": 19205760,
+            "input": 2104331,
+            "output": 45659,
+            "cacheRead": 19755520,
             "cacheWrite": 0
           }
         }
@@ -266,9 +267,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 4937350,
-          "output": 169745,
-          "cacheRead": 59031893,
+          "input": 4938874,
+          "output": 170151,
+          "cacheRead": 59581653,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -279,8 +280,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.4168534,
-        "pricingAsOf": "2026-09-16T21:47:42.177Z"
+        "usd": 23.4177974,
+        "pricingAsOf": "2026-09-16T21:47:48.866Z"
       }
     },
     "merges": [
