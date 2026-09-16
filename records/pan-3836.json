@@ -12,9 +12,27 @@
       "timestamp": "2026-09-16T16:30:35.933Z",
       "reason": "end",
       "note": "Project creation UI (dashboard) implementation complete: /projects/new page with clone/existing/new tabs, resolve-before-create pattern, inline findings, entry point navigation, documentation (WORKSPACES-AND-PROJECTS.md, configuration/projects.mdx, CLAUDE.md, create.ts module header, pan-new-project skill). Quality gates pass: typecheck ✓ lint ✓"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-09-16T16:40Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-09-16T16:40:27.000Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-09-16T16:40:27.121Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-16T16:40:26Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3836 (attempt 2/3):\n\nFailed check: lint\n\nVerification FAILED at lint (185958ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3836 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -113,7 +131,7 @@
     "recordedAt": "2026-09-16T16:30:07.994Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:40:02.572Z",
+  "updated": "2026-09-16T16:40:27.122Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
