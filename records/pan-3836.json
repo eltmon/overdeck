@@ -209,15 +209,7 @@
       "timestamp": "2026-09-16T18:14:46.685Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-09-16T18:14:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3836\n\n# Review Synthesis — PAN-3836 — 2026-09-16T18:25Z (cycle 5)\n\n## Verdict: CHANGES REQUESTED — named acceptance tests red at head: `create-intent.test.ts` 2/15 failed (incl. a real `url-invalid` resolver gap) and `project-create-routes.test.ts` AC3.9 times out\n\n## Context\n- Manifest: `.pan/review/agent-pan-3836-review-3cab2fdf/context.json`\n- Branch: feature/pan-3836\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836\n- HEAD reviewed: 3cab2fdf2711dffed8eea5dedbe80926aaa35e38\n- Cycle number: 5\n- Prior cycle SHA: 25d2d8f5505bf10673cb5423751f93f4fc98a6fa\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | security.md | 0 |\n| correctness | ready | correctness.md | 0 (approvable; both original blockers still fixed) |\n| performance | ready | performance.md | 0 |\n| requirements | ready | requirements.md | 2 (1 kept, 1 folded in per convergence gate — see below) |\n\n## Blocking Findings\n\n### [requirements] Named acceptance tests red at head — xBRIEF create-core-resolve / project-create-routes (FR-1, FR-4)\n**Scope:** in_pr_scope. **Evidence tier:** Tier 2 (vitest at committed head: `create-intent.test.ts` 2 failed / 15; `project-create-routes.test.ts` 1 failed / 19, \"Test timed out in 5000ms\"). These two files are the PR's named acceptance evidence for the resolve core and routes, both were modified in this cycle's diff, and red gate tests at the review head block per the standard applied in cycles 1 and 4. Three distinct failures, three distinct fixes:\n\n1. **`create-intent.test.ts > \"returns url-invalid finding for unparseable URL\"`** — exposes a **real resolver gap**, not a test defect: `parseRepoUrl` never returns `null` (it returns an all-nulls object for garbage input per its documented contract), so the `if (!parsed)` guard at `create.ts:230` never fires and `url-invalid` is unreachable. Garbage URLs fall through to a misleading `name-invalid` finding attached to the wrong field — per-field inline validation misattributes the most common clone-mode error. Fix: treat an all-nulls parse as invalid (`if (!parsed || !parsed.cloneUrl)`), routing garbage input to the existing `url-invalid` finding; the named test then passes unchanged. (Convergence-gate note: `create.ts:230` itself is outside this cycle's diff, so the production-code aspect is documented here rather than promoted as its own blocker — but it is the reviewer's recommended resolution for the red test, which IS in the cycle diff.)\n2. **`create-intent.test.ts:253 > \"returns project-exists finding for duplicate key\"`** — defective test: it simulates a duplicate with `mkdirSync(intent1.path)`, but `project-exists` is emitted only from the projects registry (`getProjectSync(key)`), and an empty pre-existing directory deliberately produces no finding (per-spec). Rewrite the test to seed the registry mock so `getProjectSync('my-proj')` hits; optionally pin the empty-dir-no-finding behavior.\n3. **`project-create-routes.test.ts:427 > \"AC3.9: end-to-end clone flow: 202 → poll running → poll done\"`** — test choreography deadlock: the deferred `performProjectCreate` is settled after a single `setImmediate` turn, not enough for the job-store `.then` chain to land `done` before the final poll. The production path works (job-store suite green); flush the promise chain deterministically after `finish()` (several `setImmediate`/`queueMicrotask` turns, or fake-timer-aware polling of `getProjectCreateJob` until settled).\n\n## Resolved this cycle (verified)\n- All three WI-4 hook tests pass at head (waitFor/act fake-timer deadlock properly fixed, not re-skipped) — cycle-4 blocker cleared. Frontend suites 20/20 green.\n- `repo-url.ts` SCP branch made consistent with the HTTPS branch (unknown hosts yield null slug/folderName) — a restriction, not a loosening.\n- `?mode=` preset, `jobStarted` double-submit gate, no-loss audit (11/11), Effect-diagnostics ratchet (PASS, 308 known / none new) — all still green at head.\n\n## Non-blocking Findings\n\n### correctness\n- `?` Unknown-host SCP remotes no longer auto-derive the project name (consistent with HTTPS branch; deliberate-note UX consequence — key off `cleanPath` if auto-naming is desired).\n- `?` 202 without `jobId` would leave `creating` stuck true (unreachable today; set `jobStarted` inside the guard to harden).\n- `~` `excludeWorkspacesDir` trailing-newline corruption; `~` home-boundary lost symlink `realpath`; `~` CLI reporting regression; `~` lowercase `--linear-team` hard-fails; `~` partial state on bootstrap failure after registration.\n- `≉` `refreshRemote: true` defeats the probe memo on the keystroke path (dup of performance); `≉` SCP regex folds SSH port into repo path.\n- `?` `Effect.tryPromise` → `Effect.promise` typed-failures-as-defects delta; `?` `runClone` on `exit` not `close`; `?` mode `existing` accepts a regular file; `?` job-poll GET unauthenticated.\n\n### security (no blockers)\n- `~` `GET /api/projects/create-jobs/:jobId` has no auth guard — bounded info disclosure; add `rejectUnauthorizedDashboardRequest`.\n- `?` Unbounded `remoteProbeMemo`; `?` arbitrary-host probes (acceptable in the single-operator model; this cycle's SCP tightening shrinks the surface further).\n\n### performance (no blockers)\n- `~` SHOULD-fix: `refreshRemote: true` on `/api/projects/resolve` defeats the 60s memo — memo on resolve, freshness only on POST.\n- `≉` Serial git detection per keystroke in `existing` mode; `?` no abort/timeout on the clone itself.\n\n### requirements\n- `~` `pan project clone --dry-run` help promises JSON but prints chalk text.\n- `~` `pan project add` hook-install/context-layer messages silently dropped.\n- `≉` TalkItThrough composer changes are outside every traced xBRIEF item — absorbed scope; flagged for operator awareness.\n- `?` Job-store TTL timers not `unref`'d.\n\n## Clean Sub-roles\n- security — no blocking findings; the 3cab2fdf delta is test fixes, docs, and a 2-line parser tightening.\n- correctness — **approvable** (0 blockers); test corrections reviewed as tests-made-to-match-correct-code, not weakened.\n- performance — no MUST-level regressions; the delta is performance-neutral.\n\n## Cycle Note\nFifth blocked verdict; each cycle's blocker has been distinct and inside that cycle's own diff: c1 original defects → c2 fixes uncommitted → c3 ineffective `creating` fix → c4 hook-test timeouts → c5 red acceptance tests in the two suites this cycle's commits touched. The functional code remains clean across all four dimensions; what remains is making the FR-1/FR-4 acceptance suites green at the committed head — one genuine one-line resolver fix (`url-invalid` reachability) and two test rewrites.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.pan/review/agent-pan-3836-review-3cab2fdf/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3836 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -320,16 +312,16 @@
     "recordedAt": "2026-09-16T18:09:41.589Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:23:44.023Z",
+  "updated": "2026-09-16T18:23:46.576Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:23:43.982Z",
+    "updatedAt": "2026-09-16T18:23:45.456Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -458,10 +450,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 6688,
-            "output": 292904,
-            "cacheRead": 101073519,
-            "cacheWrite": 1451697
+            "input": 6696,
+            "output": 293079,
+            "cacheRead": 101172859,
+            "cacheWrite": 1452125
           }
         }
       },
@@ -473,15 +465,15 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 6688,
-          "output": 292904,
-          "cacheRead": 101073519,
-          "cacheWrite": 1451697
+          "input": 6696,
+          "output": 293079,
+          "cacheRead": 101172859,
+          "cacheWrite": 1452125
         }
       },
       "costAtCloseOut": {
-        "usd": 32.197152,
-        "pricingAsOf": "2026-09-16T18:23:44.011Z"
+        "usd": 32.208504,
+        "pricingAsOf": "2026-09-16T18:23:46.557Z"
       }
     },
     "merges": [
