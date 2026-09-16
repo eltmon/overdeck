@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-09-16T21:47Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-09-16T21:47:42.796Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "MiniMax-M3",
+      "timestamp": "2026-09-16T22:03:05.948Z"
     }
   ],
   "feedback": [],
@@ -97,7 +102,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T22:03:04.829Z",
+  "updated": "2026-09-16T22:03:05.948Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "reviewing",
