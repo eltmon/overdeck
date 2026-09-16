@@ -267,6 +267,26 @@
       "reason": "resume",
       "agentModel": "k3",
       "timestamp": "2026-09-16T19:50:13.582Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T19:50:19.636Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T19:50:19.647Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T19:50:19.659Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-16T19:50:19.670Z"
     }
   ],
   "feedback": [],
@@ -372,7 +392,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T19:50:14.109Z",
+  "updated": "2026-09-16T19:50:19.670Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "reviewing",
@@ -557,7 +577,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "k3",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
