@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:04:20.612Z",
+  "updated": "2026-09-16T16:06:11.488Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "delete-new-project-modal": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 3687887,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T16:04:20.612Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -194,6 +186,17 @@
         "outcome": "completed",
         "reason": "All entry points wired: sidebar +, workspace chips (3x), App.handleNewProject all navigate to /projects/new with proper mode params",
         "releasedAt": "2026-09-16T16:04:13.456Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3687887,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T16:04:20.612Z",
+        "itemId": "delete-new-project-modal",
+        "outcome": "completed",
+        "reason": "NewProjectModal component and all references deleted; typecheck passes",
+        "releasedAt": "2026-09-16T16:06:11.488Z"
       }
     ],
     "statusReasons": {
@@ -240,6 +243,10 @@
       "wire-entry-points-no-loss": {
         "reason": "All entry points wired: sidebar +, workspace chips (3x), App.handleNewProject all navigate to /projects/new with proper mode params",
         "updatedAt": "2026-09-16T16:04:13.456Z"
+      },
+      "delete-new-project-modal": {
+        "reason": "NewProjectModal component and all references deleted; typecheck passes",
+        "updatedAt": "2026-09-16T16:06:11.488Z"
       }
     }
   },
@@ -306,6 +313,9 @@
     "wire-entry-points-no-loss.ac3": "completed",
     "wire-entry-points-no-loss.ac4": "completed",
     "wire-entry-points-no-loss.ac5": "completed",
-    "delete-new-project-modal": "running"
+    "delete-new-project-modal": "completed",
+    "delete-new-project-modal.ac1": "completed",
+    "delete-new-project-modal.ac2": "completed",
+    "delete-new-project-modal.ac3": "completed"
   }
 }
