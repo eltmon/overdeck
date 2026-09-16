@@ -367,7 +367,7 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:57:29.098Z",
+  "updated": "2026-09-16T19:04:21.058Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -377,7 +377,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
     "updatedAt": "2026-09-16T18:56:44.540Z",
     "reviewNotes": "Approved cycle 7: pure origin/main merge with zero feature-file changes; all prior fixes re-verified at head (72/72 unit, 20/20 frontend green); 0 blockers from all four reviewers.",
     "testNotes": "typecheck PASS, lint PASS, npm test PASS (1528 test files/14371 tests passed, 4/51 skipped; plus frontend suite 4 files/64 tests passed), exit 0.",
