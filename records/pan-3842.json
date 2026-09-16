@@ -115,18 +115,18 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T22:31:16.483Z",
+  "updated": "2026-09-16T22:31:30.337Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T21:35:31.957Z",
-    "updatedAt": "2026-09-16T22:31:15.637Z",
+    "updatedAt": "2026-09-16T22:31:30.315Z",
     "reviewNotes": "Both cycle-1 blockers verified fixed; 4/4 reviewers zero blockers at dfe7305. Caveat: an uncommitted resolveSlotSpawnFitness refactor (+157/-81, green 37/37) sits in the tree and is NOT covered by this approval",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
@@ -220,9 +220,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 463545,
-            "output": 82046,
-            "cacheRead": 44276988,
+            "input": 464769,
+            "output": 82549,
+            "cacheRead": 45366920,
             "cacheWrite": 0
           }
         }
@@ -241,15 +241,15 @@
           "cacheWrite": 270975
         },
         "custom/MiniMax-M3": {
-          "input": 463545,
-          "output": 82046,
-          "cacheRead": 44276988,
+          "input": 464769,
+          "output": 82549,
+          "cacheRead": 45366920,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.861657,
-        "pricingAsOf": "2026-09-16T22:31:15.686Z"
+        "usd": 13.862629,
+        "pricingAsOf": "2026-09-16T22:31:30.318Z"
       }
     },
     "merges": [
@@ -258,7 +258,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
