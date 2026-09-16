@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T20:57:26.421Z",
+  "updated": "2026-09-16T21:14:05.693Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -91,7 +91,7 @@
       "needsYouEmittedAt": "2026-09-16T20:57:26.419Z"
     }
   ],
-  "workModel": "k3",
+  "workModel": "MiniMax-M3",
   "tasks": {
     "sequence": 16,
     "claims": {},
