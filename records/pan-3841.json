@@ -82,7 +82,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:12:28.824Z",
+  "updated": "2026-09-16T21:13:00.424Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "failed",
@@ -207,7 +207,7 @@
       "needsYouEmittedAt": "2026-09-16T19:37:46.793Z"
     }
   ],
-  "workModel": "k3",
+  "workModel": "MiniMax-M3",
   "tasks": {
     "sequence": 14,
     "claims": {},
