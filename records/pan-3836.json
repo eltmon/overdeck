@@ -337,16 +337,16 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:24:22.600Z",
+  "updated": "2026-09-16T18:24:23.428Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:24:00.558Z",
+    "updatedAt": "2026-09-16T18:24:23.426Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -451,8 +451,9 @@
         "tests/unit/lib/projects/create-intent.test.ts",
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
-      "recordedAt": "2026-09-16T18:09:41.589Z"
-    }
+      "recordedAt": "2026-09-16T18:24:22.598Z"
+    },
+    "reviewRequestedAt": "2026-09-16T18:24:23.426Z"
   },
   "closeOut": {
     "usage": {
