@@ -1,0 +1,1204 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-16T14:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3836: Deliberate project creation: clone from GitHub, resolve-before-create, remote-derived identity, /projects/new",
+    "updated": "2026-09-16T14:28:53.950Z"
+  },
+  "plan": {
+    "id": "pan-3836",
+    "title": "Deliberate project creation: clone from GitHub, resolve-before-create, remote-derived identity, /projects/new",
+    "status": "proposed",
+    "uid": "ebfdf1fe-0237-432a-9525-3d421658521e",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-16T14:40:00.000Z",
+    "updated": "2026-09-16T14:28:53.950Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3836",
+        "label": "PAN-3836",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3836.md",
+        "label": "PRD drafts/pan-3836.md",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "projects",
+      "workspaces",
+      "dashboard",
+      "cli",
+      "git-clone",
+      "resolve-before-create"
+    ],
+    "narratives": {
+      "Problem": "Project creation is the thinnest flow in Overdeck and every other flow depends on it. Nothing can clone a repository from GitHub; registerProjectFromPath writes only name and path, so github_repo, tracker, default_branch and issue_prefix must be edited by hand before the pipeline can run; registration never creates the main workspace row; NewProjectModal has no resolve-before-create preview and shows errors as one ad hoc string; and the dashboard never says when to create a project versus a workspace.",
+      "Proposal": "Copy the shape of src/lib/workspaces/create.ts onto projects: a shared core src/lib/projects/create.ts with resolveProjectCreateIntent (zero writes, findings per field, memoized git ls-remote probe) and performProjectCreate (spawned git clone with progress and prompt-guard env, git init, registration with detected extras, workspaces/ in .git/info/exclude, main-workspace bootstrap through the workspace core). Expose it as POST /api/projects/resolve, a 202 clone job on POST /api/projects with a pollable GET /api/projects/create-jobs/:jobId, and pan project clone / pan project add --dry-run. Replace NewProjectModal with a /projects/new page (mode tabs, status strip, inline findings, clone progress, project-versus-workspace guide) behind a no-loss audit test, then delete the modal. Update projects.mdx, WORKSPACES-AND-PROJECTS.md, CLAUDE.md and the pan-new-project skill. All decisions D-1 to D-17 are fixed in the PRD.",
+      "NonGoals": "- No smart name field on /workspaces/new that accepts an issue id or URL and routes to pan start.\n- No checked-in per-repo setup config (shared directories, setup command) like Orca's orca.yaml.\n- No moving of worktrees out of <project>/workspaces/ to a central directory.\n- No cloning onto a Fly remote host.\n- Never edit the tracked .gitignore of a registered repository; only .git/info/exclude.\n- No tests/quality_gates config detection; the pan-new-project skill keeps doing that.\n- Do not refactor resolveWorkspaceRemote in src/lib/github-credentials.ts (D-16).\n- No execSync anywhere under src/lib/projects/ or the dashboard routes.\n- No direct SQL against the workspaces/projects tables; only the resolver and writer doors.\n- No --harness or --model overrides and no hardcoded model fallbacks."
+    },
+    "metadata": {
+      "sizeJustification": "The PRD (operator-authored, 17 decisions) is one strictly serial chain: core types → perform → job store → routes → hook → page → entry-point wiring with the no-loss audit → modal deletion. No prefix of that chain ships independent user value (a core with no caller, routes with no page, or a page next to the modal it replaces), so sibling issues would produce four serial pipeline runs each blocked on the previous merge with no per-run UAT target. The 32 files are the honest projection of one feature across lib, routes, CLI, frontend, tests and docs; docs and CLI items are already parallel branches of the DAG.",
+      "prd": "drafts/pan-3836.md on overdeck-state (workspace copy with corrections: .pan/drafts/PAN-3836.md)",
+      "canonicalFilename": "2026-09-16-PAN-3836-deliberate-project-creation-clone-from-github-resolve-before-create-remote-derived-identity-projects-new.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kept PAN-3836 as one issue with plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The operator authored one PRD with a strictly serial dependency chain; sibling issues would add four serial pipeline runs with no independently verifiable value per run."
+      },
+      {
+        "summary": "Split the core file into a resolve item (inspected, deep) and a perform item sharing src/lib/projects/create.ts with a blocks edge.",
+        "rationale": "The resolve types and findings contract are the foundation every later item consumes; inspecting them before perform, routes, CLI and page start prevents a MIN-796-style cascade."
+      },
+      {
+        "summary": "Marked project-create-routes as the second inspected item (fast) with foundationFor the hook and page.",
+        "rationale": "The 202/422/409 contract and job record shape are what the frontend polls; a drift there would force the hook and page to be redone."
+      },
+      {
+        "summary": "Used an informs edge, not blocks, from the routes item to the frontend hook.",
+        "rationale": "The PRD pins the request and response shapes, so the hook can be built and unit-tested against mocked fetch in parallel; the DAG still serializes the page after the hook."
+      },
+      {
+        "summary": "Replaced the PRD's AC-8 clone target eltmon/overdeck-knowledge with eltmon/okf under $HOME/.overdeck/uat/pan-3836 named pan-3836-uat.",
+        "rationale": "overdeck-knowledge is already on disk at ~/Projects/overdeck-knowledge on the development machine, so resolve would return target-exists and the UAT could never pass."
+      },
+      {
+        "summary": "Moved the rewrite of NewWorkspacePage.test.tsx:372 and NewWorkspacePage.parity.test.tsx:117-118 into the wiring item.",
+        "rationale": "Those cases assert the chips open the modal; without rewriting them the wiring item cannot be green before the modal-deletion item."
+      },
+      {
+        "summary": "Placed the CLI test at tests/unit/cli/project-create-commands.test.ts.",
+        "rationale": "The PRD named tests/unit/cli/project-clone.test.ts but pointed at tests/unit/cli/commands/ for the exitCli pattern, which lives in tests/unit/cli/project-commands.test.ts; one sibling file next to it is the least ambiguous location."
+      },
+      {
+        "summary": "Documentation is two items: user/dev docs plus CLAUDE.md, and the pan-new-project skill.",
+        "rationale": "The skill edit needs pan sync and a distinct verification, so it is independently reviewable; both run in parallel with the frontend chain."
+      }
+    ],
+    "items": [
+      {
+        "id": "repo-url-parser",
+        "title": "Pure repository URL parser src/lib/projects/repo-url.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/repo-url.ts",
+            "tests/unit/lib/projects/repo-url.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/repo-url.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "repo-url.test.ts exits 0 with one it per D-12 URL form",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/projects/repo-url.ts exporting ParsedRepoUrl and parseRepoUrl(raw) exactly as PRD section 7.2: three regexes in order (shorthand o/r, SCP-like git@host:path, https://host/path), provider by host (github.com, gitlab.com, else null), slug = captured path minus .git, folderName = last slug segment, cloneUrl normalized per D-12 (append .git for github/gitlab https; strip trailing / and .git first). No network, no fs. Write tests/unit/lib/projects/repo-url.test.ts with one it per form plus 'returns null for a bare word' and 'strips trailing slash and .git'."
+        },
+        "items": [
+          {
+            "id": "repo-url-parser.ac1",
+            "title": "Given the input 'o/r', when parseRepoUrl runs, then it returns cloneUrl 'https://github.com/o/r.git', provider 'github', slug 'o/r', folderName 'r'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-url-parser.ac2",
+            "title": "Given 'git@gitlab.com:g/sub/r.git' or 'ssh://git@github.com/o/r.git', when parsed, then provider follows the host and slug is 'g/sub/r' or 'o/r' with folderName 'r'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-url-parser.ac3",
+            "title": "Given 'https://github.com/o/r/' or 'https://github.com/o/r.git', when parsed, then cloneUrl is 'https://github.com/o/r.git' and the trailing slash is stripped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-url-parser.ac4",
+            "title": "Given a bare word such as 'orca', when parsed, then it returns null; given 'https://example.com/x/y.git' it returns provider null and slug null with cloneUrl preserved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-url-parser.ac5",
+            "title": "Given the test file tests/unit/lib/projects/repo-url.test.ts, when npx vitest run executes it, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registration-extras",
+        "title": "registerProjectFromPath accepts detected extras (PRD D-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/project-registration.ts",
+            "tests/unit/lib/project-registration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/project-registration.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-registration.test.ts exits 0 including the new extras case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/project-registration.ts add `export type RegisterProjectExtras = Pick<ProjectConfig, 'issue_prefix' | 'github_repo' | 'gitlab_repo' | 'tracker' | 'workspace'>` and an optional `extras?: RegisterProjectExtras` on RegisterProjectOptions (line 27). Change line 64 to `const projectConfig: ProjectConfig = { name, path: fullPath, ...(opts.extras ?? {}) };`. Add a test to tests/unit/lib/project-registration.test.ts (reuse its TEST_HOME isolation, lines 16-31) asserting the written projects.yaml entry contains github_repo, tracker, issue_prefix and workspace.default_branch when extras are passed, and is exactly { name, path } when they are not."
+        },
+        "items": [
+          {
+            "id": "registration-extras.ac1",
+            "title": "Given extras { github_repo: 'o/r', tracker: 'github', issue_prefix: 'OR', workspace: { default_branch: 'main' } }, when registerProjectFromPath runs, then the projects.yaml entry contains all four fields.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registration-extras.ac2",
+            "title": "Given no extras, when registerProjectFromPath runs, then the entry is exactly { name, path } as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registration-extras.ac3",
+            "title": "Given the DuplicateProjectError path, when the key already exists, then it still throws DuplicateProjectError unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registration-extras.ac4",
+            "title": "Given tests/unit/lib/project-registration.test.ts, when npx vitest run executes it, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-core-resolve",
+        "title": "resolveProjectCreateIntent core with memoized remote probe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "tests/unit/lib/projects/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts",
+            "npm run typecheck",
+            "git grep -n execSync src/lib/projects/"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts exits 0 with the eleven cases from PRD 7.5",
+            "typecheck completes without errors",
+            "git grep for execSync under src/lib/projects/ prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "create-core-perform",
+            "create-job-store",
+            "project-create-routes",
+            "cli-project-add-dry-run",
+            "cli-project-clone",
+            "use-project-create-intent-hook",
+            "new-project-page"
+          ],
+          "readinessReason": "Creates a new file src/lib/projects/create.ts and its own test; only repo-url-parser is a prerequisite and no other item edits the file until create-core-perform, which is blocked behind it."
+        },
+        "narrative": {
+          "Action": "Create src/lib/projects/create.ts with a module header in the style of src/lib/workspaces/create.ts:1-31, all types from PRD section 6 (ProjectCreateMode, ProjectIntentField, ProjectIntentCode, ProjectIntentFinding, ProjectCreateInput, ResolvedProjectIntent, ProjectCreateProgress, ProjectCreateHooks, ProjectCreateResult), promptGuardGitEnv(), probeRemote() with the 60 s memo / 15 s timeout / __resetRemoteProbeMemoForTests(), and resolveProjectCreateIntent() following the six-step skeleton in PRD 7.3 exactly (source validation, key, path + home boundary + fs, detection per D-15, issue prefix per D-3, willCreateMainWorkspace via getMainWorkspace). Import child_process/util unprefixed. Read projects.yaml via getProjectSync/listProjectsAsync only. Leave performProjectCreate for the next item (export a stub is NOT required; the perform item adds it). Write tests/unit/lib/projects/create-intent.test.ts with the isolation described in PRD 7.5 and one it per listed case."
+        },
+        "items": [
+          {
+            "id": "create-core-resolve.ac1",
+            "title": "Given mode clone with url 'stablyai/orca' and a mocked ls-remote replying 'ref: refs/heads/main HEAD', when resolved, then the intent contains key 'orca', path '<home>/Projects/orca', repoSlug 'stablyai/orca', provider 'github', defaultBranch 'main', proposedIssuePrefix 'ORCA', wouldClone true, remoteChecked true and zero findings.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-resolve.ac2",
+            "title": "Given mode clone with an unparseable url, when resolved, then findings contains { field: 'url', code: 'url-invalid' } and execFile is never called; given ls-remote failing or timing out, then findings contains 'remote-unreachable' and nothing throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-resolve.ac3",
+            "title": "Given two resolves of the same clone url within 60 s, when the second runs without refreshRemote, then execFile is called once; given refreshRemote: true, then it is called again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-resolve.ac4",
+            "title": "Given mode existing pointing at a temp git repo whose origin is 'git@github.com:o/r.git', when resolved, then repoSlug is 'o/r', provider 'github', isGitRepository true; given a directory without .git, then isGitRepository is false and no git command spawns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-resolve.ac5",
+            "title": "Given a registered key, a taken prefix, homeBoundary true with '/tmp/x', a non-empty target, and an existing main row, when resolved, then the findings are respectively project-exists, issue-prefix-taken, path-outside-home, target-exists, and willCreateMainWorkspace is false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-core-perform",
+        "title": "performProjectCreate: clone or init, register, exclude, main bootstrap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "tests/unit/lib/projects/create-perform.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-perform.test.ts",
+            "npm run typecheck",
+            "bash scripts/guard-workspace-doors.sh"
+          ],
+          "expected_outputs": [
+            "create-perform.test.ts exits 0",
+            "typecheck completes without errors",
+            "guard-workspace-doors.sh prints the passed line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "readinessReason": "Appends to create.ts after the resolve item completes; the only shared file is with create-core-resolve, which the blocks edge serializes, so it can run in its own slot beside the CLI and docs items."
+        },
+        "narrative": {
+          "Action": "Add to src/lib/projects/create.ts: performProjectCreate(intent, hooks) exactly as PRD 7.4 (throw on findings; mkdir -p parent; non-recursive mkdir claim with createdTarget; runClone via spawn('git', ['clone','--progress','--',url,path]) with promptGuardGitEnv and stderr progress parsing /^([\\w ]+):\\s+(\\d+)%/; git init --quiet for new; rm -rf only when createdTarget; registering progress; registerProjectFromPath with buildExtras(intent); excludeWorkspacesDir via .git/info/exclude per D-8; main workspace bootstrap via resolveWorkspaceCreateIntent({ kind: 'main', projectKey }) + getMainWorkspace guard + performWorkspaceCreate per D-9; final { key, name, path, mainWorkspaceId }). Write tests/unit/lib/projects/create-perform.test.ts with real temp dirs and a mocked spawn per PRD 7.5."
+        },
+        "items": [
+          {
+            "id": "create-core-perform.ac1",
+            "title": "Given a clone intent and a mocked spawn that writes 'Receiving objects: 42%' to stderr then exits 0, when performProjectCreate runs, then onProgress receives { phase: 'Receiving objects', percent: 42 } and later { phase: 'done', percent: 100 }, and the result contains key, path and a non-empty mainWorkspaceId.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-perform.ac2",
+            "title": "Given a successful clone, when perform finishes, then projects.yaml contains github_repo, tracker, issue_prefix and workspace.default_branch from the intent, <path>/.git/info/exclude contains the line 'workspaces/', and getMainWorkspace(key) returns a row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-perform.ac3",
+            "title": "Given spawn exits 1, when the core created the target directory, then the directory is removed; given the target pre-existed as an empty directory, then it is preserved and the error is rethrown with stderr text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-perform.ac4",
+            "title": "Given mode new, when perform runs, then <path>/.git exists after git init; given mode existing where .git is a file (worktree), then .git/info/exclude is not written and no error is thrown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-core-perform.ac5",
+            "title": "Given an intent with findings, when perform is called, then it throws with the first finding's message and writes nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-job-store",
+        "title": "In-memory project-create job store with TTL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/project-create-jobs.ts",
+            "tests/unit/dashboard/routes/project-create-jobs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/project-create-jobs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-create-jobs.test.ts exits 0 using fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/project-create-jobs.ts exporting the ProjectCreateJob union (PRD section 6), JOB_TTL_MS = 600000, startProjectCreateJob(intent): string (randomUUID; runs performProjectCreate in the background with an onProgress hook that updates the running record's phase/percent; on settle replaces the record with done { result } or failed { error } and schedules deletion after JOB_TTL_MS via setTimeout), getProjectCreateJob(id), and __resetProjectCreateJobsForTests(). Never use execSync or setInterval. Test with vi.mock of ../../../../src/lib/projects/create.js and vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "create-job-store.ac1",
+            "title": "Given a mocked performProjectCreate that has not settled, when startProjectCreateJob runs, then getProjectCreateJob(id) returns status 'running' with phase and percent, and the captured onProgress hook updates them.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-job-store.ac2",
+            "title": "Given the mocked perform resolves with a result, when awaited, then the job record is status 'done' with that result; given it rejects, then status 'failed' with the error message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-job-store.ac3",
+            "title": "Given a terminal job, when vi.advanceTimersByTimeAsync(JOB_TTL_MS + 1) runs, then getProjectCreateJob(id) returns undefined.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-job-store.ac4",
+            "title": "Given tests/unit/dashboard/routes/project-create-jobs.test.ts, when npx vitest run executes it, then it exits 0 without real timers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-create-routes",
+        "title": "POST /api/projects/resolve, clone job on POST /api/projects, job poll route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3836",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/dashboard/routes/projects-create-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/projects-create-routes.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "projects-create-routes.test.ts exits 0",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "use-project-create-intent-hook",
+            "new-project-page"
+          ],
+          "readinessReason": "Edits routes/projects.ts and its own new test file, neither of which any other item touches; the job store and core it imports are complete once its blockers finish."
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/projects.ts add postProjectsResolveRoute (POST /api/projects/resolve: rejectUnsafeDashboardMutationRequest guard, readProjectJsonBody, map body fields mode/url/path/parentDir/name/issuePrefix to ProjectCreateInput with homeBoundary: true, return jsonResponse(await resolveProjectCreateIntent(input))) and getProjectCreateJobRoute (GET /api/projects/create-jobs/:jobId → 404 { error: 'Unknown job' } or 200 job). Replace the body of postProjectsRoute (line 915): resolve with refreshRemote: true; findings → 422 { findings }; mode clone → startProjectCreateJob → 202 { jobId }; existing/new → await performProjectCreate → 200 { key, name, path }; perform throw → 409 { error }; keep DuplicateProjectError → 409 { error, key, existingPath }. Register the two new routes before postProjectsRoute in projectsRouteLayer (line 1072). Delete buildHomeGuard (904-911), the execAsync('git init') call (1051), and the now-unused exec/promisify imports (38-39, 46). Write the test with the HttpServerRequest.fromWeb pattern from tests/unit/dashboard/routes/registered-projects-route.test.ts, mocking ../../../../src/lib/projects/create.js and using fake timers for the TTL case."
+        },
+        "items": [
+          {
+            "id": "project-create-routes.ac1",
+            "title": "Given a POST /api/projects/resolve with a JSON body, when the route runs, then resolveProjectCreateIntent receives the body fields plus homeBoundary: true and the response echoes the resolved intent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create-routes.ac2",
+            "title": "Given a POST /api/projects whose resolve returns findings, when the route runs, then it returns 422 with { findings }; given a malformed body, then it returns 400.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create-routes.ac3",
+            "title": "Given mode clone with zero findings, when POSTed, then the route returns 202 { jobId } and GET /api/projects/create-jobs/<jobId> returns status 'running', then 'done' once the mocked perform resolves; an unknown id returns 404.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create-routes.ac4",
+            "title": "Given mode existing or new with zero findings, when POSTed, then the route returns 200 { key, name, path } and a perform throw returns 409 { error }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create-routes.ac5",
+            "title": "Given the finished file, when git grep -n 'buildHomeGuard\\|execAsync' src/dashboard/server/routes/projects.ts runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-project-add-dry-run",
+        "title": "pan project add resolves through the core and gains --dry-run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "tests/unit/cli/project-create-commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/project-create-commands.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-create-commands.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite projectAddCommand (src/cli/commands/project.ts:27-90) as a wrapper: build ProjectCreateInput { mode: 'existing', path: resolve(projectPath), name: options.name, homeBoundary: false, refreshRemote: true }; resolve; on findings print each message in red and exitCli(1); with --dry-run print JSON.stringify(intent, null, 2) and return; otherwise performProjectCreate. Keep the --linear-team/--rally-project post-write patch (lines 66-76). In the Next steps block, drop the manual github_repo/issue_prefix instructions when intent.repoSlug !== null. Add .option('--dry-run', ...) to the add command (line 375). Create tests/unit/cli/project-create-commands.test.ts mocking ../../../src/lib/projects/create.js, copying the exitCli pattern from tests/unit/cli/project-commands.test.ts."
+        },
+        "items": [
+          {
+            "id": "cli-project-add-dry-run.ac1",
+            "title": "Given pan project add <path> --dry-run, when run, then resolveProjectCreateIntent is called with homeBoundary: false and the resolved intent JSON is printed without calling performProjectCreate.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-add-dry-run.ac2",
+            "title": "Given a resolve that returns a finding, when pan project add runs, then it prints the finding message and exits 1 via exitCli.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-add-dry-run.ac3",
+            "title": "Given a clean resolve without --dry-run, when pan project add runs, then performProjectCreate is called and the success block prints the key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-add-dry-run.ac4",
+            "title": "Given pan project add --help, when run, then the output lists --dry-run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-project-clone",
+        "title": "pan project clone <url> command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "tests/unit/cli/project-create-commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/project-create-commands.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js project clone eltmon/okf --parent /tmp/pan-3836-x --dry-run"
+          ],
+          "expected_outputs": [
+            "project-create-commands.test.ts exits 0 including the clone cases",
+            "typecheck completes without errors",
+            "dry-run prints JSON containing wouldClone true and key okf and creates no directory (eltmon/okf is not a registered project key on this machine; stablyai/orca is, and would return project-exists)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add projectCloneCommand(url, options { parent?, name?, issuePrefix?, dryRun? }) to src/cli/commands/project.ts: input { mode: 'clone', url, parentDir: options.parent, name: options.name, issuePrefix: options.issuePrefix, homeBoundary: false, refreshRemote: true }; findings → red + exitCli(1); --dry-run prints JSON; otherwise performProjectCreate with an onProgress hook writing `\\r<phase> <percent>%` via process.stderr.write; print the same success block as add. Register `clone <url>` with --parent, --name, --issue-prefix, --dry-run in registerProjectCommands per PRD 7 WI-3. Extend tests/unit/cli/project-create-commands.test.ts."
+        },
+        "items": [
+          {
+            "id": "cli-project-clone.ac1",
+            "title": "Given pan project clone o/r --dry-run, when run, then resolve is called with mode clone and homeBoundary false and the printed JSON contains wouldClone: true while performProjectCreate is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-clone.ac2",
+            "title": "Given a finding such as remote-unreachable, when pan project clone runs, then it prints the message and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-clone.ac3",
+            "title": "Given a clean resolve, when pan project clone runs, then performProjectCreate is called with an onProgress hook and the key is printed on success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-clone.ac4",
+            "title": "Given pan project clone --help, when run, then the output lists --parent, --name, --issue-prefix and --dry-run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "use-project-create-intent-hook",
+        "title": "useProjectCreateIntent hook: debounced resolve, submit, job polling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts",
+            "src/dashboard/frontend/src/components/project/new/__tests__/useProjectCreateIntent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/project/new/__tests__/useProjectCreateIntent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useProjectCreateIntent.test.ts exits 0 using fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ],
+          "readinessReason": "Creates two new frontend files under components/project/new that no other item edits until delete-new-project-modal, which is transitively blocked behind it; the route contract it targets is pinned in the PRD, so it runs in parallel with backend items."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts by copying src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts and adapting per PRD WI-4: state mode/url/path/parentDir/name/issuePrefix/intent/stale/creating/error/progress; RESOLVE_DEBOUNCE_MS = 300 and the resolveSeq guard; POST /api/projects/resolve with the ProjectCreateInput minus homeBoundary; canCreate = intent && !stale && findings.length === 0 && !creating; findingsFor(field); submit() handling 422 (fold findings), 409/400 (error), 200 (onCreated), 202 (poll GET /api/projects/create-jobs/<id> every 750 ms with setTimeout; running → progress; done → onCreated; failed → error; 404 → fetch /api/registered-projects and treat a row with key === intent.key as created, else error 'Clone was interrupted; check <path> and retry.'). Export the CreatedProject type here. Default parentDir from /api/fs/list-dirs home + '/Projects' as NewProjectModal.tsx:43-47 does. Test with fake timers."
+        },
+        "items": [
+          {
+            "id": "use-project-create-intent-hook.ac1",
+            "title": "Given two rapid field edits, when 300 ms elapse under fake timers, then POST /api/projects/resolve is called exactly once with the latest body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-project-create-intent-hook.ac2",
+            "title": "Given a submit that returns 202 { jobId }, when the poll returns running then done, then progress is set from the running record and onCreated receives the done result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-project-create-intent-hook.ac3",
+            "title": "Given a poll that returns 404, when /api/registered-projects contains the expected key, then onCreated fires; when it does not, then error contains 'Clone was interrupted'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-project-create-intent-hook.ac4",
+            "title": "Given a submit that returns 422 { findings }, when handled, then intent.findings contains them and canCreate is false; given 409 { error }, then error is set and the page state stays.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-project-create-intent-hook.ac5",
+            "title": "Given the hook, when useProjectCreateIntent.test.ts runs under npx vitest, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-project-page",
+        "title": "/projects/new page with mode tabs, status strip, findings, progress",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewProjectPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewProjectPage.test.tsx",
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/components/Header.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewProjectPage.test.tsx src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "NewProjectPage.test.tsx and KnowledgePage.test.tsx exit 0",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-5"
+          ],
+          "readinessReason": "Its six files (page, page test, routes.ts, Header.tsx, AppRoutes.tsx, KnowledgePage.test.tsx) are touched by no other item; the hook it imports is complete once its blocker finishes."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/pages/NewProjectPage.tsx mirroring NewWorkspacePage.tsx structure and classes, per PRD WI-4 layout: mode tabs Clone repository (default) / Add existing / New project with ?mode= preselect; the guide line 'A project is a repository with its own issues and pipeline. Want another checkout of a project you already have? Create a workspace instead.' with 'Create a workspace' linking to /workspaces/new; per-mode fields (clone: URL input with placeholder 'https://github.com/owner/repo or owner/repo', FolderPicker parent default ~/Projects, name prefilled from intent, issue prefix prefilled from proposedIssuePrefix; existing: FolderPicker path, name, prefix; new: name, parent, prefix); the monospace status strip (key · path · github.com/<slug> or 'no remote' · default <branch> or 'branch unknown' · will clone / will git init / git repository / not a git repository · main workspace will be created / exists; 'checking remote…' while remoteChecked is false in clone mode); inline findings via findingsFor(field); footer Cancel + Create project disabled while !canCreate, Ctrl/Cmd+Enter submits; while progress is set replace the footer with '<phase> <percent>%' and disable fields using the hidden attribute. Keep data-testid 'new-project-name-input'. Call capture('project_created', { mode }) then onCreated. Wire routing: routes.ts add 'project-new': '/projects/new' and getNewProjectModeFromSearch + getNewProjectReturnToFromSearch; Header.tsx add | 'project-new' to Tab; AppRoutes.tsx render NewProjectPage when activeTab === 'project-new' with the same wrapper as workspace-new; KnowledgePage.test.tsx:60 destructure 'project-new' out of legacyPaths. Load the pan-style-guide skill before writing the page (no pill badges, no decorative color). Write NewProjectPage.test.tsx mocking the hook as NewWorkspacePage.test.tsx:24-27 does, porting the seven NewProjectModal.test.tsx cases under the same names."
+        },
+        "items": [
+          {
+            "id": "new-project-page.ac1",
+            "title": "Given /projects/new, when rendered, then three mode tabs, the guide line with a link to /workspaces/new, and the status strip are present; given ?mode=existing, then the Add existing tab is active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-page.ac2",
+            "title": "Given each mode, when its tab is active, then only that mode's fields render (URL + parent + name + prefix for clone; path picker + name + prefix for existing; name + parent + prefix for new).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-page.ac3",
+            "title": "Given an intent with findings, when rendered, then each finding shows inline against its field and the Create project button is disabled; given an intent with repoSlug 'o/r' and defaultBranch 'main', then the strip shows 'github.com/o/r' and 'default main'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-page.ac4",
+            "title": "Given progress { phase: 'Receiving objects', percent: 42 }, when rendered, then the footer shows 'Receiving objects 42%' and the fields are disabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-page.ac5",
+            "title": "Given TAB_PATHS, when KnowledgePage.test.tsx runs, then its residue assertion still passes with 'project-new' destructured out and npm run typecheck completes without errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-entry-points-no-loss",
+        "title": "Route every new-project entry point to /projects/new with a no-loss audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewProjectPage.no-loss.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewProjectPage.no-loss.test.tsx src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three page test files exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "readinessReason": "Edits App.tsx, NewWorkspacePage.tsx and page tests that only delete-new-project-modal also touches, and that item is blocked behind this one; runs in its own slot once the page exists."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in src/dashboard/frontend/src/App.tsx make handleNewProject (line 230) navigate like onNewWorkspace (line 498): setActiveTabState('project-new') + pushState({ tab: 'project-new' }, '', '/projects/new'); remove isNewProjectModalOpen (229) and the <NewProjectModal> mount (845-849); have handleProjectCreated honor a returnTo query by navigating to /workspaces/new?project=<key> when present. In NewWorkspacePage.tsx make the two chip buttons (183-196) navigate to /projects/new?mode=existing&returnTo=/workspaces/new and ?mode=new&returnTo=/workspaces/new, add a third chip 'clone repo' → ?mode=clone&returnTo=/workspaces/new, and delete newProjectOpen (48), the NewProjectModal import (6) and mount (475-490). Rewrite NewWorkspacePage.test.tsx:372 and NewWorkspacePage.parity.test.tsx:117-118 to assert navigation via a pushState spy (keep their vi.mock blocks for now). Write NewProjectPage.no-loss.test.tsx containing the WI-5 affordance table as an array of { label, assert } rows and failing if any assert throws. For the AC-8 end-to-end check (ac5) never pan reload or pan restart the live dashboard from this workspace (operator ban on non-flywheel agents deploying; rule no-live-boot-hotpatch). Either start a throwaway instance from this workspace after npm run build on a free port with OVERDECK_DISABLE_DEACON=1 (single-deacon invariant) and drive it with an isolated Playwright browser profile, or leave ac5 to the UAT role and note the deferral in the pan task done message with the route and page test results as evidence (PRD Checkpoint B fallback). Tear down with pan project remove pan-3836-uat and rm -rf $HOME/.overdeck/uat/pan-3836."
+        },
+        "items": [
+          {
+            "id": "wire-entry-points-no-loss.ac1",
+            "title": "Given the sidebar +, the HomePage new-project button, and the three /workspaces/new chips, when clicked, then window.location.pathname becomes /projects/new (chips add ?mode=<mode>&returnTo=/workspaces/new) and no modal renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-entry-points-no-loss.ac2",
+            "title": "Given a project created from a page opened with returnTo=/workspaces/new, when onCreated fires, then the app navigates to /workspaces/new?project=<key>; without returnTo it selects the project on the command deck as handleProjectCreated already does.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-entry-points-no-loss.ac3",
+            "title": "Given NewProjectPage.no-loss.test.tsx, when run, then every row of the WI-5 affordance table (both tabs, folder pickers, name input test id, parent picker, path preview, ~/Projects default, inline error, Cancel/Create, onCreated, capture('project_created')) is asserted and the file exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-entry-points-no-loss.ac4",
+            "title": "Given the rewritten NewWorkspacePage.test.tsx and NewWorkspacePage.parity.test.tsx, when run, then they exit 0 while the NewProjectModal file still exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-entry-points-no-loss.ac5",
+            "title": "Given the built dashboard at /projects/new in Clone mode with URL https://github.com/eltmon/okf, parent $HOME/.overdeck/uat/pan-3836 and name pan-3836-uat, when Create project is clicked and the progress row completes, then projects.yaml contains pan-3836-uat with github_repo eltmon/okf, tracker github, issue_prefix PAN3836UAT and workspace.default_branch main, and `pan workspace main --project pan-3836-uat` prints the clone path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-new-project-modal",
+        "title": "Delete NewProjectModal after the no-loss audit is green",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewProjectModal.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n NewProjectModal src/",
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__ src/dashboard/frontend/src/components/CommandDeck/__tests__/NewProjectWiring.test.tsx"
+          ],
+          "expected_outputs": [
+            "git grep for NewProjectModal under src/ prints nothing",
+            "typecheck completes without errors",
+            "page tests and NewProjectWiring.test.tsx exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: delete src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx and __tests__/NewProjectModal.test.tsx; remove the vi.mock('../../components/CommandDeck/NewProjectModal.js') blocks from NewWorkspacePage.test.tsx:10-17 and NewWorkspacePage.parity.test.tsx:9-16; change the CreatedProject import in App.tsx:20 to the hook module. Keep NewProjectWiring.test.tsx. Run typecheck to catch any other importer."
+        },
+        "items": [
+          {
+            "id": "delete-new-project-modal.ac1",
+            "title": "Given the finished tree, when git grep -n NewProjectModal src/ runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-new-project-modal.ac2",
+            "title": "Given App.tsx, when typecheck runs, then it completes without errors with CreatedProject imported from components/project/new/useProjectCreateIntent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-new-project-modal.ac3",
+            "title": "Given NewProjectWiring.test.tsx and the two NewWorkspacePage test files, when run, then they exit 0 without the modal mock.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-projects-and-workspaces",
+        "title": "Document clone, detection, and project-vs-workspace in projects.mdx, WORKSPACES-AND-PROJECTS.md, CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan project clone' configuration/projects.mdx docs/WORKSPACES-AND-PROJECTS.md",
+            "grep -n '/projects/new' CLAUDE.md configuration/projects.mdx"
+          ],
+          "expected_outputs": [
+            "both grep commands print at least one matching line per file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: in configuration/projects.mdx under 'Registering Projects' (line 35) add a 'Clone a repository' subsection with `pan project clone https://github.com/owner/repo` and the dashboard path /projects/new, list what registration now detects (github_repo/gitlab_repo, tracker, workspace.default_branch, proposed issue_prefix, main workspace) and that .git/info/exclude gets workspaces/; add a 'Project or workspace?' note with the WI-4 guide wording; update the issue_prefix row (line 91) to say it is proposed automatically. In docs/WORKSPACES-AND-PROJECTS.md add 'Creating a project (PAN-3836)' after the PAN-3330 section (line 104) describing the core, routes, job lifecycle, D-5, D-8, and the no-loss audit. In CLAUDE.md:23 extend the 'Workspace creation UI' bullet with: Project creation lives at /projects/new (clone, add existing, new); registration detects the remote and creates the main workspace."
+        },
+        "items": [
+          {
+            "id": "docs-projects-and-workspaces.ac1",
+            "title": "Given configuration/projects.mdx, when read, then it contains a 'Clone a repository' subsection naming `pan project clone` and /projects/new, a 'Project or workspace?' note, and an issue_prefix row saying the prefix is proposed automatically.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-projects-and-workspaces.ac2",
+            "title": "Given docs/WORKSPACES-AND-PROJECTS.md, when read, then it contains a 'Creating a project (PAN-3836)' section that names resolveProjectCreateIntent, performProjectCreate, POST /api/projects/resolve, the 202 job flow, .git/info/exclude, and the no-loss audit test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-projects-and-workspaces.ac3",
+            "title": "Given CLAUDE.md, when read, then the 'Workspace creation UI' bullet states that project creation lives at /projects/new and that registration detects the remote and creates the main workspace.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-pan-new-project",
+        "title": "Update the pan-new-project skill for detected registration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-16T14:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-new-project/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan project clone' sync-sources/skills/pan-new-project/SKILL.md",
+            "grep -n 'info/exclude' sync-sources/skills/pan-new-project/SKILL.md"
+          ],
+          "expected_outputs": [
+            "first grep prints the clone command inside Step 2",
+            "second grep prints the optional Step 6 line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: Step 2 becomes 'run `pan project clone <url>` or `pan project add <path>`; both detect the remote, default branch, and prefix and create the main workspace'. Step 3 drops issue_prefix, github_repo, and default_branch from the minimum config (registration writes them) and keeps tests/quality_gates. Step 4 notes parseGitHubReposSync already derives the GITHUB_REPOS entry from github_repo. Step 6 becomes optional and says workspaces/ is excluded via .git/info/exclude. Remove the rows of the 'WHY THIS SKILL EXISTS' table that registration now covers. Do not run pan sync from the workspace: it distributes sync-sources/ from the installed package root (src/cli/commands/sync.ts:97), so it only picks this change up after merge and deploy."
+        },
+        "items": [
+          {
+            "id": "skill-pan-new-project.ac1",
+            "title": "Given SKILL.md Step 2, when read, then it names both `pan project clone <url>` and `pan project add <path>` and states they detect remote, default branch, prefix and create the main workspace.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-new-project.ac2",
+            "title": "Given SKILL.md Step 3, when read, then its minimum config block contains no issue_prefix, github_repo or default_branch keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-new-project.ac3",
+            "title": "Given SKILL.md Step 6, when read, then it is marked optional and mentions .git/info/exclude; the 'WHY THIS SKILL EXISTS' table no longer lists missing github_repo or issue_prefix as failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "create-core-resolve",
+        "to": "create-core-perform",
+        "type": "blocks"
+      },
+      {
+        "from": "registration-extras",
+        "to": "create-core-perform",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-url-parser",
+        "to": "create-core-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "create-core-perform",
+        "to": "create-job-store",
+        "type": "blocks"
+      },
+      {
+        "from": "create-job-store",
+        "to": "project-create-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "create-core-perform",
+        "to": "project-create-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "create-core-perform",
+        "to": "cli-project-add-dry-run",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-project-add-dry-run",
+        "to": "cli-project-clone",
+        "type": "blocks"
+      },
+      {
+        "from": "project-create-routes",
+        "to": "use-project-create-intent-hook",
+        "type": "informs"
+      },
+      {
+        "from": "use-project-create-intent-hook",
+        "to": "new-project-page",
+        "type": "blocks"
+      },
+      {
+        "from": "new-project-page",
+        "to": "wire-entry-points-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-entry-points-no-loss",
+        "to": "delete-new-project-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-project-clone",
+        "to": "docs-projects-and-workspaces",
+        "type": "informs"
+      },
+      {
+        "from": "project-create-routes",
+        "to": "docs-projects-and-workspaces",
+        "type": "informs"
+      },
+      {
+        "from": "cli-project-clone",
+        "to": "skill-pan-new-project",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
