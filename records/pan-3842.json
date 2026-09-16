@@ -15,19 +15,84 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/architecture.md",
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
+      "src/dashboard/frontend/tests/talk-it-through.spec.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/MODEL_ROUTING.md",
+      "docs/TIERED-EXECUTION.md",
+      "reference/troubleshooting.mdx",
+      "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
+      "src/cli/commands/doctor-tier-fitness.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+      "src/lib/__tests__/model-capability-class.test.ts",
+      "src/lib/agents/__tests__/dispatch-tier.test.ts",
+      "src/lib/agents/__tests__/tier-fitness-context.test.ts",
+      "src/lib/agents/__tests__/tier-fitness.test.ts",
+      "src/lib/agents/spawn-prep.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/agents/tier-fitness-context.ts",
+      "src/lib/agents/tier-fitness.ts",
+      "src/lib/model-capability-class.ts"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/architecture.md",
+      "docs/DASHBOARD-ARCHITECTURE.md",
+      "docs/MODEL_ROUTING.md",
+      "docs/TIERED-EXECUTION.md",
+      "reference/troubleshooting.mdx",
+      "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
+      "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
+      "src/cli/commands/doctor-tier-fitness.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
+      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
+      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+      "src/lib/__tests__/model-capability-class.test.ts",
+      "src/lib/agents/__tests__/dispatch-tier.test.ts",
+      "src/lib/agents/__tests__/tier-fitness-context.test.ts",
+      "src/lib/agents/__tests__/tier-fitness.test.ts",
+      "src/lib/agents/spawn-prep.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/agents/tier-fitness-context.ts",
+      "src/lib/agents/tier-fitness.ts",
+      "src/lib/model-capability-class.ts"
+    ],
+    "recordedAt": "2026-09-16T21:34:52.900Z"
+  },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-16T21:34:55.857Z",
+  "updated": "2026-09-16T21:34:58.761Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T21:34:55.855Z",
+    "updatedAt": "2026-09-16T21:34:58.725Z",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewRequestedAt": "2026-09-16T21:34:55.855Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -92,16 +157,15 @@
         "src/lib/model-capability-class.ts"
       ],
       "recordedAt": "2026-09-16T21:34:52.900Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3851"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 349,
-            "output": 200,
+            "input": 13996,
+            "output": 261,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -113,12 +177,20 @@
             "cacheRead": 6423929,
             "cacheWrite": 270975
           }
+        },
+        "work": {
+          "custom/MiniMax-M3": {
+            "input": 250609,
+            "output": 3560,
+            "cacheRead": 2894056,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 349,
-          "output": 200,
+          "input": 13996,
+          "output": 261,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -127,14 +199,22 @@
           "output": 75774,
           "cacheRead": 6423929,
           "cacheWrite": 270975
+        },
+        "custom/MiniMax-M3": {
+          "input": 250609,
+          "output": 3560,
+          "cacheRead": 2894056,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.610192,
-        "pricingAsOf": "2026-09-16T19:45:11.773Z"
+        "usd": 13.703595,
+        "pricingAsOf": "2026-09-16T21:34:58.748Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3851"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -330,69 +410,5 @@
     "docs-fitness.ac2": "completed",
     "docs-fitness.ac3": "completed",
     "docs-fitness.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".overdeck/context/codebase/architecture.md",
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "scripts/file-size-allowlist.txt",
-      "scripts/source-introspection-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/MODEL_ROUTING.md",
-      "docs/TIERED-EXECUTION.md",
-      "reference/troubleshooting.mdx",
-      "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
-      "src/cli/commands/doctor-tier-fitness.ts",
-      "src/cli/commands/doctor.ts",
-      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-      "src/lib/__tests__/model-capability-class.test.ts",
-      "src/lib/agents/__tests__/dispatch-tier.test.ts",
-      "src/lib/agents/__tests__/tier-fitness-context.test.ts",
-      "src/lib/agents/__tests__/tier-fitness.test.ts",
-      "src/lib/agents/spawn-prep.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/agents/tier-fitness-context.ts",
-      "src/lib/agents/tier-fitness.ts",
-      "src/lib/model-capability-class.ts"
-    ],
-    "actualChangedFiles": [
-      ".overdeck/context/codebase/architecture.md",
-      "docs/DASHBOARD-ARCHITECTURE.md",
-      "docs/MODEL_ROUTING.md",
-      "docs/TIERED-EXECUTION.md",
-      "reference/troubleshooting.mdx",
-      "scripts/file-size-allowlist.txt",
-      "scripts/source-introspection-baseline.txt",
-      "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
-      "src/cli/commands/doctor-tier-fitness.ts",
-      "src/cli/commands/doctor.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
-      "src/lib/__tests__/model-capability-class.test.ts",
-      "src/lib/agents/__tests__/dispatch-tier.test.ts",
-      "src/lib/agents/__tests__/tier-fitness-context.test.ts",
-      "src/lib/agents/__tests__/tier-fitness.test.ts",
-      "src/lib/agents/spawn-prep.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/agents/tier-fitness-context.ts",
-      "src/lib/agents/tier-fitness.ts",
-      "src/lib/model-capability-class.ts"
-    ],
-    "recordedAt": "2026-09-16T21:34:52.900Z"
   }
 }
