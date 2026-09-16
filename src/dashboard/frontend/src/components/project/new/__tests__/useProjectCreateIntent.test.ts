@@ -145,26 +145,20 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     await waitFor(() => expect(result.current.intent).not.toBeNull());
 
     // Submit WITHOUT awaiting — start async call, advance timers, THEN await
-    const submitPromise = act(() => result.current.submit());
+    const submitPromise = result.current.submit();
 
     // Advance to allow /api/projects POST to resolve
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await vi.advanceTimersByTimeAsync(0);
     expect(mockFetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }));
 
     // Advance for first poll (running) at 750ms
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(760);
-    });
+    await vi.advanceTimersByTimeAsync(760);
     await waitFor(() => expect(result.current.progress).not.toBeNull());
     expect(result.current.progress?.phase).toBe('Receiving objects');
     expect(result.current.progress?.percent).toBe(50);
 
     // Advance for second poll (done) at 750ms
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(760);
-    });
+    await vi.advanceTimersByTimeAsync(760);
 
     // NOW await the submit promise which has been progressing in the background
     await submitPromise;
@@ -230,12 +224,10 @@ describe('useProjectCreateIntent (PAN-3836)', () => {
     await waitFor(() => expect(result.current.intent).not.toBeNull());
 
     // Submit WITHOUT awaiting — start async call, advance timers, THEN await
-    const submitPromise = act(() => result.current.submit());
+    const submitPromise = result.current.submit();
 
     // Allow the async submit to progress
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await vi.advanceTimersByTimeAsync(0);
 
     // Await the submit promise which has been progressing
     await submitPromise;
