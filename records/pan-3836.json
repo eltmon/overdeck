@@ -342,7 +342,7 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:25:42.727Z",
+  "updated": "2026-09-16T18:25:45.579Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -351,7 +351,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T18:24:30.601Z",
+    "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
+    "updatedAt": "2026-09-16T18:25:42.714Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: url-invalid reachability, project-exists test simulation, and AC3.9 promise chain deadlock",
     "verificationNotes": "Verification FAILED at test (435726ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -458,8 +459,7 @@
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
       "recordedAt": "2026-09-16T18:24:22.598Z"
-    },
-    "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -482,10 +482,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 6696,
-            "output": 293079,
-            "cacheRead": 101172859,
-            "cacheWrite": 1452125
+            "input": 6722,
+            "output": 294789,
+            "cacheRead": 101475589,
+            "cacheWrite": 1456394
           }
         }
       },
@@ -497,15 +497,15 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 6696,
-          "output": 293079,
-          "cacheRead": 101172859,
-          "cacheWrite": 1452125
+          "input": 6722,
+          "output": 294789,
+          "cacheRead": 101475589,
+          "cacheWrite": 1456394
         }
       },
       "costAtCloseOut": {
-        "usd": 32.208504,
-        "pricingAsOf": "2026-09-16T18:24:33.956Z"
+        "usd": 32.25269,
+        "pricingAsOf": "2026-09-16T18:25:45.569Z"
       }
     },
     "merges": [
