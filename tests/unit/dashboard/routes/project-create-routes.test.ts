@@ -19,15 +19,6 @@ const routeMocks = vi.hoisted(() => ({
   resolveProjectCreateIntent: vi.fn(),
   performProjectCreate: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
-  DuplicateProjectError: class DuplicateProjectError extends Error {
-    constructor(
-      public key: string,
-      public existingPath: string,
-    ) {
-      super(`Duplicate project key: ${key}`);
-      this.name = 'DuplicateProjectError';
-    }
-  },
 }));
 
 vi.mock('../../../../src/lib/projects/create.js', () => ({
@@ -42,6 +33,7 @@ vi.mock('../../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
 
 import { projectsRouteLayer } from '../../../../src/dashboard/server/routes/projects.js';
 import { __resetProjectCreateJobsForTests, JOB_TTL_MS } from '../../../../src/dashboard/server/routes/project-create-jobs.js';
+import { DuplicateProjectError } from '../../../../src/lib/project-registration.js';
 
 function makeResolvedIntent(mode: 'clone' | 'existing' | 'new', overrides: Partial<ResolvedProjectIntent> = {}): ResolvedProjectIntent {
   return {
@@ -191,9 +183,7 @@ describe('project-create routes', () => {
     });
 
     it('AC2.2: returns 404 if jobId is empty (route not found)', async () => {
-      const { status } = await requestProjectsRoute('/api/projects/create-jobs/');
-
-      expect(status).toBe(404);
+      await expect(requestProjectsRoute('/api/projects/create-jobs/')).rejects.toThrow(/RouteNotFound/);
     });
 
     it('AC2.3: returns 200 with running job status', async () => {
@@ -381,7 +371,7 @@ describe('project-create routes', () => {
       const intent = makeResolvedIntent('existing');
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
       routeMocks.performProjectCreate.mockRejectedValue(
-        new routeMocks.DuplicateProjectError('test-proj', '/existing/path'),
+        new DuplicateProjectError('test-proj', '/existing/path'),
       );
 
       const { status, body } = await requestProjectsRoute('/api/projects', {
@@ -444,11 +434,14 @@ describe('project-create routes', () => {
       };
 
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      let finish: () => void;
       routeMocks.performProjectCreate.mockImplementation((_, hooks) => {
         // Simulate progress callback
         hooks.onProgress?.({ phase: 'cloning', percent: 50 });
-        // Then resolve with result
-        return Promise.resolve(result);
+        // Return deferred promise that resolves when test calls finish()
+        return new Promise((res) => {
+          finish = () => res(result);
+        });
       });
 
       // Step 1: POST /api/projects → 202 with jobId
@@ -469,8 +462,12 @@ describe('project-create routes', () => {
         percent: 50,
       });
 
-      // Step 3: Advance timers and poll → 200 done
-      await vi.advanceTimersByTimeAsync(100);
+      // Step 3: Finish the deferred promise
+      finish!();
+      // Allow promise chain to settle
+      await new Promise((r) => setImmediate(r));
+
+      // Step 4: Poll again → 200 done
       const doneRes = await requestProjectsRoute(`/api/projects/create-jobs/${jobId}`);
 
       expect(doneRes.status).toBe(200);
