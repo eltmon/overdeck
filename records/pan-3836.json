@@ -238,7 +238,7 @@
     "recordedAt": "2026-09-16T17:17:24.960Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:17:37.269Z",
+  "updated": "2026-09-16T17:19:43.800Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -252,7 +252,7 @@
     "verificationNotes": "Verification FAILED at test (449190ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
-    "reviewRequestedAt": "2026-09-16T17:17:25.780Z",
+    "reviewRequestedAt": "2026-09-16T17:19:43.429Z",
     "reviewSpawnedAt": "2026-09-16T16:51:13.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -350,7 +350,8 @@
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
       "recordedAt": "2026-09-16T17:17:24.960Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-09-16T17:19:43.429Z"
   },
   "closeOut": {
     "usage": {
