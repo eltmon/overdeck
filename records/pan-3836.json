@@ -342,19 +342,19 @@
     "recordedAt": "2026-09-16T18:24:22.598Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T18:39:49.398Z",
+  "updated": "2026-09-16T18:45:41.190Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-09-16T18:25:42.317Z",
-    "updatedAt": "2026-09-16T18:39:49.202Z",
+    "updatedAt": "2026-09-16T18:45:41.110Z",
     "testNotes": "Reconciled from green GitHub Actions CI on fcad7fae: build (22) (https://github.com/eltmon/overdeck/actions/runs/35134130718/job/104922116379)",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Verification FAILED at test (814354ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-16T18:25:42.317Z",
     "reviewSpawnedAt": "2026-09-16T18:23:45.956Z",
@@ -481,10 +481,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 50,
-            "output": 8443,
-            "cacheRead": 4146834,
-            "cacheWrite": 213333
+            "input": 156,
+            "output": 35763,
+            "cacheRead": 17498664,
+            "cacheWrite": 288203
           }
         },
         "work": {
@@ -504,10 +504,10 @@
           "cacheWrite": 227318
         },
         "anthropic/claude-sonnet-5": {
-          "input": 50,
-          "output": 8443,
-          "cacheRead": 4146834,
-          "cacheWrite": 213333
+          "input": 156,
+          "output": 35763,
+          "cacheRead": 17498664,
+          "cacheWrite": 288203
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 6722,
@@ -517,8 +517,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.69992,
-        "pricingAsOf": "2026-09-16T18:39:49.382Z"
+        "usd": 36.830874,
+        "pricingAsOf": "2026-09-16T18:45:41.148Z"
       }
     },
     "merges": [
