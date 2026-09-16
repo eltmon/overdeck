@@ -24,12 +24,13 @@ Registered projects:
 {{PROJECT_LINES}}
 
 For each project:
-1. Per-issue records: `<state root>/records/*.json` when the layout is migrated, otherwise `<state root>/.pan/records/*.json`. Use `updated` to keep records touched after {{WINDOW_START}}. Read `pipeline` (reviewStatus, reviewedAtCommit, reviewSpawnedAt, testStatus, uatStatus, uatNotes, verificationStatus, verificationNotes, mergeStatus, prUrl), `feedback`, `recoveryTrips`, `scopeDrift`, and `sessionHistory` (count review cycles and manual interventions from it).
-2. Review syntheses: `<repo path>/workspaces/*/.pan/review/*/synthesis.md`, and feedback files under `<repo path>/workspaces/*/.overdeck/feedback/`.
-3. Deacon log: `{{OVERDECK_HOME}}/logs/deacon.log`. It is large; filter lines whose bracketed timestamp is at or after {{WINDOW_START}} (for example `awk -F'[][]' '$2 >= "{{WINDOW_START}}"'`) and look for recoveries, re-dispatches, nudges, stuck flags, orphan cleanups, and auto-resumes.
-4. Agent lifecycle logs: `{{OVERDECK_HOME}}/agents/*/lifecycle.log`, plus any spawn failures.
-5. CI: `gh run list --repo <github_repo> --created ">={{WINDOW_START}}"` and the `overdeck/test` status stamps on PRs from `gh pr view <n> --json statusCheckRollup`.
-6. Issues filed in the window: `gh issue list --repo <github_repo> --search "created:>={{WINDOW_START}}" --label pipeline`, and the same for `blocks-main` and `bug`. Use these to link faults to issues that already exist.
+1. Per-issue records — go through the canonical read door (do NOT read the JSON files directly): `pan records show <issue-id> --project <project-key>`, or `pan show <issue-id>`. Treat the record as a cache; the source of truth is the git history plus the dispatcher record. Use `updated` to keep records touched after {{WINDOW_START}}. Read `pipeline` (reviewStatus, reviewedAtCommit, reviewSpawnedAt, testStatus, uatStatus, uatNotes, verificationStatus, verificationNotes, mergeStatus, prUrl), `feedback`, `recoveryTrips`, `scopeDrift`, and `sessionHistory` (count review cycles and manual interventions from it).
+2. Review reports — every review run writes a directory `<repo path>/workspaces/*/.pan/review/<runId>/` containing one file per source. Self-review runs write `review.md`. The convoy writes `correctness.md`, `security.md`, `performance.md`, and `requirements.md`. Older runs may also have `synthesis.md`. Read every `*.md` under that directory, not just the synthesis — that is where ignored findings, blocking verdicts, and contradictions between sub-roles actually live. Tie each report to its run directory's `headSha` (in `context.json`) when citing it.
+3. Feedback files: `<repo path>/workspaces/*/.overdeck/feedback/*.md`. These are written by review and UAT specialists and by operators via the dashboard; they supersede the formal report's verdict when present.
+4. Deacon log: `{{OVERDECK_HOME}}/logs/deacon.log`. It is large; filter lines whose bracketed timestamp is at or after {{WINDOW_START}} (for example `awk -F'[][]' '$2 >= "{{WINDOW_START}}"'`) and look for recoveries, re-dispatches, nudges, stuck flags, orphan cleanups, and auto-resumes.
+5. Agent lifecycle logs: `{{OVERDECK_HOME}}/agents/*/lifecycle.log`, plus any spawn failures.
+6. CI: `gh run list --repo <github_repo> --created ">={{WINDOW_START}}"` and the `overdeck/test` status stamps on PRs from `gh pr view <n> --json statusCheckRollup`.
+7. Issues filed in the window: `gh issue list --repo <github_repo> --search "created:>={{WINDOW_START}}" --label pipeline`, and the same for `blocks-main` and `bug`. Use these to link faults to issues that already exist.
 
 ## Output shape
 

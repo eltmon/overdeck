@@ -101,4 +101,35 @@ describe('retrospective template invariants', () => {
     const mutated = `${template}\n{{UNKNOWN}}\n`;
     expect(() => assertTemplateShape(mutated)).toThrow();
   });
+
+  it('names every current review report form under the evidence inputs (operator review)', () => {
+    // Review runs write self-review to review.md; the convoy writes
+    // correctness/security/performance/requirements.md. Older runs may also
+    // have synthesis.md. The retrospective must surface ALL of these or it
+    // will silently drop the exact findings the report is meant to explain.
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    expect(inputs, RAIL_MESSAGE).not.toBeNull();
+    const inputsSection = inputs![1];
+    for (const report of [
+      'review.md',
+      'correctness.md',
+      'security.md',
+      'performance.md',
+      'requirements.md',
+      '.overdeck/feedback/',
+    ]) {
+      expect(inputsSection, `Expected Inputs to name ${report}. ${RAIL_MESSAGE}`).toContain(report);
+    }
+  });
+
+  it('routes canonical record reads through the read door (operator review)', () => {
+    // Per the canonical-state single-source-of-truth rule, agents must not
+    // read records/*.json directly. The prompt must point at the resolver
+    // (pan records show / pan show).
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    expect(inputs, RAIL_MESSAGE).not.toBeNull();
+    const inputsSection = inputs![1];
+    expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toContain('pan records show');
+    expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toContain('pan show');
+  });
 });
