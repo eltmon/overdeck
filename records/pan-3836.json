@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T16:19:55.844Z",
+  "updated": "2026-09-16T16:20:01.550Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "skill-pan-new-project": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 3883177,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T16:19:55.844Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -216,6 +208,17 @@
         "outcome": "completed",
         "reason": "Documentation updates complete: added section to WORKSPACES-AND-PROJECTS.md, extended CLAUDE.md, updated configuration/projects.mdx, added module header to create.ts, updated pan-new-project skill with dashboard flow",
         "releasedAt": "2026-09-16T16:19:36.674Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3883177,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T16:19:55.844Z",
+        "itemId": "skill-pan-new-project",
+        "outcome": "completed",
+        "reason": "Skill updated to include dashboard entry point at /projects/new with three mode tabs (clone/existing/new), resolve-before-create pattern, and integration with CLI commands",
+        "releasedAt": "2026-09-16T16:20:01.550Z"
       }
     ],
     "statusReasons": {
@@ -270,6 +273,10 @@
       "docs-projects-and-workspaces": {
         "reason": "Documentation updates complete: added section to WORKSPACES-AND-PROJECTS.md, extended CLAUDE.md, updated configuration/projects.mdx, added module header to create.ts, updated pan-new-project skill with dashboard flow",
         "updatedAt": "2026-09-16T16:19:36.674Z"
+      },
+      "skill-pan-new-project": {
+        "reason": "Skill updated to include dashboard entry point at /projects/new with three mode tabs (clone/existing/new), resolve-before-create pattern, and integration with CLI commands",
+        "updatedAt": "2026-09-16T16:20:01.550Z"
       }
     }
   },
@@ -344,6 +351,9 @@
     "docs-projects-and-workspaces.ac1": "completed",
     "docs-projects-and-workspaces.ac2": "completed",
     "docs-projects-and-workspaces.ac3": "completed",
-    "skill-pan-new-project": "running"
+    "skill-pan-new-project": "completed",
+    "skill-pan-new-project.ac1": "completed",
+    "skill-pan-new-project.ac2": "completed",
+    "skill-pan-new-project.ac3": "completed"
   }
 }
