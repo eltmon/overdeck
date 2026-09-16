@@ -136,7 +136,8 @@ async function spawnRunWithoutConsentClaim(
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
       const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model, modelSpawnKey);
-      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: tierParams.model, harness: tierParams.harness }, tierParams.difficulty ? [tierParams.difficulty] : [], [{ id: slot.slotItemId, difficulty: tierParams.difficulty }]);
+      // PAN-3842: warn against the FINAL selected model (slotModel), preserving override precedence.
+      logTierFitnessAtSpawn(slot.agentId, { tierName: tierParams.tierName ?? 'default', model: slotModel, harness: tierParams.harness ?? slotHarness }, tierParams.difficulty ? [tierParams.difficulty] : [], [{ id: slot.slotItemId, difficulty: tierParams.difficulty }]);
       if (tierParams.model) {
         slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
         // Implicit staffing (PAN-2397) omits harness — keep the parent's
@@ -633,11 +634,8 @@ async function spawnAgentWithoutConsentClaim(
     : {};
   const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
-  // PAN-3842: single-work fitness is judged against the plan's maximum
-  // difficulty — the first item selects the tier, but the agent works them all.
-  if (singleTierParams.model) {
-    logTierFitnessAtSpawn(agentId, { tierName: singleTierParams.tierName ?? 'default', model: selectedModel, harness: singleTierParams.harness }, singleTierParams.planDifficulties ?? [], singleTierParams.planItems ?? []);
-  }
+  // PAN-3842: plan-max fitness; log against the FINAL selected model so explicit overrides still warn.
+  logTierFitnessAtSpawn(agentId, { tierName: singleTierParams.tierName ?? 'default', model: selectedModel, harness: singleTierParams.harness }, singleTierParams.planDifficulties ?? [], singleTierParams.planItems ?? []);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
   // CLIProxyAPI sidecar MUST already be running. We only check — never

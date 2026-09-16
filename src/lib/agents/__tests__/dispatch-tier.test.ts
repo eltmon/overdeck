@@ -184,11 +184,17 @@ describe('resolveSlotTierSpawnParams', () => {
     expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual(IMPLICIT_PARAMS_EXPERT);
   });
 
-  it('lets an explicit per-spawn model override outrank tier routing', () => {
+  it('lets an explicit per-spawn model override outrank tier routing (PAN-3842: surfaces difficulty for fitness warn)', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-sonnet-5')).toEqual({});
+    // Override precedence preserved: tier-resolved model/harness stay unset
+    // so the spawn path keeps options.model as the FINAL selected model.
+    // Difficulty is still surfaced so the caller can warn.
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-sonnet-5')).toEqual({
+      difficulty: 'expert',
+      explicitOverride: 'claude-sonnet-5',
+    });
   });
 
   it('falls through to the implicit roles.work tier for an unlabeled item (PAN-2397)', () => {
@@ -307,13 +313,20 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     });
   });
 
-  it('lets an explicit per-spawn model override outrank single work-agent tier routing', () => {
+  it('lets an explicit per-spawn model override outrank single work-agent tier routing (PAN-3842: surfaces difficulty for fitness warn)', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
       planItem('frontier', { difficulty: 'expert' }),
     ]));
 
-    expect(resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5')).toEqual({});
+    // Override precedence preserved: tier-resolved model/harness stay unset
+    // so the spawn path keeps options.model as the FINAL selected model.
+    // Plan difficulty info is still surfaced so the caller can warn.
+    expect(resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5')).toEqual({
+      explicitOverride: 'claude-sonnet-5',
+      planDifficulties: ['expert'],
+      planItems: [{ id: 'frontier', difficulty: 'expert' }],
+    });
   });
 });
 
@@ -464,13 +477,113 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
       expect(lines).toEqual([]);
     });
 
-    it('returns {} for an explicit per-spawn model override, so no fitness line is logged', () => {
+    it('returns plan difficulties but no model/harness for an explicit per-spawn model override (PAN-3842)', () => {
       mockPan3836Config();
-      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('first', { difficulty: 'simple' })]));
-      const params = resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5');
-      expect(params).toEqual({});
-      // spawn.ts guards the log call on singleTierParams.model — {} skips it.
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('first', { difficulty: 'simple' }),
+        planItem('mid', { difficulty: 'medium' }),
+        planItem('hard', { difficulty: 'complex' }),
+      ]));
+      const params = resolveSingleWorkTierSpawnParams('/ws', 'claude-haiku-4-5');
+      // Override precedence preserved: no tier-resolved model/harness so the
+      // spawn path keeps options.model as the FINAL selected model.
       expect(params.model).toBeUndefined();
+      expect(params.harness).toBeUndefined();
+      expect(params.tierName).toBeUndefined();
+      expect(params.explicitOverride).toBe('claude-haiku-4-5');
+      // Difficulty info is still surfaced so the caller can warn against the
+      // FINAL selected (explicit) model.
+      expect(params.planDifficulties).toEqual(['simple', 'medium', 'complex']);
+      expect(params.planItems?.map((i) => i.id)).toEqual(['first', 'mid', 'hard']);
+    });
+
+    it('warns (does not block) when an explicit small model runs an expert plan via the single-work path', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('first', { difficulty: 'simple' }),
+        planItem('hard', { difficulty: 'expert' }),
+      ]));
+      const params = resolveSingleWorkTierSpawnParams('/ws', 'claude-haiku-4-5');
+      // Simulate the spawn caller using the FINAL selected model (the
+      // explicit override), which is what determines the fitness verdict.
+      const lines: string[] = [];
+      logTierFitnessAtSpawn(
+        'agent-1',
+        { tierName: params.tierName ?? 'default', model: 'claude-haiku-4-5', harness: params.harness },
+        params.planDifficulties ?? [],
+        params.planItems ?? [],
+        (l) => lines.push(l),
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('expert');
+      expect(lines[0]).toContain('small-class');
+      expect(lines[0]).toContain('hard');
+      // Warn, never block: no error is thrown and the spawn proceeds.
+    });
+
+    it('does not warn when an explicit model fits every pending item difficulty', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('first', { difficulty: 'simple' }),
+        planItem('mid', { difficulty: 'medium' }),
+        planItem('hard', { difficulty: 'complex' }),
+      ]));
+      // Frontier model explicitly picked for a plan whose hardest item is
+      // complex — fitness should not warn.
+      const params = resolveSingleWorkTierSpawnParams('/ws', 'claude-opus-4-8');
+      const lines: string[] = [];
+      logTierFitnessAtSpawn(
+        'agent-1',
+        { tierName: params.tierName ?? 'default', model: 'claude-opus-4-8', harness: params.harness },
+        params.planDifficulties ?? [],
+        params.planItems ?? [],
+        (l) => lines.push(l),
+      );
+      expect(lines).toEqual([]);
+    });
+
+    it('warns (does not block) when an explicit small model runs an expert slot item', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('task-x', { difficulty: 'expert' }),
+      ]));
+      const tierParams = resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-haiku-4-5');
+      // Override precedence preserved: no tier-resolved model.
+      expect(tierParams.model).toBeUndefined();
+      expect(tierParams.explicitOverride).toBe('claude-haiku-4-5');
+      // Difficulty is surfaced so the spawn caller can warn.
+      expect(tierParams.difficulty).toBe('expert');
+      // The spawn caller passes the FINAL selected (explicit) model to the
+      // log function; the warning fires without blocking.
+      const lines: string[] = [];
+      logTierFitnessAtSpawn(
+        'agent-slot',
+        { tierName: tierParams.tierName ?? 'default', model: 'claude-haiku-4-5', harness: tierParams.harness },
+        tierParams.difficulty ? [tierParams.difficulty] : [],
+        [{ id: 'task-x', difficulty: tierParams.difficulty }],
+        (l) => lines.push(l),
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('expert');
+      expect(lines[0]).toContain('small-class');
+      expect(lines[0]).toContain('task-x');
+    });
+
+    it('does not warn when an explicit frontier model fits an expert slot item', () => {
+      mockPan3836Config();
+      vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+        planItem('task-x', { difficulty: 'expert' }),
+      ]));
+      const tierParams = resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-opus-4-8');
+      const lines: string[] = [];
+      logTierFitnessAtSpawn(
+        'agent-slot',
+        { tierName: tierParams.tierName ?? 'default', model: 'claude-opus-4-8', harness: tierParams.harness },
+        tierParams.difficulty ? [tierParams.difficulty] : [],
+        [{ id: 'task-x', difficulty: tierParams.difficulty }],
+        (l) => lines.push(l),
+      );
+      expect(lines).toEqual([]);
     });
   });
 });

@@ -231,6 +231,11 @@ export interface SlotTierSpawnParams {
    * Implicit staffing intentionally omits `harness` so the spawn keeps its
    * historical harness handling (provider-default derived from the model). */
   implicit?: boolean;
+  /** PAN-3842: when the caller passed an explicit per-spawn model override,
+   * the helpers still surface plan difficulty info but leave `model` and
+   * `harness` unset so override precedence is preserved. This field echoes
+   * the override for clarity in tests and logs. */
+  explicitOverride?: string;
 }
 
 /**
@@ -254,9 +259,6 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  // An explicit per-spawn model override outranks all staffing (same
-  // precedence as determineModel).
-  if (explicitModel) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
@@ -283,6 +285,17 @@ export function resolveSlotTierSpawnParams(
       );
     }
     return {};
+  }
+
+  // PAN-3842: even with an explicit override, still surface the item's
+  // declared difficulty so the spawn caller can warn against the FINAL
+  // selected model. Override precedence is preserved by leaving model and
+  // harness unset — spawn.ts uses options.model unchanged in that case.
+  if (explicitModel) {
+    return {
+      difficulty: item.metadata?.difficulty as XBriefDifficulty | undefined,
+      explicitOverride: explicitModel,
+    };
   }
 
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
@@ -343,19 +356,35 @@ export function resolveSingleWorkTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  if (explicitModel) return {};
-
   const doc = readWorkspacePlanSync(workspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
   const item = getDispatchableItems(doc, new Set())[0];
-  if (!item) return {};
 
   // Extract issueId from workspace path: feature-<issueId>
   const workspaceName = basename(workspace);
   const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
   const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
+
+  // PAN-3842: even with an explicit override, gather plan difficulty info so
+  // the spawn caller can warn against the FINAL selected model. Override
+  // precedence is preserved — model and harness stay unset when an explicit
+  // override is present, and the spawn path uses options.model unchanged.
+  if (explicitModel) {
+    const pending = doc.plan.items.filter((candidate) => !['completed', 'cancelled'].includes(candidate.status));
+    const planDifficulties = [...new Set(pending.map((candidate) => candidate.metadata?.difficulty).filter((d): d is XBriefDifficulty => Boolean(d)))];
+    const planItems = pending
+      .filter((candidate) => candidate.metadata?.difficulty)
+      .map((candidate) => ({ id: candidate.id, difficulty: candidate.metadata?.difficulty as XBriefDifficulty | undefined }));
+    return {
+      planDifficulties,
+      planItems,
+      explicitOverride: explicitModel,
+    };
+  }
+
+  if (!item) return {};
 
   // PAN-2397 (Always Tiered): the single-work path staffs through the same
   // resolver as slots — explicit table when enabled, implicit roles.work
