@@ -233,21 +233,21 @@
     "recordedAt": "2026-09-16T17:17:24.960Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:17:24.962Z",
+  "updated": "2026-09-16T17:17:25.782Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:17:02.646Z",
+    "updatedAt": "2026-09-16T17:17:25.780Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (449190ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "591e9a2c9dce1f416de36efb302cac64e710ee46",
-    "reviewRequestedAt": "2026-09-16T17:00:34.461Z",
+    "reviewRequestedAt": "2026-09-16T17:17:25.780Z",
     "reviewSpawnedAt": "2026-09-16T16:51:13.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -264,7 +264,6 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "tests/unit/cli/project-create-commands.test.ts",
         "tests/unit/dashboard/routes/projects-create-routes.test.ts",
         "tests/unit/lib/projects/create-perform.test.ts"
@@ -319,6 +318,7 @@
         "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewProjectModal.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
         "src/dashboard/frontend/src/components/Header.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "src/dashboard/frontend/src/components/project/new/__tests__/useProjectCreateIntent.test.ts",
         "src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts",
         "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
@@ -344,7 +344,7 @@
         "tests/unit/lib/projects/create-intent.test.ts",
         "tests/unit/lib/projects/repo-url.test.ts"
       ],
-      "recordedAt": "2026-09-16T16:59:55.905Z"
+      "recordedAt": "2026-09-16T17:17:24.960Z"
     }
   },
   "closeOut": {
