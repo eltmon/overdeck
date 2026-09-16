@@ -282,17 +282,18 @@
     "recordedAt": "2026-09-16T17:31:53.759Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-16T17:36:17.782Z",
+  "updated": "2026-09-16T17:44:26.475Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T17:33:32.952Z",
+    "updatedAt": "2026-09-16T17:44:26.394Z",
     "reviewNotes": "WI-4 hook tests all timeout at head (fake-timer deadlock); unskip commit's fix doesn't hold — repair tests, re-skipping not a fix",
+    "verificationNotes": "Verification FAILED at test (426650ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "9f068a6947b0b583d557d496badec8af9d2979f0",
     "reviewRequestedAt": "2026-09-16T17:31:54.635Z",
@@ -400,10 +401,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5-1": {
-            "input": 66,
-            "output": 3785,
-            "cacheRead": 1554118,
-            "cacheWrite": 11022
+            "input": 262,
+            "output": 10287,
+            "cacheRead": 5831186,
+            "cacheWrite": 26825
           }
         },
         "plan": {
@@ -416,30 +417,30 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4941,
-            "output": 221475,
-            "cacheRead": 75227549,
-            "cacheWrite": 1075282
+            "input": 5281,
+            "output": 232162,
+            "cacheRead": 79522988,
+            "cacheWrite": 1173907
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5-1": {
-          "input": 872,
-          "output": 50935,
-          "cacheRead": 5844258,
-          "cacheWrite": 202877
+          "input": 1068,
+          "output": 57437,
+          "cacheRead": 10121326,
+          "cacheWrite": 218680
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4941,
-          "output": 221475,
-          "cacheRead": 75227549,
-          "cacheWrite": 1075282
+          "input": 5281,
+          "output": 232162,
+          "cacheRead": 79522988,
+          "cacheWrite": 1173907
         }
       },
       "costAtCloseOut": {
-        "usd": 20.914879,
-        "pricingAsOf": "2026-09-16T17:33:32.955Z"
+        "usd": 26.323147,
+        "pricingAsOf": "2026-09-16T17:44:26.430Z"
       }
     },
     "merges": [
@@ -448,7 +449,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
