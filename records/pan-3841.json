@@ -32,6 +32,11 @@
       "reason": "resume",
       "agentModel": "k3",
       "timestamp": "2026-09-16T21:13:31.797Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "MiniMax-M3",
+      "timestamp": "2026-09-16T21:18:01.748Z"
     }
   ],
   "feedback": [],
@@ -87,7 +92,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T21:18:00.115Z",
+  "updated": "2026-09-16T21:18:01.748Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "failed",
