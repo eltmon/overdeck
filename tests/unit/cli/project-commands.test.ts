@@ -20,7 +20,7 @@ vi.mock('../../../src/lib/projects/create.js', () => ({
   performProjectCreate: mockPerformProjectCreate,
 }));
 
-import { projectAddTargetCommand, projectAddCommand } from '../../../src/cli/commands/project.js';
+import { projectAddTargetCommand, projectAddCommand, projectCloneCommand } from '../../../src/cli/commands/project.js';
 import { getProjectByKey, listProjectTargets } from '../../../src/lib/workspaces/resolver.js';
 
 let odb: OverdeckTestDb;
@@ -143,6 +143,120 @@ describe('pan project add (PAN-3836: resolve-before-create)', () => {
     expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
     expect(mockPerformProjectCreate).toHaveBeenCalled();
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('✓ Added project'));
+  });
+});
+
+describe('pan project clone (PAN-3836: clone support)', () => {
+  let consoleLogSpy: any;
+  let stderrSpy: any;
+
+  beforeEach(() => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => 0);
+    mockResolveProjectCreateIntent.mockClear();
+    mockPerformProjectCreate.mockClear();
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+
+  it('WI-3.1: --dry-run validates URL without cloning', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'clone',
+      key: 'orca',
+      name: 'Orca',
+      path: null,
+      findings: [],
+      isGitRepository: true,
+      wouldClone: true,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: 'https://github.com/stablyai/orca.git',
+      provider: 'github',
+      repoSlug: 'stablyai/orca',
+      defaultBranch: 'main',
+      remoteChecked: true,
+      proposedIssuePrefix: 'ORCA',
+    });
+
+    await projectCloneCommand('stablyai/orca', { dryRun: true });
+
+    expect(mockResolveProjectCreateIntent).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'clone',
+      url: 'stablyai/orca',
+      refreshRemote: true,
+    }));
+    expect(mockPerformProjectCreate).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('dry-run'));
+  });
+
+  it('WI-3.2: shows findings if validation fails', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'clone',
+      key: null,
+      name: '',
+      path: null,
+      findings: [
+        {
+          field: 'url',
+          code: 'url-invalid',
+          message: 'Invalid URL format',
+        },
+      ],
+      isGitRepository: true,
+      wouldClone: false,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: null,
+      provider: null,
+      repoSlug: null,
+      defaultBranch: null,
+      remoteChecked: false,
+      proposedIssuePrefix: null,
+    });
+
+    await projectCloneCommand('not-a-url');
+
+    expect(mockPerformProjectCreate).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Validation issues'));
+  });
+
+  it('WI-3.3: clones and registers with progress updates', async () => {
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'clone',
+      key: 'orca',
+      name: 'Orca',
+      path: '/home/test/Projects/orca',
+      findings: [],
+      isGitRepository: true,
+      wouldClone: true,
+      wouldGitInit: false,
+      willCreateMainWorkspace: false,
+      cloneUrl: 'https://github.com/stablyai/orca.git',
+      provider: 'github',
+      repoSlug: 'stablyai/orca',
+      defaultBranch: 'main',
+      remoteChecked: true,
+      proposedIssuePrefix: 'ORCA',
+    });
+
+    mockPerformProjectCreate.mockResolvedValue({
+      key: 'orca',
+      name: 'Orca',
+      path: '/home/test/Projects/orca',
+      mainWorkspaceId: 'ws-123',
+    });
+
+    await projectCloneCommand('stablyai/orca');
+
+    expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
+    expect(mockPerformProjectCreate).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ onProgress: expect.any(Function) })
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('✓ Cloned and registered'));
   });
 });
 

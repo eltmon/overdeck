@@ -232,6 +232,83 @@ export async function projectAddCommand(
   console.log(chalk.dim('Documentation: https://github.com/eltmon/overdeck#what-your-project-needs-to-provide'));
 }
 
+interface CloneOptions {
+  parent?: string;
+  name?: string;
+  issuePrefix?: string;
+  dryRun?: boolean;
+}
+
+export async function projectCloneCommand(
+  url: string,
+  options: CloneOptions = {}
+): Promise<void> {
+  // Step 1: Resolve intent with network probe
+  const input: ProjectCreateInput = {
+    mode: 'clone',
+    url,
+    parentDir: options.parent,
+    name: options.name,
+    issuePrefix: options.issuePrefix,
+    homeBoundary: false, // CLI does not enforce home directory boundary
+    refreshRemote: true,
+  };
+
+  const intent = await resolveProjectCreateIntent(input);
+
+  // Show findings if there are any
+  if (intent.findings.length > 0) {
+    console.log(chalk.yellow('\nValidation issues:'));
+    for (const finding of intent.findings) {
+      console.log(chalk.red(`  ✗ ${finding.field}: ${finding.message}`));
+      if (finding.detail) {
+        console.log(chalk.dim(`    ${finding.detail}`));
+      }
+    }
+    console.log('');
+    return;
+  }
+
+  // Step 2: Dry-run mode - stop after validation
+  if (options.dryRun) {
+    console.log(chalk.blue('\n✓ Validation passed (dry-run mode)'));
+    console.log(chalk.dim(`  Key: ${intent.key}`));
+    console.log(chalk.dim(`  Clone URL: ${intent.cloneUrl}`));
+    console.log(chalk.dim(`  Target: ${intent.path}`));
+    console.log(chalk.dim(`  Repository: ${intent.repoSlug || '(unknown)'}`));
+    console.log('');
+    return;
+  }
+
+  // Step 3: Perform the actual clone
+  console.log('');
+  try {
+    const result = await performProjectCreate(intent, {
+      onProgress: (progress) => {
+        if (progress.percent !== null) {
+          process.stderr.write(`\r${progress.phase}: ${progress.percent}%`);
+        } else {
+          process.stderr.write(`\r${progress.phase}...`);
+        }
+      },
+    });
+
+    process.stderr.write('\n');
+    console.log(chalk.green(`✓ Cloned and registered: ${result.name}`));
+    console.log(chalk.dim(`  Key: ${result.key}`));
+    console.log(chalk.dim(`  Path: ${result.path}`));
+    console.log('');
+  } catch (err) {
+    if (err instanceof DuplicateProjectError) {
+      console.log(chalk.yellow(`Project already registered with key: ${err.key}`));
+      console.log(chalk.dim(`Existing path: ${err.existingPath}`));
+      console.log(chalk.dim(`To update, first run: pan project remove ${err.key}`));
+      return;
+    }
+    throw err;
+  }
+}
+
 interface ListOptions {
   json?: boolean;
 }
@@ -422,6 +499,15 @@ export function registerProjectCommands(command: Command): void {
     .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
     .option('--dry-run', 'Validate without creating (resolve-before-create pattern)')
     .action(projectAddCommand);
+
+  command
+    .command('clone <url>')
+    .description('Clone a GitHub or GitLab repository and register it as a project')
+    .option('--parent <dir>', 'Parent directory (default: ~/Projects)')
+    .option('--name <name>', 'Project name (default: repository name)')
+    .option('--issue-prefix <prefix>', 'Issue prefix (default: derived from the name)')
+    .option('--dry-run', 'Print the resolved intent as JSON and create nothing')
+    .action(projectCloneCommand);
 
   command
     .command('list')
