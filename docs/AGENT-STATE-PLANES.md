@@ -28,12 +28,18 @@ canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable
 completion is never silently lost to a stale workspace-local copy.
 
-Record writes hold the per-issue fs lock across the state-worktree commit and
-push, bounded by `OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default 30s,
+Record writes hold the per-issue fs lock — and the per-issue state git lock,
+keyed `gitRoot::ISSUE` since PAN-3848 — across the read-mutate-write-commit
+only; the push runs after both locks are released, so a slow network push
+never starves a peer issue's writer (F1). The commit wait stays bounded by
+`OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default 30s,
 PAN-2989): on expiry the writer rejects with `RecordDurabilityTimeoutError`
 and releases the lock, keeps the mutation in the local record (no
 restore-on-timeout — the raced flush may still land), and never aborts the
-shared-gitRoot flush of peer writers. A verdict write that cannot take the
+shared-gitRoot flush of peer writers. A push-race reconcile (fetch, merge
+`origin/overdeck-state`, re-push) likewise runs after the locks; the reconcile
+verifies the caller's mutation survived the merge and re-applies it if a
+peer's batched record was resolved `--theirs` over it. A verdict write that cannot take the
 lock in time falls back to `<workspace>/.overdeck/pipeline-verdict.json`;
 `drainWorkspaceVerdictFallback()` folds that fallback into the canonical
 record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
