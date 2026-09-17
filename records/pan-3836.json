@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:52:45.542Z",
+  "updated": "2026-09-17T01:52:54.863Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 53,
+    "sequence": 54,
     "claims": {},
     "claimHistory": [
       {
@@ -931,8 +931,8 @@
         "updatedAt": "2026-09-17T01:52:34.605Z"
       },
       "create-job-store": {
-        "reason": "Job store implementation complete with all acceptance criteria and tests passing",
-        "updatedAt": "2026-09-16T14:53:17.289Z"
+        "reason": "WI-2 revised: operation table, cancellation, deadlines",
+        "updatedAt": "2026-09-17T01:52:54.863Z"
       },
       "project-create-routes": {
         "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
@@ -996,11 +996,11 @@
     "create-core-perform.ac3": "completed",
     "create-core-perform.ac4": "completed",
     "create-core-perform.ac5": "completed",
-    "create-job-store": "completed",
-    "create-job-store.ac1": "completed",
-    "create-job-store.ac2": "completed",
-    "create-job-store.ac3": "completed",
-    "create-job-store.ac4": "completed",
+    "create-job-store": "pending",
+    "create-job-store.ac1": "pending",
+    "create-job-store.ac2": "pending",
+    "create-job-store.ac3": "pending",
+    "create-job-store.ac4": "pending",
     "project-create-routes": "completed",
     "project-create-routes.ac1": "completed",
     "project-create-routes.ac2": "completed",
