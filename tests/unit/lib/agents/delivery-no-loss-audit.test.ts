@@ -59,7 +59,7 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/deacon-api-recovery.ts|// respawn (resumeAgent({compact:true})): the wedged session is',
   'lib/cloister/deacon-api-recovery.ts|const recovered = await resumeAgent(sessionName, undefined, { compact: true });',
   'lib/cloister/deacon-api-recovery.ts|const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });',
-  'lib/cloister/verification-runner.ts|await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   'lib/cloister/service-reactive.ts|send: (target, message) => deliverAgentMessage(target, message, \'hook:post-compact-continuation\'),',
   'lib/cloister/service-reactive.ts|? (await import(\'../agents/messaging.js\')).messageAgent(',
   'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
