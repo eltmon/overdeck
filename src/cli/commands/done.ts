@@ -281,15 +281,26 @@ export function computeScopeDrift(
   };
 }
 
-async function recordScopeDriftForDone(
+/** Exported for tests (PAN-3847 done-scope-drift). */
+export async function recordScopeDriftForDone(
   issueId: string,
   workspacePath: string,
 ): Promise<ScopeDriftRecord | undefined> {
   try {
     const plan = readWorkspacePlanSync(workspacePath);
     if (!plan) return undefined;
+    // PAN-3847 (FR-15): scope drift diffs against a freshly fetched
+    // origin/<target>, never a remembered local ref. The fetch is best-effort.
+    const projectConfig = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
+    const { getSyncTargetBranch } = await import('../../lib/cloister/verification-runner.js');
+    const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, undefined);
+    try {
+      await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
+    } catch (fetchErr: any) {
+      console.warn(`[pan done] git fetch origin ${targetBranch} failed; scope drift diffs against the cached ref: ${fetchErr?.message ?? fetchErr}`);
+    }
     const actualChangedFiles = await Effect.runPromise(
-      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
+      changedFilesVsMain('HEAD', workspacePath, `origin/${targetBranch}`).pipe(Effect.provide(childProcessLayer)),
     );
     const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
     if (!drift) return undefined;

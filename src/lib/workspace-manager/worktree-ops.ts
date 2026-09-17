@@ -148,8 +148,16 @@ export async function createWorktree(
   defaultBranch: string = 'main'
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Fetch latest from origin
-    await execAsync('git fetch origin', { cwd: repoPath });
+    // PAN-3847 (FR-15): fetch the target so the new branch is cut from
+    // origin/<default>, not a possibly-stale local ref. Offline falls back to
+    // the local ref with a warning naming the risk.
+    let baseRef = `origin/${defaultBranch}`;
+    try {
+      await execAsync(`git fetch origin ${defaultBranch}`, { cwd: repoPath });
+    } catch (fetchErr) {
+      console.warn(`[worktree] git fetch origin ${defaultBranch} failed; cutting ${branchName} from LOCAL ${defaultBranch} — it may be stale or ahead of origin: ${fetchErr instanceof Error ? fetchErr.message : fetchErr}`);
+      baseRef = defaultBranch;
+    }
 
     // Prune stale worktree entries (e.g., from deleted workspaces)
     await execAsync('git worktree prune', { cwd: repoPath });
@@ -167,8 +175,8 @@ export async function createWorktree(
     if (branchExists) {
       await execAsync(`git worktree add "${targetPath}" "${branchName}"`, { cwd: repoPath });
     } else {
-      // Create new branch from the configured default branch
-      await execAsync(`git worktree add -b "${branchName}" "${targetPath}" "${defaultBranch}"`, { cwd: repoPath });
+      // Create new branch from the fetched origin ref of the default branch
+      await execAsync(`git worktree add -b "${branchName}" "${targetPath}" "${baseRef}"`, { cwd: repoPath });
     }
 
     await installPreRebaseHook(targetPath);

@@ -324,7 +324,7 @@ function buildSyncFailureFeedback(
   return { summary, feedbackBody };
 }
 
-function getSyncTargetBranch(
+export function getSyncTargetBranch(
   workspacePath: string,
   projectConfig: ReturnType<typeof findProjectByPathSync>,
   repoName?: string,
