@@ -45,6 +45,7 @@ import {
   readJsonBody,
   spawnPanCommandDetached,
 } from './shared.js';
+import { claimAgentStart, releaseAgentStart } from './spawn-helpers.js';
 
 function pendingDecisionError(
   agentId: string,
@@ -572,20 +573,15 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       harness: effectiveHarness,
     }));
 
-    // Spawn detached `pan start` — same pattern the existing POST /api/agents
-    // route uses, minus the HTTP hop. We deliberately write a placeholder
-    // state.json (matching the existing spawn flow) so the dashboard
-    // transitions the agent from "stopped" to "starting" within one refresh.
-    saveAgentStateSync({
-      id: agentSessionName,
-      issueId,
-      workspace: workspacePath,
-      harness: effectiveHarness ?? 'claude-code',
-      role: 'work',
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-    });
+    // Spawn detached `pan start` — the POST /api/agents pattern minus the
+    // HTTP hop. PAN-3849 (W34): no placeholder row; the in-flight claim
+    // serializes concurrent spawns (see spawn-helpers.ts).
+    if (!claimAgentStart(agentSessionName)) {
+      return jsonResponse({
+        success: false,
+        error: `Agent ${agentSessionName} is already starting or running.`, code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
 
     try {
       yield* Effect.promise(() => spawnPanCommandDetached({
@@ -597,6 +593,8 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
         cwd: workspacePath,
       }));
     } catch (err: any) {
+      // The dir wipe above removed the old state; restore an honest stopped
+      // row so the agent stays visible when the launch itself failed.
       saveAgentStateSync({
         id: agentSessionName,
         issueId,
@@ -615,6 +613,8 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
         details,
         wiped: wipeResult.removed,
       }, { status: 500 });
+    } finally {
+      releaseAgentStart(agentSessionName);
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_requested_complete', {

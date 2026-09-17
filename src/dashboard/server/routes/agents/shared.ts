@@ -298,12 +298,11 @@ function buildStoppedAgentLifecycle(
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';
   const isCompleted = runtimeData.resolution === 'completed';
-  const isPlaceholder = agentStatus === 'starting' && typeof state.model === 'string' && state.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
   const isRunning = false;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   const isRunningButStuck = false;
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = typeof state.id === 'string' && state.id.length > 0
     ? hasCompletionMarkerForAgent(state as AgentState)
     : false;
@@ -312,7 +311,7 @@ function buildStoppedAgentLifecycle(
   const canWarmResumeAfterHandoff = owesRework && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
 
@@ -323,7 +322,7 @@ function buildStoppedAgentLifecycle(
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
   } else if (canWarmResumeAfterHandoff) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
@@ -350,7 +349,6 @@ function buildStoppedAgentLifecycle(
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,

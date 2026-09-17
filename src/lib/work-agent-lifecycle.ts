@@ -49,7 +49,6 @@ export interface WorkAgentLifecycleState {
   hasSavedSession: boolean;
   hasResumableTranscript: boolean;
   hasWorkspace: boolean;
-  isPlaceholder: boolean;
   isOrphaned: boolean;
   isRunning: boolean;
   /** Agent has a live tmux session and running status, but its runtime is idle or
@@ -113,21 +112,20 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
-  const isPlaceholder = !!agentState && agentStatus === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
-  const isRunning = (agentStatus === 'running' || isPlaceholder) && hasLiveTmuxSession;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunning = agentStatus === 'running' && hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   // Running-but-stuck: live session + running status, but the runtime is idle or suspended
   // (e.g. the model returned errors and stopped producing output). The tmux session exists but
   // the agent is no longer making progress — it needs a resume, not a message.
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
   const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   // A saved resumable session is never discarded by a plain start. The explicit
   // --fresh intent is evaluated by assertCanStartFreshSync before the state wipe.
@@ -160,7 +158,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = sessionResetRequiredReason(agentId, agentOrIssueId);
@@ -182,7 +180,6 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,
@@ -223,18 +220,17 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
-  const isPlaceholder = !!agentState && agentStatus === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
-  const isRunning = (agentStatus === 'running' || isPlaceholder) && hasLiveTmuxSession;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunning = agentStatus === 'running' && hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
   const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   // A saved resumable session is never discarded by a plain start. The explicit
   // --fresh intent is evaluated by assertCanStartFreshSync before the state wipe.
@@ -267,7 +263,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = sessionResetRequiredReason(agentId, agentOrIssueId);
@@ -289,7 +285,6 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,

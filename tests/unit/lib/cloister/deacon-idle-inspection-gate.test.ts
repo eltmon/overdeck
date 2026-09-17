@@ -102,7 +102,6 @@ vi.mock('../../../../src/lib/cloister/boot-reconciliation.js', () => ({
 vi.mock('../../../../src/lib/cloister/boot-reconciliation-predicates.js', () => ({ bootReconciliationSkipReason: vi.fn() }));
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({ getBootReconciliationState: vi.fn(() => ({})) }));
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({ captureTranscriptUserRecordSnapshot: vi.fn() }));
-vi.mock('../../../../src/lib/agents/placeholder-reconciliation.js', () => ({ reconcileLiveWorkSpawnPlaceholder: vi.fn() }));
 vi.mock('../../../../src/lib/cloister/confirmed-session-query.js', () => ({
   consumeConfirmedSessionDetail: vi.fn(),
   queryConfirmedSession: vi.fn(),

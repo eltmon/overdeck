@@ -298,8 +298,8 @@ describe('work-agent-lifecycle', () => {
     sessionExistsSpy.mockRestore();
   });
 
-  it('treats placeholder agents with missing live session as orphaned and fresh-startable', () => {
-    const agentId = getUniqueAgentId('placeholder-orphan');
+  it('PAN-3849: a starting agent with no live session is fresh-startable (no placeholder concept)', () => {
+    const agentId = getUniqueAgentId('starting-no-session');
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
 
@@ -317,8 +317,11 @@ describe('work-agent-lifecycle', () => {
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
-    expect(lifecycle.isPlaceholder).toBe(true);
-    expect(lifecycle.isOrphaned).toBe(true);
+    // No placeholder classification anymore: a 'starting' row with a workspace
+    // and no live session is simply not orphaned and offers a fresh start.
+    expect(lifecycle.hasAgentState).toBe(true);
+    expect(lifecycle.hasLiveTmuxSession).toBe(false);
+    expect(lifecycle.isOrphaned).toBe(false);
     expect(lifecycle.canStartFresh).toBe(true);
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('start');

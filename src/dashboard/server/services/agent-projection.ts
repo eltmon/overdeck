@@ -17,7 +17,6 @@ import { getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
 import { stateToOverdeckParamsForDb, AGENT_COLUMNS_FOR_DB } from '../../../lib/overdeck/agent-state-sync.js';
 import { getEventStore, type EventStore, type StoredEvent } from '../event-store.js';
 import { getAgentStateSync, writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
-import { WORK_LAUNCHER_GRACE_MS } from '../../../lib/cloister/agent-grace.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import { getWorkspaceForIssue } from '../../../lib/workspaces/resolver.js';
 import type { DomainEvent } from '@overdeck/contracts';
@@ -167,115 +166,6 @@ export function saveAgentStateAndEmitEventWithDeps(
     rollbackTransaction(db);
     throw err;
   }
-}
-
-export type AgentStartPlaceholderClaim =
-  | { claimed: true }
-  | { claimed: false; reason: 'live-session' | 'active-state' };
-
-/**
- * Claim the single in-flight work-spawn slot and project its starting state.
- * The SQLite write lock makes the status check and placeholder insert one
- * operation, so concurrent dashboard requests cannot both launch `pan start`.
- */
-export function claimAgentStartPlaceholderWithDeps(
-  db: SqliteDatabase,
-  eventStore: AgentProjectionEventStore,
-  state: AgentState,
-  event: Omit<DomainEvent, 'sequence'>,
-  hasLiveTmuxSession: boolean,
-): AgentStartPlaceholderClaim {
-  if (hasLiveTmuxSession) return { claimed: false, reason: 'live-session' };
-
-  prepareAgentStateForSave(state);
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const current = db.prepare(
-      `SELECT status, started_at AS startedAt FROM agents WHERE id = ?`,
-    ).get(state.id) as { status: string; startedAt: number | null } | undefined;
-    const startingWithinGrace = current?.status === 'starting'
-      && current.startedAt !== null
-      && Date.now() - current.startedAt < WORK_LAUNCHER_GRACE_MS;
-    if (current?.status === 'running' || startingWithinGrace) {
-      rollbackTransaction(db);
-      return { claimed: false, reason: 'active-state' };
-    }
-
-    writeAgentStateJsonSync(state);
-    const rows = writeProjectionRows(db, state, event);
-    db.exec('COMMIT');
-    emitCommittedProjection(eventStore, state, event, rows);
-    return { claimed: true };
-  } catch (err) {
-    rollbackTransaction(db);
-    throw err;
-  }
-}
-
-export function claimAgentStartPlaceholderProgram(
-  state: AgentState,
-  event: Omit<DomainEvent, 'sequence'>,
-  hasLiveTmuxSession: boolean,
-): Effect.Effect<AgentStartPlaceholderClaim> {
-  return Effect.sync(() => claimAgentStartPlaceholderWithDeps(
-    getOverdeckDatabaseSync(),
-    getEventStore(),
-    state,
-    event,
-    hasLiveTmuxSession,
-  ));
-}
-
-/**
- * Roll back only the placeholder owned by this failed spawn attempt. If the
- * agent has already advanced to a real running state, the compare fails and
- * the successful concurrent launch is left untouched.
- */
-export function rollbackAgentStartPlaceholderWithDeps(
-  db: SqliteDatabase,
-  eventStore: AgentProjectionEventStore,
-  placeholder: AgentState,
-  fallback: AgentState,
-  event: Omit<DomainEvent, 'sequence'>,
-): boolean {
-  prepareAgentStateForSave(fallback);
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const current = db.prepare(
-      `SELECT status, model, started_at AS startedAt FROM agents WHERE id = ?`,
-    ).get(placeholder.id) as { status: string; model: string | null; startedAt: number | null } | undefined;
-    const placeholderStartedAt = new Date(placeholder.startedAt).getTime();
-    const ownsPlaceholder = current?.status === 'starting'
-      && current.model === 'pending-work-spawn'
-      && current.startedAt === placeholderStartedAt;
-    if (!ownsPlaceholder) {
-      rollbackTransaction(db);
-      return false;
-    }
-
-    writeAgentStateJsonSync(fallback);
-    const rows = writeProjectionRows(db, fallback, event);
-    db.exec('COMMIT');
-    emitCommittedProjection(eventStore, fallback, event, rows);
-    return true;
-  } catch (err) {
-    rollbackTransaction(db);
-    throw err;
-  }
-}
-
-export function rollbackAgentStartPlaceholderProgram(
-  placeholder: AgentState,
-  fallback: AgentState,
-  event: Omit<DomainEvent, 'sequence'>,
-): Effect.Effect<boolean> {
-  return Effect.sync(() => rollbackAgentStartPlaceholderWithDeps(
-    getOverdeckDatabaseSync(),
-    getEventStore(),
-    placeholder,
-    fallback,
-    event,
-  ));
 }
 
 // ─── PTY-supervisor lifecycle events (PAN-3849 W33) ─────────────────────────

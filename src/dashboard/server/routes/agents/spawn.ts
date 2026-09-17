@@ -38,10 +38,6 @@ import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import {
-  claimAgentStartPlaceholderProgram,
-  rollbackAgentStartPlaceholderProgram,
-} from '../../services/agent-projection.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
@@ -65,7 +61,7 @@ import {
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
 } from './shared.js';
-import { buildAgentStartPlaceholder, handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
+import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, releaseAgentStart } from './spawn-helpers.js';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function orderDispatchConflict(decision: OrderDispatchEligibility): {
@@ -848,32 +844,14 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Containers already ready or no containers needed. Claim the spawn before
     // launching `pan start`: two requests can pass the lifecycle read together,
-    // but only one may atomically write the starting placeholder.
-    const placeholderStartedAt = new Date().toISOString();
-    const { state: placeholderState, event: placeholderEvent } = buildAgentStartPlaceholder({
-      agentSessionName,
-      issueId,
-      workspacePath,
-      role,
-      effectiveHarness,
-      startedBy,
-      allowHost,
-      startedAt: placeholderStartedAt,
-    });
-    const hasLiveTmuxSession = yield* sessionExists(agentSessionName).pipe(
-      Effect.catch(() => Effect.succeed(true)),
-    );
-    const placeholderClaim = yield* claimAgentStartPlaceholderProgram(
-      placeholderState,
-      placeholderEvent,
-      hasLiveTmuxSession,
-    );
-    if (!placeholderClaim.claimed) {
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_blocked', {
+    // but only one may hold the in-flight claim (PAN-3849 W34: an in-process
+    // set, not a placeholder row — agent state is written only when the child
+    // writes its real state after the tmux session exists).
+    if (!claimAgentStart(agentSessionName)) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_in_flight_blocked', {
         issueId,
         role,
         workspacePath,
-        reason: placeholderClaim.reason,
       }));
       return jsonResponse({
         error: `Agent ${agentSessionName} is already starting or running.`,
@@ -881,12 +859,6 @@ export const postAgentsRoute = HttpRouter.add(
       }, { status: 409 });
     }
 
-    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_created', {
-      issueId,
-      role,
-      workspacePath,
-      startedAt: placeholderStartedAt,
-    }));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
       role,
@@ -912,29 +884,13 @@ export const postAgentsRoute = HttpRouter.add(
         activityId,
       });
     } catch (error: any) {
-      const initialStateIsPlaceholder = initialAgentState?.model.startsWith('pending-') === true;
-      const fallbackState: AgentState = initialAgentState && !initialStateIsPlaceholder
-        ? { ...initialAgentState }
-        : {
-            ...placeholderState,
-            model: spawnModel,
-            status: 'stopped',
-            stoppedAt: new Date().toISOString(),
-          };
-      const rolledBack = yield* rollbackAgentStartPlaceholderProgram(placeholderState, fallbackState, {
-        type: 'agent.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: agentSessionName,
-          status: fallbackState.status,
-          previousStatus: 'starting',
-          hasLiveTmuxSession: false,
-        },
-      });
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_rollback', {
+      // Nothing to roll back (PAN-3849 W34): no placeholder was written, so a
+      // failed spawn leaves whatever state existed before — usually none — and
+      // a later `pan start` proceeds fresh instead of being refused by a
+      // stranded 'pending-' placeholder row (F2).
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_spawn_failed', {
         issueId,
-        rolledBack,
-        fallbackStatus: fallbackState.status,
+        message: error instanceof Error ? error.message : String(error),
       }));
       invalidateAgentsCache();
 
@@ -983,6 +939,8 @@ export const postAgentsRoute = HttpRouter.add(
         error: output.trim() || `Failed to start agent for ${issueId}`,
         activityId: error?.activityId,
       }, { status: 500 });
+    } finally {
+      releaseAgentStart(agentSessionName);
     }
 
     updateRegistryForAgentStart(issueId, workspacePath, agentSessionName);

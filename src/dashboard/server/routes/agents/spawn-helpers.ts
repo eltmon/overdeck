@@ -47,49 +47,33 @@ type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
 
 type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
 
-export function buildAgentStartPlaceholder(input: {
-  agentSessionName: string;
-  issueId: string;
-  workspacePath: string;
-  role: Role;
-  effectiveHarness: PlaceholderHarness;
-  startedBy: string;
-  allowHost: boolean;
-  startedAt: string;
-}) {
-  const state: AgentState = {
-    id: input.agentSessionName,
-    issueId: input.issueId,
-    workspace: input.workspacePath,
-    role: input.role,
-    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
-    model: 'pending-work-spawn',
-    status: 'starting',
-    startedAt: input.startedAt,
-    startedBy: input.startedBy,
-    hostOverride: input.allowHost || undefined,
-  };
-  return {
-    state,
-    event: {
-      type: 'agent.started' as const,
-      timestamp: input.startedAt,
-      payload: {
-        agentId: input.agentSessionName,
-        issueId: input.issueId,
-        agent: {
-          id: input.agentSessionName,
-          issueId: input.issueId,
-          workspace: input.workspacePath,
-          status: 'starting' as const,
-          startedAt: input.startedAt,
-          role: input.role,
-          startedBy: input.startedBy,
-          ...(input.effectiveHarness ? { runtime: input.effectiveHarness } : {}),
-        },
-      },
-    },
-  };
+/**
+ * PAN-3849 (W34): the single in-flight work-spawn claim is an in-process set.
+ * The retired placeholder row (state.json + agents row with a
+ * 'pending-' model literal) existed only to serialize concurrent spawn requests
+ * through SQLite; the dashboard is one process, so a Set is the honest gate
+ * (FR-24: agent state is written only after the tmux session exists — there
+ * are no placeholders). The route claims before `spawnPanCommand` and
+ * releases in `finally`; a dashboard restart clears the set, which is
+ * correct — a restart also kills the detached child. The residual
+ * launch-to-session window is covered by the CLI's own guard (spawnAgent
+ * throws on a duplicate tmux session name).
+ */
+const startsInFlight = new Set<string>();
+
+export function claimAgentStart(agentSessionName: string): boolean {
+  if (startsInFlight.has(agentSessionName)) return false;
+  startsInFlight.add(agentSessionName);
+  return true;
+}
+
+export function releaseAgentStart(agentSessionName: string): void {
+  startsInFlight.delete(agentSessionName);
+}
+
+/** Test hook: clear all in-flight claims (a dashboard restart does this). */
+export function resetAgentStartsInFlight(): void {
+  startsInFlight.clear();
 }
 
 export function buildContainerStartState(input: {

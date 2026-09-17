@@ -42,7 +42,6 @@ import {
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
-import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 import { buildInspectionBlockedNudge, getBlockingMandatoryInspection } from './idle-nudge-inspection.js';
@@ -178,8 +177,10 @@ export async function handleAgentHeartbeatDeadEvent(
       try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
       logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead planning pane ${agentId} (${verdict.reason})`);
     } else {
-      const action = await reconcileLiveWorkSpawnPlaceholder(state, deps.notifyAgentStatusChanged);
-      return action ? [action] : [];
+      // Work agent with a live tmux session and running/starting status: not
+      // orphaned. (The placeholder-reconciliation special case is gone with
+      // the placeholders themselves — PAN-3849 W34.)
+      return [];
     }
   } else if (state.status === 'starting') {
     // PAN-1256: work agents in `starting` status need a startup grace
