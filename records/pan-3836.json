@@ -461,18 +461,18 @@
     "recordedAt": "2026-09-17T02:33:56.035Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:37:23.742Z",
+  "updated": "2026-09-17T02:42:15.196Z",
   "pipeline": {
     "issueId": "PAN-3836",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T02:37:18.685Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-09-17T02:42:15.147Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed lint: broke the project-create-routes <-> projects.ts import cycle by moving readProjectJsonBody into its own module",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
     "verificationNotes": "Verification FAILED at lint (86364ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
@@ -602,10 +602,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5-1": {
-            "input": 2056,
-            "output": 60196,
-            "cacheRead": 34429096,
-            "cacheWrite": 199798
+            "input": 2186,
+            "output": 62613,
+            "cacheRead": 35769237,
+            "cacheWrite": 206146
           }
         },
         "plan": {
@@ -675,10 +675,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5-1": {
-          "input": 2862,
-          "output": 107346,
-          "cacheRead": 38719236,
-          "cacheWrite": 391653
+          "input": 2992,
+          "output": 109763,
+          "cacheRead": 40059377,
+          "cacheWrite": 398001
         },
         "custom/MiniMax-M3": {
           "input": 4761158,
@@ -700,8 +700,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 75.942335,
-        "pricingAsOf": "2026-09-17T02:37:23.734Z"
+        "usd": 77.483978,
+        "pricingAsOf": "2026-09-17T02:42:15.187Z"
       }
     },
     "merges": [
