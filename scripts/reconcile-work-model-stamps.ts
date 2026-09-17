@@ -130,13 +130,17 @@ async function main(): Promise<void> {
     // Re-check inside the door: the record may have changed since the scan, and
     // only the exact stamped model this run listed may be cleared.
     await updateIssueRecord(entry.project, entry.issueId, (record) => {
-      if (record.workModel && (!only || record.workModel === only)) {
+      if (record.workModel === entry.workModel) {
         delete record.workModel;
       }
     });
     const after = readIssueRecordSync(entry.project, entry.issueId);
-    if (!after?.workModel) cleared += 1;
-    console.log(`cleared ${entry.projectKey}:${entry.issueId} (was ${entry.workModel})`);
+    if (!after?.workModel) {
+      cleared += 1;
+      console.log(`cleared ${entry.projectKey}:${entry.issueId} (was ${entry.workModel})`);
+    } else {
+      console.log(`skipped ${entry.projectKey}:${entry.issueId} — workModel is now ${after.workModel}, not the scanned ${entry.workModel}`);
+    }
   }
   console.log(`\nCleared workModel on ${cleared}/${stamped.length} record(s).`);
 }
