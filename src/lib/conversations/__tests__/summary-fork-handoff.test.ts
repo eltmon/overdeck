@@ -13,6 +13,7 @@ import { resetDiscoveredSessionsSchemaBootstrap } from '../../overdeck/discovere
 import { sessionFilePath } from '../../paths.js';
 import { createHandoffPaths } from '../handoff-paths.js';
 import {
+  HandoffAuthorModelNotConfiguredError,
   HandoffStallError,
   authorHandoffExternal,
   createSummaryFork,
@@ -21,6 +22,32 @@ import {
   validateHandoffDoc,
 } from '../summary-fork.js';
 import { access } from 'node:fs/promises';
+
+// PAN-3860: the machine running these tests may have a real
+// ~/.overdeck/config.yaml with conversations.handoff_author_model set
+// (OVERDECK_HOME is frozen at module-load time in src/lib/paths.ts, so
+// per-test HOME/OVERDECK_HOME env overrides do NOT redirect global config
+// reads). Force handoffAuthorModel to undefined here so the
+// "not configured" test below is deterministic regardless of the real
+// operator config — no test in this file relies on the config-driven
+// fallback resolving to a real value; every external-authoring call here
+// passes an explicit model.
+vi.mock('../../config-yaml.js', async () => {
+  const actual = await vi.importActual<typeof import('../../config-yaml.js')>('../../config-yaml.js');
+  return {
+    ...actual,
+    loadConfigSync: () => {
+      const real = actual.loadConfigSync();
+      return {
+        ...real,
+        config: {
+          ...real.config,
+          conversations: { ...real.config.conversations, handoffAuthorModel: undefined },
+        },
+      };
+    },
+  };
+});
 import { deliverAgentMessage } from '../../agents.js';
 
 vi.mock('../../agents.js', () => ({
@@ -531,6 +558,24 @@ describe('authorHandoffExternal', { timeout: 20_000 }, () => {
     // otherwise `--permission-mode auto` stalls on a permission prompt it can
     // never answer and the fork silently degrades to a summary.
     expect(callArgs?.[4]).toEqual(['Write']);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('fails loudly with HandoffAuthorModelNotConfiguredError when no model is given and conversations.handoff_author_model is unset (PAN-3860)', { timeout: 20_000 }, async () => {
+    const home = join(tmpdir(), `pan-handoff-no-model-configured-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
+    // mockedRunModelSummary is a plain module-level vi.fn(), not reset
+    // between `it` blocks — clear so an earlier test's call doesn't leak in.
+    vi.mocked(mockedRunModelSummary).mockClear();
+
+    await expect(
+      authorHandoffExternal(source, sourceFile, 'just continue', undefined, 'claude-code'),
+    ).rejects.toThrow(HandoffAuthorModelNotConfiguredError);
+    await expect(
+      authorHandoffExternal(source, sourceFile, 'just continue', undefined, 'claude-code'),
+    ).rejects.toThrow(/no handoff author model configured.*conversations\.handoff_author_model/);
+    expect(mockedRunModelSummary).not.toHaveBeenCalled();
     rmSync(home, { recursive: true, force: true });
   });
 

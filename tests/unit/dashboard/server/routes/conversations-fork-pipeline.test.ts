@@ -8,6 +8,12 @@ import { sessionFilePath } from '../../../../../src/lib/paths.js';
 
 vi.mock('../../../../../src/lib/conversations/summary-fork.js', async () => {
   const { vi } = await import('vitest');
+  // PAN-3860: re-export the real HandoffAuthorModelNotConfiguredError class
+  // (not re-declared) so `error instanceof HandoffAuthorModelNotConfiguredError`
+  // in conversation-forks.ts keeps working against this mocked module.
+  const actual = await vi.importActual<typeof import('../../../../../src/lib/conversations/summary-fork.js')>(
+    '../../../../../src/lib/conversations/summary-fork.js',
+  );
   return {
     generateSummaryForFork: vi.fn(),
     generateFallbackSummary: vi.fn(),
@@ -25,6 +31,7 @@ vi.mock('../../../../../src/lib/conversations/summary-fork.js', async () => {
       if (!focus?.trim()) return summary;
       return `FOCUS:${focus}:${fallbackReason}\n${summary}`;
     }),
+    HandoffAuthorModelNotConfiguredError: actual.HandoffAuthorModelNotConfiguredError,
   };
 });
 
@@ -32,6 +39,7 @@ const {
   authorHandoffExternal,
   generateFallbackSummary,
   generateSummaryForFork,
+  HandoffAuthorModelNotConfiguredError,
 } = await import('../../../../../src/lib/conversations/summary-fork.js');
 
 const { runForkPipeline, buildForkRequest, handleForkPipelineFailure } = forksModule;
@@ -205,6 +213,40 @@ describe('runForkPipeline fallback resilience', () => {
     );
     const fork = getConversationByName('fork-conv')!;
     expect(fork.forkFallbackReason).toBeTruthy();
+  });
+
+  it('does NOT fall back to a plain summary when no handoff author model is configured — propagates instead (PAN-3860)', async () => {
+    const { parentConv } = await createParentAndFork();
+    vi.mocked(authorHandoffExternal).mockRejectedValue(new HandoffAuthorModelNotConfiguredError());
+    // These are plain vi.fn() module mocks (not vi.spyOn), so their call
+    // history persists across `it` blocks in this describe — clear before
+    // asserting "not called" so an earlier test's fallback call doesn't
+    // produce a false failure here.
+    vi.mocked(generateSummaryForFork).mockClear();
+    vi.mocked(generateFallbackSummary).mockClear();
+    const { ensureSpy, injectSpy } = stubSpawnAndInject();
+
+    await expect(
+      runForkPipeline(
+        'fork-conv',
+        parentConv,
+        'session-id',
+        undefined,
+        'handoff',
+        false,
+        undefined,
+        undefined,
+        'focus text',
+        'external',
+      ),
+    ).rejects.toThrow(HandoffAuthorModelNotConfiguredError);
+
+    // A missing model config is an operator error, not a transient authoring
+    // failure — the pipeline must never silently degrade to a plain summary.
+    expect(generateSummaryForFork).not.toHaveBeenCalled();
+    expect(generateFallbackSummary).not.toHaveBeenCalled();
+    expect(ensureSpy).not.toHaveBeenCalled();
+    expect(injectSpy).not.toHaveBeenCalled();
   });
 });
 

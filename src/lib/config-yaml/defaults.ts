@@ -63,11 +63,12 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
-    // PAN-3860: the previous authoring default lived as a private literal
-    // inside summary-fork.ts, bypassing config entirely. Centralizing it here
-    // preserves the same behavior for un-configured installs while making it
-    // an operator-settable value like compactionModel/titleModel.
-    handoffAuthorModel: 'claude-sonnet-4-6',
+    // PAN-3860: deliberately no default here (unlike compactionModel/
+    // titleModel above) — the previous default lived as a private literal in
+    // summary-fork.ts, which is exactly the hardcoded-fallback pattern the
+    // repo bans. Leaving this unset means an operator who hasn't configured
+    // `conversations.handoff_author_model` gets a loud failure from
+    // `pan handoff`, not a silently-chosen model.
     watchDirs: ['~/Projects'],
     scanMaxParallel: null,
     embeddings: false,
