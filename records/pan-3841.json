@@ -161,25 +161,25 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:24:29.744Z",
+  "updated": "2026-09-17T01:25:35.778Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:24:28.927Z",
-    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "updatedAt": "2026-09-17T01:25:35.706Z",
+    "reviewNotes": "Cycle-5 re-applies the canonical-read-door evidence bridge (bf27cbe) and adds a docs commit (ffb32f). Net new substantive code vs cycle 4: zero. CodeRabbit surfaced 3 advisory findings (err.message leak, EVIDENCE_LIMITS caps, scopeDrift.truncated underreporting) — all non-blocking, all at ? severity.",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
-    "reviewedAtCommit": "bf27cbe09fc5d26dc43bdb997c44fcaaa9eefd6d",
+    "reviewedAtCommit": "ffb32f54751e36d9b70d79f850df62bb61936161",
     "lastVerifiedCommit": "1199e01ffef113ab3c9aa9498b9931123eb2c898",
-    "reviewRequestedAt": "2026-09-17T01:23:43.461Z",
     "reviewSpawnedAt": "2026-09-17T01:23:47.681Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -251,9 +251,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 3528306,
-            "output": 124989,
-            "cacheRead": 23216384,
+            "input": 3545092,
+            "output": 141213,
+            "cacheRead": 25000192,
             "cacheWrite": 0
           }
         },
@@ -320,9 +320,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 9001527,
-          "output": 291000,
-          "cacheRead": 106057557,
+          "input": 9018313,
+          "output": 307224,
+          "cacheRead": 107841365,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -333,8 +333,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 37.9281584,
-        "pricingAsOf": "2026-09-17T01:24:29.736Z"
+        "usd": 37.9526614,
+        "pricingAsOf": "2026-09-17T01:25:35.753Z"
       }
     },
     "merges": [
