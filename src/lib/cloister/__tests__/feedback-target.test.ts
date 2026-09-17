@@ -16,8 +16,17 @@ vi.mock('fs', async (importOriginal) => ({
   existsSync: (path: string) => filesystem.existingPaths.has(String(path)),
 }));
 vi.mock('../../tmux.js', () => ({
-  sessionExists: (name: string) => Effect.succeed(tmux.liveSessions.has(name)),
   listSessionNames: () => Effect.succeed([...tmux.liveSessions]),
+}));
+
+// PAN-3849: feedback routing reads liveness from the single oracle — map the
+// fixture's liveSessions set to the same verdicts the old mock produced.
+vi.mock('../../agents/liveness.js', () => ({
+  isAlive: (name: string) => Promise.resolve(
+    tmux.liveSessions.has(name)
+      ? { alive: true, paneAlive: true }
+      : { alive: false, reason: 'no-session' },
+  ),
 }));
 
 vi.mock('../../projects.js', () => ({
