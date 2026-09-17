@@ -10,6 +10,7 @@ import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
 import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
@@ -225,6 +226,26 @@ export async function messageAgent(
 ): Promise<MessageDeliveryOutcome> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
+
+  // PAN-3879: conversations (conv-*) have no agents/<id>/state.json, so the
+  // harness must come from the conversation row — the same resolver the
+  // dashboard message path uses. Without this, expectedHarness falls back to
+  // claude-code and a live acp-host/codex pane reads as a zombie, and the
+  // guard below calls resumeAgent, which refuses conversations outright.
+  // Lazy import: overdeck/conversations.js deliberately avoids the agents
+  // graph (import-cycle comment at its call site), and this keeps the
+  // agent hot path import graph unchanged.
+  const isConversationTarget = normalizedId.startsWith('conv-');
+  let conversationHarness: RuntimeName | undefined;
+  if (isConversationTarget && !agentState) {
+    try {
+      const { getConversationByName } = await import('../overdeck/conversations.js');
+      conversationHarness = getConversationByName(normalizedId)?.harness ?? undefined;
+    } catch {
+      // The conversations store may be unavailable in minimal installs or
+      // tests — fall through to the agent-state default below.
+    }
+  }
 
   // PAN-2668: pipeline feedback that owes rework (failed verification/review)
   // is a re-drive, not a casual message. Consult the intent policy so the
@@ -520,7 +541,7 @@ export async function messageAgent(
     return { delivered: true, queuedToMail: true };
   }
 
-  const expectedHarness = agentState?.harness ?? 'claude-code';
+  const expectedHarness = agentState?.harness ?? conversationHarness ?? 'claude-code';
 
   let appServerState: string | undefined;
   try {
@@ -572,20 +593,34 @@ export async function messageAgent(
   // as live if any descendant is the expected runtime for the saved harness.
   const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
   if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
-    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
-    if (opts.dedupKey !== undefined) {
-      return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
-    }
-    const { resumeAgent } = await import('../agents.js');
-    const resumeResult = await resumeAgent(normalizedId, message);
-    if (resumeResult.success) {
-      const delivered = resumeResult.messageDelivered !== false;
-      if (delivered) {
-        await appendTellInterventionForUserSource(normalizedId, caller);
+    // PAN-3879: resumeAgent requires agent state plus a resumable session
+    // pointer and refuses conv- ids outright — never call it on a
+    // conversation. For opencode/acp/codex targets the delivery door already
+    // routes by harness (ACP fails loudly on a dead socket instead of typing
+    // into a dead shell), so skip the guard and hand off.
+    if (isConversationTarget) {
+      if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
+        console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime — skipping the zombie resume and handing off to the harness delivery door`);
+        logAgentLifecycleSync(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
+      } else {
+        throw new Error(`Conversation ${normalizedId} tmux session is dead (no ${expectedHarness} runtime in its pane) and conversations cannot be resumed by pan tell — resume it from the dashboard, then send again.`);
       }
-      return { delivered, queuedToMail: false };
+    } else {
+      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
+      if (opts.dedupKey !== undefined) {
+        return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
+      }
+      const { resumeAgent } = await import('../agents.js');
+      const resumeResult = await resumeAgent(normalizedId, message);
+      if (resumeResult.success) {
+        const delivered = resumeResult.messageDelivered !== false;
+        if (delivered) {
+          await appendTellInterventionForUserSource(normalizedId, caller);
+        }
+        return { delivered, queuedToMail: false };
+      }
+      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
     }
-    throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
   // Codex's notify hook writes turn-completed at every idle boundary. Claiming

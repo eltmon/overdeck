@@ -111,6 +111,18 @@ export async function hasAgentRuntimeInSubtree(rootPid: string, harness: Runtime
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
       if (expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'))) return true;
+      // PAN-3879: codex app-server sessions exec `node dist/codex-app-server-host.js`,
+      // so the pane process comm is `node`, not `codex`. Match the host script in
+      // the full command line — matching bare `node` would false-positive on any
+      // node child in the subtree.
+      if (harness === 'codex' && name === 'node') {
+        try {
+          const { stdout: args } = await execAsync(`ps -p ${pid} -o args=`);
+          if (args.includes('codex-app-server-host')) return true;
+        } catch {
+          // Fall through to the child scan below.
+        }
+      }
     } catch {
       continue;
     }

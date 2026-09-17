@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   logAgentLifecycleSync: vi.fn(),
   resumeAgent: vi.fn(),
   getLatestSessionIdSync: vi.fn(),
+  hasAgentRuntimeInSubtree: vi.fn(),
+  getConversationByName: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
   getReviewStatusFromDbSync: vi.fn(() => null),
@@ -78,9 +80,13 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
   getCodexLauncherFields: vi.fn(),
   getOhmypiLauncherFields: vi.fn(),
   getRoleRuntimeBaseCommand: vi.fn(),
-  hasAgentRuntimeInSubtree: vi.fn(),
+  hasAgentRuntimeInSubtree: mocks.hasAgentRuntimeInSubtree,
   getCodexAppServerStatus: mocks.getCodexAppServerStatus,
   waitForPromptReady: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/overdeck/conversations.js', () => ({
+  getConversationByName: mocks.getConversationByName,
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({
@@ -158,12 +164,17 @@ describe('messageAgent', () => {
     });
     mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
+    mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
+    mocks.getConversationByName.mockReturnValue(null);
   });
 
   afterEach(() => {
     rmSync('/tmp/agent-pan-2262', { recursive: true, force: true });
     rmSync('/tmp/agent-pan-2701', { recursive: true, force: true });
     rmSync('/tmp/conv-20260716-1234', { recursive: true, force: true });
+    rmSync('/tmp/conv-20260917-1267', { recursive: true, force: true });
+    rmSync('/tmp/conv-20260917-1300', { recursive: true, force: true });
+    rmSync('/tmp/conv-20260917-1400', { recursive: true, force: true });
   });
 
   it('delivers to a troubled agent when its tmux session is live', async () => {
@@ -404,6 +415,106 @@ describe('messageAgent', () => {
       undefined,
     );
     expect(mocks.sessionExists).not.toHaveBeenCalled();
+  });
+
+  describe('conversation harness routing (PAN-3879)', () => {
+    // Conversations have no agents/<id>/state.json, so messageAgent must
+    // resolve the harness from the conversation row. The idle wait is mocked,
+    // so no fake timers are needed for these paths.
+    function mockLiveConvPane() {
+      mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
+      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
+    }
+
+    it('resolves an opencode conversation harness from the conversation row', async () => {
+      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
+      mockLiveConvPane();
+      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
+
+      const outcome = await messageAgent('conv-20260917-1267', 'steer this session', 'pan-tell');
+
+      // The subtree probe runs against the conversation harness (acp-host
+      // lives), not the claude-code fallback.
+      expect(mocks.hasAgentRuntimeInSubtree).toHaveBeenCalledWith('4242', 'opencode');
+      expect(mocks.resumeAgent).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'conv-20260917-1267',
+        'steer this session',
+        'messageAgent:pan-tell',
+        undefined,
+      );
+      expect(outcome).toEqual({ delivered: true, queuedToMail: true, confirmed: false });
+    });
+
+    it('skips the zombie resume for an opencode conversation and hands off to delivery', async () => {
+      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
+      mockLiveConvPane();
+      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+
+      const outcome = await messageAgent('conv-20260917-1267', 'steer this session', 'pan-tell');
+
+      expect(mocks.resumeAgent).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'conv-20260917-1267',
+        'steer this session',
+        'messageAgent:pan-tell',
+        undefined,
+      );
+      expect(outcome.delivered).toBe(true);
+    });
+
+    it('skips the zombie resume for a codex conversation (PAN-2546/PAN-2580 class)', async () => {
+      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1300', harness: 'codex' });
+      mockLiveConvPane();
+      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+
+      const outcome = await messageAgent('conv-20260917-1300', 'steer this session', 'pan-tell');
+
+      expect(mocks.resumeAgent).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'conv-20260917-1300',
+        'steer this session',
+        'messageAgent:pan-tell',
+        undefined,
+      );
+      expect(outcome.delivered).toBe(true);
+    });
+
+    it('still resumes a claude-code agent whose runtime exited', async () => {
+      mocks.getAgentStateSync.mockReturnValue({
+        id: 'agent-pan-2262',
+        issueId: 'PAN-2262',
+        status: 'running',
+        workspace: '/repo',
+        harness: 'claude-code',
+        sessionId: 'session-2262',
+      });
+      mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
+      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
+      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+      mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
+
+      const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+
+      expect(mocks.getConversationByName).not.toHaveBeenCalled();
+      expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-2262', 'review feedback');
+      expect(outcome).toEqual({ delivered: true, queuedToMail: false });
+    });
+
+    it('fails loudly for a dead claude-code conversation without calling resume', async () => {
+      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1400', harness: 'claude-code' });
+      mockLiveConvPane();
+      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+
+      await expect(messageAgent('conv-20260917-1400', 'operator message', 'pan-tell'))
+        .rejects.toThrow('cannot be resumed by pan tell');
+      expect(mocks.resumeAgent).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    });
   });
 
   describe('confirmed turn for running Claude Code agents (PAN-3846)', () => {
