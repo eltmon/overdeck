@@ -110,7 +110,7 @@ describe('role definitions', () => {
     expect(dispatcher).not.toContain('--agent .claude/agents/${subRole}.md');
   });
 
-  it('defines the review role as convoy synthesis with no merge authority', () => {
+  it('defines mode-neutral review standards with no merge authority', () => {
     const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/review.md'));
 
     expect(frontmatter).toMatchObject({
@@ -124,9 +124,11 @@ describe('role definitions', () => {
     // intentionally absent from the tools list.
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
     expect((frontmatter.tools as string[])).not.toContain('Agent');
-    expect(body).toContain('You are the review synthesis agent');
+    expect(body).toContain('The current dispatch supplies your mode');
+    expect(body).not.toContain('CURRENT MODE: SELF-REVIEW');
+    expect(body).not.toContain('STANDBY');
+    expect(body).not.toContain('wait for the four convoy reviewers');
     expect(body).toContain('pan review spawn-reviewer');
-    expect(body.toLowerCase()).toContain('poll');
     expect(body.toLowerCase()).toContain('approve');
     expect(body.toLowerCase()).toContain('changes requested');
     expect(body).toContain('Review never merges');

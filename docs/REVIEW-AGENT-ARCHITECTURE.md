@@ -43,6 +43,46 @@ point, so manual requests, automatic dispatch, and recovery use the same mode.
 | `full` | The review parent plus the four-lane convoy run in parallel; the parent writes `synthesis.md`. |
 | `none` | AI review is skipped, but the verification quality floor still applies. |
 
+The shared `roles/review.md` is mode-neutral: it supplies evidence, severity,
+coverage, verification, and reporting standards. `buildSelfReviewPrompt` supplies
+only the combined-review workflow. `buildReviewRolePrompt` supplies the full-mode
+wait/signals/synthesis workflow. Quick review never receives instructions to
+wait for a convoy and then an override telling it to ignore them.
+
+Combined review applies explicit correctness, security, performance, and
+requirements/UX checklists. Reviewers finish assigned coverage and a second pass
+before signaling, distinguish implementation from specification defects, and
+trace real callers before reporting a helper-probe failure as a product bug.
+The report records changed-file coverage and acceptance-criterion evidence,
+including whether tests exercise real entry points and run in normal gates.
+There are no per-commit finding caps. New evidence of a real blocker remains
+reportable on later cycles, with an explanation of why it was missed earlier.
+The mechanical non-convergence escalation below is unchanged.
+
+Reviewers reuse successful verification for the exact reviewed HEAD or run
+focused checks. Overdeck TypeScript/Effect/compiler changes require the Effect
+diagnostic ratchet; documentation/style-only changes can mark it not applicable.
+This does not disable any CI or pipeline verification gate. Probe fixtures must
+be isolated from live operator state.
+
+### Prompt refactor no-loss audit
+
+| Previous obligation | Current home |
+| --- | --- |
+| Mode and output file selection | Mode-specific dispatch in `review-agent.ts` |
+| Full-mode wait, four terminal signals, failure handling, early-read exception | `buildReviewRolePrompt` only |
+| Stale-signal guard and exact run ID | Full dispatch; preserved |
+| PR scope, prior review evidence, deduplication, severity | Shared `roles/review.md` |
+| Report head/base, findings, convoy status, AC coverage | Shared report contract plus full dispatch |
+| One completion signal, contention fallback, Pi sentinel | Shared role plus exact dispatch commands |
+| No merge, no delegation, no host lifecycle changes, no test dispatch | Shared role boundaries |
+| Notify orchestration before a silent stall | Shared role; preserved |
+| Arbitrary blocker-count cap and hiding previously missed blockers | Deliberately removed; evidence determines severity |
+| Four specialist scope/checklists and completion contracts | Existing specialist templates, with evidence and coverage additions |
+
+Focused tests in `review-agent.test.ts`, `role-definitions.test.ts`, and
+`code-review-agent-definitions.test.ts` guard mode separation and these contracts.
+
 A full review never substitutes a prior report for a fresh convoy lane. If rework
 changes code, the next full review runs every lane again.
 

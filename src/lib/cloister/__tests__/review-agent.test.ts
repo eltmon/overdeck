@@ -112,7 +112,7 @@ vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
 }));
 
-import { purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
+import { buildReviewRolePrompt, purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
 
 describe('spawnReviewRoleForIssue', () => {
   beforeEach(() => {
@@ -150,6 +150,40 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
     mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+  });
+
+  it('dispatches quick review without convoy wait instructions', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-quick-contract',
+      branch: 'feature/pan-1194',
+    }));
+    expect(result.success).toBe(true);
+    const options = mocks.spawnRun.mock.calls[0][2];
+    const prompt = options.prompt;
+    expect(prompt).toContain('sole reviewer');
+    expect(prompt).toContain('second coverage pass');
+    expect(prompt).toContain('AC evidence');
+    expect(prompt).not.toContain('STANDBY');
+    expect(prompt).not.toContain('REVIEWER_READY');
+    expect(prompt).not.toContain('synthesis.md');
+  });
+
+  it('keeps convoy wait, failure, and report obligations in the full dispatch', () => {
+    const prompt = buildReviewRolePrompt({
+      issueId: 'PAN-1194', workspace: '/tmp/full', branch: 'feature/pan-1194',
+      runId: 'run-full', reviewDir: '/tmp/full/review', contextManifestPath: '/tmp/context.json',
+    });
+    expect(prompt).toContain('STANDBY');
+    expect(prompt).toContain('REVIEWER_READY');
+    expect(prompt).toContain('REVIEWER_FAILED');
+    expect(prompt).toContain('REVIEWER_TIMEOUT');
+    expect(prompt).toContain('block approval');
+    expect(prompt).toContain('Operator-requested early reads');
+    expect(prompt).toContain('STALE-SIGNAL GUARD');
+    expect(prompt).toContain('synthesis.md');
+    expect(prompt).toContain('--run-id "run-full"');
+    expect(prompt).not.toContain('sole reviewer');
   });
 
   it('inherits host override from the completed work agent for the review spawn', async () => {
