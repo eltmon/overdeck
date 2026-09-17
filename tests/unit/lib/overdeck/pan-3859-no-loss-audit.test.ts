@@ -48,4 +48,15 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     expect(typeof mod.detectComplexity).toBe('function');
     expect(typeof mod.parseDifficultyLabel).toBe('function');
   });
+
+  it('W6: the deprecated generateRouterConfig is gone; the work-types variant survives', async () => {
+    // generateRouterConfig (@deprecated, zero callers) was the last consumer of
+    // settings.models.complexity. writeRouterConfig(Sync) and
+    // generateRouterConfigFromWorkTypes remain.
+    const mod = await import('../../../../src/lib/router-config.js');
+    expect('generateRouterConfig' in mod).toBe(false);
+    expect(typeof mod.generateRouterConfigFromWorkTypes).toBe('function');
+    expect(typeof mod.writeRouterConfigSync).toBe('function');
+    expect(typeof mod.getRouterConfigPath).toBe('function');
+  });
 });
