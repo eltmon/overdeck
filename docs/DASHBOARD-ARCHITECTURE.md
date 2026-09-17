@@ -74,11 +74,26 @@ its own. The button therefore sends `dashboardMutationJsonHeaders()`, with no
 argument: that helper resolves a WebSocket RPC URL internally, so passing it a
 relative REST path would throw in `new URL(...)`.
 
-The kickoff prompt locates per-issue records under the `state root` the server
-already resolved through the canonical state resolver and rendered into
-`{{PROJECT_LINES}}`, in whichever layout that resolver reports for the project
-(migrated, or the legacy layout an unmigrated project still uses — the
-template spells out both). Those records are a source of truth, not a cache. Note the standing gap: no `pan` verb and no
+The kickoff prompt never tells the conversation to read per-issue records.
+Instead the server gathers that evidence itself, before the conversation
+exists, and embeds it at `{{EVIDENCE}}` under the template's `## Record
+evidence` heading. `collectRetrospectiveEvidence` enumerates through
+`listIssueRecords` — the issue-record read door's own bounded enumeration
+facet, which already resolves both the migrated layout and the legacy layout
+(the latter is issue-workspace scoped, because `getIssueRecordPath` delegates
+to `getIssueRecordBasePath`; a project state-root concatenation is **not**
+equivalent and getting that wrong is exactly how an earlier cycle shipped a
+broken instruction). Records are filtered to `updated >= windowStart` and
+projected to a bounded per-issue snapshot preserving `pipeline`, `feedback`,
+`sessionHistory`, `recoveryTrips`, and `scopeDrift`.
+
+Every omission is disclosed in the rendered text rather than dropped
+silently: out-of-window counts, records with no usable timestamp, per-issue
+and per-project cap overflow, and a read door that threw (which renders as
+`EVIDENCE UNAVAILABLE` and tells the agent not to infer that nothing
+happened). Caps live in `EVIDENCE_LIMITS`. This is what keeps the feature
+inside the single-source-of-truth rule: the conversation consumes a snapshot
+produced by the read door, and never reaches for a store itself. Note the standing gap: no `pan` verb and no
 dashboard endpoint returns a **full** record to a shell consumer — `pan show
 --json` is the runtime lens and `pan task show --json` is a single plan item,
 so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
