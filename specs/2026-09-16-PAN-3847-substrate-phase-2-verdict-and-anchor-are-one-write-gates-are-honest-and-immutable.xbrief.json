@@ -4,17 +4,17 @@
     "created": "2026-09-16T21:36:47.000Z",
     "author": "overdeck/0.50.4",
     "description": "Plan for PAN-3847: Substrate Phase 2: verdict and anchor are one write; gates are honest and immutable",
-    "updated": "2026-09-16T21:41:31.281Z"
+    "updated": "2026-09-17T11:46:05.219Z"
   },
   "plan": {
     "id": "pan-3847",
     "title": "Substrate Phase 2: verdict and anchor are one write; gates are honest and immutable",
-    "status": "proposed",
+    "status": "completed",
     "uid": "880bc0d4-5e6a-478b-a81f-5795848cbc80",
     "author": "agent:claude-fable-5-1",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-09-16T21:36:47.000Z",
-    "updated": "2026-09-16T21:41:31.281Z",
+    "updated": "2026-09-17T11:46:05.219Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3847",
@@ -1090,5 +1090,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
