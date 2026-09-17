@@ -728,19 +728,79 @@ function pushStateBranch(
     DEFAULT_STATE_PUSH_TIMEOUT_MS,
   );
 
-  return runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
-    Effect.matchEffect({
-      onSuccess: () => Effect.succeed({ pushed: true }),
-      onFailure: (err) => {
-        const message = err.stderr || err._tag;
-        // The paths-only queue has no mutation intent and must never replay or
-        // rebase. Domain writers resolve non-fast-forward conflicts before
-        // enqueuing a new concrete file version (PAN-2541 D10).
-        warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
-      },
+  const attempt = runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
+    Effect.match({
+      onSuccess: (): PushAttemptOutcome => ({ ok: true }),
+      onFailure: (err): PushAttemptOutcome => ({ ok: false, message: err.stderr || err._tag }),
     }),
   );
+
+  return Effect.promise(() => pushWithRetry(() => Effect.runPromise(attempt))).pipe(
+    Effect.map((result) => {
+      // The paths-only queue has no mutation intent and must never replay or
+      // rebase. Domain writers resolve non-fast-forward conflicts before
+      // enqueuing a new concrete file version (PAN-2541 D10).
+      if (!result.pushed) warnAutoPush(branch, result.reason ?? 'push failed');
+      return result;
+    }),
+  );
+}
+
+const DEFAULT_PUSH_RETRY_DELAYS_MS: readonly number[] = [500, 1500, 3000];
+
+/**
+ * Delays between push attempts after a `cannot lock ref` rejection. Override
+ * with OVERDECK_STATE_PUSH_RETRY_DELAYS_MS (comma-separated ms; an empty
+ * string disables retries) — the same env idiom as OVERDECK_STATE_PUSH_TIMEOUT_MS.
+ * Tests that keep a ref-lock race alive on purpose set it to `0,0,0`.
+ */
+function pushRetryDelaysMs(): readonly number[] {
+  const raw = process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS;
+  if (raw === undefined) return DEFAULT_PUSH_RETRY_DELAYS_MS;
+  return raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0)
+    .map((v) => Number.parseInt(v, 10)).filter((n) => Number.isFinite(n) && n >= 0);
+}
+
+/**
+ * A rejected push is retried only on git's `cannot lock ref` rejection: another
+ * writer pushed the same local branch at the same instant, the rejection is
+ * transient, and a plain retry succeeds once the ref lock clears. Anything
+ * else (non-fast-forward, auth, network, hooks) fails immediately as before. No fetch, no rebase,
+ * no force. Total added delay is at most 5s (D11: the record writer's state
+ * git lock has a 30s durability budget).
+ */
+function isRetryablePushRejection(message: string): boolean {
+  // Only the ref-lock race is transient. A non-fast-forward rejection means
+  // origin really advanced; the PAN-3291 merge reconciliation owns that case
+  // and must not wait behind 5s of pointless retries.
+  return message.includes('cannot lock ref');
+}
+
+interface PushAttemptOutcome {
+  ok: boolean;
+  message?: string;
+}
+
+async function pushWithRetry(
+  attempt: () => Promise<PushAttemptOutcome>,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<PushResult> {
+  const delays = pushRetryDelaysMs();
+  const maxAttempts = delays.length + 1;
+  let lastMessage = 'unknown error';
+  for (let n = 1; n <= maxAttempts; n++) {
+    const outcome = await attempt();
+    if (outcome.ok) return { pushed: true };
+    lastMessage = outcome.message ?? 'unknown error';
+    if (n < maxAttempts && isRetryablePushRejection(lastMessage)) {
+      const delayMs = delays[n - 1]!;
+      console.log(`[auto-commit] push rejected (attempt ${n}/${maxAttempts}): ${lastMessage.split('\n')[0]}; retrying in ${delayMs}ms`);
+      await sleep(delayMs);
+      continue;
+    }
+    break;
+  }
+  return { pushed: false, reason: `push failed: ${lastMessage}` };
 }
 
 function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<PushResult, never> {
@@ -852,6 +912,7 @@ export const __testInternals = {
   boundStateFlush,
   startSerializedFlush,
   waitForFlush,
+  pushWithRetry,
   /**
    * The flush a timer turn (or an explicit flush) started for `projectRoot`,
    * or `undefined` when nothing is in flight. Tests use this to await the
