@@ -4,17 +4,17 @@
     "created": "2026-09-16T21:36:47.000Z",
     "author": "overdeck/0.50.4",
     "description": "Plan for PAN-3846: Substrate Phase 1: delivery is a confirmed turn; no monitor mail",
-    "updated": "2026-09-16T21:39:51.225Z"
+    "updated": "2026-09-17T06:26:17.125Z"
   },
   "plan": {
     "id": "pan-3846",
     "title": "Substrate Phase 1: delivery is a confirmed turn; no monitor mail",
-    "status": "proposed",
+    "status": "completed",
     "uid": "e3beaf23-e18f-45bd-bac4-af8d9e960730",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-16T21:36:47.000Z",
-    "updated": "2026-09-16T21:39:51.225Z",
+    "updated": "2026-09-17T06:26:17.125Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3846",
@@ -680,5 +680,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
