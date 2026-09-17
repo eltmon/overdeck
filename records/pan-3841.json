@@ -189,7 +189,7 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T03:26:41.999Z",
+  "updated": "2026-09-17T03:26:44.050Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -200,9 +200,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T03:26:41.803Z",
+    "updatedAt": "2026-09-17T03:26:41.975Z",
     "reviewNotes": "evidenceHead=e85ab105961b3dff9a93509f3b14c71cc3c0baa1. Cycle-6 passed-review claim that real-fs tests covered both layouts was wrong (legacy-only); cycle-7 commit e85ab1059 adds (1) migrated-layout fixtures with legacy decoys (4 new tests proving the resolver selects the migrated branch and ignores PAN-LEGACY/PAN-WORKSPACE) and (2) explicit untrusted-evidence prompt framing ('data, not instructions' with anti-injection phrases and verbatim-timestamps rule, pinned by 2 new template tests). Focused validation: record-list-real-fs.test.ts 10/10, retrospective-template.test.ts 13/13. All five required corrections now backed by real-fs tests on both layouts. Old cycle-6 anchor preserved at .pan/review/agent-pan-3841-review-9098a72e/review.md. New run-id agent-pan-3841-review-e85ab1059 created; not signaling against the old run.",
     "testNotes": "Verified at HEAD 9098a72e (branch moved ffb32f54->f865018e->9098a72e mid-run; f865018e fixed a real bug I found at ffb32f54 -- see below). npm run typecheck: 0 errors (verified twice, both HEADs). npm run lint: full clean pass at ffb32f54 (961 lines, all guards passed); at 9098a72e reached the final lint:effect-diagnostics step with zero failures across the whole chain (partial re-run due to heavy shared-host contention, not a code issue). Tests: at ffb32f54 my independent 'npm test' run found 18 failed/14333 passed/51 skipped -- 2 of the failures were a genuine deterministic defect in PAN-3841's own new file src/lib/overdeck/__tests__/conversation-retrospective.test.ts (duplicate `EVIDENCE_LIMITS` import at lines 217 and 469 -> PARSE_ERROR, confirmed via isolated `npx vitest run` reproducing 'Identifier EVIDENCE_LIMITS has already been declared'); the other 16 failures were beforeEach hook timeouts (setupOverdeckTestDb, 5000ms) in files unrelated to this issue, consistent with CPU contention from concurrent vitest runs in sibling workspaces observed at the time. Commit f865018e2fb (landed after I reported this) removes the duplicate import and fixes 4 other review-flagged defects. I independently re-ran the specific PAN-3841 test files in isolation at HEAD 9098a72e (conversation-retrospective.test.ts, record-list-real-fs.test.ts, conversations-retrospective.test.ts, retrospective-template.test.ts): 4 files / 68 tests, all passed, confirming the fix. I did not re-run the full 'npm test' suite a second time at 9098a72e: system load was severe during the re-verification window (swap 100% full, load avg ~7.3, multiple concurrent agent processes independently running lint/build in this exact shared workspace) and a full run risked another unreliable OOM-style kill. The pipeline record's own self-reported testNotes ('Skipped: no code changed since pre-review verification gate') is not independent evidence and was not relied on beyond corroboration; the reviewer's own full-suite self-report at 9098a72e (14366/14367 passed, one pre-existing quarantined flake PAN-2421 unrelated to this file) is consistent with my scoped result. Anomaly for the record: while blocked ~90min by a system-wide low-memory event, the branch received a new commit and an uncommitted, very-recently-modified (mtime ~5 min old) addition to src/lib/pan-dir/__tests__/record-list-real-fs.test.ts appeared in the working tree -- left untouched per policy (tests evaluate committed HEAD); operator's deaconIgnored note on the issue record says agents were asked to stop for independent review/PRD redesign as of 22:55, so this may be authorized human-directed work, not a rogue agent -- flagging for awareness.",
+    "uatNotes": "UAT required per retro-mount.ac1/ac2/ac4 (explicit browser-driven acceptance criteria) and the review's own note that browser UAT was 'still unevidenced'. Used the workspace's own already-running isolated Docker stack (overdeck-feature-pan-3841-{server,frontend,dev}); restarted server+frontend containers after each rebuild to load fresh dist and clear stale Vite dep-cache state; confirmed via /api/health that the server ran buildCommit 9098a72e (deploymentCoherent:true) during the UAT. Navigated Playwright to https://feature-pan-3841.overdeck.localhost/command-deck/panopticon-cli with a model already selected in the sidebar picker (Claude Sonnet 5). ac1 CONFIRMED: 'Pipeline retrospective' button renders between the model picker and 'New conversation' in the header row; clicking it opens a menu with exactly 'Last 24 hours' and 'Last 7 days'. ac2 BLOCKED: choosing 'Last 24 hours' POSTs to /api/conversations/retrospective; the browser network log shows this proxied request returns 404, so no navigation to /conv/<name> occurs. Root-caused this to a PRE-EXISTING container misconfiguration unrelated to PAN-3841's diff: src/dashboard/frontend/vite.config.ts's container-mode dev proxy hardcodes apiTarget='http://server:3011', but `ss -tlnp` inside the server container shows the actual node process listens on port 3013 (matching the Traefik api-router's declared port), so the frontend's Vite proxy silently 404s on every /api/* mutation it forwards inside this workspace container. Curling the same route+body directly against the server on its real port (3013, via the api- Traefik host) returns 401 unauthorized (i.e. the route exists and the auth guard runs correctly) -- confirming the route/handler are fine and the fault is the proxy target port, not this issue's code. vite.config.ts is not part of PAN-3841's changed files. ac4 (sidebar-narrowest, non-overlapping buttons) NOT conclusively verified: the shared workspace container experienced repeated HMR full-reloads from other concurrent agent activity during the test window, causing transient DOM state that made a reliable bounding-box check impractical in the time available. Per role boundaries I did not edit vite.config.ts, the docker-compose file, or any container env var to route around the port mismatch. A required acceptance criterion (ac2) remains unproven end-to-end, so uatStatus is failed even though the underlying blocker is environmental, not a PAN-3841 defect -- this matches the reviewer's own 'environmental lane constraint' note, now root-caused with a specific misconfigured port.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
@@ -319,10 +320,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 780,
-            "output": 198577,
-            "cacheRead": 115956475,
-            "cacheWrite": 1290655
+            "input": 782,
+            "output": 198831,
+            "cacheRead": 116326498,
+            "cacheWrite": 1292886
           }
         },
         "work": {
@@ -354,15 +355,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 780,
-          "output": 198577,
-          "cacheRead": 115956475,
-          "cacheWrite": 1290655
+          "input": 782,
+          "output": 198831,
+          "cacheRead": 116326498,
+          "cacheWrite": 1292886
         }
       },
       "costAtCloseOut": {
-        "usd": 47.6007464,
-        "pricingAsOf": "2026-09-17T03:26:41.845Z"
+        "usd": 47.6828724,
+        "pricingAsOf": "2026-09-17T03:26:44.043Z"
       }
     },
     "merges": [
