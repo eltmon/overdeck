@@ -107,6 +107,11 @@
       "timestamp": "2026-09-17T01:40:08.715Z",
       "reason": "end",
       "note": "Anomaly first: found and fixed a real regression my own prior round introduced — resolveSingleWorkTierSpawnParams ran getDispatchableItems before the explicit-override branch, reaching doc.plan.edges on plans the override path never used to touch. agents-spawn-supervisor.test.ts was 15 failed / 20 passed on HEAD; the earlier verification-gate red was NOT only the demo-bug I had staged. Now 35/35.\n\nSecond deviation: the missing-slot-item integration test asserts less than originally drafted. resolveSlotTierSpawnParams no longer throws there, but the spawn still fails at buildRegisteredSlotPrompt -> createActiveSlice, which rejects a missing item independently of this feature and predates it. The test pins that the failure is NOT the tiered-execution one, so no new abort was added; it does not claim the spawn survives.\n\nThird: a stray untracked settings-full.yml (Playwright a11y dump from 18:54, pre-dating this session) blocked the done check. Not deleted, not committed — added to .git/info/exclude and reported to conv-20260916-1699.\n\nScope held: did NOT change D11 representative-only doctor policy or the untiered-default warning (both deliberate PRD decisions), and implemented no speculative security or malformed-input hardening.\n\nDelivered, per the adjudicated experiment RESULTS.md:\n- R4 false negative: capabilityClassOf reads the literal row first, hops MODEL_DEPRECATIONS only for ids without one. Adjudicator probe went checkedClass frontier / expertWarnings [] to checkedClass small / expertWarnings [underpowered]. Deleting the deprecated rows would not have fixed it.\n- F-5: underpowered messages group failing difficulties by their own requirement; the single-requirement sentence stays byte-identical.\n- F-1: provider-not-enabled scoped to CONFIGURABLE_PROVIDERS, a new shared table both the server schema union and the frontend Provider type derive from. xai/groq/cerebras/mistral/quantumllama had no config key, no merge branch and no Settings card, so that warning was unclearable. Band checks still run for them.\n- F-4: frontend knownModelIds unions the shared class table, so Settings stops calling mistral-large-latest and llama-3.3-70b-versatile unknown.\n- F-3: unique badge keys at both sites; verified by reverting the key expression and watching the test fail.\n- F-6a: new agents-spawn-tier-fitness.test.ts drives real spawnAgent/spawnRun with side effects mocked. Demonstrated it catches the pre-dfe7305 ordering in both directions (spurious warn on a correctly-staffed frontier slot; warning naming the parent default instead of the staffed model).\n- F-6b: TieredExecutionSection.test.tsx and tiered-crews.test.ts added to npm test; frontend leg went 64 to 112 tests.\n- PRD corrections R1 and R2 written through the canonical draft writer; docs updated.\n\nGates: npm test exit 0 (14386 backend, 112 frontend, 51 skipped), typecheck green, lint green with Effect diagnostics 308 known and none new. All 8 xBRIEF items reopened and re-closed through the task door."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-17T01:57:59.220Z"
     }
   ],
   "feedback": [],
@@ -179,7 +184,7 @@
     "recordedAt": "2026-09-17T01:40:01.804Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:57:58.323Z",
+  "updated": "2026-09-17T01:57:59.221Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
