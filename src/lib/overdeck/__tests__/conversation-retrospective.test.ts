@@ -220,6 +220,8 @@ import {
 } from '../conversation-retrospective.js';
 
 const WINDOW_START = new Date('2026-09-16T00:00:00.000Z');
+// Upper bound of the window; records after it are clock-skewed, not recent.
+const NOW_BOUND = new Date('2026-09-17T00:00:00.000Z');
 
 const MIGRATED: PLine = {
   key: 'panopticon-cli', path: '/repo/pan', stateRoot: '/state/pan', migrated: true, githubRepo: 'eltmon/overdeck',
@@ -246,6 +248,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [record()],
     });
     expect(project.key).toBe('panopticon-cli');
@@ -267,6 +270,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [LEGACY],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async (p) => { seen.push(p.key); return [record({ issueId: 'LEG-9' })]; },
     });
     expect(seen).toEqual(['legacy-proj']);
@@ -277,6 +281,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const evidence = await collectRetrospectiveEvidence({
       projects: [MIGRATED, LEGACY],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async (p) => [record({ issueId: p.migrated ? 'MIG-1' : 'LEG-1' })],
     });
     expect(evidence.map((e) => e.issues[0].issueId)).toEqual(['MIG-1', 'LEG-1']);
@@ -286,6 +291,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [
         record({ issueId: 'IN-1', updated: '2026-09-16T12:00:00.000Z' }),
         record({ issueId: 'OUT-1', updated: '2026-09-15T12:00:00.000Z' }),
@@ -303,6 +309,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [record({ issueId: 'EDGE', updated: WINDOW_START.toISOString() })],
     });
     expect(project.issues.map((i) => i.issueId)).toEqual(['EDGE']);
@@ -312,6 +319,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [],
     });
     expect(project.issues).toEqual([]);
@@ -322,6 +330,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => { throw new Error('state worktree missing'); },
     });
     expect(project.unavailable).toBe('state worktree missing');
@@ -334,6 +343,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [
         { issueId: '' } as RetrospectiveSourceRecord,
         undefined as unknown as RetrospectiveSourceRecord,
@@ -347,6 +357,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [{ issueId: 'BARE', updated: '2026-09-16T12:00:00.000Z' }],
     });
     const issue = project.issues[0];
@@ -360,7 +371,8 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const many = Array.from({ length: EVIDENCE_LIMITS.maxIssuesPerProject + 5 }, (_, i) =>
       record({ issueId: `PAN-${i}`, updated: `2026-09-16T${String(i % 24).padStart(2, '0')}:00:00.000Z` }));
     const [project] = await collectRetrospectiveEvidence({
-      projects: [MIGRATED], windowStart: WINDOW_START, listRecords: async () => many,
+      projects: [MIGRATED], windowStart: WINDOW_START,
+      now: NOW_BOUND, listRecords: async () => many,
     });
     expect(project.issues).toHaveLength(EVIDENCE_LIMITS.maxIssuesPerProject);
     expect(project.truncated).toBe(5);
@@ -371,6 +383,7 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
+      now: NOW_BOUND,
       listRecords: async () => [record({
         feedback: Array.from({ length: EVIDENCE_LIMITS.maxFeedbackPerIssue + 3 }, (_, i) =>
           ({ seq: i, specialist: 'review-agent', outcome: 'x', timestamp: '2026-09-16T11:00:00.000Z' })),
@@ -383,10 +396,10 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
   });
 
   it('isRecordInWindow classifies in / out / undated', () => {
-    expect(isRecordInWindow('2026-09-16T12:00:00.000Z', WINDOW_START)).toBe('in');
-    expect(isRecordInWindow('2026-09-15T12:00:00.000Z', WINDOW_START)).toBe('out');
-    expect(isRecordInWindow(undefined, WINDOW_START)).toBe('undated');
-    expect(isRecordInWindow('garbage', WINDOW_START)).toBe('undated');
+    expect(isRecordInWindow('2026-09-16T12:00:00.000Z', WINDOW_START, NOW_BOUND)).toBe('in');
+    expect(isRecordInWindow('2026-09-15T12:00:00.000Z', WINDOW_START, NOW_BOUND)).toBe('out');
+    expect(isRecordInWindow(undefined, WINDOW_START, NOW_BOUND)).toBe('undated');
+    expect(isRecordInWindow('garbage', WINDOW_START, NOW_BOUND)).toBe('undated');
   });
 });
 
@@ -445,5 +458,171 @@ describe('evidence reaches the rendered kickoff message', () => {
     const oneDay = (createConversation.mock.calls[0][0] as Record<string, unknown>).message as string;
     expect(oneDay).not.toContain('OLD');
     expect(oneDay).toContain('No issue records were updated in this window');
+  });
+});
+
+// ─── Review cycle 5: the five required corrections ───────────────────────────
+// Each of these reproduces a defect the reviewer's probe demonstrated against
+// the committed code. They assert behaviour, not wording.
+
+
+const PROJECT_A = { key: 'alpha', path: '/repos/alpha', stateRoot: '/state/alpha', migrated: true };
+
+describe('required #3 — the window has an upper bound', () => {
+  it('classifies a future-dated record as future, not in-window', () => {
+    // Probe: updated=2099 returned 'in' and sat at the top of every window.
+    expect(isRecordInWindow('2099-01-01T00:00:00.000Z', WINDOW_START, NOW_BOUND)).toBe('future');
+  });
+
+  it('excludes future-dated records from the snapshot and discloses the count', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [
+        { issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z' },
+        { issueId: 'PAN-FUTURE', updated: '2099-01-01T00:00:00.000Z' },
+      ],
+    });
+    expect(project.issues.map((i) => i.issueId)).toEqual(['PAN-1']);
+    expect(project.future).toBe(1);
+    expect(formatEvidence([project])).toContain('dated after the window end');
+  });
+});
+
+describe('required #4 — nested selection keeps the NEWEST entries', () => {
+  it('keeps the newest sessionHistory events when the cap truncates', async () => {
+    // Probe: sessionHistory is append-only oldest-first, so slice(0, 20) kept
+    // event-0..event-19 and dropped event-20, the most recent one.
+    const total = EVIDENCE_LIMITS.maxSessionsPerIssue + 1;
+    const sessionHistory = Array.from({ length: total }, (_, i) => ({
+      timestamp: new Date(Date.UTC(2026, 8, 16, 1, i)).toISOString(),
+      reason: `event-${i}`,
+    }));
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{ issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z', sessionHistory }],
+    });
+    const kept = project.issues[0].sessionHistory.map((s) => s.reason);
+    expect(kept[0]).toBe(`event-${total - 1}`);
+    expect(kept).not.toContain('event-0');
+    expect(project.issues[0].sessionHistoryTruncated).toBe(1);
+  });
+
+  it('keeps the newest feedback and recoveryTrips entries too', async () => {
+    const feedback = Array.from({ length: EVIDENCE_LIMITS.maxFeedbackPerIssue + 1 }, (_, i) => ({
+      seq: i, specialist: 'review', outcome: 'blocked',
+      timestamp: new Date(Date.UTC(2026, 8, 16, 2, i)).toISOString(),
+    }));
+    const recoveryTrips = Array.from({ length: EVIDENCE_LIMITS.maxRecoveryTripsPerIssue + 1 }, (_, i) => ({
+      recoveryPath: `path-${i}`, tripCount: 1, open: true,
+      needsYouEmittedAt: new Date(Date.UTC(2026, 8, 16, 3, i)).toISOString(),
+    }));
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [
+        { issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z', feedback, recoveryTrips },
+      ],
+    });
+    const issue = project.issues[0];
+    expect(issue.feedback[0].seq).toBe(EVIDENCE_LIMITS.maxFeedbackPerIssue);
+    expect(issue.recoveryTrips[0].recoveryPath).toBe(`path-${EVIDENCE_LIMITS.maxRecoveryTripsPerIssue}`);
+  });
+
+  it('sorts entries with unparseable timestamps last without dropping them', async () => {
+    const sessionHistory = [
+      { timestamp: 'not-a-date', reason: 'undated' },
+      { timestamp: '2026-09-16T05:00:00.000Z', reason: 'older' },
+      { timestamp: '2026-09-16T09:00:00.000Z', reason: 'newest' },
+    ];
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{ issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z', sessionHistory }],
+    });
+    expect(project.issues[0].sessionHistory.map((s) => s.reason)).toEqual(['newest', 'older', 'undated']);
+  });
+});
+
+describe('scopeDrift truncation counts BOTH arrays', () => {
+  it('reports declaredScopeUntouched overflow instead of underreporting zero', async () => {
+    const untouched = Array.from({ length: EVIDENCE_LIMITS.maxScopeDriftFiles + 1 }, (_, i) => `u${i}.ts`);
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{
+        issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z',
+        scopeDrift: { outsideDeclaredScope: [], declaredScopeUntouched: untouched },
+      }],
+    });
+    expect(project.issues[0].scopeDrift?.truncated).toBe(1);
+  });
+});
+
+describe('required #1 — global serialized-size budget', () => {
+  it('keeps the rendered snapshot under the byte cap and says what it dropped', async () => {
+    // Probe: one record with a 1MB verificationNotes rendered 1,000,939 bytes,
+    // clearing every per-row cap and blowing the downstream message limit.
+    const huge = 'x'.repeat(1_000_000);
+    const projects = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A, { ...PROJECT_A, key: 'beta' }],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{
+        issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z',
+        pipeline: { verificationNotes: huge },
+      }],
+    });
+    const rendered = formatEvidence(projects);
+    expect(Buffer.byteLength(rendered, 'utf8')).toBeLessThanOrEqual(EVIDENCE_LIMITS.maxRenderedBytes);
+    expect(rendered).toContain('TRUNCATED');
+  });
+
+  it('leaves a normal-sized snapshot untruncated', async () => {
+    const projects = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{ issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z' }],
+    });
+    expect(formatEvidence(projects)).not.toContain('TRUNCATED');
+  });
+});
+
+describe('required #2 — read-door failures reach the snapshot', () => {
+  it('surfaces per-path failures returned alongside records', async () => {
+    // The production adapter returns { records, failures }; an empty record
+    // list with failures must NOT render as "no evidence found".
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => ({
+        records: [],
+        failures: [{ path: '/state/alpha/records', message: 'EACCES: permission denied' }],
+      }),
+    });
+    expect(project.unreadable).toHaveLength(1);
+    const rendered = formatEvidence([project]);
+    expect(rendered).toContain('EACCES');
+    expect(rendered).toContain('INCOMPLETE');
+    expect(rendered).not.toContain('No evidence found for this project.');
+  });
+
+  it('still accepts the plain-array shape for callers that have no diagnostics', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [PROJECT_A],
+      windowStart: WINDOW_START,
+      now: NOW_BOUND,
+      listRecords: async () => [{ issueId: 'PAN-1', updated: '2026-09-16T12:00:00.000Z' }],
+    });
+    expect(project.issues).toHaveLength(1);
+    expect(project.unreadable).toEqual([]);
   });
 });

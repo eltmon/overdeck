@@ -18,7 +18,7 @@ import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { listProjectsAsync, getProjectSync } from '../projects.js';
 import { resolveStateReadHomeAsync } from '../state-read-home.js';
-import { listIssueRecords } from '../pan-dir/record-list.js';
+import { listIssueRecordsDetailed } from '../pan-dir/record-list.js';
 
 export const RETROSPECTIVE_WINDOWS = {
   '24h': { label: 'last 24 hours', ms: 24 * 60 * 60 * 1000 },
@@ -130,7 +130,9 @@ export async function handleRetrospectiveConversationCreate(
     now?: () => Date;
     overdeckHome?: () => string;
     /** Injected for tests; defaults to the canonical issue-record read door. */
-    listRecords?: (project: RetrospectiveProjectLine) => Promise<RetrospectiveSourceRecord[]>;
+    listRecords?: (
+      project: RetrospectiveProjectLine,
+    ) => Promise<RetrospectiveSourceRecord[] | RetrospectiveRecordListing>;
   },
 ): Promise<ReturnType<typeof jsonResponse>> {
   if (!isRetrospectiveRequestBody(body)) {
@@ -151,6 +153,7 @@ export async function handleRetrospectiveConversationCreate(
   const evidence = await collectRetrospectiveEvidence({
     projects,
     windowStart,
+    now,
     listRecords: deps.listRecords ?? listRecordsThroughReadDoor,
   });
   const message = renderRetrospectiveKickoff({
@@ -187,6 +190,14 @@ export const EVIDENCE_LIMITS = {
   maxSessionsPerIssue: 20,
   maxRecoveryTripsPerIssue: 10,
   maxScopeDriftFiles: 15,
+  /**
+   * Global ceiling on the rendered snapshot. handleConversationCreate caps the
+   * whole kickoff message, so an unbounded snapshot does not just bloat the
+   * prompt — it can push the message over that cap and lose the instructions
+   * too. Per-row caps alone do not bound this: one record with a megabyte of
+   * verificationNotes clears every per-row cap.
+   */
+  maxRenderedBytes: 262_144,
 } as const;
 
 export interface RetrospectiveIssueEvidence {
@@ -211,6 +222,10 @@ export interface RetrospectiveProjectEvidence {
   outOfWindow: number;
   /** Records with no usable `updated` timestamp — kept, but flagged as undatable. */
   undated: number;
+  /** Records dated after `now` (clock skew or hand edit) — excluded, not silently ranked first. */
+  future: number;
+  /** Directories or record files the read door could not read for this project. */
+  unreadable: { path: string; message: string }[];
   /** Issues dropped by the per-project cap. */
   truncated: number;
   /** Populated when the read door itself failed for this project. */
@@ -231,19 +246,57 @@ function pickPipeline(pipeline: Record<string, unknown> | undefined): Record<str
   return out;
 }
 
-/** A record counts as in-window when its `updated` parses and is at or after the start. */
-export function isRecordInWindow(updated: string | undefined, windowStart: Date): 'in' | 'out' | 'undated' {
+/**
+ * A record is in-window when `updated` parses and falls in `[start, now]`.
+ *
+ * The upper bound matters: a clock-skewed or hand-edited record dated in the
+ * future would otherwise always satisfy `>= start` and silently sit at the top
+ * of every window, including windows it predates. Future records are reported
+ * as their own omission rather than quietly mixed in.
+ */
+export function isRecordInWindow(
+  updated: string | undefined,
+  windowStart: Date,
+  now: Date,
+): 'in' | 'out' | 'future' | 'undated' {
   if (!updated) return 'undated';
   const parsed = Date.parse(updated);
   if (Number.isNaN(parsed)) return 'undated';
+  if (parsed > now.getTime()) return 'future';
   return parsed >= windowStart.getTime() ? 'in' : 'out';
 }
 
+/**
+ * Newest-first, stable for entries whose timestamp is missing or unparseable
+ * (those sort last, keeping their original relative order). The canonical
+ * record stores these arrays append-only, i.e. OLDEST first, so slicing without
+ * sorting keeps the oldest N and discards exactly the recent activity a
+ * retrospective is about.
+ */
+function newestFirst<T>(items: T[], timestampOf: (item: T) => string | undefined): T[] {
+  return items
+    .map((item, index) => ({ item, index, at: Date.parse(timestampOf(item) ?? '') }))
+    .sort((a, b) => {
+      const aBad = Number.isNaN(a.at);
+      const bBad = Number.isNaN(b.at);
+      if (aBad && bBad) return a.index - b.index;
+      if (aBad) return 1;
+      if (bBad) return -1;
+      if (a.at !== b.at) return b.at - a.at;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.item);
+}
+
 function projectIssueEvidence(record: RetrospectiveSourceRecord): RetrospectiveIssueEvidence {
-  const feedback = record.feedback ?? [];
-  const sessions = record.sessionHistory ?? [];
-  const trips = record.recoveryTrips ?? [];
+  // Sort before slicing: these arrays are append-only oldest-first, so a plain
+  // slice would keep the oldest entries and drop the newest.
+  const feedback = newestFirst(record.feedback ?? [], (f) => f.timestamp);
+  const sessions = newestFirst(record.sessionHistory ?? [], (s) => s.timestamp);
+  const trips = newestFirst(record.recoveryTrips ?? [], (t) => t.needsYouEmittedAt);
   const drift = record.scopeDrift;
+  const driftOutside = drift?.outsideDeclaredScope ?? [];
+  const driftUntouched = drift?.declaredScopeUntouched ?? [];
   return {
     issueId: record.issueId,
     updated: record.updated,
@@ -264,9 +317,12 @@ function projectIssueEvidence(record: RetrospectiveSourceRecord): RetrospectiveI
     recoveryTripsTruncated: Math.max(0, trips.length - EVIDENCE_LIMITS.maxRecoveryTripsPerIssue),
     scopeDrift: drift
       ? {
-        outsideDeclaredScope: (drift.outsideDeclaredScope ?? []).slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
-        declaredScopeUntouched: (drift.declaredScopeUntouched ?? []).slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
-        truncated: Math.max(0, (drift.outsideDeclaredScope ?? []).length - EVIDENCE_LIMITS.maxScopeDriftFiles),
+        outsideDeclaredScope: driftOutside.slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
+        declaredScopeUntouched: driftUntouched.slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
+        // Count BOTH arrays: reporting only the `outside` overflow understated
+        // the omission whenever `declaredScopeUntouched` was the longer list.
+        truncated: Math.max(0, driftOutside.length - EVIDENCE_LIMITS.maxScopeDriftFiles)
+          + Math.max(0, driftUntouched.length - EVIDENCE_LIMITS.maxScopeDriftFiles),
       }
       : undefined,
   };
@@ -285,23 +341,42 @@ export interface RetrospectiveSourceRecord {
   scopeDrift?: { outsideDeclaredScope?: string[]; declaredScopeUntouched?: string[] };
 }
 
+/** What the read door returns when the caller needs failures as well as records. */
+export interface RetrospectiveRecordListing {
+  records: RetrospectiveSourceRecord[];
+  failures?: { path: string; message: string }[];
+}
+
 export async function collectRetrospectiveEvidence(input: {
   projects: RetrospectiveProjectLine[];
   windowStart: Date;
+  /** Upper bound of the window; records after it are reported as future-dated. */
+  now: Date;
   /** Injected for tests; defaults to the canonical enumeration read door. */
-  listRecords: (project: RetrospectiveProjectLine) => Promise<RetrospectiveSourceRecord[]>;
+  listRecords: (
+    project: RetrospectiveProjectLine,
+  ) => Promise<RetrospectiveSourceRecord[] | RetrospectiveRecordListing>;
 }): Promise<RetrospectiveProjectEvidence[]> {
   const out: RetrospectiveProjectEvidence[] = [];
   for (const project of input.projects) {
     let records: RetrospectiveSourceRecord[];
+    let unreadable: { path: string; message: string }[] = [];
     try {
-      records = await input.listRecords(project);
+      const listed = await input.listRecords(project);
+      if (Array.isArray(listed)) {
+        records = listed;
+      } else {
+        records = listed.records ?? [];
+        unreadable = listed.failures ?? [];
+      }
     } catch (error) {
       out.push({
         key: project.key,
         issues: [],
         outOfWindow: 0,
         undated: 0,
+        future: 0,
+        unreadable: [],
         truncated: 0,
         unavailable: error instanceof Error ? error.message : String(error),
       });
@@ -309,11 +384,13 @@ export async function collectRetrospectiveEvidence(input: {
     }
     let outOfWindow = 0;
     let undated = 0;
+    let future = 0;
     const kept: RetrospectiveSourceRecord[] = [];
     for (const record of records) {
       if (!record?.issueId) continue;
-      const verdict = isRecordInWindow(record.updated, input.windowStart);
+      const verdict = isRecordInWindow(record.updated, input.windowStart, input.now);
       if (verdict === 'out') { outOfWindow++; continue; }
+      if (verdict === 'future') { future++; continue; }
       if (verdict === 'undated') undated++;
       kept.push(record);
     }
@@ -324,6 +401,8 @@ export async function collectRetrospectiveEvidence(input: {
       issues: capped.map(projectIssueEvidence),
       outOfWindow,
       undated,
+      future,
+      unreadable,
       truncated: Math.max(0, kept.length - capped.length),
     });
   }
@@ -339,16 +418,24 @@ export function formatEvidence(projects: RetrospectiveProjectEvidence[]): string
       blocks.push(`### ${project.key}\n\nEVIDENCE UNAVAILABLE — the issue-record read door failed for this project: ${project.unavailable}. Treat this project as unexamined; do not infer that nothing happened in it.`);
       continue;
     }
+    const unreadableNote = project.unreadable.length
+      ? ` ${project.unreadable.length} path(s) could not be read (${project.unreadable
+        .slice(0, 3).map((f) => `${f.path}: ${f.message}`).join('; ')}${
+        project.unreadable.length > 3 ? '; …' : ''}), so this project's evidence is INCOMPLETE — do not read the absence of an issue here as proof it was quiet.`
+      : '';
     if (project.issues.length === 0) {
-      blocks.push(`### ${project.key}\n\nNo issue records were updated in this window (${project.outOfWindow} record(s) fell outside it). No evidence found for this project.`);
+      const empties = [`${project.outOfWindow} record(s) fell outside it`];
+      if (project.future) empties.push(`${project.future} dated after the window end (clock skew; excluded)`);
+      blocks.push(`### ${project.key}\n\nNo issue records were updated in this window (${empties.join(', ')}).${unreadableNote || ' No evidence found for this project.'}`);
       continue;
     }
     const lines = [`### ${project.key}`, ''];
     const notes: string[] = [`${project.issues.length} issue record(s) in window`];
     if (project.outOfWindow) notes.push(`${project.outOfWindow} outside the window (not shown)`);
+    if (project.future) notes.push(`${project.future} dated after the window end and excluded as clock-skewed`);
     if (project.undated) notes.push(`${project.undated} with no usable \`updated\` timestamp (shown, treat their timing as unknown)`);
     if (project.truncated) notes.push(`${project.truncated} dropped by the ${EVIDENCE_LIMITS.maxIssuesPerProject}-issue cap (most recently updated kept)`);
-    lines.push(`${notes.join('; ')}.`, '');
+    lines.push(`${notes.join('; ')}.${unreadableNote}`, '');
     for (const issue of project.issues) {
       lines.push(`- **${issue.issueId}** (updated ${issue.updated ?? 'unknown'}${issue.model ? `, model ${issue.model}` : ''}${issue.harness ? `, harness ${issue.harness}` : ''})`);
       const pipe = Object.entries(issue.pipeline);
@@ -372,7 +459,66 @@ export function formatEvidence(projects: RetrospectiveProjectEvidence[]): string
     }
     blocks.push(lines.join('\n'));
   }
-  return blocks.join('\n\n');
+  return applyRenderedByteBudget(blocks);
+}
+
+/**
+ * Enforce the global size ceiling.
+ *
+ * Blocks are emitted project-by-project in order, and we stop at the first one
+ * that would cross the budget rather than emitting a half-block. What was
+ * dropped is always stated, so a truncated snapshot can never be mistaken for a
+ * complete one.
+ */
+function applyRenderedByteBudget(blocks: string[]): string {
+  const budget = EVIDENCE_LIMITS.maxRenderedBytes;
+  const size = (text: string) => Buffer.byteLength(text, 'utf8');
+  // Reserve room for the footer up front. Appending the disclosure after
+  // filling to the cap is how the first version of this function overshot its
+  // own budget by 90 bytes: the notice explaining the truncation was itself
+  // uncounted.
+  const footerReserve = 400;
+  const fillBudget = budget - footerReserve;
+
+  const kept: string[] = [];
+  let used = 0;
+  let dropped = 0;
+  let headTruncated = false;
+
+  for (const block of blocks) {
+    const cost = size(block) + 2; // the '\n\n' join
+    if (used + cost <= fillBudget) {
+      kept.push(block);
+      used += cost;
+      continue;
+    }
+    if (kept.length === 0) {
+      // A single block bigger than the whole budget still has to fit, so trim
+      // it by BYTES (not characters — a char slice is not a byte bound under
+      // UTF-8) and say so.
+      let head = block;
+      while (size(head) > fillBudget && head.length > 1) {
+        head = head.slice(0, Math.max(1, Math.floor(head.length * 0.9)));
+      }
+      kept.push(head);
+      used = size(head) + 2;
+      headTruncated = true;
+      continue;
+    }
+    dropped++;
+  }
+
+  const footer: string[] = [];
+  if (headTruncated) {
+    footer.push(`this project's evidence exceeded the ${budget}-byte snapshot budget on its own and was cut short`);
+  }
+  if (dropped > 0) {
+    footer.push(`${dropped} further project block(s) were dropped`);
+  }
+  if (footer.length) {
+    kept.push(`[TRUNCATED: ${footer.join('; ')}. The omitted material was NOT examined — do not infer that nothing happened there.]`);
+  }
+  return kept.join('\n\n');
 }
 
 /**
@@ -386,8 +532,15 @@ export function formatEvidence(projects: RetrospectiveProjectEvidence[]): string
  */
 export async function listRecordsThroughReadDoor(
   project: RetrospectiveProjectLine,
-): Promise<RetrospectiveSourceRecord[]> {
+): Promise<RetrospectiveRecordListing> {
   const config = getProjectSync(project.key);
   if (!config) throw new Error(`project "${project.key}" is not registered`);
-  return (await listIssueRecords(config)) as unknown as RetrospectiveSourceRecord[];
+  // Detailed form: the array-only facet cannot distinguish "no records" from
+  // "the directory could not be read", and a retrospective that reports silence
+  // it never actually verified is worse than one that reports a gap.
+  const listed = await listIssueRecordsDetailed(config);
+  return {
+    records: listed.records as unknown as RetrospectiveSourceRecord[],
+    failures: listed.failures.map((f) => ({ path: f.path, message: f.message })),
+  };
 }
