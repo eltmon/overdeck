@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:42:07.859Z",
+  "updated": "2026-09-17T00:42:11.270Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 19,
+    "sequence": 20,
     "claims": {
       "spawn-single-log": {
         "writerId": "agent-pan-3842",
@@ -359,6 +359,13 @@
         "pid": 3550819,
         "host": "eltmon-z790",
         "claimedAt": "2026-09-17T00:39:52.895Z"
+      },
+      "class-table": {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3605631,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T00:42:11.270Z"
       }
     },
     "claimHistory": [
@@ -453,8 +460,8 @@
     ],
     "statusReasons": {
       "class-table": {
-        "reason": "Adjudicated R4: capabilityClassOf hops MODEL_DEPRECATIONS before checking the literal id, so an explicitly selected glm-4.7-flash is rated frontier (glm-5.1) and its expert warning is suppressed",
-        "updatedAt": "2026-09-17T00:42:07.859Z"
+        "reason": "literal-first classification",
+        "updatedAt": "2026-09-17T00:42:11.270Z"
       },
       "fitness-checker": {
         "reason": "Added src/lib/agents/tier-fitness.ts (checkTierFitness/checkStaffingFitness, §5.2 bands, §5.3 shapes, per-entry algorithm per WI-2) plus 17-case test with injected literal ctx; typecheck green; type-only imports keep module fs-free.",
@@ -487,7 +494,7 @@
     }
   },
   "statusOverrides": {
-    "class-table": "pending",
+    "class-table": "running",
     "class-table.ac1": "pending",
     "class-table.ac2": "pending",
     "class-table.ac3": "pending",
