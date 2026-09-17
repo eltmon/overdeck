@@ -16,7 +16,8 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionIdSync: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
-  clearFeedbackDeliveryStuck: vi.fn(),
+  getReviewStatusFromDbSync: vi.fn(() => null),
+  clearWorkspaceStuck: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -104,8 +105,9 @@ vi.mock('../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: mocks.logAgentLifecycleSync,
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  clearFeedbackDeliveryStuck: mocks.clearFeedbackDeliveryStuck,
+vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
+  getReviewStatusFromDbSync: mocks.getReviewStatusFromDbSync,
+  clearWorkspaceStuck: mocks.clearWorkspaceStuck,
 }));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
@@ -364,6 +366,7 @@ describe('messageAgent', () => {
     });
 
     it('returns delivered+confirmed when the probe matches on the second poll', async () => {
+      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
       mocks.probeTranscriptSince
         .mockResolvedValueOnce({ matchedUserRecord: false, realAssistantTurnCount: 0 })
         .mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
@@ -388,7 +391,8 @@ describe('messageAgent', () => {
       );
       // A confirmed delivery clears a stale feedback_delivery_needs_you flag
       // for the agent's issue (PAN-3846; replaces the retirement patrol).
-      expect(mocks.clearFeedbackDeliveryStuck).toHaveBeenCalledWith('PAN-2262');
+      expect(mocks.getReviewStatusFromDbSync).toHaveBeenCalledWith('PAN-2262');
+      expect(mocks.clearWorkspaceStuck).toHaveBeenCalledWith('PAN-2262');
     });
 
     it('returns delivered:false, confirmed:false when no turn appears in either attempt', async () => {
@@ -409,7 +413,7 @@ describe('messageAgent', () => {
         expect.stringContaining('messageAgent NOT confirmed'),
       );
       // No confirmed turn, no stuck-flag repair.
-      expect(mocks.clearFeedbackDeliveryStuck).not.toHaveBeenCalled();
+      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
     });
   });
 });

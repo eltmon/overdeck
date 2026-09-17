@@ -631,10 +631,15 @@ export async function messageAgent(
     // feedback_delivery_needs_you escalation it recorded is stale (PAN-3846).
     if (agentState.issueId) {
       try {
-        // Lazy import: keep review-status (and its DB-backed load-time wiring)
-        // out of messaging's static import graph.
-        const { clearFeedbackDeliveryStuck } = await import('../review-status.js');
-        clearFeedbackDeliveryStuck(agentState.issueId);
+        // A confirmed delivery repairs the state the retired feedback-delivery
+        // retirement patrol used to clear. Lazy import through the DB sync door
+        // (not review-status.js, whose import graph cycles back into agents).
+        const { getReviewStatusFromDbSync, clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+        const row = getReviewStatusFromDbSync(agentState.issueId);
+        if (row?.stuck === true && row.stuckReason === 'feedback_delivery_needs_you') {
+          clearWorkspaceStuck(agentState.issueId);
+          logAgentLifecycleSync(normalizedId, `messageAgent cleared feedback_delivery_needs_you for ${agentState.issueId} after confirmed delivery`);
+        }
       } catch (clearError) {
         console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
       }

@@ -127,7 +127,8 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionIdSync: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
-  clearFeedbackDeliveryStuck: vi.fn(),
+  getReviewStatusFromDbSync: vi.fn(() => null),
+  clearWorkspaceStuck: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
   surfaceIssueFeedbackNeedsYou: vi.fn(),
   resolveIssueFeedbackTarget: vi.fn(),
@@ -245,8 +246,13 @@ vi.mock('../../../../src/lib/persistent-logger.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
-  clearFeedbackDeliveryStuck: mocks.clearFeedbackDeliveryStuck,
+  clearFeedbackDeliveryStuck: vi.fn(),
   getReviewStatusSync: mocks.getReviewStatusSync,
+}));
+
+vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
+  getReviewStatusFromDbSync: mocks.getReviewStatusFromDbSync,
+  clearWorkspaceStuck: mocks.clearWorkspaceStuck,
 }));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
@@ -466,6 +472,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     });
 
     it('clears the escalation flag through the review-status door', async () => {
+      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
       const promise = messageAgent('agent-pan-3679', 'review feedback', 'internal', { owesRework: true });
       await vi.advanceTimersByTimeAsync(1_000);
       await expect(promise).resolves.toEqual({
@@ -473,7 +480,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
         queuedToMail: true,
         confirmed: true,
       });
-      expect(mocks.clearFeedbackDeliveryStuck).toHaveBeenCalledWith('PAN-3679');
+      expect(mocks.clearWorkspaceStuck).toHaveBeenCalledWith('PAN-3679');
     });
   });
 });
