@@ -136,7 +136,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:00:30.083Z",
+  "updated": "2026-09-17T01:00:48.479Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -331,7 +331,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 14,
+    "sequence": 15,
     "claims": {},
     "claimHistory": [
       {
@@ -414,8 +414,8 @@
     ],
     "statusReasons": {
       "retro-template": {
-        "reason": "Created roles/retrospective.md per WI-1: frontmatter name:retrospective, title-shaped first body line, read-only ground rules naming pan/gh/git/HTTP-write forbiddens, Inputs section using exactly the 5 placeholders (grep count 9 ≥ 5), Output shape with the 4 ordered headings. check-prompt-change-trailer.sh: 'Prompt-Change trailer found; ok'. lint-skills.sh: passed. Committed alone as bf294801d5a with Prompt-Change trailer and pushed.",
-        "updatedAt": "2026-09-16T19:43:11.561Z"
+        "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
+        "updatedAt": "2026-09-17T01:00:48.479Z"
       },
       "retro-template-test": {
         "reason": "Added tests/unit/prompts/retrospective-template.test.ts modeled on prompt-invariants.test.ts: pins frontmatter name, read-only ground-rules section (pan start/pan kill/pan tell/gh issue create/git push), exact 5-placeholder set, and 4 ordered output headings scoped to the Output shape section. Includes mutation tests proving the assertions reject a template missing the ground-rules section or carrying an extra {{UNKNOWN}} token. 4/4 green; committed as 7d98a2d3043 and pushed.",
@@ -444,11 +444,11 @@
     }
   },
   "statusOverrides": {
-    "retro-template": "completed",
-    "retro-template.ac1": "completed",
-    "retro-template.ac2": "completed",
-    "retro-template.ac3": "completed",
-    "retro-template.ac4": "completed",
+    "retro-template": "pending",
+    "retro-template.ac1": "pending",
+    "retro-template.ac2": "pending",
+    "retro-template.ac3": "pending",
+    "retro-template.ac4": "pending",
     "retro-template-test": "completed",
     "retro-template-test.ac1": "completed",
     "retro-template-test.ac2": "completed",
