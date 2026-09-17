@@ -15,7 +15,11 @@ export interface RecordLockOwner {
 
 export interface RecordLockOptions {
   writerId: string;
-  recordPath: string;
+  /**
+   * The record file whose tmp files are swept on acquire. Omitted for locks
+   * that guard no single record (e.g. the repo-scoped state git lock).
+   */
+  recordPath?: string;
   /** Names the lock's issue in the RecordLockError text (PAN-3848 W23). */
   issueId?: string;
   retryDelaysMs?: readonly number[];
@@ -94,7 +98,7 @@ export async function acquireRecordLock(lockPath: string, options: RecordLockOpt
         try { await rm(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
         throw error;
       }
-      await sweepRecordTmpFiles(options.recordPath);
+      if (options.recordPath) await sweepRecordTmpFiles(options.recordPath);
       return owner;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;

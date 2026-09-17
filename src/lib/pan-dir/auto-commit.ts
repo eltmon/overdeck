@@ -31,6 +31,7 @@ import { findProjectByPathSync, listProjectsSync } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
 import { isStateMigrationLocked } from '../state-migration-lock.js';
 import { isStatePlaneOnlyDiff } from '../state-plane.js';
+import { withStateRepoLock } from './state-git-lock.js';
 
 const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
@@ -474,7 +475,12 @@ function startSerializedFlush(
   // and is awaited only through `promise`.
   const committed = prior.catch(() => undefined).then(() => {
     controller.signal.throwIfAborted();
-    return Effect.runPromise(boundStateFlush(commitOperation), { signal: controller.signal });
+    // Cross-process index exclusion (PAN-3848 F7): the per-issue locks do not
+    // exclude peer issues on this checkout. The lock wraps the commit op
+    // including its best-effort fetch; the push stays outside it.
+    return withStateRepoLock(gitRoot, `autocommit:${projectRoot}`, () =>
+      Effect.runPromise(boundStateFlush(commitOperation), { signal: controller.signal }),
+    );
   });
   const commitTail = committed.catch(() => undefined);
   serializers.set(gitRoot, commitTail);

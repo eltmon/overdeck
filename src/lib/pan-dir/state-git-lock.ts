@@ -68,3 +68,53 @@ export async function withStateGitLock<T>(
     if (processQueues.get(key) === tail) processQueues.delete(key);
   }
 }
+
+const repoProcessQueues = new Map<string, Promise<void>>();
+
+/**
+ * PAN-3848 (F7): the repo-scoped state git lock. `withStateGitLock` is keyed
+ * per (gitRoot, issue) — the per-issue record lock — so two issues (or two
+ * processes) can run `git add`/`git commit` concurrently on one state
+ * checkout and contest the index, and two push-race reconciles can merge
+ * concurrently on one worktree. This lock is keyed on the git root alone and
+ * covers local index/commit operations plus the mutating sections of
+ * push-race reconciliation. The per-issue lock is retained; this one is added.
+ *
+ * LEAF RULE: acquire this lock inside per-issue locks (or with no other pan
+ * lock held), never acquire a per-issue/record lock while holding it — the
+ * reverse order self-deadlocks.
+ */
+export function stateRepoLockPath(gitRoot: string): string {
+  const key = createHash('sha256').update(resolve(gitRoot)).digest('hex');
+  return join(getOverdeckHome(), 'locks', 'state-git', `repo-${key}.lock`);
+}
+
+export async function withStateRepoLock<T>(
+  gitRoot: string,
+  writerId: string,
+  operation: () => Promise<T>,
+  retryDelaysMs: readonly number[] = STATE_GIT_LOCK_RETRY_DELAYS_MS,
+): Promise<T> {
+  const key = resolve(gitRoot);
+  const prior = repoProcessQueues.get(key) ?? Promise.resolve();
+  let releaseQueue!: () => void;
+  const gate = new Promise<void>((resolveGate) => {
+    releaseQueue = resolveGate;
+  });
+  const tail = prior.catch(() => undefined).then(() => gate);
+  repoProcessQueues.set(key, tail);
+
+  await prior.catch(() => undefined);
+  const lockPath = stateRepoLockPath(gitRoot);
+  try {
+    await acquireRecordLock(lockPath, { writerId, issueId: `repo:${key}`, retryDelaysMs });
+    try {
+      return await operation();
+    } finally {
+      await releaseRecordLock(lockPath);
+    }
+  } finally {
+    releaseQueue();
+    if (repoProcessQueues.get(key) === tail) repoProcessQueues.delete(key);
+  }
+}

@@ -53,7 +53,7 @@ import {
   type FlushResult,
 } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
-import { withStateGitLock } from './state-git-lock.js';
+import { withStateGitLock, withStateRepoLock } from './state-git-lock.js';
 
 export const AGENT_PLANE_DIRNAME = 'agents';
 export const AGENT_PLANE_VERSION = 1 as const;
@@ -309,26 +309,39 @@ async function reconcileAgentPlanePush(
       if (status) return { committed: true, pushed: false, reason: 'agent-plane reconciliation blocked by dirty state worktree' };
 
       await git(context.root, ['fetch', 'origin', 'overdeck-state']);
-      try {
-        await git(context.root, ['merge', '--no-edit', 'origin/overdeck-state']);
-      } catch (mergeError) {
-        const conflicts = (await git(context.root, ['diff', '--name-only', '--diff-filter=U']))
-          .split('\n').map((path) => path.trim()).filter(Boolean);
-        if (conflicts.length !== 1 || conflicts[0] !== relativePath) {
-          await abortAgentPlaneMerge(context.root);
-          return {
-            committed: true,
-            pushed: false,
-            reason: `agent-plane reconciliation conflicted outside ${relativePath}: ${conflicts.join(', ') || gitFailureMessage(mergeError)}`,
-          };
-        }
+      // Mutating section under the repo-scoped lock (PAN-3848 F7): the fetch
+      // above and the push below touch no local index state, but the merge
+      // and conflict resolution must never run concurrently with another
+      // writer's git mutation on this checkout — in this process or another.
+      const merged = await withStateRepoLock(
+        context.root,
+        `agent-plane-reconcile:${safeAgentId(desired.agentId)}`,
+        async (): Promise<'merged' | FlushResult> => {
+          try {
+            await git(context.root, ['merge', '--no-edit', 'origin/overdeck-state']);
+            return 'merged';
+          } catch (mergeError) {
+            const conflicts = (await git(context.root, ['diff', '--name-only', '--diff-filter=U']))
+              .split('\n').map((path) => path.trim()).filter(Boolean);
+            if (conflicts.length !== 1 || conflicts[0] !== relativePath) {
+              await abortAgentPlaneMerge(context.root);
+              return {
+                committed: true,
+                pushed: false,
+                reason: `agent-plane reconciliation conflicted outside ${relativePath}: ${conflicts.join(', ') || gitFailureMessage(mergeError)}`,
+              };
+            }
 
-        await git(context.root, ['checkout', '--theirs', '--', relativePath]);
-        const remote = readAgentPlaneRecordAtPath(context.path);
-        writeAgentPlaneRecordAtomicSync(context.path, mergeAgentPlaneRecords(remote, desired));
-        await git(context.root, ['add', '--', relativePath]);
-        await git(context.root, ['-c', 'core.editor=true', 'commit', '--no-edit']);
-      }
+            await git(context.root, ['checkout', '--theirs', '--', relativePath]);
+            const remote = readAgentPlaneRecordAtPath(context.path);
+            writeAgentPlaneRecordAtomicSync(context.path, mergeAgentPlaneRecords(remote, desired));
+            await git(context.root, ['add', '--', relativePath]);
+            await git(context.root, ['-c', 'core.editor=true', 'commit', '--no-edit']);
+            return 'merged';
+          }
+        },
+      );
+      if (merged !== 'merged') return merged;
 
       try {
         await git(context.root, ['push', 'origin', 'overdeck-state']);

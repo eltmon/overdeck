@@ -17,7 +17,7 @@ import {
   recordReconcileSuccess,
   type PendingPushEscalation,
 } from './push-health.js';
-import { withStateGitLock } from './state-git-lock.js';
+import { withStateGitLock, withStateRepoLock } from './state-git-lock.js';
 import {
   ensureIssueRecordSync,
   getIssueRecordPath,
@@ -347,26 +347,31 @@ async function restoreRetryableRecord(
   }
 
   throwIfDurabilityAborted(signal);
-  writeIssueRecordSync(project, issueId, restored);
-  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  // The compensating add/commit runs under the repo-scoped lock (PAN-3848
+  // F7): the restore runs inside the caller's per-issue locks, which do not
+  // exclude a peer issue's git mutation on this checkout.
+  await withStateRepoLock(gitRoot, `restore:${issueId}`, async () => {
+    writeIssueRecordSync(project, issueId, restored);
+    await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
 
-  try {
-    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
-    return;
-  } catch (diffError) {
-    throwIfDurabilityAborted(signal);
-    void diffError;
-    // A staged diff needs a compensating commit so HEAD, not only the worktree,
-    // is retryable. The failed mutation remains auditable in local history.
-  }
+    try {
+      await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
+      return;
+    } catch (diffError) {
+      throwIfDurabilityAborted(signal);
+      void diffError;
+      // A staged diff needs a compensating commit so HEAD, not only the worktree,
+      // is retryable. The failed mutation remains auditable in local history.
+    }
 
-  await git(gitRoot, [
-    'commit',
-    '-m',
-    `chore(records): restore ${issueId} after failed state push`,
-    '--',
-    relativeRecordPath,
-  ], { signal });
+    await git(gitRoot, [
+      'commit',
+      '-m',
+      `chore(records): restore ${issueId} after failed state push`,
+      '--',
+      relativeRecordPath,
+    ], { signal });
+  });
 }
 
 async function deliverPendingEscalation(
@@ -544,35 +549,43 @@ async function reconcileStatePush(
   let conflictedPaths: string[] = [];
 
   try {
-    await abortMerge(gitRoot, { signal });
-    await abortRebase(gitRoot, { signal });
-
     for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
       throwIfDurabilityAborted(signal);
       await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
-      await adoptOrphanedStateWrites(gitRoot, signal);
-      try {
-        await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
-      } catch (error) {
-        throwIfDurabilityAborted(signal);
-        try {
-          await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
-        } catch (resolveError) {
-          if (resolveError instanceof StateMergeConflictError) {
-            conflictedPaths = resolveError.conflictedPaths;
-          }
+      // Mutating section under the repo-scoped lock (PAN-3848 F7): adopt,
+      // merge, conflict resolution, and the survival re-apply must never run
+      // concurrently with another writer's git mutation on this checkout — in
+      // this process or another. The fetch above and the push below are
+      // read-only and network-bound, so they stay outside the lock.
+      await withStateRepoLock(gitRoot, `reconcile:${issueId}`, async () => {
+        if (attempt === 0) {
           await abortMerge(gitRoot, { signal });
           await abortRebase(gitRoot, { signal });
-          throw new Error(
-            `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
-            { cause: error },
-          );
         }
-      }
+        await adoptOrphanedStateWrites(gitRoot, signal);
+        try {
+          await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
+        } catch (error) {
+          throwIfDurabilityAborted(signal);
+          try {
+            await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
+          } catch (resolveError) {
+            if (resolveError instanceof StateMergeConflictError) {
+              conflictedPaths = resolveError.conflictedPaths;
+            }
+            await abortMerge(gitRoot, { signal });
+            await abortRebase(gitRoot, { signal });
+            throw new Error(
+              `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
+              { cause: error },
+            );
+          }
+        }
 
-      if (mutation) {
-        await ensureMutationSurvivedReconcile(project, issueId, mutator, mutation, gitRoot, recordPath, signal);
-      }
+        if (mutation) {
+          await ensureMutationSurvivedReconcile(project, issueId, mutator, mutation, gitRoot, recordPath, signal);
+        }
+      });
 
       try {
         await git(gitRoot, ['push', 'origin', STATE_BRANCH], { signal });
