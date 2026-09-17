@@ -1,4 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { execSync } from 'node:child_process';
+import { dirname } from 'node:path';
 import { mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,5 +48,76 @@ describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
 
     expect(isPreWorktreeMetadataOnlyDir(workspacePath)).toBe(false);
     expect(stagePreWorktreeMetadataSync(workspacePath)).toBeNull();
+  });
+});
+
+describe('createWorktree — CWE-78: branch config never reaches a shell', () => {
+  let repoPath: string;
+  let marker: string;
+  const cleanup: string[] = [];
+
+  beforeEach(() => {
+    repoPath = mkdtempSync(join(tmpdir(), 'worktree-cwe78-repo-'));
+    marker = join(mkdtempSync(join(tmpdir(), 'worktree-cwe78-marker-')), 'pwned');
+    execSync('git init -q && git commit --allow-empty -qm init', {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+      },
+    });
+  });
+
+  afterEach(() => {
+    for (const path of cleanup.splice(0)) {
+      execSync(`git worktree remove --force "${path}" 2>/dev/null || true`, { cwd: repoPath, shell: '/bin/bash' });
+      rmSync(path, { recursive: true, force: true });
+    }
+    rmSync(repoPath, { recursive: true, force: true });
+    rmSync(dirname(marker), { recursive: true, force: true });
+  });
+
+  it('a defaultBranch containing shell syntax is never executed', async () => {
+    const { createWorktree } = await import('../worktree-ops.js');
+    const targetPath = join(repoPath, 'wt-out');
+    cleanup.push(targetPath);
+
+    // Shell metacharacters in a config-supplied branch name must travel as an
+    // argv element, not be interpolated into a shell command.
+    const malicious = `main; touch ${marker}`;
+    const warn = (await import('node:console')).default;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await createWorktree(repoPath, targetPath, 'scratch/cwe78', malicious);
+    warnSpy.mockRestore();
+
+    expect(existsSync(marker)).toBe(false);
+    // The fetch fails (unknown refspec), the local-ref fallback fails the same
+    // way — the command reports failure, never execution.
+    expect(result.success).toBe(false);
+    expect(warn).toBeDefined();
+  });
+
+  it('a legitimate defaultBranch still fetches and cuts the worktree from origin/<default>', async () => {
+    const { createWorktree } = await import('../worktree-ops.js');
+    // Give the repo an origin with a real main branch.
+    const remotePath = mkdtempSync(join(tmpdir(), 'worktree-cwe78-remote-'));
+    cleanup.push(remotePath);
+    execSync('git init -q --bare .', { cwd: remotePath });
+    execSync(`git remote add origin "${remotePath}"`, { cwd: repoPath });
+    execSync('git branch -M main && git push -q origin main', { cwd: repoPath, env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@test.com',
+      GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 'test@test.com',
+    } });
+
+    const targetPath = join(repoPath, 'wt-ok');
+    cleanup.push(targetPath);
+    const result = await createWorktree(repoPath, targetPath, 'scratch/ok', 'main');
+
+    expect(result.success).toBe(true);
+    expect(existsSync(join(targetPath, '.git'))).toBe(true);
   });
 });

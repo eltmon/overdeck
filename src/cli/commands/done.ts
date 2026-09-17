@@ -4,9 +4,10 @@ import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
 import type { AgentState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -295,7 +296,7 @@ export async function recordScopeDriftForDone(
     const { getSyncTargetBranch } = await import('../../lib/cloister/verification-runner.js');
     const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, undefined);
     try {
-      await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
+      await execFileAsync('git', ['fetch', 'origin', '--', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
     } catch (fetchErr: any) {
       console.warn(`[pan done] git fetch origin ${targetBranch} failed; scope drift diffs against the cached ref: ${fetchErr?.message ?? fetchErr}`);
     }
@@ -326,7 +327,7 @@ async function isMergeSetMergedIntoTargets(
 
     if (!existsSync(join(repoPath, '.git'))) return false;
 
-    await execAsync(`git fetch origin ${repo.targetBranch}`, {
+    await execFileAsync('git', ['fetch', 'origin', '--', repo.targetBranch], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 60000,
