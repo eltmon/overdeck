@@ -533,6 +533,7 @@ export async function handleUnrecordedReviewRequest(
     prUrl ?? '',
     `${reason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
   );
+}
 
 /** PR #3872 finding 1: a stale review (reviewStaleSince set) must never take the no-op path — exported for tests. */
 export function shouldSkipReReviewAsNoop(
