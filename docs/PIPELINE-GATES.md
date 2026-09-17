@@ -15,7 +15,9 @@ Review `blocked`/`failed`, test `failed`, and UAT `failed` verdicts all return w
 the work agent through the same feedback doors: `writeFeedbackFile()` persists the
 feedback, `resolveIssueFeedbackTarget()` finds or resurrects the work target, and
 `surfaceIssueFeedbackNeedsYou()` creates a durable escalation when no target resolves.
-The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`.
+The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`. Delivery is confirmed
+against the agent's transcript; an unconfirmed delivery surfaces a needs-you
+escalation instead of reporting success (PAN-3846).
 
 ## Review Convergence Gate (PAN-3151)
 
