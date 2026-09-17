@@ -31,15 +31,18 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: issueOwesReworkSync(issueId),
     });
-    console.log(chalk.green('Message sent to ' + agentId));
-    console.log(chalk.dim(`  "${message}"`));
-    // PAN-3736: when the delivery door explains itself — a busy agent whose
-    // message went to its mail file, a paused gate, a dedup — print that
-    // reason. It names the mail file, so the reader can check or hand-deliver
-    // the message instead of assuming the agent is dead.
-    if (outcome?.reason) {
-      console.log(chalk.dim(`  ${outcome.reason}`));
+    if (!outcome.delivered) {
+      console.error(chalk.red(`Message NOT delivered to ${agentId}`));
+      console.error(chalk.dim(`  "${message}"`));
+      console.error(chalk.dim(`  ${outcome.reason ?? 'no reason reported'}`));
+      if (outcome.queuedToMail) {
+        console.error(chalk.dim(`  The text is saved under ~/.overdeck/agents/${agentId}/mail/ for manual delivery.`));
+      }
+      return exitCli(1);
     }
+    console.log(chalk.green(`Message delivered to ${agentId}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
+    console.log(chalk.dim(`  "${message}"`));
+    return exitCli(0);
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
     return exitCli(1);

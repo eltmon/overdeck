@@ -53,4 +53,29 @@ describe('pan tell', () => {
       owesRework: true,
     });
   });
+
+  it('exits 1 with the reason on stderr when delivery is not confirmed (PAN-3846 W4)', async () => {
+    mocks.messageAgent.mockResolvedValue({
+      delivered: false,
+      queuedToMail: true,
+      confirmed: false,
+      reason: 'message was injected but no turn appeared in transcript session-1 within the confirmation window (2 attempts)',
+    });
+
+    await tellCommand('PAN-3846', 'are you there');
+
+    expect(mocks.exitCli).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Message NOT delivered to agent-pan-3846'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no turn appeared in transcript session-1'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('~/.overdeck/agents/agent-pan-3846/mail/'));
+  });
+
+  it('exits 0 and prints turn confirmed on a confirmed delivery (PAN-3846 W4)', async () => {
+    mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true });
+
+    await tellCommand('PAN-3846', 'status please');
+
+    expect(mocks.exitCli).toHaveBeenCalledWith(0);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Message delivered to agent-pan-3846 (turn confirmed)'));
+  });
 });
