@@ -41,8 +41,13 @@ describe('isAgentIdleForNudge (PAN-1586)', () => {
     expect(isAgentIdleForNudge('agent-x', STALE, NOW)).toBe(false);
   });
 
-  it('returns true when the mirror is explicitly idle', () => {
-    mockRuntime.mockReturnValue(rt({ state: 'idle' }));
+  it('PAN-3846: the mirror idle label alone never makes an agent idle — work activity decides', () => {
+    // Stop hook flips the mirror to 'idle' between every two turns; with fresh
+    // work activity that is a working agent, not an idle one.
+    mockRuntime.mockReturnValue(rt({ state: 'idle', lastActivity: new Date(NOW - 30_000).toISOString() }));
+    expect(isAgentIdleForNudge('agent-x', STALE, NOW)).toBe(false);
+    // With work activity older than the threshold the idle label agrees.
+    mockRuntime.mockReturnValue(rt({ state: 'idle', lastActivity: new Date(NOW - 60 * 60 * 1000).toISOString() }));
     expect(isAgentIdleForNudge('agent-x', STALE, NOW)).toBe(true);
   });
 

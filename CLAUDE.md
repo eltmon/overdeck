@@ -46,7 +46,7 @@
 | Harnesses (claude-code, ohmypi, codex, acp, kimi-code), ToS gate | [configuration/harnesses.mdx](configuration/harnesses.mdx), [reference/harness-landscape.mdx](reference/harness-landscape.mdx) |
 | Roles, sub-roles, agent taxonomy, review architecture | [docs/ROLES.md](docs/ROLES.md), [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md) |
 | Skills ↔ CLI convention (`sync-sources/skills/pan-<verb>/`) | [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) |
-| Agent message delivery (PTY supervisor, Channels fallback, blocking-menu guard) | [docs/AGENT-MESSAGE-DELIVERY.md](docs/AGENT-MESSAGE-DELIVERY.md) |
+| Agent message delivery (confirmed turn, PTY supervisor, Channels fallback, blocking-menu guard) | [docs/AGENT-MESSAGE-DELIVERY.md](docs/AGENT-MESSAGE-DELIVERY.md) |
 | Dashboard server architecture, WS endpoints, terminal protocol | [docs/DASHBOARD-ARCHITECTURE.md](docs/DASHBOARD-ARCHITECTURE.md) |
 | Verification gate, verdict feedback routing, review convergence, auto-resume gates | [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md) |
 | Resource governor (memory gate, preemption) | [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md) |

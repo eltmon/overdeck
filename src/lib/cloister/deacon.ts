@@ -38,9 +38,8 @@ import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { swarmJanitorPass } from './deacon-swarm.js';
-import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
-import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { removeAgentStateDir } from '../agents/state-dir-removal.js';
 import { sweepTranscriptRetention } from './transcript-retention.js';
@@ -144,7 +143,7 @@ export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
 export { reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 export { coordinateSwarmSlots } from './deacon-swarm.js';
-export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
+export { nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
@@ -184,7 +183,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { getAgentIdleAgeMs, isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
@@ -927,71 +926,6 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
 
   if (actions.length > 0) {
     console.log(`[deacon] Cleanup complete: purged ${actions.length} stale agent directories`);
-  }
-
-  return actions;
-}
-
-/**
- * Clean up abandoned feedback directories.
- *
- * Event-driven cleanup handles the happy path (new review cycle → clear on
- * dispatch; merge → close-out removes workspace). This sweep is the safety net
- * for workspaces where those events never fired: work agent is no longer
- * running AND no review is in flight AND feedback files are still sitting in
- * `.pan/feedback/`.
- *
- * The feedback is useless once consumed, so we always delete — no archive, no
- * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
- */
-export async function cleanupAbandonedFeedback(): Promise<string[]> {
-  const actions: string[] = [];
-
-  const { getReviewStatusSync } = await import('../review-status.js');
-  const { clearFeedbackFiles } = await import('./feedback-writer.js');
-
-  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-    const panFeedbackDir = join(workspacePath, '.pan', 'feedback');
-    if (!existsSync(panFeedbackDir)) continue;
-
-    const issueLower = issueId.toLowerCase();
-
-    // Gate 1: work agent tmux session active? If yes, feedback may be current.
-    const agentSession = `agent-${issueLower}`;
-    try {
-      if (await Effect.runPromise(sessionExists(agentSession))) continue;
-    } catch {
-      // Treat lookup error as "session might exist" — skip out of caution.
-      continue;
-    }
-
-    // Gate 2: review in flight? If yes, feedback is about to be consumed.
-    try {
-      const status = getReviewStatusSync(issueId);
-      if (status?.reviewStatus === 'reviewing') continue;
-    } catch {
-      // No status entry → safe to clean.
-    }
-
-    // Both gates passed — feedback is abandoned, safe to delete.
-    try {
-      const countFeedbackFiles = (dir: string) => existsSync(dir)
-        ? readdirSync(dir).filter(f => /^\d{3}-/.test(f) && f.endsWith('.md')).length
-        : 0;
-      const before = countFeedbackFiles(panFeedbackDir);
-      if (before === 0) continue;
-      await Effect.runPromise(clearFeedbackFiles(workspacePath));
-      actions.push(
-        `Cleared ${before} abandoned feedback file(s) in feature-${issueLower} (agent stopped, no in-flight review)`,
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[deacon] cleanupAbandonedFeedback failed for feature-${issueLower}:`, msg);
-    }
-  }
-
-  if (actions.length > 0) {
-    console.log(`[deacon] Feedback cleanup: ${actions.length} workspace(s) cleared`);
   }
 
   return actions;
@@ -1957,7 +1891,7 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
         // Clean up accumulated stale feedback so the work agent doesn't read them
         await clearStaleCiFeedback(issueId).catch(() => {});
         console.log(`[deacon] Cleared stale CI-blocked merge for ${issueId} — reset to readyForMerge`);
-        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
+        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000)}m)`);
         continue;
       }
 
@@ -1994,9 +1928,11 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
               ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
               : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`;
 
-        await Effect.runPromise(sendKeys(agentSessionName, nudgeMessage));
-        actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
-        console.log(`[deacon] Sent dead-end recovery nudge to ${agentSessionName}`);
+        const { messageAgent } = await import('../agents/messaging.js');
+        const outcome = await messageAgent(agentSessionName, nudgeMessage, 'deacon:dead-end', { owesRework: true });
+        const idleMin = Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000);
+        if (outcome.delivered) actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${idleMin}m, turn confirmed=${outcome.confirmed === true})`);
+        else actions.push(`Dead-end recovery: nudge NOT delivered to ${agentSessionName} (${statusType}): ${outcome.reason ?? 'unknown'}`);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[deacon] Failed to send dead-end nudge to ${agentSessionName}:`, msg);
@@ -2685,7 +2621,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reconciledJournalActions = await reconcileInFlightJournals();
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
-  for (const a of (await import('./feedback-stuck-retirement.js')).retireResolvedFeedbackDeliveryStuckFlags()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
@@ -2736,16 +2671,6 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // PAN-3053: read-only Docker bridge-pool pressure signal; emits on transitions only.
   for (const a of await (await import('./bridge-pool-patrol.js')).patrolDockerBridgePool()) { actions.push(a); addLog('action', a, state.patrolCycle); }
-
-  // Re-send the resume continue prompt when a work agent is alive and idle after
-  // resume but no user record landed in the JSONL transcript.
-  const stalledResumeActions = await nudgeStalledResumeWorkAgents();
-  actions.push(...stalledResumeActions);
-  for (const a of stalledResumeActions) addLog('action', a, state.patrolCycle);
-
-  const kickoffRedeliveryActions = await redeliverUndeliveredKickoffs();
-  actions.push(...kickoffRedeliveryActions);
-  for (const a of kickoffRedeliveryActions) addLog('action', a, state.patrolCycle);
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
@@ -3134,15 +3059,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Retention needs the canonical registry row to prove terminal state before
   // agent GC removes that evidence. Both run on the same 60-cycle cadence.
   if (state.patrolCycle % 60 === 0) for (const id of (await pruneTerminalStoppedAgents()).removed) actions.push(`[agents-gc] pruned ${id}`);
-
-  // Periodic abandoned-feedback sweep — safety net for workspaces where the
-  // event-driven cleanup (new review cycle / merge / close-out) never fired.
-  // See docs/REVIEW-AGENT-ARCHITECTURE.md.
-  if (shouldRunRecoveryJanitor('feedback', state.patrolCycle)) {
-    const feedbackActions = await cleanupAbandonedFeedback();
-    actions.push(...feedbackActions);
-    for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
-  }
 
   // PAN-1908: primary orphan reviewer-session cleanup is reactive
   // (agent.stopped for the owning work agent). This is a thin safety-net

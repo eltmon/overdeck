@@ -12,7 +12,6 @@ import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFi
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
   clearReadySignal,
@@ -33,11 +32,10 @@ import {
 import { getLatestSessionIdSync } from './activity.js';
 import {
   deliverAgentMessage,
-  deliverResumeMessageWithTranscriptConfirmation,
+  deliverMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
-import { watchForEatenAgentMessage } from './eaten-message-watcher.js';
-import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
+import { formatMailFileContent } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
@@ -63,6 +61,8 @@ export interface MessageDeliveryOutcome {
   queuedToMail: boolean;
   reason?: string;
   deduplicated?: boolean;
+  /** true when a transcript probe saw the message land as a new turn (Claude Code only). */
+  confirmed?: boolean;
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -453,7 +453,7 @@ export async function messageAgent(
       if (fallbackHarness === 'claude-code') {
         const fallbackSessionId = getLatestSessionIdSync(normalizedId);
         if (fallbackSessionId) {
-          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+          const delivery = await deliverMessageWithTranscriptConfirmation({
             agentId: normalizedId,
             workspace: agentState.workspace,
             sessionId: fallbackSessionId,
@@ -521,29 +521,6 @@ export async function messageAgent(
   }
 
   const expectedHarness = agentState?.harness ?? 'claude-code';
-
-  // PAN-3015 monitor tier: when the agent's Claude Code session runs a live
-  // `pan monitor` background task, the durable mail file IS the delivery — the
-  // monitor prints it to stdout and the harness surfaces it to the model,
-  // waking an idle session. No keystroke transport runs, which sidesteps the
-  // whole echo-confirm/paste/Enter failure class (PAN-1769, PAN-2228,
-  // PAN-1988). Mid-session tells only: kickoff/resume never reach this path
-  // (no monitor exists before the session's first turn), and a stale
-  // heartbeat or dead pid falls through to the normal cascade.
-  //
-  // KEYED deliveries never take this tier (PAN-2997 review cycle 7): the
-  // monitor claims a mail file by renaming it before emitting, so a monitor
-  // exit between claim and emit loses the wake, and a dashboard crash after
-  // the emit but before the outbox ack replays it — the mail spool cannot
-  // enforce the key across the complete model-visible side effect. Keyed
-  // messages fall through to the supervisor/tmux door, which can.
-  if (expectedHarness === 'claude-code' && opts.dedupKey === undefined && isMonitorLive(normalizedId)) {
-    queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
-    logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
-    console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
-    await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: true, queuedToMail: true, reason: 'monitor' };
-  }
 
   let appServerState: string | undefined;
   try {
@@ -625,15 +602,52 @@ export async function messageAgent(
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
     ? agentState?.sessionId ?? getLatestSessionIdSync(normalizedId)
     : undefined;
-  let transcriptWatch: { sessionId: string; fromByteOffset: number } | undefined;
-  if (agentState?.workspace && transcriptSessionId) {
-    const snapshot = await captureTranscriptUserRecordSnapshot(agentState.workspace, transcriptSessionId);
-    transcriptWatch = {
+
+  if (agentState?.workspace && transcriptSessionId && opts.dedupKey === undefined) {
+    // Claude Code, unkeyed: deliver and wait for the transcript to show the turn.
+    const confirmedDelivery = await deliverMessageWithTranscriptConfirmation({
+      agentId: normalizedId,
+      workspace: agentState.workspace,
       sessionId: transcriptSessionId,
-      fromByteOffset: snapshot.readOffset ?? snapshot.fileSize ?? 0,
-    };
+      message,
+      caller: deliveryCaller,
+      // A supervisor-backed agent owns a verified PTY socket; require that path
+      // instead of silently falling back to a tmux paste whose compaction
+      // summary can masquerade as the message landing (same guard as resume).
+      deliveryMethod: agentState.deliveryMethod === 'supervisor' || agentState.supervisorEnabled === true
+        ? 'supervisor'
+        : deliveryMethod,
+    });
+    queueAgentMail(normalizedId, message, 'delivered');
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    if (!confirmedDelivery.delivered) {
+      const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
+      logAgentLifecycleSync(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+      return { delivered: false, queuedToMail: true, confirmed: false, reason };
+    }
+    logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
+    // A confirmed delivery repairs the state the feedback-delivery retirement
+    // patrol used to clear: once a message provably lands, the
+    // feedback_delivery_needs_you escalation it recorded is stale (PAN-3846).
+    if (agentState.issueId) {
+      try {
+        // A confirmed delivery repairs the state the retired feedback-delivery
+        // retirement patrol used to clear. Lazy import through the DB sync door
+        // (not review-status.js, whose import graph cycles back into agents).
+        const { getReviewStatusFromDbSync, clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+        const row = getReviewStatusFromDbSync(agentState.issueId);
+        if (row?.stuck === true && row.stuckReason === 'feedback_delivery_needs_you') {
+          clearWorkspaceStuck(agentState.issueId);
+          logAgentLifecycleSync(normalizedId, `messageAgent cleared feedback_delivery_needs_you for ${agentState.issueId} after confirmed delivery`);
+        }
+      } catch (clearError) {
+        console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
+      }
+    }
+    return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
+  // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
   const delivery = await deliverWithOptionalKey(
     normalizedId,
     message,
@@ -653,28 +667,10 @@ export async function messageAgent(
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
 
-  if (delivery.ok && transcriptWatch && agentState?.workspace) {
-    void watchForEatenAgentMessage({
-      agentId: normalizedId,
-      workspace: agentState.workspace,
-      sessionId: transcriptWatch.sessionId,
-      message,
-      caller: deliveryCaller,
-      deliveryMethod,
-      fromByteOffset: transcriptWatch.fromByteOffset,
-    }).then((outcome) => {
-      if (outcome === 'redelivered') {
-        console.log(`[agents] ${normalizedId}: redelivered message eaten by submit-time compaction`);
-      }
-    }).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[agents] eaten-message watcher failed for ${normalizedId}: ${errorMessage}`);
-    });
-  }
-
   return {
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,
+    confirmed: false,
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }

@@ -28,6 +28,20 @@ and ACP sockets — precede these but are no-ops for Claude Code agents):
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
 
+## Delivery contract (PAN-3846)
+
+`messageAgent` returns `delivered: true` for a running Claude Code agent only
+when the agent's transcript shows the message as a new turn — the delivery is
+probed against the session JSONL for up to 30 seconds across two attempts
+(`deliverMessageWithTranscriptConfirmation` in `src/lib/agents/delivery.ts`,
+the generalized resume primitive). When no turn appears, the outcome is
+`delivered: false` with a `reason` (and `confirmed: false`); callers that need
+escalation branch on `delivered` and surface a needs-you instead of reporting
+success. Keyed deliveries keep the dedup door as their receipt and non-Claude
+harnesses keep their composer-level contract; both report `confirmed: false`.
+A confirmed delivery also clears the issue's `feedback_delivery_needs_you`
+stuck flag through the review-status door.
+
 The tmux fallback presses Enter after an unverified paste so text never sits
 orphaned in the composer — except when the pane is blocked on a numbered choice
 menu (session-resume gate, permission prompt, plan approval). That menu is why
