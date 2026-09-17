@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:01:25.080Z",
+  "updated": "2026-09-17T01:01:28.508Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 24,
+    "sequence": 25,
     "claims": {
       "spawn-single-log": {
         "writerId": "agent-pan-3842",
@@ -499,8 +499,8 @@
         "updatedAt": "2026-09-17T00:39:52.895Z"
       },
       "settings-badges": {
-        "reason": "Settings crew rows and supervisor block render draft-computed fitness badges via tierFitnessWarnings in tiered-crews.ts; 32 section tests pass incl. 6 new PAN-3842 cases; typecheck+lint green (cycle and introspection guards fixed via doctor CheckResult re-declare and audited baseline accept).",
-        "updatedAt": "2026-09-16T20:25:42.223Z"
+        "reason": "Adjudicated F-3 duplicate React key on same-code warnings, and F-4 frontend catalog divergence (mistral-large-latest, llama-3.3-70b-versatile known to server, unknown to Settings)",
+        "updatedAt": "2026-09-17T01:01:28.508Z"
       },
       "docs-fitness": {
         "reason": "Added Tier fitness warnings to TIERED-EXECUTION.md, Capability classes to MODEL_ROUTING.md, and the doctor-row sentence to troubleshooting.mdx; all four verify greps print matches.",
@@ -541,12 +541,12 @@
     "spawn-single-log.ac2": "pending",
     "spawn-single-log.ac3": "pending",
     "spawn-single-log.ac4": "pending",
-    "settings-badges": "completed",
-    "settings-badges.ac1": "completed",
-    "settings-badges.ac2": "completed",
-    "settings-badges.ac3": "completed",
-    "settings-badges.ac4": "completed",
-    "settings-badges.ac5": "completed",
+    "settings-badges": "pending",
+    "settings-badges.ac1": "pending",
+    "settings-badges.ac2": "pending",
+    "settings-badges.ac3": "pending",
+    "settings-badges.ac4": "pending",
+    "settings-badges.ac5": "pending",
     "docs-fitness": "completed",
     "docs-fitness.ac1": "completed",
     "docs-fitness.ac2": "completed",
