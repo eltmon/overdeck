@@ -102,6 +102,11 @@
       "reason": "resume",
       "agentModel": "MiniMax-M3",
       "timestamp": "2026-09-17T00:34:10.237Z"
+    },
+    {
+      "timestamp": "2026-09-17T01:40:08.715Z",
+      "reason": "end",
+      "note": "Anomaly first: found and fixed a real regression my own prior round introduced — resolveSingleWorkTierSpawnParams ran getDispatchableItems before the explicit-override branch, reaching doc.plan.edges on plans the override path never used to touch. agents-spawn-supervisor.test.ts was 15 failed / 20 passed on HEAD; the earlier verification-gate red was NOT only the demo-bug I had staged. Now 35/35.\n\nSecond deviation: the missing-slot-item integration test asserts less than originally drafted. resolveSlotTierSpawnParams no longer throws there, but the spawn still fails at buildRegisteredSlotPrompt -> createActiveSlice, which rejects a missing item independently of this feature and predates it. The test pins that the failure is NOT the tiered-execution one, so no new abort was added; it does not claim the spawn survives.\n\nThird: a stray untracked settings-full.yml (Playwright a11y dump from 18:54, pre-dating this session) blocked the done check. Not deleted, not committed — added to .git/info/exclude and reported to conv-20260916-1699.\n\nScope held: did NOT change D11 representative-only doctor policy or the untiered-default warning (both deliberate PRD decisions), and implemented no speculative security or malformed-input hardening.\n\nDelivered, per the adjudicated experiment RESULTS.md:\n- R4 false negative: capabilityClassOf reads the literal row first, hops MODEL_DEPRECATIONS only for ids without one. Adjudicator probe went checkedClass frontier / expertWarnings [] to checkedClass small / expertWarnings [underpowered]. Deleting the deprecated rows would not have fixed it.\n- F-5: underpowered messages group failing difficulties by their own requirement; the single-requirement sentence stays byte-identical.\n- F-1: provider-not-enabled scoped to CONFIGURABLE_PROVIDERS, a new shared table both the server schema union and the frontend Provider type derive from. xai/groq/cerebras/mistral/quantumllama had no config key, no merge branch and no Settings card, so that warning was unclearable. Band checks still run for them.\n- F-4: frontend knownModelIds unions the shared class table, so Settings stops calling mistral-large-latest and llama-3.3-70b-versatile unknown.\n- F-3: unique badge keys at both sites; verified by reverting the key expression and watching the test fail.\n- F-6a: new agents-spawn-tier-fitness.test.ts drives real spawnAgent/spawnRun with side effects mocked. Demonstrated it catches the pre-dfe7305 ordering in both directions (spurious warn on a correctly-staffed frontier slot; warning naming the parent default instead of the staffed model).\n- F-6b: TieredExecutionSection.test.tsx and tiered-crews.test.ts added to npm test; frontend leg went 64 to 112 tests.\n- PRD corrections R1 and R2 written through the canonical draft writer; docs updated.\n\nGates: npm test exit 0 (14386 backend, 112 frontend, 51 skipped), typecheck green, lint green with Effect diagnostics 308 known and none new. All 8 xBRIEF items reopened and re-closed through the task door."
     }
   ],
   "feedback": [],
@@ -174,7 +179,7 @@
     "recordedAt": "2026-09-17T01:40:01.804Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:40:02.848Z",
+  "updated": "2026-09-17T01:40:08.785Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -184,13 +189,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:40:02.844Z",
+    "updatedAt": "2026-09-17T01:40:08.697Z",
     "reviewNotes": "Cycle 3 clean: 4/4 reviewers zero blockers at 4f4d3e1a; both cycle-1 blockers now fixed structurally via resolveSlotSpawnFitness, tree clean, simulation tests replaced with production-helper regressions",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "4f4d3e1a8d36395fbbbe8756e010055017c46b6d",
     "lastVerifiedCommit": "d967cb9716a8bcafff9f0469c71259b344bd4fe4",
+    "reviewRequestedAt": "2026-09-17T01:40:02.844Z",
     "reviewSpawnedAt": "2026-09-16T22:33:07.333Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -262,8 +268,7 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
-    "reviewRequestedAt": "2026-09-17T01:40:02.844Z"
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -294,9 +299,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 471263,
-            "output": 85617,
-            "cacheRead": 50661846,
+            "input": 471640,
+            "output": 86196,
+            "cacheRead": 50884831,
             "cacheWrite": 0
           }
         }
@@ -321,15 +326,15 @@
           "cacheWrite": 357773
         },
         "custom/MiniMax-M3": {
-          "input": 471263,
-          "output": 85617,
-          "cacheRead": 50661846,
+          "input": 471640,
+          "output": 86196,
+          "cacheRead": 50884831,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.95129,
-        "pricingAsOf": "2026-09-16T22:55:47.544Z"
+        "usd": 19.952098,
+        "pricingAsOf": "2026-09-17T01:40:08.755Z"
       }
     },
     "merges": [
@@ -338,7 +343,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
