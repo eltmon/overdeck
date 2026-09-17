@@ -136,6 +136,10 @@
     {
       "at": "2026-09-17T02:34:01.428Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-09-17T04:20:31.036Z",
+      "event": "stopped"
     }
   ],
   "archiveRef": null,
