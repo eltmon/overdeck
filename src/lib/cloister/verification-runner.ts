@@ -230,7 +230,8 @@ export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliati
   return reset;
 }
 
-async function deliverVerificationFeedback(
+/** Exported for focused delivery-outcome tests (PR #3874 review). */
+export async function deliverVerificationFeedback(
   issueId: string,
   message: string,
   details: Record<string, unknown>,
@@ -244,8 +245,24 @@ async function deliverVerificationFeedback(
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
-    await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
-    console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
+    // PR #3874 review: delivered:false no longer throws — escalate instead of
+    // logging success, the same contract as review-verdict-feedback.
+    let outcome: Awaited<ReturnType<typeof messageAgent>>;
+    try {
+      outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
+    } catch (err) {
+      outcome = { delivered: false, queuedToMail: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    if (outcome.delivered) {
+      console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
+      return;
+    }
+    const reason = outcome.reason ?? 'delivery was not accepted';
+    console.warn(`[${logPrefix}] Could not message ${target.agentId}; verification feedback for ${issueId} not delivered: ${reason}`);
+    await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+      specialist: 'verification-gate',
+      ...details,
+    });
     return;
   }
 
