@@ -207,3 +207,243 @@ describe('loadRetrospectiveTemplate', () => {
     expect(await loadRetrospectiveTemplate(file)).toBe('edited version');
   });
 });
+
+// ─── Canonical evidence bridge (data flow, not prompt wording) ────────────────
+
+import {
+  collectRetrospectiveEvidence,
+  formatEvidence,
+  isRecordInWindow,
+  EVIDENCE_LIMITS,
+  type RetrospectiveProjectLine as PLine,
+  type RetrospectiveSourceRecord,
+} from '../conversation-retrospective.js';
+
+const WINDOW_START = new Date('2026-09-16T00:00:00.000Z');
+
+const MIGRATED: PLine = {
+  key: 'panopticon-cli', path: '/repo/pan', stateRoot: '/state/pan', migrated: true, githubRepo: 'eltmon/overdeck',
+};
+const LEGACY: PLine = {
+  key: 'legacy-proj', path: '/repo/legacy', stateRoot: '/repo/legacy', migrated: false,
+};
+
+function record(over: Partial<RetrospectiveSourceRecord> = {}): RetrospectiveSourceRecord {
+  return {
+    issueId: 'PAN-1',
+    updated: '2026-09-16T12:00:00.000Z',
+    pipeline: { reviewStatus: 'passed', mergeStatus: 'pending', prUrl: 'https://x/1', ignoredKey: 'drop me' },
+    feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'changes-requested', timestamp: '2026-09-16T11:00:00.000Z' }],
+    sessionHistory: [{ timestamp: '2026-09-16T10:00:00.000Z', reason: 'start', agentModel: 'claude-opus-5' }],
+    recoveryTrips: [{ recoveryPath: 'orphan-pickup', tripCount: 2, open: true }],
+    scopeDrift: { outsideDeclaredScope: ['a.ts'], declaredScopeUntouched: ['b.ts'] },
+    ...over,
+  };
+}
+
+describe('collectRetrospectiveEvidence — data flow through the read door', () => {
+  it('surfaces records for a migrated project and preserves all five field groups', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [record()],
+    });
+    expect(project.key).toBe('panopticon-cli');
+    expect(project.issues).toHaveLength(1);
+    const issue = project.issues[0];
+    expect(issue.issueId).toBe('PAN-1');
+    expect(issue.pipeline).toEqual({ reviewStatus: 'passed', mergeStatus: 'pending', prUrl: 'https://x/1' });
+    expect(issue.pipeline).not.toHaveProperty('ignoredKey');
+    expect(issue.feedback[0]).toMatchObject({ specialist: 'review-agent', outcome: 'changes-requested' });
+    expect(issue.sessionHistory[0]).toMatchObject({ reason: 'start' });
+    expect(issue.recoveryTrips[0]).toMatchObject({ recoveryPath: 'orphan-pickup', tripCount: 2, open: true });
+    expect(issue.scopeDrift?.outsideDeclaredScope).toEqual(['a.ts']);
+  });
+
+  it('surfaces records for a legacy project through the same injected door', async () => {
+    // The legacy layout is issue-workspace scoped, which is exactly why the
+    // collector delegates resolution instead of concatenating a state root.
+    const seen: string[] = [];
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [LEGACY],
+      windowStart: WINDOW_START,
+      listRecords: async (p) => { seen.push(p.key); return [record({ issueId: 'LEG-9' })]; },
+    });
+    expect(seen).toEqual(['legacy-proj']);
+    expect(project.issues.map((i) => i.issueId)).toEqual(['LEG-9']);
+  });
+
+  it('handles migrated and legacy projects in one pass', async () => {
+    const evidence = await collectRetrospectiveEvidence({
+      projects: [MIGRATED, LEGACY],
+      windowStart: WINDOW_START,
+      listRecords: async (p) => [record({ issueId: p.migrated ? 'MIG-1' : 'LEG-1' })],
+    });
+    expect(evidence.map((e) => e.issues[0].issueId)).toEqual(['MIG-1', 'LEG-1']);
+  });
+
+  it('filters by window: keeps in-window, drops out-of-window, flags undated', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [
+        record({ issueId: 'IN-1', updated: '2026-09-16T12:00:00.000Z' }),
+        record({ issueId: 'OUT-1', updated: '2026-09-15T12:00:00.000Z' }),
+        record({ issueId: 'OUT-2', updated: '2020-01-01T00:00:00.000Z' }),
+        record({ issueId: 'UNDATED-1', updated: undefined }),
+        record({ issueId: 'BADDATE-1', updated: 'not-a-date' }),
+      ],
+    });
+    expect(project.issues.map((i) => i.issueId).sort()).toEqual(['BADDATE-1', 'IN-1', 'UNDATED-1']);
+    expect(project.outOfWindow).toBe(2);
+    expect(project.undated).toBe(2);
+  });
+
+  it('keeps a record exactly on the window boundary', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [record({ issueId: 'EDGE', updated: WINDOW_START.toISOString() })],
+    });
+    expect(project.issues.map((i) => i.issueId)).toEqual(['EDGE']);
+  });
+
+  it('reports an empty project as no evidence rather than crashing', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [],
+    });
+    expect(project.issues).toEqual([]);
+    expect(formatEvidence([project])).toContain('No evidence found for this project');
+  });
+
+  it('discloses a failed read door instead of implying nothing happened', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => { throw new Error('state worktree missing'); },
+    });
+    expect(project.unavailable).toBe('state worktree missing');
+    const rendered = formatEvidence([project]);
+    expect(rendered).toContain('EVIDENCE UNAVAILABLE');
+    expect(rendered).toContain('do not infer that nothing happened');
+  });
+
+  it('skips malformed records with no issueId without failing the batch', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [
+        { issueId: '' } as RetrospectiveSourceRecord,
+        undefined as unknown as RetrospectiveSourceRecord,
+        record({ issueId: 'GOOD-1' }),
+      ],
+    });
+    expect(project.issues.map((i) => i.issueId)).toEqual(['GOOD-1']);
+  });
+
+  it('tolerates a record missing every optional evidence field', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [{ issueId: 'BARE', updated: '2026-09-16T12:00:00.000Z' }],
+    });
+    const issue = project.issues[0];
+    expect(issue.pipeline).toEqual({});
+    expect(issue.feedback).toEqual([]);
+    expect(issue.scopeDrift).toBeUndefined();
+    expect(formatEvidence([project])).toContain('(no populated fields)');
+  });
+
+  it('caps issues per project and discloses how many it dropped', async () => {
+    const many = Array.from({ length: EVIDENCE_LIMITS.maxIssuesPerProject + 5 }, (_, i) =>
+      record({ issueId: `PAN-${i}`, updated: `2026-09-16T${String(i % 24).padStart(2, '0')}:00:00.000Z` }));
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED], windowStart: WINDOW_START, listRecords: async () => many,
+    });
+    expect(project.issues).toHaveLength(EVIDENCE_LIMITS.maxIssuesPerProject);
+    expect(project.truncated).toBe(5);
+    expect(formatEvidence([project])).toContain('dropped by the');
+  });
+
+  it('caps nested per-issue arrays and reports the overflow', async () => {
+    const [project] = await collectRetrospectiveEvidence({
+      projects: [MIGRATED],
+      windowStart: WINDOW_START,
+      listRecords: async () => [record({
+        feedback: Array.from({ length: EVIDENCE_LIMITS.maxFeedbackPerIssue + 3 }, (_, i) =>
+          ({ seq: i, specialist: 'review-agent', outcome: 'x', timestamp: '2026-09-16T11:00:00.000Z' })),
+      })],
+    });
+    const issue = project.issues[0];
+    expect(issue.feedback).toHaveLength(EVIDENCE_LIMITS.maxFeedbackPerIssue);
+    expect(issue.feedbackTruncated).toBe(3);
+    expect(formatEvidence([project])).toContain('+3 more not shown');
+  });
+
+  it('isRecordInWindow classifies in / out / undated', () => {
+    expect(isRecordInWindow('2026-09-16T12:00:00.000Z', WINDOW_START)).toBe('in');
+    expect(isRecordInWindow('2026-09-15T12:00:00.000Z', WINDOW_START)).toBe('out');
+    expect(isRecordInWindow(undefined, WINDOW_START)).toBe('undated');
+    expect(isRecordInWindow('garbage', WINDOW_START)).toBe('undated');
+  });
+});
+
+describe('evidence reaches the rendered kickoff message', () => {
+  it('embeds collected evidence in the message the write door receives', async () => {
+    const createConversation = vi.fn(async () => new Response('{}', { status: 201 }));
+    await handleRetrospectiveConversationCreate(
+      { window: '24h' },
+      {
+        createConversation,
+        loadTemplate: async () => `---\nname: retrospective\n---\nPipeline retrospective: {{WINDOW_LABEL}}\n\n## Record evidence\n\n{{EVIDENCE}}\n`,
+        collectProjects: async () => [MIGRATED],
+        listRecords: async () => [record({ issueId: 'PAN-3836' })],
+        now: () => new Date('2026-09-16T18:00:00.000Z'),
+        overdeckHome: () => '/home/o/.overdeck',
+      },
+    );
+    const message = (createConversation.mock.calls[0][0] as Record<string, unknown>).message as string;
+    expect(message).toContain('PAN-3836');
+    expect(message).toContain('reviewStatus="passed"');
+    expect(message).toContain('review-agent');
+    expect(message).not.toContain('{{EVIDENCE}}');
+  });
+
+  it('applies the request window to the evidence cut-off', async () => {
+    const createConversation = vi.fn(async () => new Response('{}', { status: 201 }));
+    const seen: Date[] = [];
+    await handleRetrospectiveConversationCreate(
+      { window: '7d' },
+      {
+        createConversation,
+        loadTemplate: async () => 'X {{EVIDENCE}}',
+        collectProjects: async () => [MIGRATED],
+        listRecords: async () => [record({ issueId: 'OLD', updated: '2026-09-12T00:00:00.000Z' })],
+        now: () => new Date('2026-09-16T18:00:00.000Z'),
+        overdeckHome: () => '/home/o/.overdeck',
+      },
+    );
+    // 2026-09-12 is inside 7d of 2026-09-16 but outside 24h.
+    const sevenDay = (createConversation.mock.calls[0][0] as Record<string, unknown>).message as string;
+    expect(sevenDay).toContain('OLD');
+    expect(seen).toEqual([]);
+
+    createConversation.mockClear();
+    await handleRetrospectiveConversationCreate(
+      { window: '24h' },
+      {
+        createConversation,
+        loadTemplate: async () => 'X {{EVIDENCE}}',
+        collectProjects: async () => [MIGRATED],
+        listRecords: async () => [record({ issueId: 'OLD', updated: '2026-09-12T00:00:00.000Z' })],
+        now: () => new Date('2026-09-16T18:00:00.000Z'),
+        overdeckHome: () => '/home/o/.overdeck',
+      },
+    );
+    const oneDay = (createConversation.mock.calls[0][0] as Record<string, unknown>).message as string;
+    expect(oneDay).not.toContain('OLD');
+    expect(oneDay).toContain('No issue records were updated in this window');
+  });
+});

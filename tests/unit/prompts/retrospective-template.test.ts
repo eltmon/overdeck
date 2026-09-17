@@ -34,6 +34,7 @@ const EXPECTED_PLACEHOLDERS = [
   '{{WINDOW_END}}',
   '{{OVERDECK_HOME}}',
   '{{PROJECT_LINES}}',
+  '{{EVIDENCE}}',
 ];
 
 function groundRulesSection(body: string): string {
@@ -122,50 +123,60 @@ describe('retrospective template invariants', () => {
     }
   });
 
-  it('locates records under the server-resolved state root, with no invented command', () => {
-    // Two earlier cycles shipped fabricated instructions here: first
-    // `pan records show` (no such CLI verb), then a `node -e` import of
-    // `src/lib/pan-dir/record.js` (the source is TypeScript; that path does
-    // not exist). Neither was runnable. What IS verified: the server resolves
-    // each project's state root through the canonical state resolver and
-    // renders it into PROJECT_LINES before the prompt is delivered, and the
-    // records sit under that root in one of two documented layouts. Assert
-    // the facts the prompt must carry, never a command string.
+  it('tells the agent to use the embedded evidence, never to read records itself', () => {
+    // Three cycles were lost to fabricated read instructions here: `pan records
+    // show` (no such verb), then a `node -e` import of a .js path that does not
+    // exist, then a state-root concatenation that is wrong for the legacy
+    // layout (getIssueRecordPath -> getIssueRecordBasePath is issue-workspace
+    // scoped). The fix is structural: the server now gathers the evidence
+    // through the canonical read door and embeds it, so the prompt should
+    // instruct no read at all. Note we deliberately do NOT ban resolver API
+    // names here — prohibiting a legitimate API by name was itself a defect.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    expect(inputsSection, RAIL_MESSAGE).toContain('state root');
-    expect(inputsSection, RAIL_MESSAGE).toContain('records/<issue>.json');
-    expect(inputsSection, RAIL_MESSAGE).toContain('.pan/records/<issue>.json');
+    expect(inputsSection, RAIL_MESSAGE).toContain('read door');
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/do \*\*not\*\* read record JSON off disk/i);
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/do \*\*not\*\* try to enumerate records yourself/i);
     // No fabricated invocation may reappear in any form.
     expect(inputsSection, RAIL_MESSAGE).not.toMatch(/pan records show/i);
     expect(inputsSection, RAIL_MESSAGE).not.toMatch(/node\s+(-e|--input-type)/);
-    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/readIssueRecord|getIssueRecordPath/);
   });
 
-  it('states that records are a source of truth, not a cache', () => {
+  it('carries a Record evidence section fed by the EVIDENCE placeholder', () => {
+    expect(template, RAIL_MESSAGE).toContain('## Record evidence');
+    const section = template.match(/## Record evidence([\s\S]*?)(\n## )/);
+    expect(section, `Expected a "## Record evidence" section before the next heading. ${RAIL_MESSAGE}`).not.toBeNull();
+    expect(section![1], RAIL_MESSAGE).toContain('{{EVIDENCE}}');
+  });
+
+  it('requires the agent to repeat the snapshot stated omissions', () => {
+    // A capped or failed read must never be reported as "nothing happened".
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    const inputsSection = inputs![1];
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/omission/i);
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/never present a capped or failed read/i);
+  });
+
+  it('never calls the durable record a cache', () => {
     // sync-sources/rules/single-source-of-truth.md:19 — the SQLite DB is the
     // disposable cache, rebuilt FROM `records/` on overdeck-state. A previous
-    // cycle inverted this and told the agent the record was "a derived cache";
-    // that would make it discount the only evidence it has for feedback,
-    // scopeDrift, sessionHistory and recoveryTrips.
-    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
-    expect(inputs, RAIL_MESSAGE).not.toBeNull();
-    const inputsSection = inputs![1];
-    expect(inputsSection, RAIL_MESSAGE).toContain('source of truth');
-    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/derived cache|merely a cache/i);
+    // cycle inverted this and called the record "a derived cache", which would
+    // make the agent discount the only evidence it has. The agent no longer
+    // reads records itself, so the positive framing moved to the code comment
+    // on the bridge; the negative guard stays here because the inverted claim
+    // must never come back.
+    expect(template, RAIL_MESSAGE).not.toMatch(/derived cache|merely a cache/i);
   });
 
-  it('discloses that no shell-reachable door returns the full record', () => {
-    // `pan show --json` is the runtime lens and `pan task show` is one plan
-    // item; neither reaches the four forensic fields. The prompt must say so
-    // rather than implying a door exists, so the retrospective reports the
-    // limitation instead of inventing a workaround.
+  it('names the evidence field groups the report depends on', () => {
+    // The headline numbers ("more than two review cycles", "needed manual
+    // intervention") are derived from these. If the prompt stops naming them
+    // the agent will not know they are available in the snapshot.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    expect(inputsSection, RAIL_MESSAGE).toContain('pan show');
-    for (const field of ['feedback', 'scopeDrift', 'sessionHistory', 'recoveryTrips']) {
+    for (const field of ['pipeline', 'feedback', 'scopeDrift', 'sessionHistory', 'recoveryTrips']) {
       expect(inputsSection, `Expected Inputs to name ${field}. ${RAIL_MESSAGE}`).toContain(field);
     }
   });
