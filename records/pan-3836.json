@@ -475,7 +475,7 @@
     "recordedAt": "2026-09-17T04:20:26.020Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T04:22:56.502Z",
+  "updated": "2026-09-17T04:22:58.847Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -485,7 +485,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T04:22:56.434Z",
+    "updatedAt": "2026-09-17T04:22:58.275Z",
     "reviewNotes": "Agent re-review request (2/25): Wired reserveProjectCreateOperation into POST /api/projects with settle-on-every-exit; fixed the five non-blocking findings",
     "testNotes": "Shepherd-run gates on dc7a572: frontend tsc clean, eslint clean on touched files, Playwright project-creation journeys 13/13 on the isolated built server (incl. new return-to journey).",
     "uatNotes": "Browser UAT by the shepherding conversation against the workspace stack at https://feature-pan-3836.overdeck.localhost (server rebuilt to branch head; Vite proxy pinned to this stack's server, see PAN-3854 root cause). Verified live: /projects/new renders in all three modes; clone of https://github.com/eltmon/okf resolved 'Will clone to /home/node/Projects/okf', Options showed derived name/prefix, clone completed and registered with tracker/github_repo/issue_prefix/default_branch detected, repo on main, workspaces/ excluded, landed on /command-deck/okf; new-mode create resolved target path and 10-char derived prefix; prefix conflict opened Options, flagged the field, disabled Create; unique prefix cleared it; workspace-page chips carry mode+returnTo; after the dc7a572 fix the return path lands on /workspaces/new?project=<key> with the chip and target dir preselected (before the fix it clobbered to /command-deck: real defect, fixed + journey added). Observation (follow-up filed): keystrokes typed within the first seconds after the page loads were discarded 3 of 5 times under load; retyping after defaults settle works.",
@@ -721,7 +721,7 @@
       },
       "costAtCloseOut": {
         "usd": 137.891821,
-        "pricingAsOf": "2026-09-17T04:22:56.493Z"
+        "pricingAsOf": "2026-09-17T04:22:58.839Z"
       }
     },
     "merges": [
