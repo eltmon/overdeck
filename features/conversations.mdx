@@ -223,7 +223,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--cwd <path>` | Working directory for the new conversation. |
 | `--project <key-or-name>` | Registered project for the successor. Defaults to inheriting the source conversation's project, even when `--cwd` points outside that project's directory. |
 | `--author <who>` | Who authors the handoff doc: `external` (default) or `source`. |
-| `--author-model <model>` | Model for the external authoring session (only when `--author=external`). |
+| `--author-model <model>` | Model for the external authoring session (only when `--author=external`). Falls back to `conversations.handoff_author_model` in `config.yaml` when omitted — there is no built-in default, so set one of the two or the handoff fails with a clear error. |
 | `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
 
 <Note>
