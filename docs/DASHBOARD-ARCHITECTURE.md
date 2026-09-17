@@ -76,9 +76,9 @@ relative REST path would throw in `new URL(...)`.
 
 The kickoff prompt locates per-issue records under the `state root` the server
 already resolved through the canonical state resolver and rendered into
-`{{PROJECT_LINES}}` (`<state root>/records/<issue>.json` when migrated,
-`<state root>/.pan/records/<issue>.json` when legacy). Those records are a
-source of truth, not a cache. Note the standing gap: no `pan` verb and no
+`{{PROJECT_LINES}}`, in whichever layout that resolver reports for the project
+(migrated, or the legacy layout an unmigrated project still uses — the
+template spells out both). Those records are a source of truth, not a cache. Note the standing gap: no `pan` verb and no
 dashboard endpoint returns a **full** record to a shell consumer — `pan show
 --json` is the runtime lens and `pan task show --json` is a single plan item,
 so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
