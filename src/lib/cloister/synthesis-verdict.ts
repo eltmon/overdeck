@@ -58,7 +58,13 @@ function resolveWorkspacePath(issueId: string, workspacePath?: string): string |
   return resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : null;
 }
 
-async function readHeadEvidenceAsync(runDir: string): Promise<string | undefined> {
+/**
+ * The review run's spawn-time head anchor from its context.json — the anchor the
+ * run's verdict report actually covers (PR #3872 finding 2). Exported for the
+ * unsignaled-recovery auto-complete, which must anchor verdicts to the review
+ * run, never to the recovery-time workspace head.
+ */
+export async function readHeadEvidenceAsync(runDir: string): Promise<string | undefined> {
   try {
     const context = JSON.parse(await readFile(join(runDir, 'context.json'), 'utf-8')) as {
       headSha?: unknown;

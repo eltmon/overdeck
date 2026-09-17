@@ -2,12 +2,13 @@
  * PAN-3512 — the two unsignaled-recovery auto-completes route their terminal
  * verdict through the write door instead of writing the review row directly.
  *
- * PAN-3847: the door refuses anchorless verdicts, so the auto-complete first
- * snapshots the workspace head and skips (logs) when none is available; a
- * refusal is reported instead of being announced as a completed auto-complete.
+ * PAN-3847: the door refuses anchorless verdicts. PR #3872 finding 2: the
+ * auto-complete anchors to the review RUN's context.json head and skips when
+ * the workspace head moved past it; a refusal is reported instead of being
+ * announced as a completed auto-complete.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, unlinkSync, writeFileSync, utimesSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -69,6 +70,9 @@ beforeEach(() => {
   mkdirSync(runDir, { recursive: true });
   reportPath = join(runDir, 'synthesis.md');
   writeFileSync(reportPath, '## Verdict: CHANGES REQUESTED — terminal verdicts are dropped\n');
+  // PR #3872 finding 2: the auto-complete anchors to the review run's
+  // context.json head, matched against the current workspace head.
+  writeFileSync(join(runDir, 'context.json'), JSON.stringify({ headSha: 'unsignaled-head' }));
   // Age the synthesis past the 5-minute settle window so the sweep intervenes.
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
   utimesSync(reportPath, tenMinutesAgo, tenMinutesAgo);
@@ -101,20 +105,31 @@ describe('unsignaled-recovery auto-complete — verdict write door (PAN-3512)', 
     expect(input.verdict).toBe('blocked');
     expect(input.writer).toBe('unsignaled-recovery');
     expect(input.notes).toBe('terminal verdicts are dropped');
-    // PAN-3847: the auto-complete snapshots the workspace head so the door's
-    // anchor requirement is met.
+    // PR #3872 finding 2: the anchor comes from the review run's context.json,
+    // matched against the current workspace head.
     expect(input.evidenceHead).toBe('unsignaled-head');
     expect(actions.some(a => a.includes('Auto-completed review'))).toBe(true);
   });
 
-  it('skips the auto-complete when no workspace head snapshot is available (PAN-3847)', async () => {
+  it('skips the auto-complete when the workspace head moved past the review-run anchor (PR #3872 finding 2)', async () => {
     mocks.sessionExistsSync.mockReturnValue(false);
-    mocks.snapshotWorkspaceHeadsPromise.mockResolvedValue(undefined);
+    mocks.snapshotWorkspaceHeadsPromise.mockResolvedValue('a-newer-head');
 
     const actions = await checkCompletedButUnsignaledReviews();
 
     expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
-    expect(actions.some(a => a.includes('no workspace head snapshot available'))).toBe(true);
+    expect(actions.some(a => a.includes('no longer matches the review-run anchor'))).toBe(true);
+    expect(actions.some(a => a.includes('Auto-completed review'))).toBe(false);
+  });
+
+  it('skips the auto-complete when the review run has no head anchor (PR #3872 finding 2)', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    unlinkSync(join(workspace, '.pan', 'review', RUN_DIR_NAME, 'context.json'));
+
+    const actions = await checkCompletedButUnsignaledReviews();
+
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
+    expect(actions.some(a => a.includes('no longer matches the review-run anchor'))).toBe(true);
     expect(actions.some(a => a.includes('Auto-completed review'))).toBe(false);
   });
 

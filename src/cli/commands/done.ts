@@ -481,7 +481,7 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
 /** PR #3872 finding 1: a stale review (reviewStaleSince set) must never take the no-op path — exported for tests. */
 export function shouldSkipReReviewAsNoop(
   currentStatus: { reviewStatus?: string; reviewedAtCommit?: string; reviewStaleSince?: string } | null | undefined,
-): boolean {
+): currentStatus is { reviewStatus?: string; reviewedAtCommit: string; reviewStaleSince?: string } {
   return currentStatus?.reviewStatus === 'passed'
     && Boolean(currentStatus?.reviewedAtCommit)
     && !currentStatus?.reviewStaleSince;
@@ -808,7 +808,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // This prevents agents from accidentally cycling the pipeline after approval.
     // PR #3872 finding 1: a stale review (reviewStaleSince set) must NEVER take
     // the no-op path — the marker exists to force exactly this re-review.
-    if (shouldSkipReReviewAsNoop(currentStatus)) {
+    if (currentStatus && shouldSkipReReviewAsNoop(currentStatus)) {
       const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
       try {
         const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
