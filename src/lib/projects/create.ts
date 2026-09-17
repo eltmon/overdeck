@@ -41,18 +41,27 @@
  */
 
 import { execFile, spawn } from 'child_process';
-import { mkdir, rm, stat, readFile, appendFile, readdir, realpath } from 'fs/promises';
+import { mkdir, rm, stat, lstat, readFile, appendFile, readdir, realpath } from 'fs/promises';
 import { join, resolve, dirname, basename, isAbsolute, sep } from 'path';
 import { homedir } from 'os';
 import { promisify } from 'util';
 
 import { parseRepoUrl } from './repo-url.js';
 import {
+  cancelledFailure,
+  classifyGitFailure,
+  sanitizeCreationFailure,
+  setupIncompleteFailure,
+  MAX_DETAIL_BYTES,
+  type ProjectCreateFailure,
+} from './create-errors.js';
+import {
   getProjectSync,
   listProjectsAsync,
   type ProjectConfig,
 } from '../projects.js';
-import { registerProjectFromPath } from '../project-registration.js';
+import { registerProjectFromPath, installGitHooksInDir } from '../project-registration.js';
+import { ensureProjectLayer } from '../context-layers/index.js';
 import { resolveWorkspaceCreateIntent, performWorkspaceCreate } from '../workspaces/create.js';
 import { getMainWorkspace } from '../workspaces/resolver.js';
 
@@ -145,6 +154,24 @@ export interface ProjectCreateResult {
   name: string;
   path: string;
   mainWorkspaceId: string;
+  /** True when this run wrote a fresh project context layer. */
+  seededContextLayer: boolean;
+  /** Number of git hooks installed, for the CLI's existing reporting. */
+  hooksInstalled: number;
+}
+
+/**
+ * A thrown {@link ProjectCreateFailure}.
+ *
+ * Creation failures cross an async boundary, so they have to be throwable; the
+ * typed payload rides along so routes, the CLI and the UI can branch on `code`
+ * instead of matching on a message.
+ */
+export class ProjectCreateFailureError extends Error {
+  constructor(public readonly failure: ProjectCreateFailure) {
+    super(failure.message);
+    this.name = 'ProjectCreateFailureError';
+  }
 }
 
 /** Git environment that disables interactive credential prompts. */
@@ -248,6 +275,13 @@ async function probeRemote(
   }
 }
 
+/**
+ * Canonicalize a project path the same way resolve does, for callers that must
+ * compare identity (recovery, repair) without duplicating the rule.
+ */
+export const canonicalizeProjectPath = (filePath: string): Promise<string> =>
+  canonicalizePath(filePath);
+
 /** Reset the remote probe memo for tests. */
 export function __resetRemoteProbeMemoForTests(): void {
   remoteProbeMemo.clear();
@@ -265,7 +299,7 @@ export function __resetRemoteProbeMemoForTests(): void {
  * from an already-resolved absolute path, so it carries no `.` or `..` segment and
  * cannot walk back out of the canonical ancestor.
  */
-async function canonicalizePath(filePath: string): Promise<string> {
+export async function canonicalizePath(filePath: string): Promise<string> {
   const abs = resolve(filePath);
   const tail: string[] = [];
   let current = abs;
@@ -753,12 +787,19 @@ function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
   return extras;
 }
 
-/** Exclude workspaces directory from git. */
+/**
+ * Add the workspaces directory to `.git/info/exclude`, idempotently (D-8).
+ *
+ * Never the tracked `.gitignore`: a freshly cloned repository must not come back
+ * dirty because Overdeck decided to edit a file the project owns. A `.git` file
+ * means a linked worktree, whose gitdir lives elsewhere; rather than improvise a
+ * second resolver for it, skip.
+ */
 async function excludeWorkspacesDir(root: string, dir: string): Promise<void> {
   const gitDir = join(root, '.git');
   try {
     const gitStats = await stat(gitDir);
-    if (!gitStats.isDirectory()) return; // .git is a file (worktree), skip
+    if (!gitStats.isDirectory()) return;
   } catch {
     return; // No .git, skip
   }
@@ -780,79 +821,257 @@ async function excludeWorkspacesDir(root: string, dir: string): Promise<void> {
   }
 
   const lines = content.split('\n').map((line) => line.trim());
-  const shouldAdd = !lines.includes(`${dir}/`) && !lines.includes(dir);
+  if (lines.includes(`${dir}/`) || lines.includes(dir)) return;
 
-  if (shouldAdd) {
-    const newEntry = `${dir}/\n`;
-    await appendFile(excludeFile, newEntry);
-  }
+  // A file whose last line has no newline would otherwise concatenate, producing
+  // `*.logworkspaces/` — which breaks the previous pattern *and* fails to exclude.
+  const prefix = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+  await appendFile(excludeFile, `${prefix}${dir}/\n`);
 }
 
-/** Run git clone with progress reporting. */
+/** How long a clone gets to exit after SIGTERM before it is killed outright. */
+const CLONE_TERM_GRACE_MS = 5_000;
+
+/**
+ * Run `git clone`, owning its cancellation and its output (WI-1.4).
+ *
+ * Three things here are deliberate and were wrong before:
+ *
+ *   - **One settlement guard.** `exit`, `close`, `error`, abort and the deadline
+ *     can all fire, sometimes in combination. Settling on the first one and
+ *     ignoring the rest is what stops a cancelled clone from also reporting a
+ *     spawn error, and stops cleanup from running twice.
+ *   - **Settle on `close`, not `exit`.** `exit` fires when the process ends but
+ *     its stdio may still be draining; deleting the target then races a child
+ *     that can still write into it.
+ *   - **Abort escalates.** SIGTERM first so git can unwind, then SIGKILL after a
+ *     grace period, because a wedged transport ignores SIGTERM and the operator
+ *     is waiting on a cancel that must actually finish.
+ */
 async function runClone(
   cloneUrl: string,
   targetPath: string,
   hooks: ProjectCreateHooks,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  const signal = hooks.signal;
+  if (signal?.aborted) throw new ProjectCreateFailureError(cancelledFailure());
+
+  return new Promise<void>((resolveClone, rejectClone) => {
+    let settled = false;
+    let killTimer: NodeJS.Timeout | undefined;
+    let aborted = false;
+    // A rolling tail rather than every chunk: `git clone --progress` repaints
+    // continuously, so retaining all of it costs hundreds of KB for 20 useful lines.
+    let stderrTail = '';
+
     const proc = spawn('git', ['clone', '--progress', '--', cloneUrl, targetPath], {
       env: promptGuardGitEnv(),
       stdio: ['ignore', 'ignore', 'pipe'],
-      signal: hooks.signal,
     });
 
-    const stderrChunks: Buffer[] = [];
+    const cleanup = (): void => {
+      if (killTimer) clearTimeout(killTimer);
+      signal?.removeEventListener('abort', onAbort);
+    };
 
-    proc.stderr!.on('data', (chunk: Buffer) => {
-      stderrChunks.push(chunk);
+    const settle = (err?: ProjectCreateFailureError): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (err) rejectClone(err);
+      else resolveClone();
+    };
+
+    function onAbort(): void {
+      if (settled || aborted) return;
+      aborted = true;
+      proc.kill('SIGTERM');
+      killTimer = setTimeout(() => {
+        // Still alive after the grace period: the transport is wedged and only
+        // SIGKILL ends it. `close` below is what actually settles the promise.
+        proc.kill('SIGKILL');
+      }, CLONE_TERM_GRACE_MS);
+      // Not unref'd on purpose: this timer must fire even if nothing else keeps
+      // the loop alive, or a cancel would hang waiting on a process nobody killed.
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+
+    proc.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
-      const lines = text.split(/[\r\n]+/);
+      stderrTail = (stderrTail + text).slice(-MAX_DETAIL_BYTES);
 
-      for (const line of lines) {
+      for (const line of text.split(/[\r\n]+/)) {
+        // Git's own phase words, with a percentage local to that phase. There is
+        // no honest overall percent to compute from them (D-13).
         const match = line.match(/^([\w ]+):\s+(\d+)%/);
-        if (match) {
-          const phase = match[1].trim();
-          hooks.onProgress?.({ phase, percent: Number(match[2]) });
-        }
+        if (match) hooks.onProgress?.({ phase: match[1].trim(), percent: Number(match[2]) });
       }
     });
 
-    proc.on('exit', (code: number) => {
+    proc.on('error', (err) => {
+      // A spawn failure: there is no child, so nothing to wait for.
+      settle(new ProjectCreateFailureError(sanitizeCreationFailure(err)));
+    });
+
+    proc.on('close', (code: number | null) => {
+      if (aborted) {
+        settle(new ProjectCreateFailureError(cancelledFailure(stderrTail)));
+        return;
+      }
       if (code === 0) {
-        hooks.onProgress?.({ phase: 'done', percent: 100 });
-        resolve();
-      } else {
-        const stderr = Buffer.concat(stderrChunks).toString();
-        const lines = stderr.split('\n').slice(-20).join('\n');
-        reject(new Error(`git clone failed: ${lines}`));
+        settle();
+        return;
       }
+      settle(
+        new ProjectCreateFailureError(classifyGitFailure(stderrTail, { targetPath })),
+      );
     });
-
-    proc.on('error', reject);
   });
 }
 
 /**
- * Perform a resolved project creation: clone/init, register, exclude,
- * bootstrap main workspace.
+ * Finish everything a registered project needs beyond its `projects.yaml` entry,
+ * idempotently (D-9).
+ *
+ * This is split out of `performProjectCreate` for one reason: registration can
+ * succeed and setup can then fail, which used to strand a registered project
+ * that ordinary create could never retry (the duplicate guard rejected it) and
+ * that nothing else could repair. Every step here is safe to run again, so the
+ * repair path and the happy path are the same code.
+ *
+ * It never clones, never registers, and never overwrites configuration the
+ * operator or a previous run already set.
+ */
+export async function finishProjectSetup(args: {
+  key: string;
+  expectedPath: string;
+}): Promise<ProjectCreateResult> {
+  const config = getProjectSync(args.key);
+  if (!config) {
+    throw new ProjectCreateFailureError({
+      code: 'operation-unknown',
+      message: `No project is registered under '${args.key}'.`,
+      retrySafe: false,
+    });
+  }
+
+  const canonicalRegistered = await canonicalizePath(config.path);
+  const canonicalExpected = await canonicalizePath(args.expectedPath);
+  if (canonicalRegistered !== canonicalExpected) {
+    // Repairing the wrong project is worse than refusing: the caller's expected
+    // path is a claim about identity, and it does not hold.
+    throw new ProjectCreateFailureError({
+      code: 'destination-conflict',
+      message: `Project '${args.key}' is registered at ${canonicalRegistered}, not ${canonicalExpected}.`,
+      retrySafe: false,
+    });
+  }
+
+  // Context layer: seeds only when absent, so operator edits survive repair.
+  const seededContextLayer = ensureProjectLayer(canonicalRegistered);
+
+  try {
+    const { preTrustDirectorySync } = await import('../workspace-manager.js');
+    preTrustDirectorySync(canonicalRegistered);
+  } catch {
+    // Non-fatal: trust is a convenience, not a correctness requirement.
+  }
+
+  let hooksInstalled = 0;
+  const rootGit = join(canonicalRegistered, '.git');
+  try {
+    await stat(rootGit);
+    hooksInstalled = installGitHooksInDir(rootGit);
+  } catch {
+    // Not a git repository (a plain folder added as a project): nothing to hook.
+  }
+
+  await excludeWorkspacesDir(canonicalRegistered, config.workspace?.workspaces_dir || 'workspaces');
+
+  const existingMain = getMainWorkspace(args.key);
+  if (existingMain) {
+    const canonicalMain = await canonicalizePath(existingMain.path);
+    if (canonicalMain !== canonicalRegistered) {
+      throw new ProjectCreateFailureError({
+        code: 'destination-conflict',
+        message: `The main workspace for '${args.key}' points at ${canonicalMain}, not ${canonicalRegistered}.`,
+        retrySafe: false,
+      });
+    }
+    return {
+      key: args.key,
+      name: config.name,
+      path: canonicalRegistered,
+      mainWorkspaceId: existingMain.id,
+      seededContextLayer,
+      hooksInstalled,
+    };
+  }
+
+  const wsIntent = await resolveWorkspaceCreateIntent({ kind: 'main', projectKey: args.key });
+  if (wsIntent.findings.length > 0) {
+    throw new ProjectCreateFailureError(
+      setupIncompleteFailure({
+        key: args.key,
+        path: canonicalRegistered,
+        cause: wsIntent.findings[0].message,
+      }),
+    );
+  }
+  const mainWorkspace = await performWorkspaceCreate(wsIntent);
+
+  return {
+    key: args.key,
+    name: config.name,
+    path: canonicalRegistered,
+    mainWorkspaceId: mainWorkspace.id,
+    seededContextLayer,
+    hooksInstalled,
+  };
+}
+
+/**
+ * Perform a resolved project creation: clone or init, register, finish setup.
+ *
+ * Success means the project is registered *and* its main workspace exists. A
+ * failure after registration is reported as `setup-incomplete` carrying a repair
+ * action, never as a generic error — because at that point the repository is on
+ * disk and retrying create would either clone a second copy or hit the duplicate
+ * guard forever.
  */
 export async function performProjectCreate(
   intent: ResolvedProjectIntent,
   hooks: ProjectCreateHooks = {},
 ): Promise<ProjectCreateResult> {
-  if (intent.findings.length > 0) {
-    throw new Error(intent.findings[0].message);
+  const blocking = intent.findings.filter((f) => f.code !== 'project-exists-here');
+  if (blocking.length > 0) {
+    throw new ProjectCreateFailureError({
+      code: 'internal-error',
+      message: blocking[0].message,
+      retrySafe: false,
+    });
   }
   if (!intent.key || !intent.path) {
-    throw new Error('Project intent did not resolve to a key and path.');
+    throw new ProjectCreateFailureError({
+      code: 'internal-error',
+      message: 'Project intent did not resolve to a key and path.',
+      retrySafe: false,
+    });
   }
 
+  // Claim the target with a non-recursive mkdir so "we created it" is a fact,
+  // not an inference (D-5). Only a directory this operation created may ever be
+  // removed on failure; a pre-existing one is the operator's and stays.
   let createdTarget = false;
+  let createdIdentity: DirectoryIdentity | null = null;
   if (intent.wouldClone || intent.wouldGitInit) {
+    hooks.onProgress?.({ phase: 'preparing', percent: null });
     await mkdir(dirname(intent.path), { recursive: true });
     try {
       await mkdir(intent.path);
       createdTarget = true;
+      createdIdentity = await readDirectoryIdentity(intent.path);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     }
@@ -865,40 +1084,104 @@ export async function performProjectCreate(
       await execFileAsync('git', ['init', '--quiet'], { cwd: intent.path });
     }
   } catch (err) {
-    if (createdTarget) {
-      await rm(intent.path, { recursive: true, force: true });
-    }
-    throw err;
+    await removeOwnedTarget(intent.path, createdTarget, createdIdentity);
+    throw err instanceof ProjectCreateFailureError
+      ? err
+      : new ProjectCreateFailureError(sanitizeCreationFailure(err));
   }
 
   hooks.onProgress?.({ phase: 'registering', percent: null });
-  const extras = buildExtras(intent);
-  const registered = await registerProjectFromPath({
-    path: intent.path,
-    name: intent.name,
-    extras: Object.keys(extras).length > 0 ? extras : undefined,
-  });
 
-  await excludeWorkspacesDir(intent.path, 'workspaces');
-
-  const wsIntent = await resolveWorkspaceCreateIntent({
-    kind: 'main',
-    projectKey: registered.key,
-  });
-  if (wsIntent.findings.length > 0) {
-    throw new Error(wsIntent.findings[0].message);
+  let registeredKey: string;
+  try {
+    const registered = await registerProjectFromPath({
+      path: intent.path,
+      name: intent.name,
+      extras: buildExtras(intent),
+    });
+    registeredKey = registered.key;
+  } catch (err) {
+    // registerProjectFromPath writes the config before its later steps, so a
+    // throw does not prove nothing landed. Reread the canonical registry rather
+    // than inferring from whether the promise rejected.
+    const current = getProjectSync(intent.key);
+    if (current && (await canonicalizePath(current.path)) === intent.path) {
+      throw new ProjectCreateFailureError(
+        setupIncompleteFailure({ key: intent.key, path: intent.path, cause: err }),
+      );
+    }
+    await removeOwnedTarget(intent.path, createdTarget, createdIdentity);
+    throw err instanceof ProjectCreateFailureError
+      ? err
+      : new ProjectCreateFailureError(sanitizeCreationFailure(err));
   }
 
-  const existing = getMainWorkspace(registered.key);
-  const mainWorkspace = existing
-    ? existing
-    : await performWorkspaceCreate(wsIntent);
+  try {
+    const result = await finishProjectSetup({ key: registeredKey, expectedPath: intent.path });
+    hooks.onProgress?.({ phase: 'done', percent: 100 });
+    return result;
+  } catch (err) {
+    // The repository exists and the project is registered. Deleting either to
+    // "undo" would destroy a successful clone, so report the repair instead.
+    if (err instanceof ProjectCreateFailureError) throw err;
+    throw new ProjectCreateFailureError(
+      setupIncompleteFailure({ key: registeredKey, path: intent.path, cause: err }),
+    );
+  }
+}
 
-  hooks.onProgress?.({ phase: 'done', percent: 100 });
-  return {
-    key: registered.key,
-    name: registered.config.name,
-    path: registered.config.path,
-    mainWorkspaceId: mainWorkspace.id,
-  };
+/**
+ * Enough of a directory's identity to tell "the one we made" from "a different
+ * one that now sits at the same path".
+ *
+ * Inode alone is not enough: filesystems reuse a just-freed inode number, so a
+ * directory deleted and recreated between our claim and our cleanup can present
+ * the same `ino`. Creation time is what separates them.
+ */
+interface DirectoryIdentity {
+  dev: number;
+  ino: number;
+  birthtimeMs: number;
+}
+
+async function readDirectoryIdentity(target: string): Promise<DirectoryIdentity | null> {
+  try {
+    const stats = await lstat(target);
+    return {
+      dev: stats.dev,
+      ino: stats.ino,
+      // Some filesystems report 0; ctime is the usable fallback there.
+      birthtimeMs: stats.birthtimeMs || stats.ctimeMs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sameDirectory(a: DirectoryIdentity, b: DirectoryIdentity): boolean {
+  return a.dev === b.dev && a.ino === b.ino && a.birthtimeMs === b.birthtimeMs;
+}
+
+/**
+ * Remove the target only if this operation created it and it is still the same
+ * directory (D-5).
+ *
+ * `rm -rf` on a path we no longer own is the one mistake in this file with no
+ * undo, so the bar is proof of identity, not absence of evidence: anything we
+ * cannot confirm is ours is left exactly where it is.
+ */
+async function removeOwnedTarget(
+  targetPath: string,
+  created: boolean,
+  identity: DirectoryIdentity | null,
+): Promise<void> {
+  if (!created || !identity) return;
+  const current = await readDirectoryIdentity(targetPath);
+  if (!current || !sameDirectory(current, identity)) return;
+  try {
+    if (!(await lstat(targetPath)).isDirectory()) return;
+  } catch {
+    return;
+  }
+  await rm(targetPath, { recursive: true, force: true });
 }
