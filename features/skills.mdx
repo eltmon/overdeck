@@ -345,24 +345,7 @@ This spawns all three reviewers in parallel, then synthesizes their findings int
 
 ### Planning & Exploration Subagents
 
-| Subagent | Model | Focus | Permission Mode |
-|----------|-------|-------|-----------------|
-| `planning-agent` | sonnet | Codebase research, execution planning | `plan` (read-only) |
-| `codebase-explorer` | haiku | Fast architecture discovery, pattern finding | `plan` (read-only) |
-| `triage-agent` | haiku | Issue categorization, complexity estimation | default |
-| `health-monitor` | haiku | Agent stuck detection, log analysis | default |
-
-**Usage Examples:**
-```bash
-# Explore codebase architecture
-Task(subagent_type='codebase-explorer', prompt='Map out the authentication system')
-
-# Triage an issue
-Task(subagent_type='triage-agent', prompt='Categorize and estimate ISSUE-123')
-
-# Check agent health
-Task(subagent_type='health-monitor', prompt='Check status of all running agents')
-```
+Overdeck ships no custom planning or exploration subagent files. Planning runs as the `plan` role (`roles/plan.md`), and any role that needs parallel read-only exploration uses Claude Code's built-in `Explore` and `general-purpose` subagent types, which inherit the parent session's model and provider routing. Custom `.claude/agents/` files with a pinned `model:` broke under CLIProxy-routed sessions; see the "Why no ambient subagents" section in `docs/ROLES.md`.
 
 ## Best Practices
 
