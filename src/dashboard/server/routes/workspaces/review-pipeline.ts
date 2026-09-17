@@ -143,6 +143,42 @@ async function getDirtyWorkspaceErrorForReviewRequest(
     return null;
   }
 }
+
+/**
+ * PAN-3847 (FR-16): a re-review request is refused when the working tree is
+ * dirty (reviewers only see committed HEAD) or when HEAD already equals the
+ * last approved anchor and the row is not stale.
+ */
+export async function reReviewGuardError(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  existingStatus: Pick<ReviewStatus, 'reviewStatus' | 'reviewedAtCommit' | 'reviewStaleSince'> | null | undefined,
+): Promise<{ error: string; hint: string } | null> {
+  const dirtyError = await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
+  if (dirtyError) {
+    return {
+      error: 'working tree is dirty',
+      hint: 'Commit or discard changes, push, then request review again. Reviewers only see committed HEAD.',
+    };
+  }
+  try {
+    const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+    const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+    if (
+      currentHead &&
+      existingStatus?.reviewedAtCommit === currentHead &&
+      existingStatus.reviewStatus === 'passed' &&
+      !existingStatus.reviewStaleSince
+    ) {
+      return {
+        error: 'HEAD already approved',
+        hint: `Review already passed at ${currentHead.slice(0, 8)} and nothing changed.`,
+      };
+    }
+  } catch { /* snapshot unavailable — the dispatch-side runId guard is the backstop */ }
+  return null;
+}
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
@@ -239,6 +275,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
     if (!workspaceInfo.exists) {
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
+    }
+
+    // PAN-3847 (FR-16): refuse a re-review on a dirty tree or an unchanged,
+    // already-approved HEAD — before any status reset or pending operation.
+    const reReviewGuard = yield* Effect.promise(() =>
+      reReviewGuardError(issueId, workspacePath, workspaceInfo, existingStatus));
+    if (reReviewGuard) {
+      console.log(`[review] Rejecting re-review for ${issueId}: ${reReviewGuard.error}`);
+      return jsonResponse({ success: false, error: reReviewGuard.error, hint: reReviewGuard.hint }, { status: 409 });
     }
 
     const reviewModeProject = requestedReviewMode.mode === undefined
@@ -549,6 +594,15 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         if (dirtyError) {
           console.log(`[request-review] Rejecting ${issueId}: dirty workspace on rerun path`);
           return jsonResponse({ success: false, error: dirtyError }, { status: 400 });
+        }
+
+        // PAN-3847 (FR-16): a forced re-review is still refused when HEAD already
+        // equals the approved anchor — nothing new to review.
+        const rerunGuard = yield* Effect.promise(() =>
+          reReviewGuardError(canonicalIssueId, workspacePathRerun, wsInfoRerun, existingStatus));
+        if (rerunGuard) {
+          console.log(`[request-review] Rejecting ${issueId}: ${rerunGuard.error} on rerun path`);
+          return jsonResponse({ success: false, error: rerunGuard.error, hint: rerunGuard.hint }, { status: 409 });
         }
 
         console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
