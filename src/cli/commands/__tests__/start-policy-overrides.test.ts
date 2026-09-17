@@ -77,4 +77,21 @@ describe('pan start policy overrides', () => {
       swarm: { policy: { inspection: 'required', mode: 'off' } },
     });
   });
+
+  // PAN-3857 (D2): a start without --model must not rewrite an existing
+  // record.workModel — not with a prior agent's model, not with a default.
+  it('leaves a previously stamped record.workModel untouched when no --model was passed', async () => {
+    updateIssueRecord.mockImplementationOnce(async (_project, _issueId, mutator) => {
+      const record: Record<string, unknown> = { workModel: 'claude-opus-5' };
+      await mutator(record);
+      return record;
+    });
+
+    await persistStartPolicyOverrides({} as never, 'PAN-3857', { swarmMode: 'off' });
+
+    await expect(updateIssueRecord.mock.results[0].value).resolves.toEqual({
+      workModel: 'claude-opus-5',
+      swarm: { policy: { mode: 'off' } },
+    });
+  });
 });

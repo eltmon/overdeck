@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSpawnModel } from '../start.js';
+import { resolveSpawnModel, resolveStartSpawnModel } from '../start-spawn-model.js';
 
 // PAN-2410: --fresh must re-run staffing against current config instead of
 // inheriting the dead agent's recorded model.
@@ -24,5 +24,34 @@ describe('resolveSpawnModel (PAN-2410)', () => {
     // it crashed spawn with "Unknown model"; staffing must re-run instead.
     expect(resolveSpawnModel(undefined, undefined, 'pending-work-spawn')).toBeUndefined();
     expect(resolveSpawnModel(undefined, false, 'pending-work-spawn')).toBeUndefined();
+  });
+});
+
+// PAN-3857 (D2/D3): the spawn model comes from the explicit --model flag and
+// the prior agent's model (resume continuity) ONLY. record.workModel is never
+// read back into it — a stored override takes effect through the
+// issue-override tier in resolveStaffing instead.
+describe('resolveStartSpawnModel (PAN-3857)', () => {
+  it('resume path: a prior agent on model M and no --model resumes with M', () => {
+    expect(resolveStartSpawnModel(undefined, false, 'claude-opus-5')).toBe('claude-opus-5');
+    expect(resolveStartSpawnModel(undefined, undefined, 'claude-opus-5')).toBe('claude-opus-5');
+  });
+
+  it('fresh spawn with no --model ignores the prior agent model so tier resolution runs', () => {
+    expect(resolveStartSpawnModel(undefined, true, 'claude-opus-5')).toBeUndefined();
+  });
+
+  it('no --model and no prior agent leaves the model to tier/role resolution', () => {
+    expect(resolveStartSpawnModel(undefined, undefined, undefined)).toBeUndefined();
+    expect(resolveStartSpawnModel(undefined, false, undefined)).toBeUndefined();
+  });
+
+  it('explicit --model wins over the prior agent model, fresh or not', () => {
+    expect(resolveStartSpawnModel('gpt-5.6', true, 'claude-opus-5')).toBe('gpt-5.6');
+    expect(resolveStartSpawnModel('gpt-5.6', false, 'claude-opus-5')).toBe('gpt-5.6');
+  });
+
+  it('a pending- placeholder prior model does not count as resume continuity', () => {
+    expect(resolveStartSpawnModel(undefined, false, 'pending-work-spawn')).toBeUndefined();
   });
 });

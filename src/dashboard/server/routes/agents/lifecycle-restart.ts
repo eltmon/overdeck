@@ -562,7 +562,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
 
     const args = buildPanStartArgs({
       issueId,
-      model: spawnModel,
+      model: newModel ?? null, // PAN-3857: forward only an explicit operator choice
       harness: effectiveHarness,
     });
 

@@ -452,6 +452,9 @@ export const postAgentsRoute = HttpRouter.add(
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
+    // PAN-3857: forward --model to `pan start` only for an explicit body model —
+    // forwarding a resolved default would skip tier resolution and stamp record.workModel.
+    const explicitModel: string | null = (body as any).model ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* checkCodexAuthStatus();
@@ -833,7 +836,7 @@ export const postAgentsRoute = HttpRouter.add(
       effectiveHarness,
       startedBy,
       allowHost,
-      spawnModel,
+      explicitModel,
       spawnGuardrails,
       projectPath,
       eventStore,
@@ -896,7 +899,7 @@ export const postAgentsRoute = HttpRouter.add(
       activityId = yield* Effect.promise(() => spawnPanCommand(
         buildPanStartArgs({
           issueId,
-          model: spawnModel,
+          model: explicitModel,
           harness: effectiveHarness,
           allowHost,
           offBook,
