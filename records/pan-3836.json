@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:54:35.372Z",
+  "updated": "2026-09-17T01:54:38.617Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,8 +678,16 @@
     }
   ],
   "tasks": {
-    "sequence": 62,
-    "claims": {},
+    "sequence": 63,
+    "claims": {
+      "use-project-create-intent-hook": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 578792,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:54:38.616Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -1050,7 +1058,7 @@
     "cli-project-clone.ac2": "completed",
     "cli-project-clone.ac3": "completed",
     "cli-project-clone.ac4": "completed",
-    "use-project-create-intent-hook": "pending",
+    "use-project-create-intent-hook": "running",
     "use-project-create-intent-hook.ac1": "pending",
     "use-project-create-intent-hook.ac2": "pending",
     "use-project-create-intent-hook.ac3": "pending",
