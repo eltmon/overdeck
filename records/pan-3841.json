@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:08:21.769Z",
+  "updated": "2026-09-17T01:09:51.903Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "reviewing",
@@ -352,16 +352,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "retro-lib": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 3946218,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:03:51.784Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -439,6 +431,17 @@
         "outcome": "completed",
         "reason": "Added the '**Pipeline retrospective button:**' paragraph to docs/DASHBOARD-ARCHITECTURE.md directly after the Simple home conversation composer paragraph (endpoint path, per-request roles/retrospective.md template read, unscoped conversation under the No project bucket, read-only prompt contract pinned by the invariant test) and the '### Conversation kickoff templates (not roles)' subsection to docs/ROLES.md after the active-role-files table listing roles/retrospective.md alongside the three handoff templates with the Prompt-Change: trailer requirement. Both grep checks print one line each. Commit cadccbb20a3 pushed.",
         "releasedAt": "2026-09-16T20:14:49.537Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 3946218,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:03:51.784Z",
+        "itemId": "retro-lib",
+        "outcome": "completed",
+        "reason": "Evidence bridge: collectRetrospectiveEvidence enumerates via listIssueRecords read door (migrated + legacy), window-filters, bounds with disclosed truncation, renders to {{EVIDENCE}}. 28 data-flow tests pass.",
+        "releasedAt": "2026-09-17T01:09:51.903Z"
       }
     ],
     "statusReasons": {
@@ -451,8 +454,8 @@
         "updatedAt": "2026-09-17T01:00:51.805Z"
       },
       "retro-lib": {
-        "reason": "Implement server-side canonical evidence bridge via listIssueRecords read door",
-        "updatedAt": "2026-09-17T01:03:51.784Z"
+        "reason": "Evidence bridge: collectRetrospectiveEvidence enumerates via listIssueRecords read door (migrated + legacy), window-filters, bounds with disclosed truncation, renders to {{EVIDENCE}}. 28 data-flow tests pass.",
+        "updatedAt": "2026-09-17T01:09:51.903Z"
       },
       "retro-route": {
         "reason": "Added POST /api/conversations/retrospective per WI-4: new routes/conversations-retrospective.ts (validateOrigin 403, readJsonBody from specialists/shared.js, delegates to handleRetrospectiveConversationCreate funneling into handleConversationCreate with generateAiTitle wired to conversationReadDependencies); conversations.ts line 182 now exports conversationReadDependencies (file still 1070 lines); server.ts imports + merges conversationsRetrospectiveRouteLayer after conversationsRouteLayer. Route tests mock the write door and the conversations.js module body: valid 7d body -> 201 with message starting 'Pipeline retrospective: last 7 days' and no projectKey; bad window -> 400 Invalid window; foreign Origin -> 403. 3/3 green; typecheck + lint-file-size pass. Commit f60c7b3efab pushed.",
@@ -482,12 +485,12 @@
     "retro-template-test.ac1": "pending",
     "retro-template-test.ac2": "pending",
     "retro-template-test.ac3": "pending",
-    "retro-lib": "running",
-    "retro-lib.ac1": "pending",
-    "retro-lib.ac2": "pending",
-    "retro-lib.ac3": "pending",
-    "retro-lib.ac4": "pending",
-    "retro-lib.ac5": "pending",
+    "retro-lib": "completed",
+    "retro-lib.ac1": "completed",
+    "retro-lib.ac2": "completed",
+    "retro-lib.ac3": "completed",
+    "retro-lib.ac4": "completed",
+    "retro-lib.ac5": "completed",
     "retro-route": "completed",
     "retro-route.ac1": "completed",
     "retro-route.ac2": "completed",
