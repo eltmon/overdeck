@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:52:59.506Z",
+  "updated": "2026-09-17T01:53:03.401Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 55,
-    "claims": {
-      "create-job-store": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 559473,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:52:59.506Z"
-      }
-    },
+    "sequence": 56,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -919,6 +911,17 @@
         "outcome": "completed",
         "reason": "WI-3: JSON --dry-run via toPublicProjectIntent (credentials redacted), real registration metadata instead of a stub that dropped detected config, uppercased --linear-team, findings exit 1, SIGINT->abort->130, new pan project finish-setup. Commit 0f67887d08d.",
         "releasedAt": "2026-09-17T01:52:45.542Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 559473,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:52:59.506Z",
+        "itemId": "create-job-store",
+        "outcome": "completed",
+        "reason": "WI-2.1/2.2: operation table with same-id/same-target dedup, AbortController ownership, cancel transitions, 30-min deadline retired at registering, 10-min retention, unref'd timers. Commit 69079096aa3.",
+        "releasedAt": "2026-09-17T01:53:03.400Z"
       }
     ],
     "statusReasons": {
@@ -939,8 +942,8 @@
         "updatedAt": "2026-09-17T01:52:34.605Z"
       },
       "create-job-store": {
-        "reason": "WI-2 revised: operation table, cancellation, deadlines",
-        "updatedAt": "2026-09-17T01:52:54.863Z"
+        "reason": "WI-2.1/2.2: operation table with same-id/same-target dedup, AbortController ownership, cancel transitions, 30-min deadline retired at registering, 10-min retention, unref'd timers. Commit 69079096aa3.",
+        "updatedAt": "2026-09-17T01:53:03.400Z"
       },
       "project-create-routes": {
         "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
@@ -1004,11 +1007,11 @@
     "create-core-perform.ac3": "completed",
     "create-core-perform.ac4": "completed",
     "create-core-perform.ac5": "completed",
-    "create-job-store": "running",
-    "create-job-store.ac1": "pending",
-    "create-job-store.ac2": "pending",
-    "create-job-store.ac3": "pending",
-    "create-job-store.ac4": "pending",
+    "create-job-store": "completed",
+    "create-job-store.ac1": "completed",
+    "create-job-store.ac2": "completed",
+    "create-job-store.ac3": "completed",
+    "create-job-store.ac4": "completed",
     "project-create-routes": "completed",
     "project-create-routes.ac1": "completed",
     "project-create-routes.ac2": "completed",
