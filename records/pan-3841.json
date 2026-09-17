@@ -161,10 +161,10 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:25:44.709Z",
+  "updated": "2026-09-17T01:32:14.927Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
@@ -172,8 +172,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:25:44.690Z",
-    "reviewNotes": "Cycle-5 re-applies the canonical-read-door evidence bridge (bf27cbe) and adds a docs commit (ffb32f). Net new substantive code vs cycle 4: zero. CodeRabbit surfaced 3 advisory findings (err.message leak, EVIDENCE_LIMITS caps, scopeDrift.truncated underreporting) — all non-blocking, all at ? severity.",
+    "updatedAt": "2026-09-17T01:32:14.880Z",
+    "reviewNotes": "Cycle-5 passed verdict retracted. Operator's required corrections from 01:04:52 not addressed in bf27cbe/ffb32f. Probe (/tmp/pan3841-evidence-probe.ts) confirms: no global serialized-size budget (1MB notes string → 1,000,939 rendered bytes), isRecordInWindow has no upper bound (updated=2099 accepted), nested sessionHistory slice keeps oldest 20 and drops newest event-20, declaredScopeUntouched truncation underreported. record-list.ts:20,33-37 — unbounded Promise.all, readdir errors swallowed to [], parse failures only warn — so the collector's try/catch never sees real resolver failures. Unit tests inject listRecords mocks; the real resolver is never exercised. Five required corrections: global byte budget, bounded resolver I/O with surfaced diagnostics, start<=updated<=now, deterministic recent-first nested sort, isolated temp-filesystem fixtures for migrated+legacy.",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
@@ -251,9 +251,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 3545217,
-            "output": 141363,
-            "cacheRead": 25262976,
+            "input": 3561896,
+            "output": 163042,
+            "cacheRead": 28452864,
             "cacheWrite": 0
           }
         },
@@ -291,10 +291,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 502,
-            "output": 114676,
-            "cacheRead": 81229607,
-            "cacheWrite": 720247
+            "input": 560,
+            "output": 131277,
+            "cacheRead": 85470664,
+            "cacheWrite": 858630
           }
         },
         "work": {
@@ -320,21 +320,21 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 9018438,
-          "output": 307374,
-          "cacheRead": 108104149,
+          "input": 9035117,
+          "output": 329053,
+          "cacheRead": 111294037,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 502,
-          "output": 114676,
-          "cacheRead": 81229607,
-          "cacheWrite": 720247
+          "input": 560,
+          "output": 131277,
+          "cacheRead": 85470664,
+          "cacheWrite": 858630
         }
       },
       "costAtCloseOut": {
-        "usd": 37.9528784,
-        "pricingAsOf": "2026-09-17T01:25:44.696Z"
+        "usd": 39.3441964,
+        "pricingAsOf": "2026-09-17T01:32:14.908Z"
       }
     },
     "merges": [
