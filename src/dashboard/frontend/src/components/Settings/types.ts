@@ -190,7 +190,6 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
-    flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;

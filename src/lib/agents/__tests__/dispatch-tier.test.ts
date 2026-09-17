@@ -17,10 +17,11 @@ vi.mock('../../config-yaml.js', async (importOriginal) => {
 });
 vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(),
+  readTierOverrides: vi.fn(() => ({})),
 }));
 
 import { loadConfigSync } from '../../config-yaml.js';
-import { readWorkspacePlanSync } from '../../xbrief/io.js';
+import { readTierOverrides, readWorkspacePlanSync } from '../../xbrief/io.js';
 import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
@@ -161,6 +162,7 @@ describe('resolveSlotTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('carries the resolved tier model and harness into the spawn params when tiering is on', () => {
@@ -209,6 +211,26 @@ describe('resolveSlotTierSpawnParams', () => {
 
     expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({});
   });
+
+  // PAN-3858: a recorded promotion must change the model the slot spawns on.
+  it('applies a recorded tier promotion to the slot item before resolving its tier', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'simple' })]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      'task-x': {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'simple', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+    });
+  });
 });
 
 describe('resolveSingleWorkTierSpawnParams', () => {
@@ -246,6 +268,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('routes tiered when global config is off but plan metadata opts in', () => {
@@ -352,6 +375,30 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     ]));
 
     expect(resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5')).toEqual({});
+  });
+
+  // PAN-3858: a promotion raises an item's effective difficulty, which can
+  // change WHICH item is the plan's hardest remaining one.
+  it('ranks a promoted item by its effective difficulty when picking the staffing item', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('promoted', { difficulty: 'medium' }),
+      planItem('hard', { difficulty: 'complex' }),
+    ]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      promoted: {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'medium', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+    });
   });
 });
 
