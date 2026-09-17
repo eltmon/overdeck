@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:11.345Z",
+  "updated": "2026-09-17T02:10:14.618Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 69,
+    "sequence": 70,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -989,8 +989,8 @@
         "updatedAt": "2026-09-17T00:40:38.153Z"
       },
       "registration-extras": {
-        "reason": "Added RegisterProjectExtras type and optional extras parameter. Tests verify extras are saved and backward compatibility is maintained.",
-        "updatedAt": "2026-09-16T14:41:54.603Z"
+        "reason": "revised PRD",
+        "updatedAt": "2026-09-17T02:10:14.618Z"
       },
       "create-core-resolve": {
         "reason": "WI-1.2/1.3: server-resolved parentDir/homeDir with ~ expansion (D-4), rev-parse --show-toplevel Git root + worktree detection with subdirectory finding (D-15), ENOENT/ENOTDIR/EACCES distinguished (D-11), project-exists-here vs conflict, 128-entry capped probe memo (D-2), typed extras (D-10), and new create-errors.ts taxonomy + sanitizer (WI-1.3). Commit cbd58db24a9.",
@@ -1049,11 +1049,11 @@
     "repo-url-parser.ac3": "completed",
     "repo-url-parser.ac4": "completed",
     "repo-url-parser.ac5": "completed",
-    "registration-extras": "completed",
-    "registration-extras.ac1": "completed",
-    "registration-extras.ac2": "completed",
-    "registration-extras.ac3": "completed",
-    "registration-extras.ac4": "completed",
+    "registration-extras": "pending",
+    "registration-extras.ac1": "pending",
+    "registration-extras.ac2": "pending",
+    "registration-extras.ac3": "pending",
+    "registration-extras.ac4": "pending",
     "create-core-resolve": "completed",
     "create-core-resolve.ac1": "completed",
     "create-core-resolve.ac2": "completed",
