@@ -3,11 +3,12 @@ import { MODEL_DEPRECATIONS } from './model-deprecations.js';
 export type ModelCapabilityClass = 'frontier' | 'workhorse' | 'small';
 
 /** PAN-3842: one source of truth for "how strong is this model", used by the
- * tier-fitness checker. Keyed by current (non-deprecated) catalog id.
+ * tier-fitness checker.
  * Rule of thumb: provider tierModels.opus slot ⇒ frontier, sonnet slot ⇒
  * workhorse, haiku slot ⇒ small; ties broken by price and the frontend tier.
- * Deprecated ids (keys of MODEL_DEPRECATIONS) are NOT listed here;
- * capabilityClassOf resolves them through MODEL_DEPRECATIONS first. */
+ * A retired id may carry its OWN row when it is still launchable and its real
+ * capability differs from its replacement's — capabilityClassOf reads the
+ * literal id first and only hops MODEL_DEPRECATIONS for ids with no row. */
 export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityClass>> = {
   // frontier
   'claude-fable-5-1': 'frontier',
@@ -77,7 +78,22 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'mistral-small-latest': 'small',
 };
 
+/**
+ * Capability class of the model that will ACTUALLY run.
+ *
+ * Literal id first, deprecation hop only as a fallback. An explicit per-spawn
+ * override is launched verbatim — determineModel/normalizeModelOverrideSync
+ * validate the id but never rewrite it — so rating a retired id by its
+ * replacement describes a model that is not executing. That suppressed the
+ * warning this feature exists for: glm-4.7-flash (small) spawns as itself but
+ * hopped to glm-5.1 (frontier) and silently passed an expert plan.
+ *
+ * Ids with no row of their own still hop, which is what keeps a retired id
+ * like gpt-5.2-codex classified as its live replacement rather than unknown.
+ */
 export function capabilityClassOf(modelId: string): ModelCapabilityClass | undefined {
-  const resolved = MODEL_DEPRECATIONS[modelId] ?? modelId;
-  return MODEL_CAPABILITY_CLASSES[resolved];
+  const own = MODEL_CAPABILITY_CLASSES[modelId];
+  if (own !== undefined) return own;
+  const replacement = MODEL_DEPRECATIONS[modelId];
+  return replacement === undefined ? undefined : MODEL_CAPABILITY_CLASSES[replacement];
 }
