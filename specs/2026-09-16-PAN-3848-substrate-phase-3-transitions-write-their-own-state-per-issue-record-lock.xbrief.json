@@ -4,17 +4,17 @@
     "created": "2026-09-16T21:36:47.000Z",
     "author": "overdeck/0.50.4",
     "description": "Plan for PAN-3848: Substrate Phase 3: transitions write their own state; per-issue record lock",
-    "updated": "2026-09-16T21:40:16.850Z"
+    "updated": "2026-09-17T23:32:38.883Z"
   },
   "plan": {
     "id": "pan-3848",
     "title": "Substrate Phase 3: transitions write their own state; per-issue record lock",
-    "status": "proposed",
+    "status": "completed",
     "uid": "e352e5c4-4ddf-47a2-a6c3-b6f777158fce",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-16T21:36:47.000Z",
-    "updated": "2026-09-16T21:40:16.850Z",
+    "updated": "2026-09-17T23:32:38.883Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3848",
@@ -714,5 +714,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
