@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:34:10.250Z",
+  "updated": "2026-09-17T00:39:35.367Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -330,7 +330,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 16,
+    "sequence": 17,
     "claims": {},
     "claimHistory": [
       {
@@ -465,8 +465,8 @@
         "updatedAt": "2026-09-16T20:06:58.713Z"
       },
       "spawn-single-log": {
-        "reason": "Single-work spawn now logs fitness against deduped plan-wide difficulties with offending item ids; helper reworked to item pairs; 28 dispatch-tier tests pass, typecheck green.",
-        "updatedAt": "2026-09-16T20:11:04.600Z"
+        "reason": "Adjudicated experiment RESULTS.md: real spawn-entry regression — resolveSingleWorkTierSpawnParams calls getDispatchableItems before the explicit-override branch, breaking 15 tests in agents-spawn-supervisor.test.ts",
+        "updatedAt": "2026-09-17T00:39:35.367Z"
       },
       "settings-badges": {
         "reason": "Settings crew rows and supervisor block render draft-computed fitness badges via tierFitnessWarnings in tiered-crews.ts; 32 section tests pass incl. 6 new PAN-3842 cases; typecheck+lint green (cycle and introspection guards fixed via doctor CheckResult re-declare and audited baseline accept).",
@@ -506,11 +506,11 @@
     "spawn-slot-log.ac2": "completed",
     "spawn-slot-log.ac3": "completed",
     "spawn-slot-log.ac4": "completed",
-    "spawn-single-log": "completed",
-    "spawn-single-log.ac1": "completed",
-    "spawn-single-log.ac2": "completed",
-    "spawn-single-log.ac3": "completed",
-    "spawn-single-log.ac4": "completed",
+    "spawn-single-log": "pending",
+    "spawn-single-log.ac1": "pending",
+    "spawn-single-log.ac2": "pending",
+    "spawn-single-log.ac3": "pending",
+    "spawn-single-log.ac4": "pending",
     "settings-badges": "completed",
     "settings-badges.ac1": "completed",
     "settings-badges.ac2": "completed",
