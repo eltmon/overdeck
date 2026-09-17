@@ -161,21 +161,20 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:24:06.087Z",
+  "updated": "2026-09-17T01:24:27.224Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:23:51.991Z",
+    "updatedAt": "2026-09-17T01:24:27.118Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
-    "verificationNotes": "Verification FAILED at typecheck (7617ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "reviewedAtCommit": "bf27cbe09fc5d26dc43bdb997c44fcaaa9eefd6d",
@@ -252,9 +251,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 3504005,
-            "output": 120906,
-            "cacheRead": 20978688,
+            "input": 3528306,
+            "output": 124989,
+            "cacheRead": 23216384,
             "cacheWrite": 0
           }
         },
@@ -321,9 +320,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 8977226,
-          "output": 286917,
-          "cacheRead": 103819861,
+          "input": 9001527,
+          "output": 291000,
+          "cacheRead": 106057557,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -334,8 +333,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 37.9159714,
-        "pricingAsOf": "2026-09-17T01:24:06.075Z"
+        "usd": 37.9281584,
+        "pricingAsOf": "2026-09-17T01:24:27.207Z"
       }
     },
     "merges": [
