@@ -10,6 +10,7 @@ const {
   mockSetReviewStatus,
   mockClearWorkspaceStuck,
   mockGetAgentStateSync,
+  mockClearAgentPaused,
   mockSetAgentPaused,
   mockRunQualityGates,
   mockWriteArtifact,
@@ -22,6 +23,7 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockClearWorkspaceStuck: vi.fn(),
   mockGetAgentStateSync: vi.fn(),
+  mockClearAgentPaused: vi.fn(),
   mockResolveWorkspaceRepoRootsSync: vi.fn(),
   mockRunTestSkipGate: vi.fn(),
   mockSetAgentPaused: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentStateSync: mockGetAgentStateSync,
+  clearAgentPaused: mockClearAgentPaused,
   setAgentPaused: mockSetAgentPaused,
   messageAgent: vi.fn(),
   stopAgent: vi.fn(),
@@ -154,6 +157,7 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
       pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
     });
     mockSetAgentPaused.mockReturnValue(Effect.succeed(null));
+    mockClearAgentPaused.mockReturnValue(Effect.succeed(null));
   });
 
   it('clears the stuck flag and lifts the verification-stuck pause on pass', async () => {
@@ -170,8 +174,46 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
       verificationStatus: 'passed',
       lastVerifiedCommit: 'a'.repeat(40),
     }));
+    // PR #3872 finding 7: the pause clears through the dedicated API, BEFORE
+    // the marker clear.
+    expect(mockClearAgentPaused).toHaveBeenCalledWith('agent-pan-3847');
+    expect(mockSetAgentPaused).not.toHaveBeenCalled();
     expect(mockClearWorkspaceStuck).toHaveBeenCalledWith(issueId);
-    expect(mockSetAgentPaused).toHaveBeenCalledWith('agent-pan-3847', undefined, false);
+    expect(mockClearWorkspaceStuck.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockClearAgentPaused.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('keeps the consistent paused+stuck pair when the unpause fails (PR #3872 finding 7)', async () => {
+    mockClearAgentPaused.mockReturnValue(Effect.fail(new Error('disk full')));
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('passed');
+    expect(mockClearWorkspaceStuck).not.toHaveBeenCalled();
+  });
+
+  it('retries the marker clear once on failure (PR #3872 finding 7)', async () => {
+    mockClearWorkspaceStuck
+      .mockImplementationOnce(() => { throw new Error('lock busy'); })
+      .mockImplementationOnce(() => undefined);
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('passed');
+    expect(mockClearWorkspaceStuck).toHaveBeenCalledTimes(2);
   });
 
   it('leaves an unrelated pause alone on pass', async () => {

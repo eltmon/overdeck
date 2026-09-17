@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   snapshotWorkspaceHeadsPromise: vi.fn(),
   getCloisterEventStore: vi.fn(),
   getAgentStateSync: vi.fn(),
+  clearAgentPaused: vi.fn(),
   setAgentPaused: vi.fn(),
   runQualityGates: vi.fn(),
   writeVerificationArtifact: vi.fn(),
@@ -143,6 +144,7 @@ vi.mock('../../../../src/lib/git-utils.js', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
+  clearAgentPaused: mocks.clearAgentPaused,
   getAgentStateSync: mocks.getAgentStateSync,
   getAgentRuntimeState: vi.fn(() => null),
   getAgentRuntimeStateSync: vi.fn(() => null),
@@ -235,6 +237,7 @@ describe('verdict-and-gate no-loss audit (PAN-3847 W21)', () => {
     mocks.snapshotWorkspaceHeadsPromise.mockResolvedValue('c'.repeat(40));
     mocks.getAgentStateSync.mockReturnValue(null);
     mocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+    mocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
     mocks.deliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: undefined,
       synthesisPath: undefined,
@@ -340,7 +343,7 @@ describe('verdict-and-gate no-loss audit (PAN-3847 W21)', () => {
     const row = getReviewStatusSync('PAN-3847');
     expect(row?.verificationStatus).toBe('passed');
     expect(row?.stuck).toBeFalsy();
-    expect(mocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-3847', undefined, false);
+    expect(mocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-3847');
   });
 
   it('(2a) green CI alone cannot set testStatus passed — only a test verdict can', () => {

@@ -36,7 +36,7 @@ import type {
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -961,22 +961,38 @@ async function runVerificationForIssuePromise(
     });
     // PAN-3847 (FR-10): a verification pass clears a verification_stuck flag and
     // lifts the pause that escalateVerificationStuck set — the gate that created
-    // the stuck state is the gate that clears it.
+    // the stuck state is the gate that clears it. PR #3872 finding 7: unpause
+    // FIRST through the dedicated clear API (setAgentPaused always SETS paused —
+    // passing undefined never unpauses). If the unpause fails, keep the
+    // consistent paused+stuck pair; then clear the marker with one retry so a
+    // transient write failure cannot strand the pair unpaused+stuck.
     const stuckRow = getReviewStatusSync(issueId);
     if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
-      const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
-      clearWorkspaceStuck(issueId);
-      console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
-    }
-    {
       const stuckAgentId = `agent-${issueId.toLowerCase()}`;
       const agentState = getAgentStateSync(stuckAgentId);
+      let unpaused = true;
       if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
         try {
-          await Effect.runPromise(setAgentPaused(stuckAgentId, undefined, false));
+          await Effect.runPromise(clearAgentPaused(stuckAgentId));
           console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
         } catch (err: any) {
-          console.warn(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
+          unpaused = false;
+          console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId} — keeping the verification_stuck marker so the pair stays consistent: ${err?.message ?? err}`);
+        }
+      }
+      if (unpaused) {
+        const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+        try {
+          clearWorkspaceStuck(issueId);
+          console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
+        } catch (firstErr: any) {
+          console.warn(`[${logPrefix}] verification_stuck clear failed for ${issueId} — retrying once: ${firstErr?.message ?? firstErr}`);
+          try {
+            clearWorkspaceStuck(issueId);
+            console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId} on retry: verification passed`);
+          } catch (retryErr: any) {
+            console.error(`[${logPrefix}] verification_stuck clear failed twice for ${issueId} — the marker remains and the agent was unpaused; the next verification pass re-attempts the clear: ${retryErr?.message ?? retryErr}`);
+          }
         }
       }
     }
