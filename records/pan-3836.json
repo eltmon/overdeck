@@ -317,6 +317,11 @@
       "reason": "feedback",
       "note": "[2026-09-16T22:55Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-09-16T22:55:03.597Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-17T00:32:01.033Z"
     }
   ],
   "feedback": [
@@ -430,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T00:27:09.672Z",
+  "updated": "2026-09-17T00:32:01.034Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
