@@ -59,10 +59,10 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/deacon-api-recovery.ts|// respawn (resumeAgent({compact:true})): the wedged session is',
   'lib/cloister/deacon-api-recovery.ts|const recovered = await resumeAgent(sessionName, undefined, { compact: true });',
   'lib/cloister/deacon-api-recovery.ts|const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });',
-  'lib/cloister/verification-runner.ts|await messageAgent(target.agentId, message, \'internal\', { owesRework: true });',
+  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   'lib/cloister/service-reactive.ts|send: (target, message) => deliverAgentMessage(target, message, \'hook:post-compact-continuation\'),',
   'lib/cloister/service-reactive.ts|? (await import(\'../agents/messaging.js\')).messageAgent(',
-  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true });',
+  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   'cli/commands/recover.ts|const result = await resumeAgent(agentId, undefined, {',
   'cli/commands/tell.ts|const outcome = await messageAgent(agentId, message, \'pan-tell\', {',
   'cli/commands/unpause.ts|const result = await resumeAgent(agentId);',
@@ -473,7 +473,9 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
 
     it('clears the escalation flag through the review-status door', async () => {
       mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
-      const promise = messageAgent('agent-pan-3679', 'review feedback', 'internal', { owesRework: true });
+      // The parked issues' exit path is a confirmed FEEDBACK redelivery —
+      // the intent flag is what authorizes the clear (PR #3870 finding 3).
+      const promise = messageAgent('agent-pan-3679', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
       await vi.advanceTimersByTimeAsync(1_000);
       await expect(promise).resolves.toEqual({
         delivered: true,

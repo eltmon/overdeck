@@ -55,6 +55,20 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
+// PR #3870 finding 2: unkeyed Claude Code deliveries now go through the
+// transcript-confirming primitive. Stub the confirmation (not the transport)
+// so the sendKeys assertions below still exercise the real delivery cascade.
+vi.mock('../agents/delivery.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import('../agents/delivery.js');
+  return {
+    ...actual,
+    deliverMessageWithTranscriptConfirmation: async (args: { agentId: string; message: string; caller: string; deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux' }) => {
+      const delivery = await actual.deliverAgentMessage(args.agentId, args.message, args.caller, args.deliveryMethod);
+      return { delivered: delivery.ok, attempts: 1, lastDelivery: delivery };
+    },
+  };
+});
+
 // PAN-3015 monitor tier is mocked so tests can flip liveness per case.
 vi.mock('../agents/monitor-transport.js', () => ({
   isMonitorLive: vi.fn(() => false),
@@ -92,6 +106,7 @@ function writeAgentState(agentId: string, partial: Partial<AgentState> = {}): vo
     status: 'running',
     startedAt: '2026-05-25T00:00:00.000Z',
     deliveryMethod: 'tmux',
+    sessionId: `session-${agentId}`,
     ...partial,
   };
   writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
