@@ -108,13 +108,15 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
-      "docs/DASHBOARD-ARCHITECTURE.md",
+      "package.json",
       "scripts/file-size-allowlist.txt",
       "scripts/source-introspection-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts"
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+      "src/dashboard/frontend/src/components/Settings/types.ts",
+      "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+      "src/lib/__tests__/configurable-providers.test.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/configurable-providers.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -140,23 +142,23 @@
     ],
     "actualChangedFiles": [
       ".overdeck/context/codebase/architecture.md",
-      "docs/DASHBOARD-ARCHITECTURE.md",
       "docs/MODEL_ROUTING.md",
       "docs/TIERED-EXECUTION.md",
+      "package.json",
       "reference/troubleshooting.mdx",
       "scripts/file-size-allowlist.txt",
       "scripts/source-introspection-baseline.txt",
       "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
       "src/cli/commands/doctor-tier-fitness.ts",
       "src/cli/commands/doctor.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
       "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
       "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
       "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
       "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+      "src/dashboard/frontend/src/components/Settings/types.ts",
+      "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+      "src/lib/__tests__/configurable-providers.test.ts",
       "src/lib/__tests__/model-capability-class.test.ts",
       "src/lib/agents/__tests__/dispatch-tier.test.ts",
       "src/lib/agents/__tests__/tier-fitness-context.test.ts",
@@ -165,12 +167,14 @@
       "src/lib/agents/spawn.ts",
       "src/lib/agents/tier-fitness-context.ts",
       "src/lib/agents/tier-fitness.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/configurable-providers.ts",
       "src/lib/model-capability-class.ts"
     ],
-    "recordedAt": "2026-09-16T21:34:52.900Z"
+    "recordedAt": "2026-09-17T01:40:01.804Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:39:46.196Z",
+  "updated": "2026-09-17T01:40:01.807Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
