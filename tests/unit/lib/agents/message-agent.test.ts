@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   resumeAgent: vi.fn(),
   getLatestSessionIdSync: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
-  watchForEatenAgentMessage: vi.fn(),
+  probeTranscriptSince: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -43,18 +43,25 @@ vi.mock('../../../../src/lib/agents/identity.js', () => ({
   waitForAgentIdle: mocks.waitForAgentIdle,
 }));
 
-vi.mock('../../../../src/lib/agents/delivery.js', () => ({
-  deliverAgentMessage: mocks.deliverAgentMessage,
-  deliverResumeMessageWithTranscriptConfirmation: vi.fn(),
-  resilientDeliveryMethod: (method: unknown) => method,
-}));
-
-vi.mock('../../../../src/lib/agents/eaten-message-watcher.js', () => ({
-  watchForEatenAgentMessage: mocks.watchForEatenAgentMessage,
-}));
+vi.mock('../../../../src/lib/agents/delivery.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/agents/delivery.js')>();
+  return {
+    ...actual,
+    deliverAgentMessage: mocks.deliverAgentMessage,
+    // Run the REAL confirming primitive, but with the mocked transport injected
+    // so the test drives polling through the stubbed probe and fake timers.
+    deliverMessageWithTranscriptConfirmation: (args: Record<string, unknown>) =>
+      actual.deliverMessageWithTranscriptConfirmation({
+        ...args,
+        deliver: mocks.deliverAgentMessage,
+      } as Parameters<typeof actual.deliverMessageWithTranscriptConfirmation>[0]),
+    resilientDeliveryMethod: (method: unknown) => method,
+  };
+});
 
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: mocks.captureTranscriptUserRecordSnapshot,
+  probeTranscriptSince: mocks.probeTranscriptSince,
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
@@ -142,7 +149,7 @@ describe('messageAgent', () => {
       fileSize: 0,
       readOffset: 0,
     });
-    mocks.watchForEatenAgentMessage.mockResolvedValue('landed');
+    mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
   });
 
@@ -165,6 +172,7 @@ describe('messageAgent', () => {
     await expect(messageAgent('agent-pan-2262', 'review feedback', 'pan-tell')).resolves.toEqual({
       delivered: true,
       queuedToMail: true,
+      confirmed: false,
     });
 
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
@@ -179,7 +187,7 @@ describe('messageAgent', () => {
     );
   });
 
-  it('watches keyed Claude feedback for submit-time compaction loss', async () => {
+  it('delivers keyed Claude feedback without transcript confirmation (the dedup door owns the receipt)', async () => {
     mocks.getAgentStateSync.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
@@ -188,12 +196,6 @@ describe('messageAgent', () => {
       harness: 'claude-code',
       sessionId: 'session-2262',
       deliveryMethod: 'supervisor',
-    });
-    mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
-      sessionFile: '/tmp/session-2262.jsonl',
-      userRecordCount: 7,
-      fileSize: 4_096,
-      readOffset: 4_000,
     });
 
     await expect(messageAgent(
@@ -204,11 +206,13 @@ describe('messageAgent', () => {
     )).resolves.toEqual({
       delivered: true,
       queuedToMail: false,
+      confirmed: false,
     });
 
-    expect(mocks.captureTranscriptUserRecordSnapshot).toHaveBeenCalledWith('/repo', 'session-2262');
-    expect(mocks.captureTranscriptUserRecordSnapshot.mock.invocationCallOrder[0])
-      .toBeLessThan(mocks.deliverAgentMessage.mock.invocationCallOrder[0]!);
+    // Keyed deliveries never enter the confirming primitive: the dedup door
+    // owns their receipt, so no transcript snapshot or probe runs.
+    expect(mocks.captureTranscriptUserRecordSnapshot).not.toHaveBeenCalled();
+    expect(mocks.probeTranscriptSince).not.toHaveBeenCalled();
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
       'agent-pan-2262',
       'review feedback',
@@ -216,15 +220,6 @@ describe('messageAgent', () => {
       'supervisor',
       { dedupKey: 'review-feedback:cycle-3' },
     );
-    expect(mocks.watchForEatenAgentMessage).toHaveBeenCalledWith({
-      agentId: 'agent-pan-2262',
-      workspace: '/repo',
-      sessionId: 'session-2262',
-      message: 'review feedback',
-      caller: 'messageAgent:internal',
-      deliveryMethod: 'supervisor',
-      fromByteOffset: 4_000,
-    });
   });
 
   it('reports paused-agent mail as undelivered with the gate reason', async () => {
@@ -344,5 +339,67 @@ describe('messageAgent', () => {
       undefined,
     );
     expect(mocks.sessionExists).not.toHaveBeenCalled();
+  });
+
+  describe('confirmed turn for running Claude Code agents (PAN-3846)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mocks.getAgentStateSync.mockReturnValue({
+        id: 'agent-pan-2262',
+        issueId: 'PAN-2262',
+        status: 'running',
+        workspace: '/repo',
+        harness: 'claude-code',
+        sessionId: 'session-2262',
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('returns delivered+confirmed when the probe matches on the second poll', async () => {
+      mocks.probeTranscriptSince
+        .mockResolvedValueOnce({ matchedUserRecord: false, realAssistantTurnCount: 0 })
+        .mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+      await vi.advanceTimersByTimeAsync(150);
+      await expect(promise).resolves.toEqual({
+        delivered: true,
+        queuedToMail: true,
+        confirmed: true,
+      });
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'agent-pan-2262',
+        'review feedback',
+        'messageAgent:pan-tell',
+        undefined,
+      );
+      expect(mocks.probeTranscriptSince).toHaveBeenCalledTimes(2);
+      expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+        'agent-pan-2262',
+        expect.stringContaining('messageAgent confirmed turn in session-2262'),
+      );
+    });
+
+    it('returns delivered:false, confirmed:false when no turn appears in either attempt', async () => {
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+      await vi.advanceTimersByTimeAsync(70_000);
+      const outcome = await promise;
+
+      expect(outcome.delivered).toBe(false);
+      expect(outcome.confirmed).toBe(false);
+      expect(outcome.queuedToMail).toBe(true);
+      expect(outcome.reason).toContain('no turn appeared in transcript session-2262');
+      // Two attempts of the confirming primitive, each with its own window.
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(2);
+      expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+        'agent-pan-2262',
+        expect.stringContaining('messageAgent NOT confirmed'),
+      );
+    });
   });
 });

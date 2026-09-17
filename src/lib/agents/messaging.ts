@@ -12,7 +12,6 @@ import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFi
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
   clearReadySignal,
@@ -33,10 +32,9 @@ import {
 import { getLatestSessionIdSync } from './activity.js';
 import {
   deliverAgentMessage,
-  deliverResumeMessageWithTranscriptConfirmation,
+  deliverMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
-import { watchForEatenAgentMessage } from './eaten-message-watcher.js';
 import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
@@ -63,6 +61,8 @@ export interface MessageDeliveryOutcome {
   queuedToMail: boolean;
   reason?: string;
   deduplicated?: boolean;
+  /** true when a transcript probe saw the message land as a new turn (Claude Code only). */
+  confirmed?: boolean;
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -453,7 +453,7 @@ export async function messageAgent(
       if (fallbackHarness === 'claude-code') {
         const fallbackSessionId = getLatestSessionIdSync(normalizedId);
         if (fallbackSessionId) {
-          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+          const delivery = await deliverMessageWithTranscriptConfirmation({
             agentId: normalizedId,
             workspace: agentState.workspace,
             sessionId: fallbackSessionId,
@@ -625,15 +625,34 @@ export async function messageAgent(
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
     ? agentState?.sessionId ?? getLatestSessionIdSync(normalizedId)
     : undefined;
-  let transcriptWatch: { sessionId: string; fromByteOffset: number } | undefined;
-  if (agentState?.workspace && transcriptSessionId) {
-    const snapshot = await captureTranscriptUserRecordSnapshot(agentState.workspace, transcriptSessionId);
-    transcriptWatch = {
+
+  if (agentState?.workspace && transcriptSessionId && opts.dedupKey === undefined) {
+    // Claude Code, unkeyed: deliver and wait for the transcript to show the turn.
+    const confirmedDelivery = await deliverMessageWithTranscriptConfirmation({
+      agentId: normalizedId,
+      workspace: agentState.workspace,
       sessionId: transcriptSessionId,
-      fromByteOffset: snapshot.readOffset ?? snapshot.fileSize ?? 0,
-    };
+      message,
+      caller: deliveryCaller,
+      // A supervisor-backed agent owns a verified PTY socket; require that path
+      // instead of silently falling back to a tmux paste whose compaction
+      // summary can masquerade as the message landing (same guard as resume).
+      deliveryMethod: agentState.deliveryMethod === 'supervisor' || agentState.supervisorEnabled === true
+        ? 'supervisor'
+        : deliveryMethod,
+    });
+    queueAgentMail(normalizedId, message, 'delivered');
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    if (!confirmedDelivery.delivered) {
+      const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
+      logAgentLifecycleSync(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+      return { delivered: false, queuedToMail: true, confirmed: false, reason };
+    }
+    logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
+    return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
+  // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
   const delivery = await deliverWithOptionalKey(
     normalizedId,
     message,
@@ -653,28 +672,10 @@ export async function messageAgent(
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
 
-  if (delivery.ok && transcriptWatch && agentState?.workspace) {
-    void watchForEatenAgentMessage({
-      agentId: normalizedId,
-      workspace: agentState.workspace,
-      sessionId: transcriptWatch.sessionId,
-      message,
-      caller: deliveryCaller,
-      deliveryMethod,
-      fromByteOffset: transcriptWatch.fromByteOffset,
-    }).then((outcome) => {
-      if (outcome === 'redelivered') {
-        console.log(`[agents] ${normalizedId}: redelivered message eaten by submit-time compaction`);
-      }
-    }).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[agents] eaten-message watcher failed for ${normalizedId}: ${errorMessage}`);
-    });
-  }
-
   return {
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,
+    confirmed: false,
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }

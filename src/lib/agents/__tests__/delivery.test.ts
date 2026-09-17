@@ -479,3 +479,12 @@ describe('keyedSupervisorFailureKind (PAN-1837)', () => {
     expect(keyedSupervisorFailureKind(undefined)).toBe('ambiguous');
   });
 });
+
+describe('deliverMessageWithTranscriptConfirmation (PAN-3846)', () => {
+  it('is exported under both the new name and the one-release resume alias', async () => {
+    const delivery = await import('../delivery.js');
+    expect(typeof delivery.deliverMessageWithTranscriptConfirmation).toBe('function');
+    expect(delivery.deliverResumeMessageWithTranscriptConfirmation)
+      .toBe(delivery.deliverMessageWithTranscriptConfirmation);
+  });
+});
