@@ -275,15 +275,6 @@ async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
-  // A new review cycle owns the feedback directory: clear stale feedback files
-  // at dispatch time (PAN-3846; replaces the abandoned-feedback cleanup
-  // patrol). A clear failure must never block a review dispatch.
-  try {
-    const { clearFeedbackFiles } = await import('./feedback-writer.js');
-    await Effect.runPromise(clearFeedbackFiles(opts.workspace));
-  } catch {
-    // best-effort — feedback staleness is repaired on every dispatch anyway
-  }
   if (!opts.model) {
     const project = resolveProjectForIssue(opts.issueId);
     const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
