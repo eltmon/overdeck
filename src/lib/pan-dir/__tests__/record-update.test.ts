@@ -21,6 +21,8 @@ describe('updateIssueRecord durability', () => {
   const originalHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
+    // Keep the ref-lock push retry (auto-commit.ts) instant: these tests hold the race open on purpose.
+    process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS = '0,0,0';
     root = mkdtempSync(join(tmpdir(), 'pan-record-update-'));
     remote = mkdtempSync(join(tmpdir(), 'pan-record-update-origin-'));
     process.env.OVERDECK_HOME = join(root, 'overdeck-home');
@@ -49,6 +51,7 @@ describe('updateIssueRecord durability', () => {
   });
 
   afterEach(() => {
+    delete process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS;
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
     rmSync(root, { recursive: true, force: true });

@@ -79,6 +79,8 @@ describe('updateIssueRecord durability budget (PAN-2989)', () => {
   const originalBudget = process.env.OVERDECK_RECORD_DURABILITY_BUDGET_MS;
 
   beforeEach(() => {
+    // Keep the ref-lock push retry (auto-commit.ts) instant: these tests hold the race open on purpose.
+    process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS = '0,0,0';
     root = mkdtempSync(join(tmpdir(), 'pan-record-budget-'));
     remote = mkdtempSync(join(tmpdir(), 'pan-record-budget-origin-'));
     process.env.OVERDECK_HOME = join(root, 'overdeck-home');
@@ -112,6 +114,7 @@ describe('updateIssueRecord durability budget (PAN-2989)', () => {
   });
 
   afterEach(() => {
+    delete process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS;
     vi.useRealTimers();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;

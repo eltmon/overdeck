@@ -746,8 +746,20 @@ function pushStateBranch(
   );
 }
 
-const PUSH_RETRY_DELAYS_MS = [500, 1500, 3000] as const;
-const PUSH_MAX_ATTEMPTS = PUSH_RETRY_DELAYS_MS.length + 1;
+const DEFAULT_PUSH_RETRY_DELAYS_MS: readonly number[] = [500, 1500, 3000];
+
+/**
+ * Delays between push attempts after a `cannot lock ref` rejection. Override
+ * with OVERDECK_STATE_PUSH_RETRY_DELAYS_MS (comma-separated ms; an empty
+ * string disables retries) — the same env idiom as OVERDECK_STATE_PUSH_TIMEOUT_MS.
+ * Tests that keep a ref-lock race alive on purpose set it to `0,0,0`.
+ */
+function pushRetryDelaysMs(): readonly number[] {
+  const raw = process.env.OVERDECK_STATE_PUSH_RETRY_DELAYS_MS;
+  if (raw === undefined) return DEFAULT_PUSH_RETRY_DELAYS_MS;
+  return raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0)
+    .map((v) => Number.parseInt(v, 10)).filter((n) => Number.isFinite(n) && n >= 0);
+}
 
 /**
  * A rejected push is retried only on git's `cannot lock ref` rejection: another
@@ -773,14 +785,16 @@ async function pushWithRetry(
   attempt: () => Promise<PushAttemptOutcome>,
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<PushResult> {
+  const delays = pushRetryDelaysMs();
+  const maxAttempts = delays.length + 1;
   let lastMessage = 'unknown error';
-  for (let n = 1; n <= PUSH_MAX_ATTEMPTS; n++) {
+  for (let n = 1; n <= maxAttempts; n++) {
     const outcome = await attempt();
     if (outcome.ok) return { pushed: true };
     lastMessage = outcome.message ?? 'unknown error';
-    if (n < PUSH_MAX_ATTEMPTS && isRetryablePushRejection(lastMessage)) {
-      const delayMs = PUSH_RETRY_DELAYS_MS[n - 1]!;
-      console.log(`[auto-commit] push rejected (attempt ${n}/${PUSH_MAX_ATTEMPTS}): ${lastMessage.split('\n')[0]}; retrying in ${delayMs}ms`);
+    if (n < maxAttempts && isRetryablePushRejection(lastMessage)) {
+      const delayMs = delays[n - 1]!;
+      console.log(`[auto-commit] push rejected (attempt ${n}/${maxAttempts}): ${lastMessage.split('\n')[0]}; retrying in ${delayMs}ms`);
       await sleep(delayMs);
       continue;
     }
