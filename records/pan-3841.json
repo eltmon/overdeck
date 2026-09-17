@@ -132,7 +132,7 @@
     "recordedAt": "2026-09-16T20:37:56.228Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-16T22:56:28.586Z",
+  "updated": "2026-09-17T00:27:12.884Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -332,7 +332,7 @@
       "needsYouEmittedAt": "2026-09-16T19:37:46.793Z"
     }
   ],
-  "workModel": "MiniMax-M3",
+  "workModel": "claude-opus-5",
   "tasks": {
     "sequence": 14,
     "claims": {},
