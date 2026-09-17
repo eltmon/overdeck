@@ -63,6 +63,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    // PAN-3860: the previous authoring default lived as a private literal
+    // inside summary-fork.ts, bypassing config entirely. Centralizing it here
+    // preserves the same behavior for un-configured installs while making it
+    // an operator-settable value like compactionModel/titleModel.
+    handoffAuthorModel: 'claude-sonnet-4-6',
     watchDirs: ['~/Projects'],
     scanMaxParallel: null,
     embeddings: false,

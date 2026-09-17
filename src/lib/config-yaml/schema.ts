@@ -171,6 +171,8 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given (PAN-3860, default: claude-sonnet-4-6) */
+  handoff_author_model?: ModelId;
   watch_dirs?: string[];
   scan_max_parallel?: number | null;
   embeddings?: boolean;
@@ -851,6 +853,7 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    handoffAuthorModel: ModelId;
     watchDirs: string[];
     scanMaxParallel: number | null;
     embeddings: boolean;

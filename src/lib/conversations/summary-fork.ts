@@ -182,8 +182,17 @@ async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollInt
   }
 }
 
-const DEFAULT_HANDOFF_AUTHOR_MODEL = 'claude-sonnet-4-6';
 const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
+
+/**
+ * PAN-3860: the handoff authoring model must come from config, not a private
+ * literal — `conversations.handoff_author_model` (default: claude-sonnet-4-6,
+ * see config-yaml/defaults.ts), operator-overridable like compactionModel and
+ * titleModel. `--author-model` / a per-call `model` argument still wins.
+ */
+function defaultHandoffAuthorModel(): string {
+  return loadConfigSync().config.conversations.handoffAuthorModel;
+}
 // When the raw transcript exceeds this many characters, pre-compact it via
 // generateSmartSummary (which chunks internally) before sending to the
 // handoff authoring model. Threshold chosen to keep the final prompt
@@ -223,7 +232,7 @@ export async function authorHandoffExternal(
   const timestamp = (options.now ?? new Date()).toISOString();
   const paths = createHandoffPaths(sourceConv.name, timestamp);
 
-  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+  const effectiveModel = model ?? defaultHandoffAuthorModel();
   const effectiveHarness: RuntimeName = harness ?? 'claude-code';
 
   // The authoring harness decides the prompt template: Claude Code's `Write`
@@ -647,7 +656,7 @@ async function createSummaryForkPromise(
           options.handoffAuthorHarness,
         );
         summary = handoff.docText;
-        usedSummaryModel = options.handoffAuthorModel ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+        usedSummaryModel = options.handoffAuthorModel ?? defaultHandoffAuthorModel();
         handoffDocPath = handoff.docPath;
       } catch (error) {
         forkFallbackReason = handoffFailureReason(error);
