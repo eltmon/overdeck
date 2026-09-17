@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:06:12.136Z",
+  "updated": "2026-09-17T01:06:27.304Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 48,
+    "sequence": 49,
     "claims": {},
     "claimHistory": [
       {
@@ -905,8 +905,8 @@
         "updatedAt": "2026-09-17T01:06:12.136Z"
       },
       "create-core-perform": {
-        "reason": "Implemented performProjectCreate with clone/init, registration with extras, workspaces exclusion, and main workspace bootstrap. Already included in create.ts from previous task.",
-        "updatedAt": "2026-09-16T14:46:59.057Z"
+        "reason": "WI-1.4/1.5 revised: real AbortSignal wiring with SIGTERM->5s->SIGKILL, single settlement guard, bounded stderr, D-5 cleanup ownership, and a new idempotent finishProjectSetup + resolveProjectCreateRecovery so a partial registration is repairable instead of stranded.",
+        "updatedAt": "2026-09-17T01:06:27.303Z"
       },
       "create-job-store": {
         "reason": "Job store implementation complete with all acceptance criteria and tests passing",
@@ -968,12 +968,12 @@
     "create-core-resolve.ac3": "completed",
     "create-core-resolve.ac4": "completed",
     "create-core-resolve.ac5": "completed",
-    "create-core-perform": "completed",
-    "create-core-perform.ac1": "completed",
-    "create-core-perform.ac2": "completed",
-    "create-core-perform.ac3": "completed",
-    "create-core-perform.ac4": "completed",
-    "create-core-perform.ac5": "completed",
+    "create-core-perform": "pending",
+    "create-core-perform.ac1": "pending",
+    "create-core-perform.ac2": "pending",
+    "create-core-perform.ac3": "pending",
+    "create-core-perform.ac4": "pending",
+    "create-core-perform.ac5": "pending",
     "create-job-store": "completed",
     "create-job-store.ac1": "completed",
     "create-job-store.ac2": "completed",
