@@ -136,7 +136,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:00:48.479Z",
+  "updated": "2026-09-17T01:00:51.805Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -331,7 +331,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 15,
+    "sequence": 16,
     "claims": {},
     "claimHistory": [
       {
@@ -418,8 +418,8 @@
         "updatedAt": "2026-09-17T01:00:48.479Z"
       },
       "retro-template-test": {
-        "reason": "Added tests/unit/prompts/retrospective-template.test.ts modeled on prompt-invariants.test.ts: pins frontmatter name, read-only ground-rules section (pan start/pan kill/pan tell/gh issue create/git push), exact 5-placeholder set, and 4 ordered output headings scoped to the Output shape section. Includes mutation tests proving the assertions reject a template missing the ground-rules section or carrying an extra {{UNKNOWN}} token. 4/4 green; committed as 7d98a2d3043 and pushed.",
-        "updatedAt": "2026-09-16T19:44:41.315Z"
+        "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
+        "updatedAt": "2026-09-17T01:00:51.805Z"
       },
       "retro-lib": {
         "reason": "Created src/lib/overdeck/conversation-retrospective.ts per WI-3: RETROSPECTIVE_WINDOWS (24h/7d), isRetrospectiveWindow, stripFrontmatter (same regex as runtime-command.ts), formatProjectLines (migrated/legacy/empty variants), renderRetrospectiveKickoff (split/join substitution + trim), loadRetrospectiveTemplate (no cache, path param for temp-file tests), collectRetrospectiveProjects (listProjectsAsync + resolveStateReadHomeAsync), handleRetrospectiveConversationCreate (400 on invalid window, forwards only model/harness/effort strings, never projectKey/issueId). 11/11 unit tests green; typecheck passes; conversation-runtime.ts untouched (1163 lines). Commit 0a259e2a4a7 pushed.",
@@ -449,10 +449,10 @@
     "retro-template.ac2": "pending",
     "retro-template.ac3": "pending",
     "retro-template.ac4": "pending",
-    "retro-template-test": "completed",
-    "retro-template-test.ac1": "completed",
-    "retro-template-test.ac2": "completed",
-    "retro-template-test.ac3": "completed",
+    "retro-template-test": "pending",
+    "retro-template-test.ac1": "pending",
+    "retro-template-test.ac2": "pending",
+    "retro-template-test.ac3": "pending",
     "retro-lib": "completed",
     "retro-lib.ac1": "completed",
     "retro-lib.ac2": "completed",
