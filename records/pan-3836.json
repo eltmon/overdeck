@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:53:16.157Z",
+  "updated": "2026-09-17T01:53:19.367Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 58,
+    "sequence": 59,
     "claims": {},
     "claimHistory": [
       {
@@ -957,8 +957,8 @@
         "updatedAt": "2026-09-17T01:53:03.400Z"
       },
       "project-create-routes": {
-        "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
-        "updatedAt": "2026-09-17T00:32:18.348Z"
+        "reason": "WI-2.3-2.6: cancel/reconcile/finish-setup routes and safe DTOs",
+        "updatedAt": "2026-09-17T01:53:19.367Z"
       },
       "cli-project-add-dry-run": {
         "reason": "WI-3: JSON --dry-run via toPublicProjectIntent (credentials redacted), real registration metadata instead of a stub that dropped detected config, uppercased --linear-team, findings exit 1, SIGINT->abort->130, new pan project finish-setup. Commit 0f67887d08d.",
@@ -1023,12 +1023,12 @@
     "create-job-store.ac2": "completed",
     "create-job-store.ac3": "completed",
     "create-job-store.ac4": "completed",
-    "project-create-routes": "completed",
-    "project-create-routes.ac1": "completed",
-    "project-create-routes.ac2": "completed",
-    "project-create-routes.ac3": "completed",
-    "project-create-routes.ac4": "completed",
-    "project-create-routes.ac5": "completed",
+    "project-create-routes": "pending",
+    "project-create-routes.ac1": "pending",
+    "project-create-routes.ac2": "pending",
+    "project-create-routes.ac3": "pending",
+    "project-create-routes.ac4": "pending",
+    "project-create-routes.ac5": "pending",
     "cli-project-add-dry-run": "completed",
     "cli-project-add-dry-run.ac1": "completed",
     "cli-project-add-dry-run.ac2": "completed",
