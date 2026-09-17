@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:45:38.720Z",
+  "updated": "2026-09-17T01:01:25.080Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 23,
+    "sequence": 24,
     "claims": {
       "spawn-single-log": {
         "writerId": "agent-pan-3842",
@@ -359,13 +359,6 @@
         "pid": 3550819,
         "host": "eltmon-z790",
         "claimedAt": "2026-09-17T00:39:52.895Z"
-      },
-      "fitness-checker": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3651757,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T00:45:38.720Z"
       }
     },
     "claimHistory": [
@@ -467,6 +460,17 @@
         "outcome": "completed",
         "reason": "R4 fixed: capabilityClassOf reads the literal row first, hops only for ids without one. glm-4.7-flash now rates small and warns on expert plans. PRD revision R1 written through the canonical draft writer. 10 tests pass.",
         "releasedAt": "2026-09-17T00:45:32.222Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3651757,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T00:45:38.720Z",
+        "itemId": "fitness-checker",
+        "outcome": "completed",
+        "reason": "F-5 mixed-difficulty wording grouped by requirement; F-1 provider-not-enabled scoped to CONFIGURABLE_PROVIDERS with drift guards. 30 + 9 tests pass.",
+        "releasedAt": "2026-09-17T01:01:25.079Z"
       }
     ],
     "statusReasons": {
@@ -475,8 +479,8 @@
         "updatedAt": "2026-09-17T00:45:32.222Z"
       },
       "fitness-checker": {
-        "reason": "mixed-difficulty wording",
-        "updatedAt": "2026-09-17T00:45:38.720Z"
+        "reason": "F-5 mixed-difficulty wording grouped by requirement; F-1 provider-not-enabled scoped to CONFIGURABLE_PROVIDERS with drift guards. 30 + 9 tests pass.",
+        "updatedAt": "2026-09-17T01:01:25.079Z"
       },
       "fitness-context": {
         "reason": "Added src/lib/agents/tier-fitness-context.ts per WI-3 verbatim plus 4-case test; all pass, typecheck green.",
@@ -511,12 +515,12 @@
     "class-table.ac3": "completed",
     "class-table.ac4": "completed",
     "class-table.ac5": "completed",
-    "fitness-checker": "running",
-    "fitness-checker.ac1": "pending",
-    "fitness-checker.ac2": "pending",
-    "fitness-checker.ac3": "pending",
-    "fitness-checker.ac4": "pending",
-    "fitness-checker.ac5": "pending",
+    "fitness-checker": "completed",
+    "fitness-checker.ac1": "completed",
+    "fitness-checker.ac2": "completed",
+    "fitness-checker.ac3": "completed",
+    "fitness-checker.ac4": "completed",
+    "fitness-checker.ac5": "completed",
     "fitness-context": "completed",
     "fitness-context.ac1": "completed",
     "fitness-context.ac2": "completed",
