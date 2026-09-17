@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T00:40:38.153Z",
+  "updated": "2026-09-17T00:41:00.131Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 45,
+    "sequence": 46,
     "claims": {},
     "claimHistory": [
       {
@@ -890,8 +890,8 @@
         "updatedAt": "2026-09-16T14:41:54.603Z"
       },
       "create-core-resolve": {
-        "reason": "Restored realpath canonicalization on the home-boundary guard and on intent.path; bounded and coalesced the remote probe; gated detection on clean findings and a complete repo path. Six tests added.",
-        "updatedAt": "2026-09-16T23:09:25.892Z"
+        "reason": "WI-1.2/1.3 revised: D-2 bounded+coalesced memo keyed on exact transport, D-4 parentDir/homeDir on the intent with ~ expansion, D-11 richer boundary findings, D-15 async git root detection, plus the new create-errors.ts typed failure taxonomy.",
+        "updatedAt": "2026-09-17T00:41:00.130Z"
       },
       "create-core-perform": {
         "reason": "Implemented performProjectCreate with clone/init, registration with extras, workspaces exclusion, and main workspace bootstrap. Already included in create.ts from previous task.",
@@ -951,12 +951,12 @@
     "registration-extras.ac2": "completed",
     "registration-extras.ac3": "completed",
     "registration-extras.ac4": "completed",
-    "create-core-resolve": "completed",
-    "create-core-resolve.ac1": "completed",
-    "create-core-resolve.ac2": "completed",
-    "create-core-resolve.ac3": "completed",
-    "create-core-resolve.ac4": "completed",
-    "create-core-resolve.ac5": "completed",
+    "create-core-resolve": "pending",
+    "create-core-resolve.ac1": "pending",
+    "create-core-resolve.ac2": "pending",
+    "create-core-resolve.ac3": "pending",
+    "create-core-resolve.ac4": "pending",
+    "create-core-resolve.ac5": "pending",
     "create-core-perform": "completed",
     "create-core-perform.ac1": "completed",
     "create-core-perform.ac2": "completed",
