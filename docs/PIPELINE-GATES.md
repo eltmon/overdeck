@@ -7,7 +7,10 @@
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
 before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the issue does not advance, so the agent can fix and retry.
-After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
+After 3 failed cycles the issue is marked `verification_stuck`, the work agent is paused,
+and a needs-you escalation fires; the counter is per issue and is reset only by
+`pan review reset` (PAN-3847). A verification pass clears the `verification_stuck` flag
+and lifts that pause.
 
 ## Verdict feedback routing
 

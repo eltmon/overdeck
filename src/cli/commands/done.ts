@@ -870,7 +870,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       mergeStatus: 'pending',
       readyForMerge: false,
       verificationStatus: 'pending',
-      verificationCycleCount: 0,
+      // PAN-3847 (FR-17): the verification cycle counter is per issue — pan done
+      // must NOT reset it; only `pan review reset` does.
       autoRequeueCount: 0,
       reviewRequestedAt,
       scopeDrift,

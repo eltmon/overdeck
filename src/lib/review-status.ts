@@ -744,7 +744,8 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
     autoRequeueCount: 0,
     verificationStatus: 'pending',
     verificationNotes: undefined,
-    verificationCycleCount: 0,
+    // PAN-3847 (FR-17): the verification cycle counter is per issue; a work
+    // start does not reset it — only `pan review reset` does.
     stuck: false,
     stuckReason: undefined,
     stuckAt: undefined,

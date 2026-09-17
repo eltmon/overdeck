@@ -179,6 +179,38 @@ export async function reReviewGuardError(
   } catch { /* snapshot unavailable — the dispatch-side runId guard is the backstop */ }
   return null;
 }
+/**
+ * Reset shapes for the trigger/rerun review paths. PAN-3847 (FR-17): neither
+ * carries verificationCycleCount — the counter is per issue and only
+ * `pan review reset` (review-control.ts) clears it. Exported for tests.
+ */
+export function buildReviewRequestReset(): Record<string, unknown> {
+  return {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    reviewStaleSince: undefined,
+  };
+}
+
+export function buildReviewRerunReset(): Record<string, unknown> {
+  return {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    reviewStaleSince: undefined,
+  };
+}
+
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
@@ -300,15 +332,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
     // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
     setPendingOperation(issueId, 'review');
-    const reviewReset: Record<string, unknown> = {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      autoRequeueCount: 0,
-      verificationCycleCount: 0,
-      verificationStatus: 'pending',
-      verificationNotes: undefined,
-      reviewStaleSince: undefined,
-    };
+    const reviewReset: Record<string, unknown> = buildReviewRequestReset();
     if (forceReview) {
       reviewReset.readyForMerge = false;
       reviewReset.mergeStatus = 'pending';
@@ -607,20 +631,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
         setPendingOperation(issueId, 'review');
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          mergeStatus: 'pending',
-          readyForMerge: false,
-          autoRequeueCount: 0,
-          verificationCycleCount: 0,
-          verificationStatus: 'pending',
-          verificationNotes: undefined,
-          reviewNotes: undefined,
-          testNotes: undefined,
-          mergeNotes: undefined,
-          reviewStaleSince: undefined,
-        });
+        setReviewStatus(issueId, buildReviewRerunReset());
 
         (async () => {
           try {

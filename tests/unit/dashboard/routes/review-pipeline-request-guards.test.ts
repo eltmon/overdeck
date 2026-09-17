@@ -24,7 +24,7 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
   snapshotWorkspaceHeadsPromise: mocks.snapshotWorkspaceHeadsPromise,
 }));
 
-import { reReviewGuardError } from '../../../../src/dashboard/server/routes/workspaces/review-pipeline.js';
+import { reReviewGuardError, buildReviewRequestReset, buildReviewRerunReset } from '../../../../src/dashboard/server/routes/workspaces/review-pipeline.js';
 
 const workspaceInfo = { isRemote: false } as never;
 const workspacePath = '/project/workspaces/feature-pan-3847';
@@ -83,5 +83,15 @@ describe('reReviewGuardError (PAN-3847)', () => {
     );
 
     expect(guard).toBeNull();
+  });
+});
+
+describe('review reset shapes keep the per-issue verification counter (PAN-3847 W19)', () => {
+  it('neither reset shape carries verificationCycleCount', () => {
+    for (const reset of [buildReviewRequestReset(), buildReviewRerunReset()]) {
+      expect(reset).not.toHaveProperty('verificationCycleCount');
+      expect(reset).toHaveProperty('reviewStaleSince', undefined);
+      expect(reset.reviewStatus).toBe('pending');
+    }
   });
 });
