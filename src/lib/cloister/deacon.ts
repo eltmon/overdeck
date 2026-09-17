@@ -184,7 +184,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { getAgentIdleAgeMs, isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
@@ -1957,7 +1957,7 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
         // Clean up accumulated stale feedback so the work agent doesn't read them
         await clearStaleCiFeedback(issueId).catch(() => {});
         console.log(`[deacon] Cleared stale CI-blocked merge for ${issueId} — reset to readyForMerge`);
-        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
+        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000)}m)`);
         continue;
       }
 
@@ -1994,9 +1994,11 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
               ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
               : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`;
 
-        await Effect.runPromise(sendKeys(agentSessionName, nudgeMessage));
-        actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
-        console.log(`[deacon] Sent dead-end recovery nudge to ${agentSessionName}`);
+        const { messageAgent } = await import('../agents/messaging.js');
+        const outcome = await messageAgent(agentSessionName, nudgeMessage, 'deacon:dead-end', { owesRework: true });
+        const idleMin = Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000);
+        if (outcome.delivered) actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${idleMin}m, turn confirmed=${outcome.confirmed === true})`);
+        else actions.push(`Dead-end recovery: nudge NOT delivered to ${agentSessionName} (${statusType}): ${outcome.reason ?? 'unknown'}`);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[deacon] Failed to send dead-end nudge to ${agentSessionName}:`, msg);
