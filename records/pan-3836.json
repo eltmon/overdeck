@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:52:54.863Z",
+  "updated": "2026-09-17T01:52:59.506Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,8 +678,16 @@
     }
   ],
   "tasks": {
-    "sequence": 54,
-    "claims": {},
+    "sequence": 55,
+    "claims": {
+      "create-job-store": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 559473,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:52:59.506Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -996,7 +1004,7 @@
     "create-core-perform.ac3": "completed",
     "create-core-perform.ac4": "completed",
     "create-core-perform.ac5": "completed",
-    "create-job-store": "pending",
+    "create-job-store": "running",
     "create-job-store.ac1": "pending",
     "create-job-store.ac2": "pending",
     "create-job-store.ac3": "pending",
