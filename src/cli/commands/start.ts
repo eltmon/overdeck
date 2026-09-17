@@ -28,7 +28,6 @@ import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
-import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
 import {
   buildStartPlanningBody,
@@ -733,7 +732,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  const spawnModel = resolveSpawnModel(options.model ?? resolveIssueWorkModel(id.toUpperCase()), options.fresh, existingAgentState?.model);
+  // PAN-3857 (D2/D3): only explicit --model overrides; the prior agent's model is resume continuity (dropped by --fresh); record.workModel is honored via the issue-override tier, never read back here.
+  const spawnModel = options.model ?? resolveSpawnModel(undefined, options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
