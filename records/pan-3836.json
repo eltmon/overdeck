@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:17.750Z",
+  "updated": "2026-09-17T02:10:21.032Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 71,
+    "sequence": 72,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -1040,8 +1040,8 @@
         "updatedAt": "2026-09-17T02:10:08.123Z"
       },
       "docs-projects-and-workspaces": {
-        "reason": "Documentation updates complete: added section to WORKSPACES-AND-PROJECTS.md, extended CLAUDE.md, updated configuration/projects.mdx, added module header to create.ts, updated pan-new-project skill with dashboard flow",
-        "updatedAt": "2026-09-16T16:19:36.674Z"
+        "reason": "revised PRD",
+        "updatedAt": "2026-09-17T02:10:21.032Z"
       },
       "skill-pan-new-project": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-9/AC-7]: sync-sources/skills/pan-new-project was not rewritten per WI-7: step 2 must become 'run pan project clone <url> or pan project add <path>; both detect remote, default branch and prefix and create the main workspace'; step 3 drops issue_prefix/github_repo/default_branch from the minimum config. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -1116,10 +1116,10 @@
     "delete-new-project-modal.ac1": "pending",
     "delete-new-project-modal.ac2": "pending",
     "delete-new-project-modal.ac3": "pending",
-    "docs-projects-and-workspaces": "completed",
-    "docs-projects-and-workspaces.ac1": "completed",
-    "docs-projects-and-workspaces.ac2": "completed",
-    "docs-projects-and-workspaces.ac3": "completed",
+    "docs-projects-and-workspaces": "pending",
+    "docs-projects-and-workspaces.ac1": "pending",
+    "docs-projects-and-workspaces.ac2": "pending",
+    "docs-projects-and-workspaces.ac3": "pending",
     "skill-pan-new-project": "pending",
     "skill-pan-new-project.ac1": "pending",
     "skill-pan-new-project.ac2": "pending",
