@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:14.618Z",
+  "updated": "2026-09-17T02:10:17.750Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 70,
+    "sequence": 71,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -693,6 +693,13 @@
         "pid": 841092,
         "host": "eltmon-z790",
         "claimedAt": "2026-09-17T02:10:11.345Z"
+      },
+      "registration-extras": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 841701,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:17.749Z"
       }
     },
     "claimHistory": [
@@ -1049,7 +1056,7 @@
     "repo-url-parser.ac3": "completed",
     "repo-url-parser.ac4": "completed",
     "repo-url-parser.ac5": "completed",
-    "registration-extras": "pending",
+    "registration-extras": "running",
     "registration-extras.ac1": "pending",
     "registration-extras.ac2": "pending",
     "registration-extras.ac3": "pending",
