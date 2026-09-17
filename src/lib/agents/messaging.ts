@@ -30,7 +30,6 @@ import {
   type Role,
 } from './agent-state.js';
 import { getLatestSessionIdSync } from './activity.js';
-import { clearFeedbackDeliveryStuck } from '../review-status.js';
 import {
   deliverAgentMessage,
   deliverMessageWithTranscriptConfirmation,
@@ -632,6 +631,9 @@ export async function messageAgent(
     // feedback_delivery_needs_you escalation it recorded is stale (PAN-3846).
     if (agentState.issueId) {
       try {
+        // Lazy import: keep review-status (and its DB-backed load-time wiring)
+        // out of messaging's static import graph.
+        const { clearFeedbackDeliveryStuck } = await import('../review-status.js');
         clearFeedbackDeliveryStuck(agentState.issueId);
       } catch (clearError) {
         console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
