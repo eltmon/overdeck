@@ -33,12 +33,16 @@ license: "MIT"
 **Triggers:** `/pan-new-project`, or start from dashboard at `/projects/new`
 
 Sets up a new project for Overdeck management. This is the ONLY correct
-way to add a new project. Do NOT just run `pan project add` alone — it
-creates a skeleton entry that breaks planning agents, workspace creation,
-issue routing, and xBRIEF task support.
+way to add a new project. Registration itself is no longer the risky part —
+since PAN-3836 `pan project clone` and `pan project add` detect the remote,
+tracker, default branch and prefix and create the main workspace. What still
+needs this skill is everything registration cannot know: tests, quality gates,
+tracker integration, and any deliberate override of a detected value.
 
 Users can register projects three ways:
-1. **CLI:** `pan project clone <url>`, `pan project add <path>`, or `pan project new <name>`
+1. **CLI:** `pan project clone <url>` or `pan project add <path>` (both take
+   `--dry-run`); `pan project finish-setup <key>` repairs one that stopped
+   partway
 2. **Dashboard:** Navigate to `/projects/new` (via sidebar `+`, workspace-page chips, or HomePage button)
 3. **Workspace page:** Click "clone repo", "add existing", or "new project" chips
 
@@ -76,16 +80,20 @@ For details, see [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.
 
 ## WHY THIS SKILL EXISTS
 
-Running `pan project add /path --name foo` alone causes these failures:
+Since PAN-3836, `pan project clone <url>` and `pan project add <path>` do the
+structural work themselves: they detect the remote, tracker, repo slug and
+default branch, propose an `issue_prefix`, pre-trust the directory, add the
+workspaces directory to `.git/info/exclude`, and create the main workspace.
+
+What registration still cannot know is what the operator wants. These remain
+manual, and skipping them causes real failures:
 
 | Missing config | Symptom |
 |----------------|---------|
-| `issue_prefix` (issue prefix) | Planning agents start in `$HOME`, not the project root |
-| Trust entry in `~/.claude.json` | Claude Code shows trust dialog, blocking autonomous agents |
-| `GITHUB_REPOS` entry | Issues don't appear on the dashboard kanban board |
-| `workspaces/` directory | Git worktree creation fails |
-| `.gitignore` entry | `workspaces/` gets committed accidentally |
 | Test config | Specialist test agents can't run tests |
+| Quality gates | Verification cannot tell a green branch from a red one |
+| `GITHUB_REPOS` entry | Issues don't appear on the dashboard kanban board |
+| Deliberate overrides (prefix, tracker, default branch) | Detection's proposal ships instead of the operator's choice |
 
 ---
 
@@ -111,31 +119,68 @@ Ask the user for (or auto-detect from the filesystem):
 - `Cargo.toml` → Rust, test: `cargo test`
 - `pyproject.toml` → Python, test: `pytest`
 
-### Step 2: Register Project
+### Step 2: Register the Project
+
+For a repository that is not on this machine yet:
 
 ```bash
-pan project add <path> --name <name>
+pan project clone <url> [--parent <dir>] [--name <name>] [--issue-prefix <PREFIX>]
 ```
 
-This creates a minimal entry AND pre-trusts the directory in `~/.claude.json`
-(the `projectAddCommand` calls `preTrustDirectory` automatically).
+For a directory that already exists:
 
-### Step 3: Configure projects.yaml
+```bash
+pan project add <path> [--name <name>]
+```
 
-Edit `~/.overdeck/projects.yaml` to add the FULL configuration.
+Both resolve through the same core, so they behave identically: they detect the
+`origin` remote, set `tracker` and `github_repo`/`gitlab_repo`, carry the
+repository's `default_branch`, propose an `issue_prefix`, pre-trust the
+directory in `~/.claude.json`, add the workspaces directory to
+`.git/info/exclude`, and create the main workspace row.
 
-**Minimum viable config:**
+Add `--dry-run` to either to print the resolved intent as JSON and write
+nothing — useful for confirming the destination and detected identity first:
+
+```bash
+pan project clone acme/widget --dry-run | jq '{key, path, repoSlug, defaultBranch}'
+```
+
+Credentials are never echoed: the dry-run document redacts any userinfo in the
+URL. Clones run non-interactively (`GIT_TERMINAL_PROMPT=0`,
+`ssh -o BatchMode=yes`), so a private repository needs credentials already
+available on **this server** — an SSH key loaded in its agent, or a configured
+credential helper. A missing one fails fast with a typed message instead of
+hanging on a prompt nobody can see.
+
+If creation stops after registration (for example the main workspace could not
+be created), the project is registered and the repository is on disk. Do **not**
+clone again — repair it:
+
+```bash
+pan project finish-setup <key>
+```
+
+That command is idempotent: it never clones and never registers a second
+project, so it is safe to re-run.
+
+### Step 3: Add what registration cannot detect
+
+Registration has already written `name`, `path`, `tracker`,
+`github_repo`/`gitlab_repo`, `issue_prefix` and `workspace.default_branch`.
+Read the entry first — `pan project show <key>` — and only add what is missing.
+
+Tests and quality gates are **not** auto-discovered; they are the main reason to
+edit `~/.overdeck/projects.yaml` by hand. Override a detected value only when
+the operator wants something different from what the remote says.
 
 ```yaml
   <project-key>:
-    name: <name>
-    path: <absolute-path>
-    issue_prefix: <PREFIX>          # CRITICAL: issue prefix for routing
-    github_repo: <owner/repo>     # or gitlab_repo
+    # name / path / tracker / github_repo / issue_prefix / default_branch:
+    # already written by registration — override only on purpose.
     workspace:
       type: <standalone|monorepo|polyrepo>
       workspaces_dir: workspaces
-      default_branch: main
     tests:
       unit:
         type: <go|vitest|maven|pytest|cargo>
@@ -232,17 +277,17 @@ No per-project task database initialization is required. xBRIEF plan items becom
 pan task --help >/dev/null && echo "PASS: pan task available"
 ```
 
-### Step 6: Create workspaces/ Directory
+### Step 6 (optional): Workspaces directory and exclusion
 
-```bash
-mkdir -p <project-path>/workspaces
-```
+Registration already adds the workspaces directory to
+`<project-path>/.git/info/exclude`, which is local and untracked. That is
+deliberate (D-8): Overdeck does not edit a repository's tracked `.gitignore`, so
+a freshly cloned project never comes back dirty.
 
-Check `.gitignore` — add `workspaces/` if not already there:
-```bash
-grep -q '^workspaces/' <project-path>/.gitignore 2>/dev/null || \
-  echo 'workspaces/' >> <project-path>/.gitignore
-```
+Only do something here if the operator wants the exclusion **shared with the
+team**, in which case they add `workspaces/` to the tracked `.gitignore`
+themselves and commit it. The directory itself is created on demand when the
+first workspace is made.
 
 ### Step 7: Create the Overdeck project context (if missing)
 
