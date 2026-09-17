@@ -67,6 +67,35 @@ function warn(
   return { code, path, tierName, model, harness, difficulties, message };
 }
 
+/**
+ * The requirement clause of an `underpowered` message.
+ *
+ * One requirement across every failing difficulty keeps the original sentence
+ * verbatim. When they differ, each group states its OWN requirement: a single
+ * max-requirement sentence after a mixed list read as though every difficulty
+ * needed the strongest class — `medium, complex, expert` on a small model
+ * implied `medium` needs frontier-class, when medium needs workhorse-class.
+ * Strongest group first. Classification is unaffected; the max still decides
+ * whether the warning fires at all.
+ */
+function underpoweredDetail(bad: XBriefDifficulty[]): string {
+  const byNeed = new Map<ModelCapabilityClass, XBriefDifficulty[]>();
+  for (const difficulty of bad) {
+    const need = DIFFICULTY_CLASS_BANDS[difficulty].min;
+    const group = byNeed.get(need);
+    if (group) group.push(difficulty);
+    else byNeed.set(need, [difficulty]);
+  }
+  if (byNeed.size === 1) {
+    const [needed] = [...byNeed.keys()];
+    return `items at that difficulty need at least ${needed}-class`;
+  }
+  return [...byNeed.entries()]
+    .sort(([a], [b]) => CAPABILITY_CLASS_RANK[b] - CAPABILITY_CLASS_RANK[a])
+    .map(([need, group]) => `${group.join(', ')} ${group.length === 1 ? 'needs' : 'need'} at least ${need}-class`)
+    .join('; ');
+}
+
 /** Steps 1–5 of the per-entry algorithm for one staffed (model, harness). */
 function checkEntry(
   entry: { model: string; harness?: string },
@@ -99,10 +128,6 @@ function checkEntry(
   const rank = CAPABILITY_CLASS_RANK[cls];
   const bad = difficulties.filter((d) => rank < CAPABILITY_CLASS_RANK[DIFFICULTY_CLASS_BANDS[d].min]);
   if (bad.length > 0) {
-    const needed = bad.reduce<ModelCapabilityClass>(
-      (acc, d) => (CAPABILITY_CLASS_RANK[DIFFICULTY_CLASS_BANDS[d].min] > CAPABILITY_CLASS_RANK[acc] ? DIFFICULTY_CLASS_BANDS[d].min : acc),
-      DIFFICULTY_CLASS_BANDS[bad[0]].min,
-    );
     warnings.push(
       warn(
         'underpowered',
@@ -111,7 +136,7 @@ function checkEntry(
         model,
         harness,
         bad,
-        `${path}: ${model} is a ${cls}-class model but this tier owns ${bad.join(', ')} — items at that difficulty need at least ${needed}-class`,
+        `${path}: ${model} is a ${cls}-class model but this tier owns ${bad.join(', ')} — ${underpoweredDetail(bad)}`,
       ),
     );
   } else if (difficulties.length > 0 && difficulties.every((d) => rank > CAPABILITY_CLASS_RANK[DIFFICULTY_CLASS_BANDS[d].max])) {

@@ -198,3 +198,37 @@ describe('checkStaffingFitness', () => {
     expect(fallback[0].path).toBe('tiered_execution.tiers.default');
   });
 });
+
+// PAN-3842 (adjudicated F-5/C1): a single max-requirement clause after a mixed
+// list read as though every listed difficulty needed the strongest class.
+describe('underpowered wording across mixed difficulties', () => {
+  it('states each requirement separately, strongest first, when they differ', () => {
+    const [warning] = checkStaffingFitness({ tierName: 'cheap', model: 'tiny-model' }, ['medium', 'complex', 'expert'], makeCtx());
+    expect(warning.code).toBe('underpowered');
+    expect(warning.message).toContain('expert needs at least frontier-class');
+    expect(warning.message).toContain('medium, complex need at least workhorse-class');
+    // The old template would have claimed frontier for medium and complex too.
+    expect(warning.message).not.toContain('medium, complex, expert — items at that difficulty need at least frontier-class');
+  });
+
+  it('never tells the operator that medium requires frontier-class', () => {
+    const [warning] = checkStaffingFitness({ tierName: 'cheap', model: 'tiny-model' }, ['medium', 'expert'], makeCtx());
+    const mediumClause = warning.message.split('; ').find((clause) => clause.startsWith('medium '));
+    expect(mediumClause).toBe('medium needs at least workhorse-class');
+  });
+
+  it('keeps the original single-requirement sentence verbatim', () => {
+    const [warning] = checkStaffingFitness({ tierName: 'cheap', model: 'tiny-model' }, ['medium', 'complex'], makeCtx());
+    expect(warning.message).toBe(
+      'tiered_execution.tiers.cheap: tiny-model is a small-class model but this tier owns medium, complex — items at that difficulty need at least workhorse-class',
+    );
+  });
+
+  it('still fires on the maximum requirement — classification is unchanged', () => {
+    const mixed = checkStaffingFitness({ tierName: 'mid', model: 'mid-model' }, ['medium', 'expert'], makeCtx());
+    expect(mixed.map((w) => w.code)).toEqual(['underpowered']);
+    // A workhorse only fails 'expert', so only that group is named.
+    expect(mixed[0].difficulties).toEqual(['expert']);
+    expect(mixed[0].message).toContain('items at that difficulty need at least frontier-class');
+  });
+});
