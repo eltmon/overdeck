@@ -407,17 +407,11 @@ export function resolveSingleWorkTierSpawnParams(
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
-  const item = getDispatchableItems(doc, new Set())[0];
-
-  // Extract issueId from workspace path: feature-<issueId>
-  const workspaceName = basename(workspace);
-  const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
-  const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
-
-  // PAN-3842: even with an explicit override, gather plan difficulty info so
-  // the spawn caller can warn against the FINAL selected model. Override
-  // precedence is preserved — model and harness stay unset when an explicit
-  // override is present, and the spawn path uses options.model unchanged.
+  // PAN-3842: an override skips tier selection, so it must also skip
+  // getDispatchableItems — that DAG walk only picks the tier-selecting item,
+  // and reaching doc.plan.edges here broke real spawns. Difficulty still comes
+  // off doc.plan.items so the caller warns against the FINAL model; model and
+  // harness stay unset so options.model wins.
   if (explicitModel) {
     const pending = doc.plan.items.filter((candidate) => !['completed', 'cancelled'].includes(candidate.status));
     const planDifficulties = [...new Set(pending.map((candidate) => candidate.metadata?.difficulty).filter((d): d is XBriefDifficulty => Boolean(d)))];
@@ -431,7 +425,13 @@ export function resolveSingleWorkTierSpawnParams(
     };
   }
 
+  const item = getDispatchableItems(doc, new Set())[0];
   if (!item) return {};
+
+  // Extract issueId from workspace path: feature-<issueId>
+  const workspaceName = basename(workspace);
+  const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
+  const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
 
   // PAN-2397 (Always Tiered): the single-work path staffs through the same
   // resolver as slots — explicit table when enabled, implicit roles.work
