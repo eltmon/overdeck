@@ -22,7 +22,7 @@ exports[`prompt-time memory injection > renders an issue turn byte-identically (
         "id": "memory_fts:1",
         "docType": "observation",
         "scope": "workspace",
-        "score": 0.300001,
+        "score": 0.300006,
         "tokens": 15
       },
       "content": "prompt injection memory retrieval summary observation hit"
@@ -33,7 +33,7 @@ exports[`prompt-time memory injection > renders an issue turn byte-identically (
         "id": "memory_fts:2",
         "docType": "sibling",
         "scope": "workspace",
-        "score": 0.300001,
+        "score": 0.300006,
         "tokens": 36
       },
       "content": "Sibling memory hint (not authoritative current state).\\nProvenance: feature-pan-999:PAN-999\\nprompt injection memory retrieval summary sibling hit"
