@@ -92,7 +92,7 @@ Sub-roles are configuration slots under a role, not independent lifecycle stages
 
 You may spawn ephemeral **Claude Code subagents** via the `Agent` tool for parallel exploration. These are NOT Overdeck lifecycle roles:
 
-- `codebase-explorer`, `general-purpose` — fast read-only code search
+- `Explore`, `general-purpose` — built-in read-only code search (Overdeck ships no custom subagent files)
 - `Plan` — architectural planning helper
 
 The review convoy sub-roles (`review.security`, `review.correctness`, `review.performance`, `review.requirements`) are NOT Claude Code subagents — they are harness-agnostic prompt templates in `roles/review-<subRole>.md` that the review role's orchestrator inlines into each convoy spawn message. Plan around the review role itself; convoy mechanics are an implementation detail.

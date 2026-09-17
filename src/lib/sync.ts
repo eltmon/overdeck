@@ -270,9 +270,9 @@ export function refreshCacheSync(): RefreshCacheResult {
 
   // Copy agent definitions from repo to cache.
   //
-  // PAN-982: This pass deploys both Claude Code subagent definitions
-  // (codebase-explorer, triage-agent, health-monitor — used by
-  // the in-session Agent tool) and the Overdeck pipeline agents
+  // PAN-982: This pass deploys the Overdeck pipeline agent definitions
+  // (no ad-hoc Claude Code subagents ship here any more — roles use the
+  // built-in `Explore` / `general-purpose` types, see docs/ROLES.md)
   // (pan-work-agent, pan-review-agent, pan-test-agent,
   // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
   // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
