@@ -425,6 +425,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
     }
+    if (config.conversations?.handoff_author_model) {
+      result.conversations.handoffAuthorModel = resolveModelIdSync(config.conversations.handoff_author_model);
+    }
     if (config.conversations?.watch_dirs) {
       result.conversations.watchDirs = config.conversations.watch_dirs;
     }
