@@ -468,20 +468,21 @@
     "recordedAt": "2026-09-17T02:33:56.035Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T03:54:34.582Z",
+  "updated": "2026-09-17T03:54:37.001Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T03:54:34.496Z",
-    "reviewNotes": "Cycle-10 blocker fixed: POST /api/projects reserves via reserveProjectCreateOperation with AC-2 route tests; all 5 advisories taken; 4 new advisories non-blocking",
+    "updatedAt": "2026-09-17T03:54:34.503Z",
+    "reviewNotes": "Agent re-review request (2/25): Wired reserveProjectCreateOperation into POST /api/projects with settle-on-every-exit; fixed the five non-blocking findings",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewedAtCommit": "ca64ae8e258ce03ceaf4930cbcd2fbbe5fb0c5a3",
     "lastVerifiedCommit": "ca64ae8e258ce03ceaf4930cbcd2fbbe5fb0c5a3",
@@ -711,7 +712,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.661059,
-        "pricingAsOf": "2026-09-17T03:54:34.567Z"
+        "pricingAsOf": "2026-09-17T03:54:36.993Z"
       }
     },
     "merges": [
