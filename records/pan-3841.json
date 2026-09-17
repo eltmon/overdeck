@@ -104,15 +104,7 @@
       "timestamp": "2026-09-17T01:07:36.897Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-09-17T01:07:36Z",
-      "markdownBody": "VERIFICATION STUCK for PAN-3841 (attempt 3/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (7617ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3841 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
@@ -159,7 +151,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:08:18.366Z",
+  "updated": "2026-09-17T01:08:19.884Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
