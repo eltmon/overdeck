@@ -163,4 +163,33 @@ describe('createWorktree — CWE-78: branch config never reaches a shell', () =>
     expect(existsSync(markerQuote)).toBe(false);
     expect(result.success).toBe(false);
   });
+
+  it('a refspec payload in defaultBranch is rejected before any fetch (CWE-78 residual)', async () => {
+    const { createWorktree } = await import('../worktree-ops.js');
+
+    // argv stops the shell but NOT refspec parsing: this payload would make
+    // git update refs/heads/pwned locally if it ever reached the fetch.
+    const result = await createWorktree(
+      repoPath,
+      join(repoPath, 'wt-refspec'),
+      'scratch/refspec',
+      '+refs/heads/main:refs/heads/pwned',
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Invalid branch name');
+    const refs = execSync('git show-ref --heads || true', { cwd: repoPath, encoding: 'utf-8' });
+    expect(refs).not.toContain('pwned');
+  });
+
+  it('shared validator accepts real branch names and rejects refspecs', async () => {
+    const { isValidBranchNamePromise } = await import('../../git-utils.js');
+
+    await expect(isValidBranchNamePromise('main')).resolves.toBe(true);
+    await expect(isValidBranchNamePromise('feature/pan-3847')).resolves.toBe(true);
+    await expect(isValidBranchNamePromise('release/1.2.x')).resolves.toBe(true);
+    await expect(isValidBranchNamePromise('+refs/heads/main:refs/heads/pwned')).resolves.toBe(false);
+    await expect(isValidBranchNamePromise('main:refs/heads/pwned')).resolves.toBe(false);
+    await expect(isValidBranchNamePromise('')).resolves.toBe(false);
+  });
 });

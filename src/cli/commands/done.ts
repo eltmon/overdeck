@@ -295,6 +295,15 @@ export async function recordScopeDriftForDone(
     const projectConfig = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
     const { getSyncTargetBranch } = await import('../../lib/cloister/verification-runner.js');
     const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, undefined);
+    // CWE-78 residual: validate the config-supplied target branch before it
+    // reaches any git refspec position (PR #3872 round 2).
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
+    try {
+      await assertValidBranchNamePromise(targetBranch, 'scope-drift target branch');
+    } catch (invalid) {
+      console.warn(`[pan done] ${invalid instanceof Error ? invalid.message : invalid} — skipping scope-drift record`);
+      return undefined;
+    }
     try {
       await execFileAsync('git', ['fetch', 'origin', '--', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
     } catch (fetchErr: any) {
@@ -326,6 +335,10 @@ async function isMergeSetMergedIntoTargets(
       : workspacePath;
 
     if (!existsSync(join(repoPath, '.git'))) return false;
+
+    // CWE-78 residual: validate before the fetch AND the merge-base refspec.
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
+    await assertValidBranchNamePromise(repo.targetBranch, `merge-set target branch for ${repo.repoKey}`);
 
     await execFileAsync('git', ['fetch', 'origin', '--', repo.targetBranch], {
       cwd: repoPath,

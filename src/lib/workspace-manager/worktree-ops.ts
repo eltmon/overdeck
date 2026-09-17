@@ -152,6 +152,15 @@ export async function createWorktree(
     // PAN-3847 (FR-15): fetch the target so the new branch is cut from
     // origin/<default>, not a possibly-stale local ref. Offline falls back to
     // the local ref with a warning naming the risk.
+    // CWE-78 residual: validate the config-supplied branch BEFORE any git call —
+    // a refspec payload ('+refs/heads/a:refs/heads/b') passes argv safely but
+    // would still make git update a local ref.
+    const { assertValidBranchNamePromise } = await import('../git-utils.js');
+    try {
+      await assertValidBranchNamePromise(defaultBranch, 'createWorktree defaultBranch');
+    } catch (invalid) {
+      return { success: false, message: invalid instanceof Error ? invalid.message : String(invalid) };
+    }
     let baseRef = `origin/${defaultBranch}`;
     try {
       // CWE-78: defaultBranch comes from per-repo/workspace config — pass it as
