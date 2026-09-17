@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:09:51.903Z",
+  "updated": "2026-09-17T01:10:01.920Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "reviewing",
@@ -352,8 +352,16 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "retro-template": {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 4070132,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:10:01.920Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -446,8 +454,8 @@
     ],
     "statusReasons": {
       "retro-template": {
-        "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
-        "updatedAt": "2026-09-17T01:00:48.479Z"
+        "reason": "Template already carries the evidence contract in bf27cbe09fc; verifying and completing",
+        "updatedAt": "2026-09-17T01:10:01.920Z"
       },
       "retro-template-test": {
         "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
@@ -476,7 +484,7 @@
     }
   },
   "statusOverrides": {
-    "retro-template": "pending",
+    "retro-template": "running",
     "retro-template.ac1": "pending",
     "retro-template.ac2": "pending",
     "retro-template.ac3": "pending",
