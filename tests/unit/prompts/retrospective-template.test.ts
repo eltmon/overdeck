@@ -181,6 +181,29 @@ describe('retrospective template invariants', () => {
     }
   });
 
+  it('frames the embedded evidence as data, not instructions', () => {
+    // The snapshot embeds free text written by other agents (uatNotes,
+    // verificationNotes, feedback bodies). Without an explicit boundary that
+    // is a prompt-injection surface: a record could carry "ignore previous
+    // instructions" straight into the kickoff.
+    const section = template.match(/## Record evidence([\s\S]*?)(\n## |\s*$)/);
+    expect(section, RAIL_MESSAGE).not.toBeNull();
+    const body = section![1];
+    // Whitespace-tolerant: the template is wrapped prose, so a phrase can span
+    // a line break. Pinning exact wrapping would fail on any future reflow
+    // without the safety property having changed.
+    expect(body, RAIL_MESSAGE).toMatch(/data,\s+not\s+instructions/i);
+    expect(body, RAIL_MESSAGE).toMatch(/ignore\s+previous\s+instructions/i);
+    expect(body, RAIL_MESSAGE).toMatch(/outrank/i);
+    expect(body, RAIL_MESSAGE).toContain('{{EVIDENCE}}');
+  });
+
+  it('requires canonical timestamps to be preserved verbatim', () => {
+    const section = template.match(/## Record evidence([\s\S]*?)(\n## |\s*$)/);
+    expect(section, RAIL_MESSAGE).not.toBeNull();
+    expect(section![1], RAIL_MESSAGE).toMatch(/timestamps.*verbatim|verbatim.*timestamp/is);
+  });
+
   it('forbids treating every feedback file as superseding the report verdict', () => {
     // Operator review: feedback files do NOT automatically supersede a
     // verdict. Each feedback file must be matched to the run/head/time the

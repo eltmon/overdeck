@@ -33,6 +33,26 @@ async function writeRecord(dir: string, issueId: string, extra: Record<string, u
   );
 }
 
+/** A valid migration marker, matching validMarker() in state-read-home.ts. */
+async function markMigrated(stateRoot: string) {
+  await mkdir(stateRoot, { recursive: true });
+  await writeFile(
+    join(stateRoot, 'migration-complete.json'),
+    JSON.stringify({
+      sourceMainSha: 'a'.repeat(40),
+      stateBranchSha: 'b'.repeat(40),
+      completedAt: '2026-09-16T00:00:00.000Z',
+      version: 1,
+    }),
+    'utf-8',
+  );
+}
+
+/** State root for an unregistered temp project: projectKey falls back to basename. */
+function stateRootFor(repoPath: string): string {
+  return join(process.env.OVERDECK_HOME as string, 'state', repoPath.split('/').pop() as string);
+}
+
 /** A project whose state home resolves to the legacy layout (no migration marker). */
 function legacyProject(repoPath: string): ProjectConfig {
   return { path: repoPath } as unknown as ProjectConfig;
@@ -128,5 +148,66 @@ describe('listIssueRecords against a real filesystem (legacy layout)', () => {
     const viaDetailed = await listIssueRecordsDetailed(legacyProject(repo));
     expect(viaArray.map((r) => r.issueId)).toEqual(['PAN-30']);
     expect(viaDetailed.records.map((r) => r.issueId)).toEqual(['PAN-30']);
+  });
+});
+
+
+describe('listIssueRecords against a real filesystem (migrated layout)', () => {
+  it('reads records from the migrated state root, not the legacy paths', async () => {
+    // Requirement #5 explicitly covers BOTH layouts. A legacy-only fixture
+    // cannot catch a resolver that picks the wrong branch, which is the exact
+    // mistake an earlier cycle shipped.
+    const repo = join(root, 'migrated-repo');
+    const stateRoot = stateRootFor(repo);
+    await markMigrated(stateRoot);
+    await writeRecord(join(stateRoot, 'records'), 'PAN-200');
+    // Decoys: a migrated project must NOT pick these up.
+    await writeRecord(join(repo, '.pan', 'records'), 'PAN-LEGACY');
+    await writeRecord(join(repo, 'workspaces', 'feature-x', '.pan', 'records'), 'PAN-WORKSPACE');
+
+    const { records, failures } = await listIssueRecordsDetailed(legacyProject(repo));
+    expect(records.map((r) => r.issueId)).toEqual(['PAN-200']);
+    expect(records.map((r) => r.issueId)).not.toContain('PAN-LEGACY');
+    expect(records.map((r) => r.issueId)).not.toContain('PAN-WORKSPACE');
+    expect(failures).toEqual([]);
+  });
+
+  it('surfaces a corrupt record in the migrated layout', async () => {
+    const repo = join(root, 'migrated-corrupt');
+    const stateRoot = stateRootFor(repo);
+    await markMigrated(stateRoot);
+    const dir = join(stateRoot, 'records');
+    await writeRecord(dir, 'PAN-210');
+    await writeFile(join(dir, 'pan-211.json'), 'not json at all', 'utf-8');
+
+    const { records, failures } = await listIssueRecordsDetailed(legacyProject(repo));
+    expect(records.map((r) => r.issueId)).toEqual(['PAN-210']);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].kind).toBe('record');
+  });
+
+  it('reports an empty migrated records dir without inventing a failure', async () => {
+    const repo = join(root, 'migrated-empty');
+    await markMigrated(stateRootFor(repo));
+    const { records, failures } = await listIssueRecordsDetailed(legacyProject(repo));
+    expect(records).toEqual([]);
+    expect(failures).toEqual([]);
+  });
+
+  it('surfaces an unreadable migrated records dir as a readdir failure', async () => {
+    const repo = join(root, 'migrated-locked');
+    const stateRoot = stateRootFor(repo);
+    await markMigrated(stateRoot);
+    const dir = join(stateRoot, 'records');
+    await writeRecord(dir, 'PAN-220');
+    await chmod(dir, 0o000);
+    try {
+      const { records, failures } = await listIssueRecordsDetailed(legacyProject(repo));
+      if (records.length === 0) {
+        expect(failures.some((f) => f.kind === 'readdir' && f.path === dir)).toBe(true);
+      }
+    } finally {
+      await chmod(dir, 0o755).catch(() => {});
+    }
   });
 });
