@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:10:36.735Z",
+  "updated": "2026-09-17T01:10:41.060Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -352,16 +352,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "retro-template-test": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 4102743,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:10:36.734Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -461,6 +453,17 @@
         "outcome": "completed",
         "reason": "roles/retrospective.md rewritten in bf27cbe09fc: Inputs item 1 instructs no record read, points at the server-collected snapshot, requires repeating stated omissions; new '## Record evidence' section carries {{EVIDENCE}}. No fabricated command remains.",
         "releasedAt": "2026-09-17T01:10:05.576Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 4102743,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:10:36.734Z",
+        "itemId": "retro-template-test",
+        "outcome": "completed",
+        "reason": "11 prompt invariants pass: EVIDENCE added to the pinned placeholder set, evidence-section and omission-disclosure assertions added, negative guards on 'pan records show' and 'node -e'; removed the assertion that banned legitimate resolver API names.",
+        "releasedAt": "2026-09-17T01:10:41.059Z"
       }
     ],
     "statusReasons": {
@@ -469,8 +472,8 @@
         "updatedAt": "2026-09-17T01:10:05.576Z"
       },
       "retro-template-test": {
-        "reason": "Prompt invariants updated alongside the template in bf27cbe09fc",
-        "updatedAt": "2026-09-17T01:10:36.734Z"
+        "reason": "11 prompt invariants pass: EVIDENCE added to the pinned placeholder set, evidence-section and omission-disclosure assertions added, negative guards on 'pan records show' and 'node -e'; removed the assertion that banned legitimate resolver API names.",
+        "updatedAt": "2026-09-17T01:10:41.059Z"
       },
       "retro-lib": {
         "reason": "Evidence bridge: collectRetrospectiveEvidence enumerates via listIssueRecords read door (migrated + legacy), window-filters, bounds with disclosed truncation, renders to {{EVIDENCE}}. 28 data-flow tests pass.",
@@ -500,10 +503,10 @@
     "retro-template.ac2": "completed",
     "retro-template.ac3": "completed",
     "retro-template.ac4": "completed",
-    "retro-template-test": "running",
-    "retro-template-test.ac1": "pending",
-    "retro-template-test.ac2": "pending",
-    "retro-template-test.ac3": "pending",
+    "retro-template-test": "completed",
+    "retro-template-test.ac1": "completed",
+    "retro-template-test.ac2": "completed",
+    "retro-template-test.ac3": "completed",
     "retro-lib": "completed",
     "retro-lib.ac1": "completed",
     "retro-lib.ac2": "completed",
