@@ -23,6 +23,9 @@ export async function persistDoneReviewIntent(
       mergeStatus: 'pending',
       verificationStatus: 'pending',
       readyForMerge: false,
+      // PAN-3847 (FR-8): pan done is one of the two doors that clear the stale
+      // marker — and only here, once the re-review intent is durable (PR #3872).
+      reviewStaleSince: undefined,
       reviewRequestedAt: intent.reviewRequestedAt,
       scopeDrift: intent.scopeDrift,
       prUrl: intent.prUrl ?? record.pipeline.prUrl,
