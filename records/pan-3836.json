@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:08.123Z",
+  "updated": "2026-09-17T02:10:11.345Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 68,
+    "sequence": 69,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -686,6 +686,13 @@
         "pid": 840194,
         "host": "eltmon-z790",
         "claimedAt": "2026-09-17T02:10:04.912Z"
+      },
+      "delete-new-project-modal": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 841092,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:11.345Z"
       }
     },
     "claimHistory": [
@@ -1098,7 +1105,7 @@
     "wire-entry-points-no-loss.ac3": "pending",
     "wire-entry-points-no-loss.ac4": "pending",
     "wire-entry-points-no-loss.ac5": "pending",
-    "delete-new-project-modal": "pending",
+    "delete-new-project-modal": "running",
     "delete-new-project-modal.ac1": "pending",
     "delete-new-project-modal.ac2": "pending",
     "delete-new-project-modal.ac3": "pending",
