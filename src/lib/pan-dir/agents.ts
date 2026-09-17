@@ -45,6 +45,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
 import {
+  commitAutoCommits,
   flushAutoCommits,
   pushPendingStateCommits,
   queueAutoCommit,
@@ -531,30 +532,44 @@ export async function flushAgentPlaneWrites(issueId: string, agentId: string): P
   const desired = readAgentPlaneRecordAtPath(context.path);
   if (!desired) return null;
 
-  return withStateGitLock(context.root, issueId, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
-    const flushed = await Effect.runPromise(flushAutoCommits(context.project.path));
-    if (flushed.errored) return flushed;
-    if (flushed.committed && flushed.pushed !== true) {
-      if (!isRemoteRefRaceError(flushed.reason ?? '')) return flushed;
-      return reconcileAgentPlanePush(context, desired);
-    }
-
-    const reconciled = await Effect.runPromise(reconcileStatePlaneDrift(context.project.path));
-    if (reconciled.errored || (reconciled.committed && reconciled.pushed !== true)) {
-      return reconciled;
-    }
-    if (flushed.committed || reconciled.committed) {
-      return { committed: true, pushed: true };
-    }
-
-    const push = await Effect.runPromise(pushPendingStateCommits(context.project.path));
-    if (push?.pushed === false && isRemoteRefRaceError(push.reason ?? '')) {
-      return reconcileAgentPlanePush(context, desired);
-    }
-    return {
-      committed: false,
-      pushed: push?.pushed,
-      reason: push?.reason ?? reconciled.reason ?? flushed.reason,
-    };
+  // Phase 1 — locked local commit (PAN-3848 F2). commitAutoCommits defers the
+  // push, and deferred waiting covers the commit phase alone, so the
+  // per-issue lock is never held across a network push the way the old
+  // flushAutoCommits call was.
+  const committed = await withStateGitLock(context.root, issueId, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
+    const result = await Effect.runPromise(commitAutoCommits(context.project.path));
+    return result;
   });
+  if (committed.errored) return committed;
+  // The locked commit may have carried newer plane writes than the
+  // pre-lock snapshot; reconcile the settled record.
+  const settled = readAgentPlaneRecordAtPath(context.path) ?? desired;
+
+  // Phase 2 — unlocked push and reconciliation. Drift, settle, push, and
+  // push-race reconciliation may wait on the network without starving peer
+  // writers.
+  const reconciled = await Effect.runPromise(reconcileStatePlaneDrift(context.project.path));
+  if (reconciled.errored || (reconciled.committed && reconciled.pushed !== true)) {
+    return reconciled;
+  }
+
+  // Settle overlapping background flushes (a timer-fired flush from an
+  // earlier plane write may still be in its detached push) so the push below
+  // carries every local commit and `pushed: true` still means settled.
+  const background = await Effect.runPromise(flushAutoCommits(context.project.path));
+  if (background.errored) return background;
+
+  const push = await Effect.runPromise(pushPendingStateCommits(context.root));
+  if (push?.pushed === false && isRemoteRefRaceError(push.reason ?? '')) {
+    const r = await reconcileAgentPlanePush(context, settled);
+    return r;
+  }
+  if (committed.committed || reconciled.committed || background.committed) {
+    return { committed: true, pushed: push?.pushed, reason: push?.reason };
+  }
+  return {
+    committed: false,
+    pushed: push?.pushed,
+    reason: push?.reason ?? reconciled.reason ?? background.reason ?? committed.reason,
+  };
 }

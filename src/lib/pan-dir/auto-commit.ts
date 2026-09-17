@@ -111,12 +111,27 @@ export interface FlushResult {
 
 interface ActiveFlush {
   controller: AbortController;
+  /** Aborts the detached push phase (PAN-3848 F2). */
+  pushController: AbortController;
   gitRoot: string;
+  /** Full flush: local commit, then the push (absent for deferred flushes). */
   promise: Promise<FlushResult>;
+  /**
+   * Resolves when the LOCAL COMMIT lands (PAN-3848 F2). Deferred waiters
+   * (commitAutoCommits under a per-issue lock) await this, never another
+   * flush's network tail.
+   */
+  committed: Promise<FlushResult>;
 }
 
 const pending = new Map<string, QueuedCommit>();
 const active = new Map<string, ActiveFlush>();
+/**
+ * Every in-flight flush (PAN-3848 F2). `active` keeps the latest flush per
+ * project root for the test hook; this set keeps superseded-but-pushing
+ * flushes visible to flush-wide waits and shutdown settling.
+ */
+const inFlight = new Set<ActiveFlush>();
 const serializers = new Map<string, Promise<unknown>>();
 
 interface GitResult {
@@ -404,7 +419,7 @@ function flushPromise(
     const started = flushInner(queuedProjectRoot, deferPush);
     if (started) matching.add(started);
   }
-  for (const activeFlush of active.values()) {
+  for (const activeFlush of inFlight) {
     if (activeFlush.gitRoot === gitRoot) matching.add(activeFlush);
   }
 
@@ -412,7 +427,11 @@ function flushPromise(
     signal?.throwIfAborted();
     return Promise.resolve({ committed: false, reason: 'no pending' });
   }
-  return waitForFlushes(gitRoot, [...matching], signal);
+  // A deferred flush awaits only local commits (PAN-3848 F2) — never an
+  // existing flush's push tail.
+  return deferPush
+    ? waitForFlushCommits(gitRoot, [...matching], signal)
+    : waitForFlushes(gitRoot, [...matching], signal);
 }
 
 function flushInner(projectRoot: string, deferPush = false): ActiveFlush | undefined {
@@ -421,32 +440,71 @@ function flushInner(projectRoot: string, deferPush = false): ActiveFlush | undef
   pending.delete(projectRoot);
 
   const gitRoot = batch.repoRoot ?? projectRoot;
+  const commitOperation = doLocalCommit(projectRoot, batch);
+  // A deferred flush commits locally only; the caller pushes after releasing
+  // its locks. A non-deferred flush pushes inline — as a detached phase (F2).
+  const pushOperation = deferPush
+    ? null
+    : (commitResult: FlushResult): Effect.Effect<FlushResult, never> =>
+      commitResult.committed ? doBoundedPush(gitRoot, batch.expectedBranch) : Effect.succeed(commitResult);
   return startSerializedFlush(
     projectRoot,
     gitRoot,
-    doBoundedCommit(projectRoot, batch, deferPush),
+    commitOperation,
+    pushOperation,
   );
 }
 
 function startSerializedFlush(
   projectRoot: string,
   gitRoot: string,
-  operation: Effect.Effect<FlushResult, never>,
+  commitOperation: Effect.Effect<FlushResult, never>,
+  pushOperation: ((commitResult: FlushResult) => Effect.Effect<FlushResult, never>) | null = null,
 ): ActiveFlush {
   const prior = serializers.get(gitRoot) ?? Promise.resolve();
   const controller = new AbortController();
-  const promise = prior.then(() => {
+  const pushController = new AbortController();
+  // The commit gate advances when the LOCAL COMMIT lands (PAN-3848 F2), not
+  // when the full flush settles: the next flush's commit may proceed while
+  // this flush's push is still in flight, so a lock-held deferred waiter
+  // never sits behind another flush's network tail. Commits stay serialized
+  // (the gate) and cross-process excluded (the repo lock inside); overlapping
+  // a push with the next commit is safe because push-race reconciliation
+  // downstream owns the resulting ref races. The push itself runs detached
+  // and is awaited only through `promise`.
+  const committed = prior.catch(() => undefined).then(() => {
     controller.signal.throwIfAborted();
-    return Effect.runPromise(operation, { signal: controller.signal });
+    return Effect.runPromise(boundStateFlush(commitOperation), { signal: controller.signal });
   });
-  const activeFlush = { controller, gitRoot, promise };
+  const commitTail = committed.catch(() => undefined);
+  serializers.set(gitRoot, commitTail);
+  void commitTail.then(() => {
+    if (serializers.get(gitRoot) === commitTail) serializers.delete(gitRoot);
+  });
+  const promise = pushOperation === null
+    ? committed
+    : committed.then((commitResult) => {
+      pushController.signal.throwIfAborted();
+      return Effect.runPromise(pushOperation(commitResult), { signal: pushController.signal });
+    });
+  const activeFlush: ActiveFlush = {
+    controller,
+    pushController,
+    gitRoot,
+    promise,
+    committed: committed.catch((error) => {
+      // A commit-phase waiter must observe aborts as results, not hangs: the
+      // full `promise` still rejects for the owner.
+      if (error instanceof Error) return { committed: false, errored: true, reason: error.message };
+      return { committed: false, errored: true, reason: String(error) };
+    }),
+  };
   active.set(projectRoot, activeFlush);
+  inFlight.add(activeFlush);
 
-  const tail = promise.catch(() => undefined);
-  serializers.set(gitRoot, tail);
   void promise.then(
-    () => clearActiveFlush(projectRoot, activeFlush, tail),
-    () => clearActiveFlush(projectRoot, activeFlush, tail),
+    () => clearActiveFlush(projectRoot, activeFlush),
+    () => clearActiveFlush(projectRoot, activeFlush),
   );
   return activeFlush;
 }
@@ -463,8 +521,31 @@ async function waitForFlushes(
   activeFlushes: readonly ActiveFlush[],
   signal?: AbortSignal,
 ): Promise<FlushResult> {
-  const completion = Promise.all(activeFlushes.map((flush) => flush.promise))
-    .then(combineFlushResults);
+  return settleFlushWaits(
+    gitRoot,
+    Promise.all(activeFlushes.map((flush) => flush.promise)).then(combineFlushResults),
+    signal,
+  );
+}
+
+/** Commit-phase wait for deferred flushes (PAN-3848 F2). */
+async function waitForFlushCommits(
+  gitRoot: string,
+  activeFlushes: readonly ActiveFlush[],
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  return settleFlushWaits(
+    gitRoot,
+    Promise.all(activeFlushes.map((flush) => flush.committed)).then(combineFlushResults),
+    signal,
+  );
+}
+
+async function settleFlushWaits<T>(
+  gitRoot: string,
+  completion: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   if (!signal) return completion;
   if (signal.aborted) {
     await abortAndSettleGitRoot(gitRoot, signal.reason);
@@ -527,26 +608,33 @@ async function abortAndSettleGitRoot(
   gitRoot: string,
   reason: unknown,
 ): Promise<void> {
-  const matching = [...active.values()].filter((flush) => flush.gitRoot === gitRoot);
-  for (const flush of matching) flush.controller.abort(reason);
+  const matching = [...inFlight].filter((flush) => flush.gitRoot === gitRoot);
+  for (const flush of matching) {
+    flush.controller.abort(reason);
+    flush.pushController.abort(reason);
+  }
   await Promise.allSettled(matching.map((flush) => flush.promise));
 }
 
 function clearActiveFlush(
   projectRoot: string,
   activeFlush: ActiveFlush,
-  tail: Promise<unknown>,
 ): void {
   if (active.get(projectRoot) === activeFlush) active.delete(projectRoot);
-  if (serializers.get(activeFlush.gitRoot) === tail) serializers.delete(activeFlush.gitRoot);
+  inFlight.delete(activeFlush);
 }
 
-function doBoundedCommit(
-  projectRoot: string,
-  batch: QueuedCommit,
-  deferPush = false,
+function doBoundedPush(
+  gitRoot: string,
+  branch: string,
 ): Effect.Effect<FlushResult, never> {
-  return boundStateFlush(doCommit(projectRoot, batch, deferPush));
+  return boundStateFlush(Effect.gen(function* () {
+    const push = yield* maybePushStateCommit(gitRoot, branch);
+    if (push && !push.pushed) {
+      return { committed: true, pushed: false, reason: push.reason };
+    }
+    return { committed: true, pushed: push?.pushed };
+  }));
 }
 
 function boundStateFlush(
@@ -566,10 +654,9 @@ function boundStateFlush(
   );
 }
 
-function doCommit(
+function doLocalCommit(
   projectRoot: string,
   batch: QueuedCommit,
-  deferPush = false,
 ): Effect.Effect<FlushResult, never> {
   const gitRoot = batch.repoRoot ?? projectRoot;
   return Effect.gen(function* () {
@@ -712,18 +799,10 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
-    // PAN-3848 (W23): the record writer pushes after releasing its per-issue
-    // locks, so the commit phase reports the deferral instead of pushing here.
-    if (deferPush) {
-      return { committed: true, pushDeferred: true };
-    }
-
-    const push = yield* maybePushStateCommit(gitRoot, branch);
-    if (push && !push.pushed) {
-      return { committed: true, pushed: false, reason: push.reason };
-    }
-
-    return { committed: true, pushed: push?.pushed };
+    // PAN-3848 (W23/F2): the commit phase reports the deferral instead of
+    // pushing here — the record writer pushes after releasing its per-issue
+    // locks, and non-deferred flushes push as a detached phase.
+    return { committed: true, pushDeferred: true };
   });
 }
 
@@ -975,7 +1054,7 @@ export const __testInternals = {
   settleAllFlushes: async (): Promise<void> => {
     for (const batch of pending.values()) if (batch.timer) clearTimeout(batch.timer);
     pending.clear();
-    await Promise.allSettled([...active.values()].map((flush) => flush.promise));
+    await Promise.allSettled([...inFlight].map((flush) => flush.promise));
   },
 };
 
