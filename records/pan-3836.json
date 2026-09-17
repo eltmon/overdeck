@@ -362,6 +362,7 @@
       "src/dashboard/frontend/src/components/project/new/projectCreateTypes.ts",
       "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
       "src/dashboard/frontend/tests/project-create-ux.spec.ts",
+      "src/dashboard/server/routes/project-body.ts",
       "src/dashboard/server/routes/project-create-routes.ts",
       "src/lib/projects/create-errors.ts",
       "src/lib/projects/create-perform.ts",
@@ -442,6 +443,7 @@
       "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx",
       "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
       "src/dashboard/frontend/tests/project-create-ux.spec.ts",
+      "src/dashboard/server/routes/project-body.ts",
       "src/dashboard/server/routes/project-create-jobs.ts",
       "src/dashboard/server/routes/project-create-routes.ts",
       "src/dashboard/server/routes/projects.ts",
@@ -465,10 +467,10 @@
       "tests/unit/lib/projects/repo-url.test.ts",
       "tests/unit/telemetry-docs.test.ts"
     ],
-    "recordedAt": "2026-09-17T02:33:56.035Z"
+    "recordedAt": "2026-09-17T04:20:26.020Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T04:20:22.404Z",
+  "updated": "2026-09-17T04:20:26.022Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
