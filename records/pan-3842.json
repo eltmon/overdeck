@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:39:52.895Z",
+  "updated": "2026-09-17T00:42:07.859Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 18,
+    "sequence": 19,
     "claims": {
       "spawn-single-log": {
         "writerId": "agent-pan-3842",
@@ -453,8 +453,8 @@
     ],
     "statusReasons": {
       "class-table": {
-        "reason": "Added src/lib/model-capability-class.ts (§5.1 table verbatim, deprecation-resolving capabilityClassOf) and its test file; all 7 tests pass, completeness covers every catalog id, typecheck green, purity grep clean.",
-        "updatedAt": "2026-09-16T19:38:50.258Z"
+        "reason": "Adjudicated R4: capabilityClassOf hops MODEL_DEPRECATIONS before checking the literal id, so an explicitly selected glm-4.7-flash is rated frontier (glm-5.1) and its expert warning is suppressed",
+        "updatedAt": "2026-09-17T00:42:07.859Z"
       },
       "fitness-checker": {
         "reason": "Added src/lib/agents/tier-fitness.ts (checkTierFitness/checkStaffingFitness, §5.2 bands, §5.3 shapes, per-entry algorithm per WI-2) plus 17-case test with injected literal ctx; typecheck green; type-only imports keep module fs-free.",
@@ -487,12 +487,12 @@
     }
   },
   "statusOverrides": {
-    "class-table": "completed",
-    "class-table.ac1": "completed",
-    "class-table.ac2": "completed",
-    "class-table.ac3": "completed",
-    "class-table.ac4": "completed",
-    "class-table.ac5": "completed",
+    "class-table": "pending",
+    "class-table.ac1": "pending",
+    "class-table.ac2": "pending",
+    "class-table.ac3": "pending",
+    "class-table.ac4": "pending",
+    "class-table.ac5": "pending",
     "fitness-checker": "completed",
     "fitness-checker.ac1": "completed",
     "fitness-checker.ac2": "completed",
