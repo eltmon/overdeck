@@ -73,7 +73,7 @@ The legacy `--auto-start` flag on `pan plan <id>` is deprecated and kept only th
 
 ## Finalizing (`pan plan finalize`)
 
-Run this from inside the planning workspace after the planning agent has produced a complete `.pan/spec.vbrief.json`.
+Run this from inside the planning workspace after the planning agent has produced a complete `.overdeck/spec.vbrief.json`.
 
 ```bash
 pan plan finalize
@@ -81,7 +81,7 @@ pan plan finalize
 
 What it does:
 
-1. Reads `.pan/spec.vbrief.json` from the current workspace (walks up if needed).
+1. Reads `.overdeck/spec.vbrief.json` from the current workspace (walks up if needed).
 2. Validates the tasks already stored in `plan.items[]`, including their declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
