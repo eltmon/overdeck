@@ -898,3 +898,81 @@ describe('tier fitness badges (PAN-3842)', () => {
     expect(screen.queryAllByTestId('tier-fitness-warning')).toHaveLength(0);
   });
 });
+
+// PAN-3842 (adjudicated F-3): every fitness badge was keyed on the warning
+// code alone, so a distribution whose entries share a code rendered siblings
+// with the same key and React logged a duplicate-key error.
+describe('fitness badge keys', () => {
+  function renderWithConsoleCapture(ui: Parameters<typeof render>[0]) {
+    const messages: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(' '));
+    });
+    try {
+      render(ui);
+    } finally {
+      spy.mockRestore();
+    }
+    return messages;
+  }
+
+  it('renders one badge per warning with no duplicate-key error for a same-code distribution', () => {
+    // Two small-class models on an expert crew: two 'underpowered' warnings,
+    // one per distribution entry. Keyed on the code alone these collided.
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          top: {
+            model: 'claude-haiku-4-5',
+            harness: 'claude-code',
+            difficulties: ['expert'],
+            distribution: [
+              { model: 'claude-haiku-4-5', harness: 'claude-code', weight: 50 },
+              { model: 'gpt-5.6-luna', harness: 'codex', weight: 50 },
+            ],
+          },
+        },
+        by_kind: {},
+        replay_threshold: 0.5,
+      },
+    } as never);
+
+    const messages = renderWithConsoleCapture(
+      <TieredExecutionSection formData={formData} onSettingsChange={vi.fn()} />,
+    );
+
+    const duplicateKeyErrors = messages.filter((message) => /same key|duplicate key|Encountered two children/i.test(message));
+    expect(duplicateKeyErrors, duplicateKeyErrors.join('\n')).toEqual([]);
+
+    const badges = screen.getAllByTestId('tier-fitness-warning');
+    expect(badges.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps every badge message rather than collapsing duplicates', () => {
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          top: {
+            model: 'claude-haiku-4-5',
+            harness: 'claude-code',
+            difficulties: ['expert'],
+            distribution: [
+              { model: 'claude-haiku-4-5', harness: 'claude-code', weight: 50 },
+              { model: 'gpt-5.6-luna', harness: 'codex', weight: 50 },
+            ],
+          },
+        },
+        by_kind: {},
+        replay_threshold: 0.5,
+      },
+    } as never);
+
+    render(<TieredExecutionSection formData={formData} onSettingsChange={vi.fn()} />);
+
+    const titles = screen.getAllByTestId('tier-fitness-warning').map((badge) => badge.getAttribute('title') ?? '');
+    expect(titles.some((title) => title.includes('claude-haiku-4-5'))).toBe(true);
+    expect(titles.some((title) => title.includes('gpt-5.6-luna'))).toBe(true);
+  });
+});
