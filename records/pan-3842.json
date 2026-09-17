@@ -184,7 +184,7 @@
     "recordedAt": "2026-09-17T01:40:01.804Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T02:08:07.581Z",
+  "updated": "2026-09-17T04:42:47.878Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -193,85 +193,19 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-09-17T02:08:04.900Z",
-    "reviewNotes": "Cycle 3 clean: 4/4 reviewers zero blockers at 4f4d3e1a; both cycle-1 blockers now fixed structurally via resolveSlotSpawnFitness, tree clean, simulation tests replaced with production-helper regressions",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
+    "readyForMerge": false,
+    "updatedAt": "2026-09-17T04:42:47.848Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-09-17T04:42:47.847Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
     "lastVerifiedCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
-    "reviewRequestedAt": "2026-09-17T01:40:02.844Z",
     "reviewSpawnedAt": "2026-09-17T01:57:58.365Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".overdeck/context/codebase/architecture.md",
-        "package.json",
-        "scripts/file-size-allowlist.txt",
-        "scripts/source-introspection-baseline.txt",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Settings/types.ts",
-        "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
-        "src/lib/__tests__/configurable-providers.test.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/configurable-providers.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/MODEL_ROUTING.md",
-        "docs/TIERED-EXECUTION.md",
-        "reference/troubleshooting.mdx",
-        "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
-        "src/cli/commands/doctor-tier-fitness.ts",
-        "src/cli/commands/doctor.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-        "src/lib/__tests__/model-capability-class.test.ts",
-        "src/lib/agents/__tests__/dispatch-tier.test.ts",
-        "src/lib/agents/__tests__/tier-fitness-context.test.ts",
-        "src/lib/agents/__tests__/tier-fitness.test.ts",
-        "src/lib/agents/spawn-prep.ts",
-        "src/lib/agents/spawn.ts",
-        "src/lib/agents/tier-fitness-context.ts",
-        "src/lib/agents/tier-fitness.ts",
-        "src/lib/model-capability-class.ts"
-      ],
-      "actualChangedFiles": [
-        ".overdeck/context/codebase/architecture.md",
-        "docs/MODEL_ROUTING.md",
-        "docs/TIERED-EXECUTION.md",
-        "package.json",
-        "reference/troubleshooting.mdx",
-        "scripts/file-size-allowlist.txt",
-        "scripts/source-introspection-baseline.txt",
-        "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
-        "src/cli/commands/doctor-tier-fitness.ts",
-        "src/cli/commands/doctor.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-        "src/dashboard/frontend/src/components/Settings/types.ts",
-        "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
-        "src/lib/__tests__/configurable-providers.test.ts",
-        "src/lib/__tests__/model-capability-class.test.ts",
-        "src/lib/agents/__tests__/dispatch-tier.test.ts",
-        "src/lib/agents/__tests__/tier-fitness-context.test.ts",
-        "src/lib/agents/__tests__/tier-fitness.test.ts",
-        "src/lib/agents/spawn-prep.ts",
-        "src/lib/agents/spawn.ts",
-        "src/lib/agents/tier-fitness-context.ts",
-        "src/lib/agents/tier-fitness.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/configurable-providers.ts",
-        "src/lib/model-capability-class.ts"
-      ],
-      "recordedAt": "2026-09-17T01:40:01.804Z"
-    },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
     "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
@@ -340,7 +274,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-17T02:08:07.572Z"
+        "pricingAsOf": "2026-09-17T04:42:47.868Z"
       }
     },
     "merges": [
