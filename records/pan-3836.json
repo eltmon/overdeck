@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:06:30.518Z",
+  "updated": "2026-09-17T01:52:34.605Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 50,
-    "claims": {
-      "create-core-perform": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 3979328,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:06:30.518Z"
-      }
-    },
+    "sequence": 51,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -897,6 +889,17 @@
         "outcome": "completed",
         "reason": "WI-1.2/1.3: server-resolved parentDir/homeDir with ~ expansion (D-4), rev-parse --show-toplevel Git root + worktree detection with subdirectory finding (D-15), ENOENT/ENOTDIR/EACCES distinguished (D-11), project-exists-here vs conflict, 128-entry capped probe memo (D-2), typed extras (D-10), and new create-errors.ts taxonomy + sanitizer (WI-1.3). Commit cbd58db24a9.",
         "releasedAt": "2026-09-17T01:06:12.136Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3979328,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:06:30.518Z",
+        "itemId": "create-core-perform",
+        "outcome": "completed",
+        "reason": "WI-1.4/1.5: clone owns its child (single settlement guard, settle on close, SIGTERM->5s->SIGKILL, 4KiB tail), dev+inode+birthtime cleanup ownership, idempotent finishProjectSetup, read-only resolveProjectCreateRecovery. Split into create-perform.ts for the file-size ratchet. Commits fe3cca5a1f5 + 452ab45ebbf.",
+        "releasedAt": "2026-09-17T01:52:34.605Z"
       }
     ],
     "statusReasons": {
@@ -913,8 +916,8 @@
         "updatedAt": "2026-09-17T01:06:12.136Z"
       },
       "create-core-perform": {
-        "reason": "WI-1.4/1.5 revised: real AbortSignal wiring with SIGTERM->5s->SIGKILL, single settlement guard, bounded stderr, D-5 cleanup ownership, and a new idempotent finishProjectSetup + resolveProjectCreateRecovery so a partial registration is repairable instead of stranded.",
-        "updatedAt": "2026-09-17T01:06:27.303Z"
+        "reason": "WI-1.4/1.5: clone owns its child (single settlement guard, settle on close, SIGTERM->5s->SIGKILL, 4KiB tail), dev+inode+birthtime cleanup ownership, idempotent finishProjectSetup, read-only resolveProjectCreateRecovery. Split into create-perform.ts for the file-size ratchet. Commits fe3cca5a1f5 + 452ab45ebbf.",
+        "updatedAt": "2026-09-17T01:52:34.605Z"
       },
       "create-job-store": {
         "reason": "Job store implementation complete with all acceptance criteria and tests passing",
@@ -976,12 +979,12 @@
     "create-core-resolve.ac3": "completed",
     "create-core-resolve.ac4": "completed",
     "create-core-resolve.ac5": "completed",
-    "create-core-perform": "running",
-    "create-core-perform.ac1": "pending",
-    "create-core-perform.ac2": "pending",
-    "create-core-perform.ac3": "pending",
-    "create-core-perform.ac4": "pending",
-    "create-core-perform.ac5": "pending",
+    "create-core-perform": "completed",
+    "create-core-perform.ac1": "completed",
+    "create-core-perform.ac2": "completed",
+    "create-core-perform.ac3": "completed",
+    "create-core-perform.ac4": "completed",
+    "create-core-perform.ac5": "completed",
     "create-job-store": "completed",
     "create-job-store.ac1": "completed",
     "create-job-store.ac2": "completed",
