@@ -134,3 +134,48 @@ describe('diff-unavailable fails the gate (PR #3872 finding 4)', () => {
     expect(outcome.error).toContain('origin/main...HEAD');
   });
 });
+
+describe('options-object skip scoping (PR #3872 round 2 finding 3)', () => {
+  it('flags skip: true at any position in the options object', () => {
+    const diff = diffFor('src/foo.test.ts', ['+  it("x", { timeout: 1000, skip: true }, () => {']);
+
+    const violations = findTestSkipViolations(diff);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({ file: 'src/foo.test.ts', kind: 'skip' });
+  });
+
+  it('does not flag an unrelated { skip: true } object literal', () => {
+    const diff = diffFor('src/foo.test.ts', ['+const fixture = { skip: true };']);
+
+    expect(findTestSkipViolations(diff)).toEqual([]);
+  });
+
+  it('does not flag skip: true inside a test NAME string without an options object', () => {
+    const diff = diffFor('src/foo.test.ts', ['+  it("handles { skip: true } payloads", () => {']);
+
+    expect(findTestSkipViolations(diff)).toEqual([]);
+  });
+});
+
+describe('removed-call counting (PR #3872 round 2 finding 4)', () => {
+  it('deleting an xit( is not a removed-test violation', () => {
+    const diff = diffFor('src/foo.test.ts', [
+      '-  xit("already skipped", () => {',
+    ]);
+
+    expect(findTestSkipViolations(diff)).toEqual([]);
+  });
+
+  it('converting it( to xit( still counts as exactly one skip violation, not a removal', () => {
+    const diff = diffFor('src/foo.test.ts', [
+      '-  it("does the thing", () => {',
+      '+  xit("does the thing", () => {',
+    ]);
+
+    const violations = findTestSkipViolations(diff);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.kind).toBe('skip');
+  });
+});

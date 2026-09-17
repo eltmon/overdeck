@@ -19,16 +19,19 @@ export interface TestSkipViolation {
 
 const TEST_FILE = /\.(test|spec)\.(ts|tsx|js|jsx)$/;
 // Direct forms: it.skip(/test.only(/xdescribe(. Conditional forms (PR #3872
-// finding 3): it.skipIf(cond)( / describe.skipIf(cond)( and a { skip: true }
-// options argument — vitest skips those too.
+// finding 3): it.skipIf(cond)( / describe.skipIf(cond)( and an options object
+// with skip: true belonging to an it/test/describe call — any property order
+// (round 2: it("x", { timeout, skip: true }, fn) must match; an unrelated
+// 'const fixture = { skip: true }' must not).
 const SKIP_OR_ONLY = /\b(?:it|test|describe)\.(skip|only)\s*\(|\bx(?:it|test|describe)\s*\(/;
-const CONDITIONAL_SKIP = /\b(?:it|test|describe)\.skipIf\s*\(|\{\s*skip:\s*true\s*\}/;
+const CONDITIONAL_SKIP = /\b(?:it|test|describe)\.skipIf\s*\(|\b(?:it|test|describe)(?:\.[a-zA-Z]+)*\s*\(\s*['"`][^'"`]*['"`]\s*,\s*\{[^{}]*\bskip:\s*true\b/;
 // For the removed/added balance: added lines count every test-call form
 // (plain, disabled xit/xtest, and chained modifiers like it.skipIf() — PR #3872
-// finding 3); removed lines count only plain calls, so deleting an already-
-// skipped test is not itself a 'removed-test' violation.
+// finding 3); removed lines count only PLAIN calls, so deleting an already-
+// skipped test (xit/xtest) is not itself a 'removed-test' violation (round 2:
+// the x? in the removed pattern made a deleted xit() count — a contradiction).
 const TEST_CALL_ADDED = /^\s*x?(?:it|test)(?:\.[a-zA-Z]+)*\s*\(/;
-const TEST_CALL_REMOVED = /^\s*x?(?:it|test)\s*\(/;
+const TEST_CALL_REMOVED = /^\s*(?:it|test)\s*\(/;
 
 export function findTestSkipViolations(unifiedDiff: string): TestSkipViolation[] {
   const violations: TestSkipViolation[] = [];
