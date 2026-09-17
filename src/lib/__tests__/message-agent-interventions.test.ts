@@ -187,7 +187,7 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
     expect(existsSync(join(stateDir, 'agent-pan-2997', 'mail'))).toBe(false);
   });
 
-  it('still routes UNKEYED mid-session tells through a live monitor', async () => {
+  it('ignores a live monitor for UNKEYED mid-session tells (PAN-3846)', async () => {
     const { isMonitorLive } = await import('../agents/monitor-transport.js');
     const { sendKeysDedup } = await import('../tmux-dedup.js');
     vi.mocked(isMonitorLive).mockReturnValue(true);
@@ -196,8 +196,13 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
 
     const result = await messageAgent('agent-pan-3015', 'ordinary tell', 'internal');
 
-    expect(result).toMatchObject({ delivered: true, queuedToMail: true, reason: 'monitor' });
+    // The monitor tier is gone from the automatic cascade: a live monitor.json
+    // does not change the outcome — the tell rides the normal transport.
+    expect(result.delivered).toBe(true);
+    expect(result.reason).not.toBe('monitor');
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith('agent-pan-3015', 'ordinary tell');
     expect(vi.mocked(sendKeysDedup)).not.toHaveBeenCalled();
+    // The mail file is the post-delivery backup, not the delivery itself.
     expect(existsSync(join(stateDir, 'agent-pan-3015', 'mail'))).toBe(true);
   });
 

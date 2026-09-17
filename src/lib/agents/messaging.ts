@@ -35,7 +35,7 @@ import {
   deliverMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
-import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
+import { formatMailFileContent } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
@@ -521,29 +521,6 @@ export async function messageAgent(
   }
 
   const expectedHarness = agentState?.harness ?? 'claude-code';
-
-  // PAN-3015 monitor tier: when the agent's Claude Code session runs a live
-  // `pan monitor` background task, the durable mail file IS the delivery — the
-  // monitor prints it to stdout and the harness surfaces it to the model,
-  // waking an idle session. No keystroke transport runs, which sidesteps the
-  // whole echo-confirm/paste/Enter failure class (PAN-1769, PAN-2228,
-  // PAN-1988). Mid-session tells only: kickoff/resume never reach this path
-  // (no monitor exists before the session's first turn), and a stale
-  // heartbeat or dead pid falls through to the normal cascade.
-  //
-  // KEYED deliveries never take this tier (PAN-2997 review cycle 7): the
-  // monitor claims a mail file by renaming it before emitting, so a monitor
-  // exit between claim and emit loses the wake, and a dashboard crash after
-  // the emit but before the outbox ack replays it — the mail spool cannot
-  // enforce the key across the complete model-visible side effect. Keyed
-  // messages fall through to the supervisor/tmux door, which can.
-  if (expectedHarness === 'claude-code' && opts.dedupKey === undefined && isMonitorLive(normalizedId)) {
-    queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
-    logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
-    console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
-    await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: true, queuedToMail: true, reason: 'monitor' };
-  }
 
   let appServerState: string | undefined;
   try {
