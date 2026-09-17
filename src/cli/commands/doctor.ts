@@ -8,6 +8,7 @@ import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
+import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -398,6 +399,25 @@ export function printPatrolWouldFireTable(): void {
     const mixed = shadow > 0 && normal > 0;
     const line = `  ${patrol}: shadow=${shadow} live=${normal}${mixed ? ' (MIXED — soak evidence invalid)' : ''}`;
     console.log(mixed ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W39, FR-26): print each patrol's action tally for the current UTC
+ * day against its budget. A suspended patrol is a needs-you the operator
+ * already got; this table is where they see the whole picture.
+ */
+export function printPatrolBudgetTable(): void {
+  console.log(chalk.bold('Patrol firing budgets (current UTC day):'));
+  const rows = listPatrolBudgetRows();
+  if (rows.length === 0) {
+    console.log(chalk.dim('  (no patrol actions recorded today)'));
+    return;
+  }
+  for (const row of rows) {
+    const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
+    const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
+    console.log(row.suspended ? chalk.red(line) : line);
   }
 }
 
@@ -1060,6 +1080,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // for the last 7 days. Zeroes across the board while OVERDECK_PATROL_SHADOW=1
   // prove the deleted-patrol candidates' repaired states are unreachable.
   printPatrolWouldFireTable();
+
+  // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
+  // against each patrol's budget, with suspended patrols named in red.
+  printPatrolBudgetTable();
 
   console.log('');
 

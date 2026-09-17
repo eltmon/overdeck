@@ -29,6 +29,7 @@ import {
 import { pidsWithCwdUnder } from '../process-cwd.js';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isPatrolShadowMode, recordWouldFire, runShadowablePatrol, type PatrolShadowOptions } from './patrol-would-fire.js';
+import { runBudgetedPatrol } from './patrol-budget.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
@@ -2567,8 +2568,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
-  for (const a of await (await import('./stale-task-claims.js')).patrolStaleTaskClaims()) { actions.push(a); addLog('action', a, state.patrolCycle); }
-  const stuckRemediationActions = await checkStuckAgentRemediation();
+  for (const a of await runBudgetedPatrol('patrolStaleTaskClaims', async () => (await import('./stale-task-claims.js')).patrolStaleTaskClaims())) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  const stuckRemediationActions = await runBudgetedPatrol('checkStuckAgentRemediation', () => checkStuckAgentRemediation());
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
@@ -2584,7 +2585,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   const { reconcileInFlightJournals } = await import('./advancing-selfheal.js');
-  const reconciledJournalActions = await runShadowablePatrol('reconcileInFlightJournals', () => reconcileInFlightJournals());
+  const reconciledJournalActions = await runBudgetedPatrol('reconcileInFlightJournals', () => runShadowablePatrol('reconcileInFlightJournals', () => reconcileInFlightJournals()));
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
@@ -2592,12 +2593,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   try {
     const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
     const { processPendingLifecycleForPatrol } = await import('./deacon-pending-lifecycle.js');
-    const action = await processPendingLifecycleForPatrol(pendingFile);
-    if (action) actions.push(action);
+    const lifecycleActions = await runBudgetedPatrol('processPendingLifecycleForPatrol', async () => {
+      const action = await processPendingLifecycleForPatrol(pendingFile);
+      return action ? [action] : [];
+    });
+    actions.push(...lifecycleActions);
   } catch (err: any) {
     console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);
   }
-  if (state.patrolCycle % 5 === 0) await (await import('./deploy-patrol.js')).runScheduledDeployPatrol();
+  if (state.patrolCycle % 5 === 0) await runBudgetedPatrol('runScheduledDeployPatrol', async () => { await (await import('./deploy-patrol.js')).runScheduledDeployPatrol(); return []; });
   /* PAN-378: Global specialist patrol removed. All specialist work now goes through
    * per-project ephemeral specialists via spawnEphemeralSpecialist(). The global
    * merge-agent, review-agent, and test-agent singletons are no longer used.
@@ -2610,58 +2614,58 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1908: primary liveness recovery is now reactive (agent.stopped /
   // agent.heartbeat_dead events handled by the Cloister domain-event scheduler).
   // Keep a thin table-query safety net on the patrol for dropped events.
-  const livenessActions = await reconcileAgentLiveness();
+  const livenessActions = await runBudgetedPatrol('reconcileAgentLiveness', () => reconcileAgentLiveness());
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
-  for (const a of await reconcileOrphanProposedSpecs()) { actions.push(a); addLog('action', a, state.patrolCycle); }
-  for (const a of await reconcilePendingPromotions()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await runBudgetedPatrol('reconcileOrphanProposedSpecs', () => reconcileOrphanProposedSpecs())) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await runBudgetedPatrol('reconcilePendingPromotions', () => reconcilePendingPromotions())) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
-  const closedIssueAgentActions = await reconcileClosedIssueAgents();
+  const closedIssueAgentActions = await runBudgetedPatrol('reconcileClosedIssueAgents', () => reconcileClosedIssueAgents());
   actions.push(...closedIssueAgentActions);
   for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1882: strikes bypass close-out, so their merged `strike/<id>` worktrees
   // + branches pile up forever. Reap any whose branch is fully merged into
   // origin/main with no live strike session (never touches feature/* or unmerged work).
-  const strikeWorkspaceActions = await reapMergedStrikeWorkspaces();
+  const strikeWorkspaceActions = await runBudgetedPatrol('reapMergedStrikeWorkspaces', () => reapMergedStrikeWorkspaces());
   actions.push(...strikeWorkspaceActions);
   for (const a of strikeWorkspaceActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1817: stop the server+frontend UI containers of workspaces whose agent
   // has been idle (no agent, no tmux) past the grace window. Light-touch and
   // reversible — never touches the agent (host tmux), worktree, or branch.
-  const idleStackActions = await reconcileIdleWorkspaceStacks();
+  const idleStackActions = await runBudgetedPatrol('reconcileIdleWorkspaceStacks', () => reconcileIdleWorkspaceStacks());
   actions.push(...idleStackActions);
   for (const a of idleStackActions) addLog('action', a, state.patrolCycle);
 
   // PAN-3053: read-only Docker bridge-pool pressure signal; emits on transitions only.
-  for (const a of await (await import('./bridge-pool-patrol.js')).patrolDockerBridgePool()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await runBudgetedPatrol('patrolDockerBridgePool', async () => (await import('./bridge-pool-patrol.js')).patrolDockerBridgePool())) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
   // pattern, prompt mis-interpretation, etc.).
-  const beadNudgeActions = await nudgeIdleWorkAgentsWithOpenBeads();
+  const beadNudgeActions = await runBudgetedPatrol('nudgeIdleWorkAgentsWithOpenBeads', () => nudgeIdleWorkAgentsWithOpenBeads());
   actions.push(...beadNudgeActions);
   for (const a of beadNudgeActions) addLog('action', a, state.patrolCycle);
 
   // Detect "Invalid signature in thinking block" in active agent output (PAN-612).
   // Context compaction corrupts thinking-block signatures; the session cannot be
   // resumed. Must run before idle-suspend so we recover corrupted agents first.
-  const signatureCorruptionActions = await checkThinkingSignatureCorruption();
+  const signatureCorruptionActions = await runBudgetedPatrol('checkThinkingSignatureCorruption', () => checkThinkingSignatureCorruption());
   actions.push(...signatureCorruptionActions);
   for (const a of signatureCorruptionActions) addLog('action', a, state.patrolCycle);
 
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
-  const suspendActions = await checkAndSuspendIdleAgents();
+  const suspendActions = await runBudgetedPatrol('checkAndSuspendIdleAgents', () => checkAndSuspendIdleAgents());
   actions.push(...suspendActions);
   for (const a of suspendActions) addLog('action', a, state.patrolCycle);
 
   // Clear readyForMerge for issues whose workspace no longer exists.
   // Prevents MERGE button showing for issues that can't actually merge.
   // PAN-3848 (W30): slated for deletion (Phase 3) — wrapped for the soak.
-  const clearedMissingWorkspaceActions = await runShadowablePatrol('clearReadyForMergeWorkspaceMissing', async (shadow) => {
+  const clearedMissingWorkspaceActions = await runBudgetedPatrol('clearReadyForMergeWorkspaceMissing', () => runShadowablePatrol('clearReadyForMergeWorkspaceMissing', async (shadow) => {
     const cleared: string[] = [];
     try {
       const { resolveProjectFromIssueSync } = await import('../projects.js');
@@ -2685,7 +2689,7 @@ export async function runPatrol(): Promise<PatrolResult> {
       console.warn(`[deacon] Failed to check workspace existence: ${err.message}`);
     }
     return cleared;
-  });
+  }));
   actions.push(...clearedMissingWorkspaceActions);
   for (const a of clearedMissingWorkspaceActions) addLog('action', a, state.patrolCycle);
 
@@ -2700,11 +2704,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1726: Reap the work session of an already-merged issue. An idle merged
   // work agent holds a PAN-1665 work slot; re-pause + kill it so the slot frees
   // for live work. (Merged = past close-out, so the warm policy does not apply.)
-  const reapedWorkActions = await checkMergedWorkSessions();
+  const reapedWorkActions = await runBudgetedPatrol('checkMergedWorkSessions', () => checkMergedWorkSessions());
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
 
-  const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
+  const reapedMergedAdvancingActions = await runBudgetedPatrol('checkMergedAdvancingSessions', () => checkMergedAdvancingSessions());
   actions.push(...reapedMergedAdvancingActions);
   for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
 
@@ -2715,7 +2719,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // scan only — no Fly provider construction and no Fly API calls.
   try {
     const { refreshClaudeCredentialsForActiveRemoteAgents } = await import('../remote/remote-completion.js');
-    const remoteCredentialActions = await refreshClaudeCredentialsForActiveRemoteAgents();
+    const remoteCredentialActions = await runBudgetedPatrol('refreshClaudeCredentialsForActiveRemoteAgents', () => refreshClaudeCredentialsForActiveRemoteAgents());
     actions.push(...remoteCredentialActions);
     for (const a of remoteCredentialActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
   } catch (err: any) {
@@ -2727,7 +2731,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // watchdog self-stops the machine when the heartbeat goes stale.
   try {
     const { refreshHostHeartbeatForEphemeralVms } = await import('../remote/remote-agents.js');
-    const heartbeatActions = await refreshHostHeartbeatForEphemeralVms();
+    const heartbeatActions = await runBudgetedPatrol('refreshHostHeartbeatForEphemeralVms', () => refreshHostHeartbeatForEphemeralVms());
     actions.push(...heartbeatActions);
     for (const a of heartbeatActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
   } catch (err: any) {
@@ -2741,7 +2745,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   // marker, and destroys the machine.
   try {
     const { reapCompletedRemoteAgents } = await import('../remote/remote-completion.js');
-    const remoteReap = await reapCompletedRemoteAgents();
+    // Budget counts only real actions (hand-offs and errors), not per-VM no-op scans.
+    const remoteReap = await runBudgetedPatrol('reapCompletedRemoteAgents', async () =>
+      (await reapCompletedRemoteAgents()).filter((r) => r.status === 'handed-off' || r.status === 'error'));
     for (const r of remoteReap) {
       if (r.status === 'handed-off' || r.status === 'error') {
         const msg = `Remote reap ${r.issueId}: ${r.status} (${r.details.join('; ')})`;
@@ -2758,49 +2764,49 @@ export async function runPatrol(): Promise<PatrolResult> {
   // meets the PAN-1665 total ceiling, these idle agents livelock test dispatch —
   // freeing the slot here lets this same cycle's checkPendingTestDispatch admit
   // the test that releases them. Kill-without-pause; see the function comment.
-  const reapedAwaitingTestActions = await runShadowablePatrol('checkAwaitingTestWorkSessions', (shadow) => checkAwaitingTestWorkSessions({ shadow }));
+  const reapedAwaitingTestActions = await runBudgetedPatrol('checkAwaitingTestWorkSessions', () => runShadowablePatrol('checkAwaitingTestWorkSessions', (shadow) => checkAwaitingTestWorkSessions({ shadow })));
   actions.push(...reapedAwaitingTestActions);
   for (const a of reapedAwaitingTestActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1908: primary review-status orphan recovery is now reactive
   // (review.coordinator.died / work.completed events). The patrol keeps a thin
   // SQLite-only safety net for dropped events.
-  const orphanActions = await runShadowablePatrol('checkOrphanedReviewStatuses', (shadow) => checkOrphanedReviewStatuses({ shadow }));
+  const orphanActions = await runBudgetedPatrol('checkOrphanedReviewStatuses', () => runShadowablePatrol('checkOrphanedReviewStatuses', (shadow) => checkOrphanedReviewStatuses({ shadow })));
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
 
   // Bound per-bead inspect sessions so work agents never wait forever for a verdict.
-  const inspectTimeoutActions = await checkInspectAgentTimeouts();
+  const inspectTimeoutActions = await runBudgetedPatrol('checkInspectAgentTimeouts', () => checkInspectAgentTimeouts());
   actions.push(...inspectTimeoutActions);
   for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1559: reap untracked inspect tmux sessions. Inspect agents now write
   // state.json at spawn, but this safety net kills older leaked sessions and
   // any future dead inspect panes before they burn compute indefinitely.
-  const inspectReaperActions = await cleanupOrphanedInspectSessions();
+  const inspectReaperActions = await runBudgetedPatrol('cleanupOrphanedInspectSessions', () => cleanupOrphanedInspectSessions());
   actions.push(...inspectReaperActions);
   for (const a of inspectReaperActions) addLog('action', a, state.patrolCycle);
 
   // Detect new commits pushed after review passed before any test/merge path can
   // act on stale review approval.
-  const postReviewActions = await checkPostReviewCommits();
+  const postReviewActions = await runBudgetedPatrol('checkPostReviewCommits', () => checkPostReviewCommits());
   actions.push(...postReviewActions);
   for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
-  const stalledConvoyActions = await runShadowablePatrol('recoverStalledReviewConvoys', (shadow) => recoverStalledReviewConvoys(undefined, { shadow }));
+  const stalledConvoyActions = await runBudgetedPatrol('recoverStalledReviewConvoys', () => runShadowablePatrol('recoverStalledReviewConvoys', (shadow) => recoverStalledReviewConvoys(undefined, { shadow })));
   actions.push(...stalledConvoyActions);
   for (const a of stalledConvoyActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1908: primary missing-status creation is now reactive (work.completed
   // event). The patrol keeps a thin agents-table safety net for dropped events.
-  const missingStatusActions = await runShadowablePatrol('checkMissingReviewStatuses', (shadow) => checkMissingReviewStatuses({ shadow }));
+  const missingStatusActions = await runBudgetedPatrol('checkMissingReviewStatuses', () => runShadowablePatrol('checkMissingReviewStatuses', (shadow) => checkMissingReviewStatuses({ shadow })));
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
 
   // PAN-2207: recover issues where `pan done` failed mid-flight (PR open + review
   // never dispatched). Runs after missing-status so we don't race reactive status
   // creation, but before test/merge recovery so the review pipeline can proceed.
-  const orphanCompletionActions = await runShadowablePatrol('checkOrphanedCompletions', (shadow) => checkOrphanedCompletions({ shadow }));
+  const orphanCompletionActions = await runBudgetedPatrol('checkOrphanedCompletions', () => runShadowablePatrol('checkOrphanedCompletions', (shadow) => checkOrphanedCompletions({ shadow })));
   actions.push(...orphanCompletionActions);
   for (const a of orphanCompletionActions) addLog('action', a, state.patrolCycle);
 
@@ -2808,27 +2814,27 @@ export async function runPatrol(): Promise<PatrolResult> {
   // POSTed testStatus (nudge once → auto-complete). Runs BEFORE the dispatcher
   // below so a recoverable verdict is honored before any re-dispatch or stuck
   // marker — the dispatcher's stuck path skips issues this already resolved.
-  const unsignaledTestActions = await runShadowablePatrol('checkCompletedButUnsignaledTests', (shadow) => checkCompletedButUnsignaledTests({ shadow }));
+  const unsignaledTestActions = await runBudgetedPatrol('checkCompletedButUnsignaledTests', () => runShadowablePatrol('checkCompletedButUnsignaledTests', (shadow) => checkCompletedButUnsignaledTests({ shadow })));
   actions.push(...unsignaledTestActions);
   for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
 
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
-  const pendingTestActions = await runShadowablePatrol('checkPendingTestDispatch', (shadow) => checkPendingTestDispatch({ shadow }));
+  const pendingTestActions = await runBudgetedPatrol('checkPendingTestDispatch', () => runShadowablePatrol('checkPendingTestDispatch', (shadow) => checkPendingTestDispatch({ shadow })));
   actions.push(...pendingTestActions);
   for (const a of pendingTestActions) addLog('action', a, state.patrolCycle);
 
   // Reset issues stuck in 'reviewing' with no active review session (PAN-733)
-  const stuckReviewActions = await runShadowablePatrol('checkStuckReviewing', (shadow) => checkStuckReviewing({ shadow }));
+  const stuckReviewActions = await runBudgetedPatrol('checkStuckReviewing', () => runShadowablePatrol('checkStuckReviewing', (shadow) => checkStuckReviewing({ shadow })));
   actions.push(...stuckReviewActions);
   for (const a of stuckReviewActions) addLog('action', a, state.patrolCycle);
 
   // Detect review specialists that wrote synthesis.md but never signaled completion
-  const unsignaledReviewActions = await runShadowablePatrol('checkCompletedButUnsignaledReviews', (shadow) => checkCompletedButUnsignaledReviews({ shadow }));
+  const unsignaledReviewActions = await runBudgetedPatrol('checkCompletedButUnsignaledReviews', () => runShadowablePatrol('checkCompletedButUnsignaledReviews', (shadow) => checkCompletedButUnsignaledReviews({ shadow })));
   actions.push(...unsignaledReviewActions);
   for (const a of unsignaledReviewActions) addLog('action', a, state.patrolCycle);
 
   // Repair verdicts that reached disk after their review status was reset to pending.
-  const unappliedReviewActions = await runShadowablePatrol('reconcileUnappliedReviewVerdicts', (shadow) => reconcileUnappliedReviewVerdicts({ shadow }));
+  const unappliedReviewActions = await runBudgetedPatrol('reconcileUnappliedReviewVerdicts', () => runShadowablePatrol('reconcileUnappliedReviewVerdicts', (shadow) => reconcileUnappliedReviewVerdicts({ shadow })));
   actions.push(...unappliedReviewActions);
   for (const a of unappliedReviewActions) addLog('action', a, state.patrolCycle);
 
@@ -2837,11 +2843,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Budget derived from the RESOLVED patrol interval, not a hardcoded 60s
   // assumption: a shorter configured interval would otherwise let the sweep
   // overrun it and start overlapping patrols.
-  const verdictFallbackActions = await runShadowablePatrol('sweepStrandedVerdictFallbacks', (shadow) => sweepStrandedVerdictFallbacks(
+  const verdictFallbackActions = await runBudgetedPatrol('sweepStrandedVerdictFallbacks', () => runShadowablePatrol('sweepStrandedVerdictFallbacks', (shadow) => sweepStrandedVerdictFallbacks(
     Date.now(),
     Math.max(1_000, Math.floor(config.patrolIntervalMs / 2)),
     { shadow },
-  ));
+  )));
   actions.push(...verdictFallbackActions);
   for (const a of verdictFallbackActions) addLog('action', a, state.patrolCycle);
 
@@ -2850,29 +2856,29 @@ export async function runPatrol(): Promise<PatrolResult> {
   // because either (a) `skipKill=true` was set or (b) complete-planning was never invoked
   // (work agent was started via a different path). If the corresponding work agent session
   // `agent-pan-<id>` is alive, planning is definitively over — kill the planning session.
-  const planningCleanupActions = await cleanupOrphanedPlanningSessions();
+  const planningCleanupActions = await runBudgetedPatrol('cleanupOrphanedPlanningSessions', () => cleanupOrphanedPlanningSessions());
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
   // The review-parent patrol is observability-only and checks the synthesis artifact
   // before the runtime row, so a completed parent is never mistaken for a stalled one.
-  const stalledParentActions = await runShadowablePatrol('checkStalledReviewParents', (shadow) => checkStalledReviewParents({ shadow }));
+  const stalledParentActions = await runBudgetedPatrol('checkStalledReviewParents', () => runShadowablePatrol('checkStalledReviewParents', (shadow) => checkStalledReviewParents({ shadow })));
   actions.push(...stalledParentActions);
   for (const a of stalledParentActions) addLog('action', a, state.patrolCycle);
 
-  const reviewerMonitorActions = await monitorReviewConvoySignals();
+  const reviewerMonitorActions = await runBudgetedPatrol('monitorReviewConvoySignals', () => monitorReviewConvoySignals());
   actions.push(...reviewerMonitorActions);
   for (const a of reviewerMonitorActions) addLog('action', a, state.patrolCycle);
 
   // Kill orphaned review sessions whose work agent is no longer running.
   // Review sessions are named review-<issueId>-<timestamp>-<role> and are
   // never killed by teardown because the exact-match pattern doesn't catch them.
-  const reviewCleanupActions = await cleanupOrphanedReviewSessions();
+  const reviewCleanupActions = await runBudgetedPatrol('cleanupOrphanedReviewSessions', () => cleanupOrphanedReviewSessions());
   actions.push(...reviewCleanupActions);
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
 
   // PAN-464: Check workspace Docker container health and auto-restart crashed containers
-  const containerActions = await checkWorkspaceContainerHealth(state);
+  const containerActions = await runBudgetedPatrol('checkWorkspaceContainerHealth', () => checkWorkspaceContainerHealth(state));
   actions.push(...containerActions);
   for (const a of containerActions) addLog('action', a, state.patrolCycle);
 
@@ -2882,51 +2888,51 @@ export async function runPatrol(): Promise<PatrolResult> {
   // dashboard's Tell action.
 
   // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
-  const mergeStuckActions = await runShadowablePatrol('checkReadyForMergeStuck', (shadow) => checkReadyForMergeStuck({ shadow }));
+  const mergeStuckActions = await runBudgetedPatrol('checkReadyForMergeStuck', () => runShadowablePatrol('checkReadyForMergeStuck', (shadow) => checkReadyForMergeStuck({ shadow })));
   actions.push(...mergeStuckActions);
   for (const a of mergeStuckActions) addLog('action', a, state.patrolCycle);
 
   // Auto-retry merges that failed due to transient post-rebase verification failures
-  const failedMergeRetryActions = await checkFailedMergeRetry();
+  const failedMergeRetryActions = await runBudgetedPatrol('checkFailedMergeRetry', () => checkFailedMergeRetry());
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
-  for (const a of await patrolStrikeLandings()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await runBudgetedPatrol('patrolStrikeLandings', () => patrolStrikeLandings())) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // PAN-2203: deterministic swarm coordination. This pass derives active
   // swarms from workspaces + xBRIEF readiness; later beads fill in merge,
   // dispatch, recovery, and cooldown behavior.
-  const swarmActions = await swarmJanitorPass();
+  const swarmActions = await runBudgetedPatrol('swarmJanitorPass', () => swarmJanitorPass());
   actions.push(...swarmActions);
   for (const a of swarmActions) addLog('action', a, state.patrolCycle);
 
   // Reconcile stale merges and bound merging/verifying states that never completed.
-  const staleMergeActions = await runShadowablePatrol('reconcileStaleMergeStatus', (shadow) => reconcileStaleMergeStatus({ shadow }));
-  staleMergeActions.push(...await runShadowablePatrol('reconcileStuckMergingStates', (shadow) => reconcileStuckMergingStates({ shadow })));
+  const staleMergeActions = await runBudgetedPatrol('reconcileStaleMergeStatus', () => runShadowablePatrol('reconcileStaleMergeStatus', (shadow) => reconcileStaleMergeStatus({ shadow })));
+  staleMergeActions.push(...await runBudgetedPatrol('reconcileStuckMergingStates', () => runShadowablePatrol('reconcileStuckMergingStates', (shadow) => reconcileStuckMergingStates({ shadow }))));
   actions.push(...staleMergeActions); for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
   // (closed-without-merge, reopened after revert, or false positive from squash detection).
   // Without this, those issues get stuck because mergeStatus blocks all pipeline gates.
-  const falseMergedActions = await runShadowablePatrol('reconcileFalseMerged', (shadow) => reconcileFalseMerged({ shadow }));
+  const falseMergedActions = await runBudgetedPatrol('reconcileFalseMerged', () => runShadowablePatrol('reconcileFalseMerged', (shadow) => reconcileFalseMerged({ shadow })));
   actions.push(...falseMergedActions);
   for (const a of falseMergedActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1028: detect merge_status=merged but review_status non-terminal (coordinator
   // crashed mid-run, dashboard missed the transition). Reconcile to review_status=passed
   // so the dashboard stops showing "running reviewers with no data."
-  const mergedReviewingActions = await runShadowablePatrol('reconcileMergedButReviewing', (shadow) => reconcileMergedButReviewing({ shadow }));
+  const mergedReviewingActions = await runBudgetedPatrol('reconcileMergedButReviewing', () => runShadowablePatrol('reconcileMergedButReviewing', (shadow) => reconcileMergedButReviewing({ shadow })));
   actions.push(...mergedReviewingActions);
   for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
 
-  const autoCloseOutActions = await autoCloseOut();
+  const autoCloseOutActions = await runBudgetedPatrol('autoCloseOut', () => autoCloseOut());
   actions.push(...autoCloseOutActions);
   for (const a of autoCloseOutActions) addLog('action', a, state.patrolCycle);
 
   // Closed-PR readyForMerge reconciler: stops the "Awaiting Merge" view from
   // listing issues whose PR was closed without merging (PAN-1111-style stale
   // state). Best-effort against the forge; 10-min per-issue cooldown.
-  const closedPrReadyActions = await runShadowablePatrol('reconcileClosedPrReadyForMerge', (shadow) => reconcileClosedPrReadyForMerge({ shadow }));
+  const closedPrReadyActions = await runBudgetedPatrol('reconcileClosedPrReadyForMerge', () => runShadowablePatrol('reconcileClosedPrReadyForMerge', (shadow) => reconcileClosedPrReadyForMerge({ shadow })));
   actions.push(...closedPrReadyActions);
-  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle); for (const a of await reconcileAutoMergeRows()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle); for (const a of await runBudgetedPatrol('reconcileAutoMergeRows', () => reconcileAutoMergeRows())) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   // PAN-2143: re-evaluate stale merge-blockers. resolveConflictGate clears a
   // stale merge_conflict/not_mergeable blocker once the branch is mergeable
@@ -2934,28 +2940,28 @@ export async function runPatrol(): Promise<PatrolResult> {
   // that falls out of the review flow stays stuck after review forever. This
   // patrol re-runs it for every in-pipeline issue still carrying a merge-blocker
   // so resolved conflicts clear and readyForMerge recomputes.
-  const staleMergeBlockerActions = await runShadowablePatrol('reconcileStaleMergeBlockers', (shadow) => reconcileStaleMergeBlockers(undefined, undefined, undefined, { shadow }));
+  const staleMergeBlockerActions = await runBudgetedPatrol('reconcileStaleMergeBlockers', () => runShadowablePatrol('reconcileStaleMergeBlockers', (shadow) => reconcileStaleMergeBlockers(undefined, undefined, undefined, { shadow })));
   actions.push(...staleMergeBlockerActions);
   for (const a of staleMergeBlockerActions) addLog('action', a, state.patrolCycle);
 
   // PAN-2198: re-derive readyForMerge for the no-blocker "stuck after review" strand
   // (review+test+verify passed, no blocker, but readyForMerge stuck false) so it
   // converges on the deacon tick instead of only on the server-restart repair sweep.
-  const stuckReadyActions = await runShadowablePatrol('reconcileStuckReadyForMerge', (shadow) => reconcileStuckReadyForMerge(undefined, { shadow }));
+  const stuckReadyActions = await runBudgetedPatrol('reconcileStuckReadyForMerge', () => runShadowablePatrol('reconcileStuckReadyForMerge', (shadow) => reconcileStuckReadyForMerge(undefined, { shadow })));
   actions.push(...stuckReadyActions);
   for (const a of stuckReadyActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
   // 7-requeue circuit breaker to avoid runaway API credit consumption.
-  const deadEndActions = await checkDeadEndAgents();
+  const deadEndActions = await runBudgetedPatrol('checkDeadEndAgents', () => checkDeadEndAgents());
   actions.push(...deadEndActions);
   for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
 
   // First-completion gap detection: nudge work agents that finished implementation
   // but never called pan done. Only fires for agents idle >10min with commits and
   // no completion marker or review status entry. Has 15-min cooldown per agent.
-  const firstCompletionActions = await runShadowablePatrol('checkFirstCompletionAgents', (shadow) => checkFirstCompletionAgents({ shadow }));
+  const firstCompletionActions = await runBudgetedPatrol('checkFirstCompletionAgents', () => runShadowablePatrol('checkFirstCompletionAgents', (shadow) => checkFirstCompletionAgents({ shadow })));
   actions.push(...firstCompletionActions);
   for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
 
@@ -2963,7 +2969,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // dev script), leaving traefik disconnected from their network — every route to
   // that stack 504s until someone runs `docker network connect` by hand. Reconcile
   // idempotently on the patrol tick.
-  const traefikActions = await reconcileTraefikNetworks();
+  const traefikActions = await runBudgetedPatrol('reconcileTraefikNetworks', () => reconcileTraefikNetworks());
   actions.push(...traefikActions);
   for (const a of traefikActions) addLog('action', a, state.patrolCycle);
 
@@ -2975,19 +2981,19 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // Stuck work agent recovery still runs — it only intervenes after 10 minutes
   // of no tool use, escalating to Escape/Ctrl-C/respawn (not paid messages).
-  const stuckActions = await checkStuckWorkAgents();
+  const stuckActions = await runBudgetedPatrol('checkStuckWorkAgents', () => checkStuckWorkAgents());
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-  if (state.patrolCycle % 10 === 0) for (const action of await reconcilePipelineLabelsPatrol()) { actions.push(action); addLog('action', action, state.patrolCycle); }
+  if (state.patrolCycle % 10 === 0) for (const action of await runBudgetedPatrol('reconcilePipelineLabelsPatrol', () => reconcilePipelineLabelsPatrol())) { actions.push(action); addLog('action', action, state.patrolCycle); }
   // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
   // Never touches the live server, port owner, or workspace-container server.
   const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
   if (state.patrolCycle % serverReaperEveryCycles === 0) {
-    const reaperActions = await reapOrphanedDashboardServers();
+    const reaperActions = await runBudgetedPatrol('reapOrphanedDashboardServers', () => reapOrphanedDashboardServers());
     actions.push(...reaperActions);
     for (const a of reaperActions) addLog('action', a, state.patrolCycle);
   }
@@ -2996,40 +3002,40 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Each ghost browser keeps a full dashboard page polling at full rate,
   // multiplying server load. Same ~10 min cadence as the server reaper.
   if (state.patrolCycle % serverReaperEveryCycles === 0) {
-    const playwrightActions = await reapLeftoverPlaywrightBrowsers();
+    const playwrightActions = await runBudgetedPatrol('reapLeftoverPlaywrightBrowsers', () => reapLeftoverPlaywrightBrowsers());
     actions.push(...playwrightActions);
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
   const projectConfigs = listProjectsSync();
-  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileProjectStatePlanes(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
+  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await runBudgetedPatrol('reconcileProjectStatePlanes', () => reconcileProjectStatePlanes(projectConfigs))) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
   // PAN-3727: sweep terminal-issue records for parked-population residue (open
   // recovery trips, operator-gate flags) left over from before close-out
   // started acknowledging it. Same cadence as the state-plane patrol above.
-  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await reconcileTerminalIssueResidue(projectConfigs)) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
+  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await runBudgetedPatrol('reconcileTerminalIssueResidue', () => reconcileTerminalIssueResidue(projectConfigs))) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog(warning.level, warning.message, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
   if (shouldRunRecoveryJanitor('agent-state', state.patrolCycle)) {
-    const cleanupActions = await cleanupStaleAgentState();
+    const cleanupActions = await runBudgetedPatrol('cleanupStaleAgentState', () => cleanupStaleAgentState());
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
 
     const transcriptDays = loadCloisterConfigSync().retention?.transcript_days;
     if (typeof transcriptDays === 'number' && Number.isFinite(transcriptDays) && transcriptDays > 0) {
-      const transcriptActions = await sweepTranscriptRetention({ transcriptDays });
+      const transcriptActions = await runBudgetedPatrol('sweepTranscriptRetention', () => sweepTranscriptRetention({ transcriptDays }));
       actions.push(...transcriptActions);
       for (const a of transcriptActions) addLog('action', a, state.patrolCycle);
     }
   }
   // Retention needs the canonical registry row to prove terminal state before
   // agent GC removes that evidence. Both run on the same 60-cycle cadence.
-  if (state.patrolCycle % 60 === 0) for (const id of (await pruneTerminalStoppedAgents()).removed) actions.push(`[agents-gc] pruned ${id}`);
+  if (state.patrolCycle % 60 === 0) for (const id of await runBudgetedPatrol('pruneTerminalStoppedAgents', async () => (await pruneTerminalStoppedAgents()).removed)) actions.push(`[agents-gc] pruned ${id}`);
 
   // PAN-1908: primary orphan reviewer-session cleanup is reactive
   // (agent.stopped for the owning work agent). This is a thin safety-net
   // sweep for dropped events (PAN-846).
   if (shouldRunRecoveryJanitor('orphan-reviewer', state.patrolCycle)) {
-    const orphanActions = await cleanupOrphanReviewerSessions();
+    const orphanActions = await runBudgetedPatrol('cleanupOrphanReviewerSessions', () => cleanupOrphanReviewerSessions());
     actions.push(...orphanActions);
     for (const a of orphanActions) addLog('action', a, state.patrolCycle);
   }
@@ -3045,6 +3051,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Patrol per-project ephemeral specialists (PAN-300)
   // Ephemeral specialists are spawned on-demand and are not auto-restarted by the deacon.
   // Patrol detects stuck sessions, dead sessions, and auto-completes successful merges (PAN-375).
+  const specialistPatrolActions = await runBudgetedPatrol('perProjectSpecialistPatrol', async () => {
+  const collected: string[] = [];
   try {
     const projectSpecialists = await getAllProjectSpecialistStatuses();
     for (const projSpec of projectSpecialists) {
@@ -3055,7 +3063,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         if (runtimeState?.state === 'active') {
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           const msg = `Dead-session reset: per-project ${projSpec.specialistType} (${projSpec.projectKey}) was active but session is gone`;
-          actions.push(msg);
+          collected.push(msg);
           addLog('action', msg, state.patrolCycle);
           console.log(`[deacon] ${msg}`);
 
@@ -3080,7 +3088,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                     postMergeLifecycle(issueId, resolved.projectPath).catch(err =>
                       console.warn(`[deacon] postMergeLifecycle failed for ${issueId}: ${err}`)
                     );
-                    actions.push(`Auto-completed stale merge for ${issueId}`);
+                    collected.push(`Auto-completed stale merge for ${issueId}`);
                   } else {
                     console.log(`[deacon] Merge specialist died and ${issueId} NOT merged. Resetting to readyForMerge.`);
                     setReviewStatusSync(issueId, { mergeStatus: 'pending' });
@@ -3109,7 +3117,7 @@ export async function runPatrol(): Promise<PatrolResult> {
           await Effect.runPromise(killSession(projSpec.tmuxSession));
           // Preserve Claude JSONL/session artifacts; only reset Overdeck runtime state.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
-          actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
+          collected.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {
           // Non-fatal — session may have already exited
         }
@@ -3130,7 +3138,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         console.log(`[deacon] ${msg}`);
         try {
           await Effect.runPromise(killSession(projSpec.tmuxSession));
-          actions.push(msg);
+          collected.push(msg);
           addLog('action', msg, state.patrolCycle);
         } catch {
           // Non-fatal
@@ -3141,6 +3149,9 @@ export async function runPatrol(): Promise<PatrolResult> {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error during per-project specialist patrol:', msg);
   }
+  return collected;
+  });
+  actions.push(...specialistPatrolActions);
 
   refreshPatrolHeartbeat(state);
 
