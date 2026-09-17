@@ -54,10 +54,13 @@ Rows 1–3 read live status first and fall back to the per-issue record's `pipel
   feature branch remain in the observed string instead of causing a miss.
 - **Residue disposition handles tracker-closed pre-record-era issues** (PAN-3396). When `pan close --residue` is used, the DoD gate is skipped and every row reports skip with the verified disposition evidence. The command closes stale convention PRs/MRs with an honest "no merge claim" comment, verifies the tracker issue is closed (tracker-agnostic via `isTrackerIssueClosed`), and marks the issue terminal without asserting `mergeStatus` (which is unknowable for recordless work). Residue is operator-conversation-only and mutually exclusive with `--abandon` and `--accept-*` flags.
 - **The verification verdict is the row; `lastVerifiedCommit` is not required** (PAN-3067). The
-  runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
-  test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves
+  runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for
+  post-review drift detection and the `overdeck/test` commit-status stamp, and a policy
+  `skipped` verdict never has one — so its absence proves
   nothing about whether verification ran, while requiring it made merged, green, deployed
-  issues permanently un-closable. UAT batch promotion records a `passed` verdict for each
+  issues permanently un-closable. PAN-3847 removed the anchor-equality test skip: a review
+  whose anchor matches `lastVerifiedCommit` no longer auto-passes the test role — the suite
+  always runs. UAT batch promotion records a `passed` verdict for each
   non-terminal member at promote time, and close-out heals members of batches promoted before
   that write path existed (PAN-3114). The row still reports the anchor's presence or absence,
   so a reader never has to guess which condition a miss came from.

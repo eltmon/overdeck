@@ -12,6 +12,27 @@ and a needs-you escalation fires; the counter is per issue and is reset only by
 `pan review reset` (PAN-3847). A verification pass clears the `verification_stuck` flag
 and lifts that pause.
 
+## Immutable run artifacts (PAN-3847)
+
+Each verification run writes an immutable artifact named by run time and workspace head:
+`<workspace>/.overdeck/verification/<ranAt>-<head8>.json`. The runner also copies it to
+`.overdeck/verification-latest.json`, which remains the dashboard's read path. Failure
+feedback references the per-run file, so the evidence a later run cannot overwrite is
+what the agent reads. Per-run files older than 30 days are pruned by the idle-stack
+patrol.
+
+## Test-skip gate (PAN-3847)
+
+Before the quality gates run, the verification runner diffs the workspace against
+`origin/<target>` and fails a required `test-skip` gate when the diff adds `.skip`,
+`.only`, `xit`, `xdescribe`, or `xtest` in test files, or removes more `it(`/`test(`
+calls than it adds. `allowOnly: false` in both vitest configs makes `.only` fail every
+gate run outright. Related: the anchor-equality test skip is gone — a review whose
+`reviewedAtCommit` equals `lastVerifiedCommit` no longer auto-passes the test role;
+`review.approved` always dispatches it. CI runs vitest on every push and never reads
+the `overdeck/test` commit status; that stamp now records only that the changed-file-
+scoped verification gate passed, bound to the tested sha.
+
 ## Verdict feedback routing
 
 Review `blocked`/`failed`, test `failed`, and UAT `failed` verdicts all return work to

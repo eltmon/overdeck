@@ -97,7 +97,10 @@ Pipeline verdicts belong to reviewed code, not to an agent session. Starting a
 fresh or resumed work agent preserves earned verdicts while the current HEAD
 matches `reviewedAtCommit`, including a proven-benign commit-anchor move. A
 real code change, an unreadable anchor, or a missing passed-review anchor resets
-the verdicts before new work starts.
+the verdicts before new work starts. PAN-3847: when the drift appears *after* a
+review passed, the row is marked `reviewStaleSince` instead of being reset by a
+patrol, and a stale review blocks merge until `pan done` or `pan review request`
+produces a re-review.
 
 ## States
 
