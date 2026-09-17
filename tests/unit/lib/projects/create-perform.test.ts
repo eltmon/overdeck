@@ -65,12 +65,14 @@ vi.mock('../../../../src/lib/workspaces/create.js', () => ({
 }));
 
 import {
-  performProjectCreate,
-  finishProjectSetup,
   ProjectCreateFailureError,
   resolveProjectCreateIntent,
   __resetRemoteProbeMemoForTests,
 } from '../../../../src/lib/projects/create.js';
+import {
+  performProjectCreate,
+  finishProjectSetup,
+} from '../../../../src/lib/projects/create-perform.js';
 import {
   PROJECTS_CONFIG_FILE,
   invalidateProjectsConfigCache,

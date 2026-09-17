@@ -69,6 +69,18 @@ const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/)[^/@\s]*@/gi;
  */
 const HEADER_CREDENTIALS = /\b(authorization|private-token|x-auth-token)\s*[:=][^\r\n]*/gi;
 
+/**
+ * Strip userinfo from a transport URL for display.
+ *
+ * The core keeps the operator's exact URL because `git` needs it; everything
+ * that leaves the server — an API response, a log line, a CLI dry-run document —
+ * gets this version instead, so an embedded token is never reflected back.
+ */
+export function redactTransportUrl(url: string | null): string | null {
+  if (!url) return url;
+  return url.replace(URL_CREDENTIALS, '$1');
+}
+
 /** Remove credentials, ANSI, and control noise from text that may be shown or logged. */
 export function sanitizeDiagnostic(raw: string): string {
   return raw
@@ -243,5 +255,19 @@ function describeCause(cause: unknown): string {
     return JSON.stringify(cause);
   } catch {
     return String(cause);
+  }
+}
+
+/**
+ * A thrown {@link ProjectCreateFailure}.
+ *
+ * Creation failures cross an async boundary, so they have to be throwable; the
+ * typed payload rides along so routes, the CLI and the UI can branch on `code`
+ * instead of matching on a message.
+ */
+export class ProjectCreateFailureError extends Error {
+  constructor(public readonly failure: ProjectCreateFailure) {
+    super(failure.message);
+    this.name = 'ProjectCreateFailureError';
   }
 }
