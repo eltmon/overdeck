@@ -21,7 +21,13 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     // VM's tmux through the remote provider instead.
     const remoteState = loadRemoteAgentState(agentId);
     if (remoteState?.location === 'remote' && remoteState.vmName) {
-      await sendToRemoteAgent(agentId, remoteState.vmName, message);
+      const remoteResult = await sendToRemoteAgent(agentId, remoteState.vmName, message);
+      if (!remoteResult.ok) {
+        console.error(chalk.red(`Message NOT delivered to ${agentId} (remote: ${remoteState.vmName})`));
+        console.error(chalk.dim(`  "${message}"`));
+        console.error(chalk.dim(`  ${remoteResult.failure ?? 'no reason reported'}`));
+        return exitCli(1);
+      }
       console.log(chalk.green('Message sent to ' + agentId + ' (remote: ' + remoteState.vmName + ')'));
       console.log(chalk.dim(`  "${message}"`));
       return;

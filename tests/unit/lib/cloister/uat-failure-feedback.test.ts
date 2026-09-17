@@ -76,7 +76,7 @@ describe('relayUatFailureFeedback', () => {
       'agent-pan-3575',
       expect.stringContaining(`MUST READ: ${feedbackPath}`),
       'internal',
-      { owesRework: true },
+      { owesRework: true, feedbackRedelivery: true },
     );
   });
 

@@ -29,6 +29,10 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: mockSetReviewStatus,
 }));
 
+vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
+  runTestSkipGate: vi.fn(async () => ({ passed: true, violations: [] })),
+}));
+
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
   DEFAULT_GATES: {},
   runQualityGates: (...args: unknown[]) => Effect.sync(() => mockRunQualityGates(...args)),

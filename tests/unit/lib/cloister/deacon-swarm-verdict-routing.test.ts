@@ -149,6 +149,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );
@@ -183,6 +184,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );
@@ -218,6 +220,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );

@@ -21,7 +21,7 @@ import {
   verificationArtifactPath,
   writeVerificationArtifact,
 } from './verification-artifact.js';
-import { runTestSkipGate } from './test-skip-gate.js';
+import { runTestSkipGate, type TestSkipViolation } from './test-skip-gate.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -36,7 +36,7 @@ import type {
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -230,7 +230,8 @@ export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliati
   return reset;
 }
 
-async function deliverVerificationFeedback(
+/** Exported for focused delivery-outcome tests (PR #3874 review). */
+export async function deliverVerificationFeedback(
   issueId: string,
   message: string,
   details: Record<string, unknown>,
@@ -244,8 +245,24 @@ async function deliverVerificationFeedback(
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
-    await messageAgent(target.agentId, message, 'internal', { owesRework: true });
-    console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
+    // PR #3874 review: delivered:false no longer throws — escalate instead of
+    // logging success, the same contract as review-verdict-feedback.
+    let outcome: Awaited<ReturnType<typeof messageAgent>>;
+    try {
+      outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
+    } catch (err) {
+      outcome = { delivered: false, queuedToMail: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    if (outcome.delivered) {
+      console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
+      return;
+    }
+    const reason = outcome.reason ?? 'delivery was not accepted';
+    console.warn(`[${logPrefix}] Could not message ${target.agentId}; verification feedback for ${issueId} not delivered: ${reason}`);
+    await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+      specialist: 'verification-gate',
+      ...details,
+    });
     return;
   }
 
@@ -597,14 +614,24 @@ async function runVerificationForIssuePromise(
 
     // PAN-3847 (FR-12): the test-skip gate runs before the quality gates — a diff
     // that adds skipped/only tests or removes test cases fails verification as a
-    // required `test-skip` gate without burning a full suite run.
+    // required `test-skip` gate without burning a full suite run. PR #3872
+    // finding 4: a diff that cannot be computed fails the gate too. Finding 6:
+    // the gate runs once per repository root and violations aggregate, so a
+    // skipped test in a secondary repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkip = await runTestSkipGate(workspacePath, changedBase);
-    if (testSkip.diffUnavailable) {
-      console.warn(`[${logPrefix}] test-skip gate abstained for ${issueId}: could not diff ${changedBase}...HEAD`);
+    const testSkipViolations: TestSkipViolation[] = [];
+    const testSkipErrors: string[] = [];
+    for (const root of repoRoots) {
+      const outcome = await runTestSkipGate(root.dir, `origin/${root.targetBranch}`);
+      if (outcome.error) testSkipErrors.push(`${root.repoKey}: ${outcome.error}`);
+      testSkipViolations.push(...outcome.violations.map(v => ({
+        ...v,
+        file: root.isPolyrepo ? `${root.repoKey}/${v.file}` : v.file,
+      })));
     }
+    const testSkipFailed = testSkipErrors.length > 0 || testSkipViolations.length > 0;
 
-    const gateResults = testSkip.passed
+    const gateResults = !testSkipFailed
       ? await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
@@ -639,9 +666,12 @@ async function runVerificationForIssuePromise(
         name: 'test-skip',
         passed: false,
         required: true,
-        output: testSkip.violations.map(v => `${v.file}: [${v.kind}] ${v.line}`).join('\n'),
+        output: [
+          ...testSkipErrors,
+          ...testSkipViolations.map(v => `${v.file}: [${v.kind}] ${v.line}`),
+        ].join('\n'),
         durationMs: Date.now() - testSkipStart,
-        error: 'Diff adds skipped or only-tests or removes test cases',
+        error: testSkipErrors[0] ?? 'Diff adds skipped or only-tests or removes test cases',
       }];
 
     const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
@@ -948,22 +978,38 @@ async function runVerificationForIssuePromise(
     });
     // PAN-3847 (FR-10): a verification pass clears a verification_stuck flag and
     // lifts the pause that escalateVerificationStuck set — the gate that created
-    // the stuck state is the gate that clears it.
+    // the stuck state is the gate that clears it. PR #3872 finding 7: unpause
+    // FIRST through the dedicated clear API (setAgentPaused always SETS paused —
+    // passing undefined never unpauses). If the unpause fails, keep the
+    // consistent paused+stuck pair; then clear the marker with one retry so a
+    // transient write failure cannot strand the pair unpaused+stuck.
     const stuckRow = getReviewStatusSync(issueId);
     if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
-      const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
-      clearWorkspaceStuck(issueId);
-      console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
-    }
-    {
       const stuckAgentId = `agent-${issueId.toLowerCase()}`;
       const agentState = getAgentStateSync(stuckAgentId);
+      let unpaused = true;
       if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
         try {
-          await Effect.runPromise(setAgentPaused(stuckAgentId, undefined, false));
+          await Effect.runPromise(clearAgentPaused(stuckAgentId));
           console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
         } catch (err: any) {
-          console.warn(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
+          unpaused = false;
+          console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId} — keeping the verification_stuck marker so the pair stays consistent: ${err?.message ?? err}`);
+        }
+      }
+      if (unpaused) {
+        const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+        try {
+          clearWorkspaceStuck(issueId);
+          console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
+        } catch (firstErr: any) {
+          console.warn(`[${logPrefix}] verification_stuck clear failed for ${issueId} — retrying once: ${firstErr?.message ?? firstErr}`);
+          try {
+            clearWorkspaceStuck(issueId);
+            console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId} on retry: verification passed`);
+          } catch (retryErr: any) {
+            console.error(`[${logPrefix}] verification_stuck clear failed twice for ${issueId} — the marker remains and the agent was unpaused; the next verification pass re-attempts the clear: ${retryErr?.message ?? retryErr}`);
+          }
         }
       }
     }

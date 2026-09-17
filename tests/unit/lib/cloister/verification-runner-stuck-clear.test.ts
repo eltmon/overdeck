@@ -10,16 +10,22 @@ const {
   mockSetReviewStatus,
   mockClearWorkspaceStuck,
   mockGetAgentStateSync,
+  mockClearAgentPaused,
   mockSetAgentPaused,
   mockRunQualityGates,
   mockWriteArtifact,
   mockSnapshotHeads,
   mockCaptureStage,
+  mockResolveWorkspaceRepoRootsSync,
+  mockRunTestSkipGate,
 } = vi.hoisted(() => ({
   mockGetReviewStatus: vi.fn(),
   mockSetReviewStatus: vi.fn(),
   mockClearWorkspaceStuck: vi.fn(),
   mockGetAgentStateSync: vi.fn(),
+  mockClearAgentPaused: vi.fn(),
+  mockResolveWorkspaceRepoRootsSync: vi.fn(),
+  mockRunTestSkipGate: vi.fn(),
   mockSetAgentPaused: vi.fn(),
   mockRunQualityGates: vi.fn(),
   mockWriteArtifact: vi.fn(),
@@ -39,6 +45,7 @@ vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentStateSync: mockGetAgentStateSync,
+  clearAgentPaused: mockClearAgentPaused,
   setAgentPaused: mockSetAgentPaused,
   messageAgent: vi.fn(),
   stopAgent: vi.fn(),
@@ -73,9 +80,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(() => [
-    { repoKey: 'main', dir: '/tmp/feature-pan-3847', isPolyrepo: false, targetBranch: 'main' },
-  ]),
+  resolveWorkspaceRepoRootsSync: mockResolveWorkspaceRepoRootsSync,
+}));
+
+vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
+  runTestSkipGate: mockRunTestSkipGate,
 }));
 
 vi.mock('../../../../src/lib/git-utils.js', () => ({
@@ -131,6 +140,10 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetReviewStatus.mockReturnValue(stuckRow());
+    mockResolveWorkspaceRepoRootsSync.mockReturnValue([
+      { repoKey: 'main', dir: '/tmp/feature-pan-3847', isPolyrepo: false, targetBranch: 'main' },
+    ]);
+    mockRunTestSkipGate.mockResolvedValue({ passed: true, violations: [] });
     mockSetReviewStatus.mockImplementation((_id: string, update: Record<string, unknown>) => ({
       ...stuckRow(),
       ...update,
@@ -144,6 +157,7 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
       pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
     });
     mockSetAgentPaused.mockReturnValue(Effect.succeed(null));
+    mockClearAgentPaused.mockReturnValue(Effect.succeed(null));
   });
 
   it('clears the stuck flag and lifts the verification-stuck pause on pass', async () => {
@@ -160,8 +174,46 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
       verificationStatus: 'passed',
       lastVerifiedCommit: 'a'.repeat(40),
     }));
+    // PR #3872 finding 7: the pause clears through the dedicated API, BEFORE
+    // the marker clear.
+    expect(mockClearAgentPaused).toHaveBeenCalledWith('agent-pan-3847');
+    expect(mockSetAgentPaused).not.toHaveBeenCalled();
     expect(mockClearWorkspaceStuck).toHaveBeenCalledWith(issueId);
-    expect(mockSetAgentPaused).toHaveBeenCalledWith('agent-pan-3847', undefined, false);
+    expect(mockClearWorkspaceStuck.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockClearAgentPaused.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('keeps the consistent paused+stuck pair when the unpause fails (PR #3872 finding 7)', async () => {
+    mockClearAgentPaused.mockReturnValue(Effect.fail(new Error('disk full')));
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('passed');
+    expect(mockClearWorkspaceStuck).not.toHaveBeenCalled();
+  });
+
+  it('retries the marker clear once on failure (PR #3872 finding 7)', async () => {
+    mockClearWorkspaceStuck
+      .mockImplementationOnce(() => { throw new Error('lock busy'); })
+      .mockImplementationOnce(() => undefined);
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('passed');
+    expect(mockClearWorkspaceStuck).toHaveBeenCalledTimes(2);
   });
 
   it('leaves an unrelated pause alone on pass', async () => {
@@ -206,5 +258,60 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
       verificationNotes: expect.stringContaining(perRunPath),
     }));
+  });
+
+  it('runs the test-skip gate once per repo root and aggregates violations (PR #3872 finding 6)', async () => {
+    mockResolveWorkspaceRepoRootsSync.mockReturnValue([
+      { repoKey: 'fe', dir: '/tmp/ws/fe', isPolyrepo: true, targetBranch: 'main' },
+      { repoKey: 'api', dir: '/tmp/ws/api', isPolyrepo: true, targetBranch: 'develop' },
+    ]);
+    mockRunTestSkipGate.mockImplementation(async (dir: string) => (
+      dir === '/tmp/ws/api'
+        ? { passed: false, violations: [{ file: 'src/bar.test.ts', line: 'it.skip("x", () => {', kind: 'skip' }] }
+        : { passed: true, violations: [] }
+    ));
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(mockRunTestSkipGate).toHaveBeenCalledTimes(2);
+    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/fe', 'origin/main');
+    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/api', 'origin/develop');
+    expect(result.outcome).toBe('failed');
+    // The violation is attributed to its repo in the recorded gate output, and
+    // the quality gates never ran.
+    const gateWrites = mockWriteArtifact.mock.calls.map((call) => call[2]).flat();
+    const skipGate = gateWrites.find((g: { name?: string }) => g?.name === 'test-skip');
+    expect(skipGate).toBeDefined();
+    expect(skipGate.output).toContain('api/src/bar.test.ts');
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
+  });
+
+  it('a diff failure in any repo fails the gate with the diagnostic (PR #3872 finding 4)', async () => {
+    mockRunTestSkipGate.mockResolvedValue({
+      passed: false,
+      violations: [],
+      diffUnavailable: true,
+      error: 'Could not diff origin/main...HEAD: unknown revision',
+    });
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('failed');
+    const gateWrites = mockWriteArtifact.mock.calls.map((call) => call[2]).flat();
+    const skipGate = gateWrites.find((g: { name?: string }) => g?.name === 'test-skip');
+    expect(skipGate?.output ?? skipGate?.error).toContain('Could not diff origin/main...HEAD');
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
   });
 });

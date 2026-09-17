@@ -16,7 +16,7 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import type { ModelId, ComplexityLevel } from '../settings.js';
+import type { ModelId } from '../settings.js';
 import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -89,7 +89,7 @@ export interface SpawnOptions {
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
   role?: 'work' | 'strike' | 'knowledge';
-  difficulty?: ComplexityLevel;
+  difficulty?: XBriefDifficulty;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
   // Work type system (PAN-118)

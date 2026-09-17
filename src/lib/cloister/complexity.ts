@@ -5,8 +5,6 @@
  * model selection for cost optimization.
  */
 
-import type { ResolveTierConfig } from '../agents/resolve-tier.js';
-
 /**
  * Task complexity levels
  *
@@ -305,42 +303,4 @@ export function parseDifficultyLabel(labels: string[]): ComplexityLevel | null {
   }
 
   return null;
-}
-
-/**
- * Map complexity level to recommended model
- *
- * @param level - Complexity level
- * @returns Recommended model name
- */
-export function complexityToModel(level: ComplexityLevel): string {
-  switch (level) {
-    case 'trivial':
-    case 'simple':
-      return 'haiku';
-    case 'medium':
-    case 'complex':
-      return 'sonnet';
-    case 'expert':
-      return 'opus';
-  }
-}
-
-/**
- * Legacy difficulty->model mapping expressed as a resolve-tier config
- * (PAN-1791). Derived from complexityToModel so the switch above stays the
- * single source of the legacy claude-only mapping; delete both together once
- * the tiered-execution parity lock test proves the new chain.
- */
-export function legacyComplexityTierConfig(): ResolveTierConfig {
-  const tiers: ResolveTierConfig['tiers'] = {};
-  const difficultyToTier: ResolveTierConfig['difficultyToTier'] = {};
-  const levels: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
-  for (const level of levels) {
-    const model = complexityToModel(level);
-    tiers[model] ??= { model, harness: 'claude-code', difficulties: [] };
-    tiers[model].difficulties.push(level);
-    difficultyToTier[level] = model;
-  }
-  return { tiers, difficultyToTier };
 }

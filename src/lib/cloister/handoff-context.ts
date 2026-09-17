@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
 import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
-import type { ComplexityLevel } from './complexity.js';
+import type { XBriefDifficulty } from '../xbrief/types.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
 import type { ContinueState } from '../xbrief/continue-state.js';
@@ -29,7 +29,7 @@ export interface HandoffTask {
   status: string;
   priority: number;
   labels?: string[];
-  complexity?: ComplexityLevel;
+  complexity?: XBriefDifficulty;
 }
 
 /**

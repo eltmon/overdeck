@@ -4,9 +4,10 @@ import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
 import type { AgentState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -295,8 +296,17 @@ export async function recordScopeDriftForDone(
     const projectConfig = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
     const { getSyncTargetBranch } = await import('../../lib/cloister/verification-runner.js');
     const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, undefined);
+    // CWE-78 residual: validate the config-supplied target branch before it
+    // reaches any git refspec position (PR #3872 round 2).
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
     try {
-      await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
+      await assertValidBranchNamePromise(targetBranch, 'scope-drift target branch');
+    } catch (invalid) {
+      console.warn(`[pan done] ${invalid instanceof Error ? invalid.message : invalid} — skipping scope-drift record`);
+      return undefined;
+    }
+    try {
+      await execFileAsync('git', ['fetch', 'origin', '--', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
     } catch (fetchErr: any) {
       console.warn(`[pan done] git fetch origin ${targetBranch} failed; scope drift diffs against the cached ref: ${fetchErr?.message ?? fetchErr}`);
     }
@@ -327,14 +337,19 @@ async function isMergeSetMergedIntoTargets(
 
     if (!existsSync(join(repoPath, '.git'))) return false;
 
-    await execAsync(`git fetch origin ${repo.targetBranch}`, {
+    // CWE-78 residual: validate before the fetch AND the merge-base refspec.
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
+    await assertValidBranchNamePromise(repo.targetBranch, `merge-set target branch for ${repo.repoKey}`);
+
+    await execFileAsync('git', ['fetch', 'origin', '--', repo.targetBranch], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 60000,
     });
 
     try {
-      await execAsync(`git merge-base --is-ancestor HEAD origin/${repo.targetBranch}`, {
+      // CWE-78: the ref travels as one argv element, never through a shell.
+      await execFileAsync('git', ['merge-base', '--is-ancestor', 'HEAD', `origin/${repo.targetBranch}`], {
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 10000,
@@ -518,6 +533,14 @@ export async function handleUnrecordedReviewRequest(
     prUrl ?? '',
     `${reason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
   );
+
+/** PR #3872 finding 1: a stale review (reviewStaleSince set) must never take the no-op path — exported for tests. */
+export function shouldSkipReReviewAsNoop(
+  currentStatus: { reviewStatus?: string; reviewedAtCommit?: string; reviewStaleSince?: string } | null | undefined,
+): currentStatus is { reviewStatus?: string; reviewedAtCommit: string; reviewStaleSince?: string } {
+  return currentStatus?.reviewStatus === 'passed'
+    && Boolean(currentStatus?.reviewedAtCommit)
+    && !currentStatus?.reviewStaleSince;
 }
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
@@ -630,14 +653,14 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   }
 
   // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
-  // PAN-3847: `pan done` is also one of the two doors that clear a stale-review
-  // marker (the other is `pan review request`) — the re-review it requests is
-  // exactly what the stale marker exists to force.
+  // PR #3872 finding 1: reviewStaleSince must survive preflight — it is cleared
+  // only as part of the successful durable write in persistDoneReviewIntent, so
+  // a preflight abort can never strand the issue as passed-but-stale.
   try {
     const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
     await updateIssueRecord(project, issueId, (record) => {
-      if (!record.pipeline.panDoneRecoveredAt && !record.pipeline.reviewStaleSince) return;
-      const { panDoneRecoveredAt: _, reviewStaleSince: _stale, ...pipeline } = record.pipeline;
+      if (!record.pipeline.panDoneRecoveredAt) return;
+      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
       return { ...record, pipeline };
     });
   } catch (e: any) {
@@ -839,7 +862,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // Step 2b: Guard against no-op re-submission. If review already passed and
     // HEAD hasn't changed since the review snapshot, skip re-review entirely.
     // This prevents agents from accidentally cycling the pipeline after approval.
-    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
+    // PR #3872 finding 1: a stale review (reviewStaleSince set) must NEVER take
+    // the no-op path — the marker exists to force exactly this re-review.
+    if (currentStatus && shouldSkipReReviewAsNoop(currentStatus)) {
       const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
       try {
         const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
@@ -928,6 +953,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationStatus: 'pending',
       // PAN-3847 (FR-17): the verification cycle counter is per issue — pan done
       // must NOT reset it; only `pan review reset` does.
+      // FR-8: the durable intent above succeeded, so the row's stale marker
+      // clears as part of the new review cycle.
+      reviewStaleSince: undefined,
       autoRequeueCount: 0,
       reviewRequestedAt,
       scopeDrift,
