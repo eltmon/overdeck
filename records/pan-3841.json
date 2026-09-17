@@ -159,7 +159,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:07:36.897Z",
+  "updated": "2026-09-17T01:07:57.264Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -170,7 +170,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:07:34.391Z",
+    "updatedAt": "2026-09-17T01:07:57.224Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Verification FAILED at typecheck (7617ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json",
@@ -333,7 +333,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.4456164,
-        "pricingAsOf": "2026-09-17T01:07:34.398Z"
+        "pricingAsOf": "2026-09-17T01:07:57.255Z"
       }
     },
     "merges": [
