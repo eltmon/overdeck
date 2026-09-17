@@ -131,18 +131,18 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:00:05.969Z",
+  "updated": "2026-09-17T01:00:06.983Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T22:55:47.468Z",
+    "updatedAt": "2026-09-17T01:00:06.981Z",
     "reviewNotes": "P1: roles/retrospective.md:27 instructs 'pan records show' (CLI verb does not exist; pan show does not emit the listed record fields). Test pins the broken instruction. Fix exists in working tree — commit it. Auth and window checks pass; convergence gate does not apply (cycle 2).",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -154,9 +154,6 @@
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-        "src/dashboard/frontend/tests/talk-it-through.spec.ts",
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [
@@ -188,9 +185,6 @@
         "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-        "src/dashboard/frontend/tests/talk-it-through.spec.ts",
         "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
         "src/dashboard/server/routes/conversations-retrospective.ts",
         "src/dashboard/server/routes/conversations.ts",
@@ -200,11 +194,12 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/prompts/retrospective-template.test.ts"
       ],
-      "recordedAt": "2026-09-16T20:37:56.228Z"
+      "recordedAt": "2026-09-17T01:00:05.968Z"
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.467Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
+    "reviewRequestedAt": "2026-09-17T01:00:06.981Z"
   },
   "closeOut": {
     "usage": {
