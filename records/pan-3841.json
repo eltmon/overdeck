@@ -107,6 +107,11 @@
       "reason": "resume",
       "agentModel": "MiniMax-M3",
       "timestamp": "2026-09-17T01:08:21.754Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "MiniMax-M3",
+      "timestamp": "2026-09-17T01:23:50.470Z"
     }
   ],
   "feedback": [],
@@ -156,7 +161,7 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:23:48.777Z",
+  "updated": "2026-09-17T01:23:50.494Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "reviewing",
@@ -339,7 +344,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "MiniMax-M3",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
