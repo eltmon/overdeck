@@ -20,12 +20,33 @@ const routeMocks = vi.hoisted(() => ({
   performProjectCreate: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
   rejectUnauthorizedDashboardRequest: vi.fn(),
+  finishProjectSetup: vi.fn(),
+  resolveProjectCreateRecovery: vi.fn(),
+  getProjectSync: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/projects/create.js', () => ({
-  resolveProjectCreateIntent: routeMocks.resolveProjectCreateIntent,
+vi.mock('../../../../src/lib/projects/create.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/projects/create.js')>(
+    '../../../../src/lib/projects/create.js',
+  );
+  return { ...actual, resolveProjectCreateIntent: routeMocks.resolveProjectCreateIntent };
+});
+
+vi.mock('../../../../src/lib/projects/create-perform.js', () => ({
   performProjectCreate: routeMocks.performProjectCreate,
+  finishProjectSetup: routeMocks.finishProjectSetup,
 }));
+
+vi.mock('../../../../src/lib/projects/create-recovery.js', () => ({
+  resolveProjectCreateRecovery: routeMocks.resolveProjectCreateRecovery,
+}));
+
+vi.mock('../../../../src/lib/projects.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/projects.js')>(
+    '../../../../src/lib/projects.js',
+  );
+  return { ...actual, getProjectSync: routeMocks.getProjectSync };
+});
 
 vi.mock('../../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
@@ -90,6 +111,10 @@ beforeEach(() => {
   __resetProjectCreateJobsForTests();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
   routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
+  routeMocks.finishProjectSetup.mockReset();
+  routeMocks.resolveProjectCreateRecovery.mockReset();
+  routeMocks.getProjectSync.mockReset();
+  routeMocks.getProjectSync.mockReturnValue({ name: 'Test Project', path: '/home/user/Projects/test-proj' });
   vi.useFakeTimers();
 });
 
@@ -202,7 +227,7 @@ describe('project-create routes', () => {
       await expect(requestProjectsRoute('/api/projects/create-jobs/')).rejects.toThrow(/RouteNotFound/);
     });
 
-    it('AC2.3: returns 200 with running job status', async () => {
+    it('AC2.3: returns 200 with the job\'s current lifecycle status', async () => {
       // Create a job via the clone path
       const intent = makeResolvedIntent('clone');
       routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
@@ -224,7 +249,8 @@ describe('project-create routes', () => {
       const { status, body } = await requestProjectsRoute(`/api/projects/create-jobs/${jobId}`);
 
       expect(status).toBe(200);
-      expect(body).toHaveProperty('status', 'running');
+      // The lifecycle is preparing -> cloning -> registering, not one 'running'.
+      expect(['preparing', 'cloning', 'registering']).toContain((body as { status: string }).status);
       expect(body).toHaveProperty('phase', 'cloning');
       expect(body).toHaveProperty('percent', 50);
     });
@@ -471,14 +497,13 @@ describe('project-create routes', () => {
       expect(createRes.status).toBe(202);
       const jobId = (createRes.body as any).jobId;
 
-      // Step 2: GET /api/projects/create-jobs/:jobId → 200 running with progress
+      // Step 2: GET /api/projects/create-jobs/:jobId → 200 with live progress.
+      // The status is a lifecycle phase now (preparing/cloning/registering),
+      // not a single 'running'.
       const runningRes = await requestProjectsRoute(`/api/projects/create-jobs/${jobId}`);
       expect(runningRes.status).toBe(200);
-      expect(runningRes.body).toMatchObject({
-        status: 'running',
-        phase: 'cloning',
-        percent: 50,
-      });
+      expect(runningRes.body).toMatchObject({ phase: 'cloning', percent: 50 });
+      expect(['preparing', 'cloning']).toContain((runningRes.body as { status: string }).status);
 
       // Step 3: Finish the deferred promise and await the job-store .then() callback
       if (!finish) throw new Error('finish was not set by mock');
@@ -502,5 +527,134 @@ describe('project-create routes', () => {
         result: { key: 'test-proj' },
       });
     });
+  });
+});
+
+// ─── New surfaces from WI-2 ──────────────────────────────────────────────────
+
+describe('POST /api/projects/create-jobs/:jobId/cancel', () => {
+  it('requires CSRF-guarded auth before touching a job', async () => {
+    routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(
+      new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }),
+    );
+
+    const { status } = await requestProjectsRoute('/api/projects/create-jobs/abc/cancel', {
+      method: 'POST',
+      body: '{}',
+    });
+
+    expect(status).toBe(403);
+  });
+
+  it('returns 404 for a job this runtime does not know', async () => {
+    const { status, body } = await requestProjectsRoute('/api/projects/create-jobs/nope/cancel', {
+      method: 'POST',
+      body: '{}',
+    });
+
+    expect(status).toBe(404);
+    expect(body).toHaveProperty('error', 'Unknown job');
+  });
+});
+
+describe('POST /api/projects/create-jobs/reconcile', () => {
+  it('rejects a body without key and expectedPath', async () => {
+    const { status } = await requestProjectsRoute('/api/projects/create-jobs/reconcile', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'clone' }),
+    });
+
+    expect(status).toBe(400);
+  });
+
+  it('passes the expected identity through to the read-only resolver', async () => {
+    routeMocks.resolveProjectCreateRecovery.mockResolvedValue({ status: 'unknown', reason: 'nothing' });
+
+    const { status, body } = await requestProjectsRoute('/api/projects/create-jobs/reconcile', {
+      method: 'POST',
+      body: JSON.stringify({
+        mode: 'clone',
+        key: 'widget',
+        expectedPath: '/home/user/Projects/widget',
+        expectedRepoSlug: 'acme/widget',
+      }),
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ status: 'unknown' });
+    expect(routeMocks.resolveProjectCreateRecovery).toHaveBeenCalledWith({
+      key: 'widget',
+      expectedPath: '/home/user/Projects/widget',
+      mode: 'clone',
+      expectedRepoSlug: 'acme/widget',
+    });
+    // Reconciliation is read-only: it must never reach a write door.
+    expect(routeMocks.performProjectCreate).not.toHaveBeenCalled();
+    expect(routeMocks.finishProjectSetup).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/projects/:projectKey/finish-setup', () => {
+  it('returns 404 for an unregistered key', async () => {
+    routeMocks.getProjectSync.mockReturnValue(undefined);
+
+    const { status } = await requestProjectsRoute('/api/projects/ghost/finish-setup', {
+      method: 'POST',
+      body: '{}',
+    });
+
+    expect(status).toBe(404);
+  });
+
+  it('repairs through the shared helper without cloning again', async () => {
+    routeMocks.finishProjectSetup.mockResolvedValue({
+      key: 'test-proj',
+      name: 'Test Project',
+      path: '/home/user/Projects/test-proj',
+      mainWorkspaceId: 'ws-1',
+      seededContextLayer: false,
+      hooksInstalled: 1,
+    });
+
+    const { status, body } = await requestProjectsRoute('/api/projects/test-proj/finish-setup', {
+      method: 'POST',
+      body: '{}',
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ key: 'test-proj', mainWorkspaceId: 'ws-1' });
+    expect(routeMocks.performProjectCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the repair target does not match the registration', async () => {
+    const { ProjectCreateFailureError } = await import(
+      '../../../../src/lib/projects/create-errors.js'
+    );
+    routeMocks.finishProjectSetup.mockRejectedValue(
+      new ProjectCreateFailureError({
+        code: 'destination-conflict',
+        message: 'registered elsewhere',
+        retrySafe: false,
+      }),
+    );
+
+    const { status, body } = await requestProjectsRoute('/api/projects/test-proj/finish-setup', {
+      method: 'POST',
+      body: JSON.stringify({ expectedPath: '/somewhere/else' }),
+    });
+
+    expect(status).toBe(409);
+    expect((body as { failure?: { code?: string } }).failure?.code).toBe('destination-conflict');
+  });
+
+  it('returns 500 for an unexpected repair failure', async () => {
+    routeMocks.finishProjectSetup.mockRejectedValue(new Error('disk exploded'));
+
+    const { status } = await requestProjectsRoute('/api/projects/test-proj/finish-setup', {
+      method: 'POST',
+      body: '{}',
+    });
+
+    expect(status).toBe(500);
   });
 });

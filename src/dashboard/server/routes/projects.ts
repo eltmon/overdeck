@@ -38,14 +38,13 @@ import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
 import {
   resolveProjectCreateIntent,
-  performProjectCreate,
+  toPublicProjectIntent,
   type ProjectCreateInput,
   type ResolvedProjectIntent,
 } from '../../../lib/projects/create.js';
-import {
-  startProjectCreateJob,
-  getProjectCreateJob,
-} from './project-create-jobs.js';
+import { performProjectCreate } from '../../../lib/projects/create-perform.js';
+import { startProjectCreateJob } from './project-create-jobs.js';
+import { projectCreateJobRoutesLayer } from './project-create-routes.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
@@ -953,35 +952,9 @@ const postProjectsResolveRoute = HttpRouter.add(
     };
 
     const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
-    return jsonResponse(intent);
-  })),
-);
-
-// ─── Route: GET /api/projects/create-jobs/:jobId ────────────────────────────
-// PAN-3836: poll background job status during clone operations.
-// Returns 404 if job not found (TTL expired or invalid ID), or 200 with job object.
-
-const getProjectCreateJobRoute = HttpRouter.add(
-  'GET',
-  '/api/projects/create-jobs/:jobId',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(request);
-    if (authError) return authError;
-
-    const params = yield* HttpRouter.params;
-    const jobId = params['jobId'] ?? '';
-
-    if (!jobId) {
-      return jsonResponse({ error: 'jobId is required' }, { status: 400 });
-    }
-
-    const job = getProjectCreateJob(jobId);
-    if (!job) {
-      return jsonResponse({ error: 'Unknown job' }, { status: 404 });
-    }
-
-    return jsonResponse(job);
+    // Never the raw intent: its cloneUrl is the operator's transport URL and can
+    // carry credentials the browser must not get back.
+    return jsonResponse(toPublicProjectIntent(intent));
   })),
 );
 
@@ -1075,7 +1048,10 @@ export const projectsRouteLayer = Layer.mergeAll(
   getIssueStaffingRoute,
   postIssueStaffingRoute,
   postProjectsResolveRoute,
-  getProjectCreateJobRoute,
+  // The create-job routes live in project-create-routes.ts (file-size ratchet);
+  // they are merged first so their literal path segments win over
+  // /api/projects/:projectKey/*.
+  projectCreateJobRoutesLayer,
   postProjectsRoute,
 );
 

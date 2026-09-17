@@ -1,29 +1,105 @@
 /**
- * Tests for project-create-jobs.ts
+ * Tests for the project-create job and operation runtime (PAN-3836 WI-2).
  *
- * Uses fake timers to verify TTL cleanup and job state transitions.
- * Mocks performProjectCreate from src/lib/projects/create.
+ * What is actually defended here: a second click, a retried POST after a lost
+ * response, and two tabs aimed at the same folder must not each start a clone;
+ * a cancel must not report success before the child has closed; and a deadline
+ * must never fire on a job that has moved on to writing configuration, because
+ * "cancelled and retry-safe" would be a lie at that point.
+ *
+ * Every timer case drives fake timers — no real 30-minute waits.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ResolvedProjectIntent, ProjectCreateResult } from '../../../../src/lib/projects/create.js';
+import type {
+  ResolvedProjectIntent,
+  ProjectCreateResult,
+} from '../../../../src/lib/projects/create.js';
 
-vi.mock('../../../../src/lib/projects/create.js', () => ({
+vi.mock('../../../../src/lib/projects/create-perform.js', () => ({
   performProjectCreate: vi.fn(),
 }));
 
 import {
   startProjectCreateJob,
   getProjectCreateJob,
+  requestProjectCreateJobCancel,
+  reserveProjectCreateOperation,
+  settleProjectCreateOperation,
+  getProjectCreateOperation,
   __resetProjectCreateJobsForTests,
   JOB_TTL_MS,
+  CLONE_DEADLINE_MS,
 } from '../../../../src/dashboard/server/routes/project-create-jobs.js';
-import { performProjectCreate } from '../../../../src/lib/projects/create.js';
+import { performProjectCreate } from '../../../../src/lib/projects/create-perform.js';
+import { ProjectCreateFailureError } from '../../../../src/lib/projects/create-errors.js';
+
+function makeIntent(overrides: Partial<ResolvedProjectIntent> = {}): ResolvedProjectIntent {
+  return {
+    mode: 'clone',
+    key: 'widget',
+    name: 'widget',
+    path: '/home/user/Projects/widget',
+    parentDir: '/home/user/Projects',
+    homeDir: '/home/user',
+    cloneUrl: 'https://github.com/acme/widget.git',
+    provider: 'github',
+    repoSlug: 'acme/widget',
+    defaultBranch: 'main',
+    remoteChecked: true,
+    isGitRepository: true,
+    gitRoot: null,
+    proposedIssuePrefix: 'WIDGET',
+    wouldClone: true,
+    wouldGitInit: false,
+    willCreateMainWorkspace: true,
+    registeredKeyAtPath: null,
+    findings: [],
+    ...overrides,
+  };
+}
+
+const result: ProjectCreateResult = {
+  key: 'widget',
+  name: 'widget',
+  path: '/home/user/Projects/widget',
+  mainWorkspaceId: 'ws-1',
+  seededContextLayer: true,
+  hooksInstalled: 1,
+};
+
+/** A perform the test drives: it never settles until released. */
+function heldPerform(): {
+  release: (value?: ProjectCreateResult) => void;
+  fail: (err: unknown) => void;
+  progress: (phase: string, percent: number | null) => void;
+  signal: () => AbortSignal | undefined;
+} {
+  let resolveFn!: (v: ProjectCreateResult) => void;
+  let rejectFn!: (e: unknown) => void;
+  let onProgress: ((p: { phase: string; percent: number | null }) => void) | undefined;
+  let capturedSignal: AbortSignal | undefined;
+
+  vi.mocked(performProjectCreate).mockImplementation((_intent, hooks) => {
+    onProgress = hooks?.onProgress;
+    capturedSignal = hooks?.signal;
+    return new Promise<ProjectCreateResult>((res, rej) => {
+      resolveFn = res;
+      rejectFn = rej;
+    });
+  });
+
+  return {
+    release: (value = result) => resolveFn(value),
+    fail: (err) => rejectFn(err),
+    progress: (phase, percent) => onProgress?.({ phase, percent }),
+    signal: () => capturedSignal,
+  };
+}
 
 beforeEach(() => {
   __resetProjectCreateJobsForTests();
-  vi.useFakeTimers();
-  vi.mocked(performProjectCreate).mockClear();
+  vi.mocked(performProjectCreate).mockReset();
 });
 
 afterEach(() => {
@@ -31,268 +107,207 @@ afterEach(() => {
   __resetProjectCreateJobsForTests();
 });
 
-function makeIntent(): ResolvedProjectIntent {
-  return {
-    mode: 'new',
-    key: 'test-proj',
-    name: 'Test Project',
-    path: '/home/user/Projects/test-proj',
-    cloneUrl: null,
-    provider: null,
-    repoSlug: null,
-    defaultBranch: null,
-    remoteChecked: false,
-    isGitRepository: true,
-    gitRoot: null,
-    parentDir: '/home/user/Projects',
-    homeDir: '/home/user',
-    proposedIssuePrefix: 'TP',
-    registeredKeyAtPath: null,
-    wouldClone: false,
-    wouldGitInit: true,
-    willCreateMainWorkspace: true,
-    findings: [],
-  };
-}
+describe('operation reservation', () => {
+  it('coalesces repeated submission before validation completes', () => {
+    const intent = makeIntent();
+    const first = reserveProjectCreateOperation({ operationId: 'op-1', intent });
+    const second = reserveProjectCreateOperation({ operationId: 'op-1', intent });
 
-describe('project-create-jobs', () => {
-  it('returns a UUID string from startProjectCreateJob', () => {
-    vi.mocked(performProjectCreate).mockResolvedValue({
-      key: 'test-proj',
-      name: 'Test Project',
-      path: '/home/user/Projects/test-proj',
-      mainWorkspaceId: 'ws-123',
+    expect(first.status).toBe('reserved');
+    // A retried POST after a lost response must attach, not start a second clone.
+    expect(second.status).toBe('joined');
+  });
+
+  it('rejects changed input for the same operation id', () => {
+    reserveProjectCreateOperation({ operationId: 'op-1', intent: makeIntent() });
+    const changed = reserveProjectCreateOperation({
+      operationId: 'op-1',
+      intent: makeIntent({ name: 'something-else', path: '/home/user/Projects/other' }),
     });
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    expect(typeof id).toBe('string');
-    expect(id.length).toBeGreaterThan(0);
+    expect(changed.status).toBe('conflict');
   });
 
-  it('tracks a running job with phase and percent', async () => {
-    vi.mocked(performProjectCreate).mockImplementation(async (intent, hooks) => {
-      // Simulate first progress callback immediately
-      hooks.onProgress?.({ phase: 'cloning', percent: 25 });
-      // Simulate second progress after some time
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      hooks.onProgress?.({ phase: 'registering', percent: 75 });
-      return {
-        key: 'test-proj',
-        name: 'Test Project',
-        path: '/home/user/Projects/test-proj',
-        mainWorkspaceId: 'ws-123',
-      };
+  it('serializes the same target across operation ids', () => {
+    reserveProjectCreateOperation({ operationId: 'op-1', intent: makeIntent() });
+    // Two tabs, two ids, one directory: both would clone into it.
+    const other = reserveProjectCreateOperation({ operationId: 'op-2', intent: makeIntent() });
+
+    expect(other.status).toBe('target-busy');
+  });
+
+  it('frees the target once the operation settles', () => {
+    reserveProjectCreateOperation({ operationId: 'op-1', intent: makeIntent() });
+    settleProjectCreateOperation('op-1', { result });
+
+    const retry = reserveProjectCreateOperation({ operationId: 'op-2', intent: makeIntent() });
+    expect(retry.status).toBe('reserved');
+  });
+
+  it('remembers a synchronous outcome so a repeated POST does not register twice', () => {
+    reserveProjectCreateOperation({ operationId: 'op-1', intent: makeIntent() });
+    settleProjectCreateOperation('op-1', { result });
+
+    expect(getProjectCreateOperation('op-1')?.settled?.result).toEqual(result);
+  });
+});
+
+describe('job lifecycle', () => {
+  it('starts in preparing and reports phases as the clone progresses', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
+
+    expect(getProjectCreateJob(id)?.status).toBe('preparing');
+
+    held.progress('Receiving objects', 42);
+    expect(getProjectCreateJob(id)).toMatchObject({
+      status: 'cloning',
+      phase: 'Receiving objects',
+      percent: 42,
     });
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    // Job should exist and be running initially
-    let job = getProjectCreateJob(id);
-    expect(job).toBeDefined();
-    expect(job?.status).toBe('running');
-
-    // Simulate first progress callback (already called synchronously)
-    await Promise.resolve();
-    job = getProjectCreateJob(id);
-    expect(job?.status).toBe('running');
-    expect(job?.phase).toBe('cloning');
-    expect(job?.percent).toBe(25);
-
-    // Advance timers to complete the async sleep in performProjectCreate
-    await vi.advanceTimersByTimeAsync(20);
-    job = getProjectCreateJob(id);
-    expect(job?.status).toBe('done');
-    if (job?.status === 'done') {
-      expect(job.result.key).toBe('test-proj');
-    }
+    held.release();
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('done'));
+    expect(getProjectCreateJob(id)?.result).toEqual(result);
   });
 
-  it('updates job to done when performProjectCreate resolves', async () => {
-    const result: ProjectCreateResult = {
-      key: 'test-proj',
-      name: 'Test Project',
-      path: '/home/user/Projects/test-proj',
-      mainWorkspaceId: 'ws-123',
-    };
+  it('carries a structured failure and a legacy error string together', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    vi.mocked(performProjectCreate).mockResolvedValue(result);
+    held.fail(
+      new ProjectCreateFailureError({
+        code: 'authentication-required',
+        message: 'This server could not authenticate to the repository.',
+        retrySafe: true,
+      }),
+    );
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    // Use runAllTimersAsync to allow the promise to settle and handlers to run
-    // but do this before the TTL deletion can fire (TTL is 600s)
-    await vi.advanceTimersByTimeAsync(100);
-
-    const job = getProjectCreateJob(id);
-    expect(job?.status).toBe('done');
-    if (job?.status === 'done') {
-      expect(job.result).toEqual(result);
-      expect(typeof job.finishedAt).toBe('number');
-    }
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('failed'));
+    const job = getProjectCreateJob(id)!;
+    expect(job.failure?.code).toBe('authentication-required');
+    // Older clients read `error`; it must not drift from the structured failure.
+    expect(job.error).toBe(job.failure?.message);
   });
 
-  it('updates job to failed when performProjectCreate rejects', async () => {
-    const errorMsg = 'Clone failed: network error';
-    vi.mocked(performProjectCreate).mockRejectedValue(new Error(errorMsg));
+  it('never leaks a raw stack through an unexpected throw', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
+    held.fail(new Error('kaboom'));
 
-    // Advance timers to let the promise rejection settle
-    await vi.advanceTimersByTimeAsync(100);
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('failed'));
+    expect(JSON.stringify(getProjectCreateJob(id))).not.toContain('at Object');
+  });
+});
 
-    const job = getProjectCreateJob(id);
-    expect(job?.status).toBe('failed');
-    if (job?.status === 'failed') {
-      expect(job.error).toBe(errorMsg);
-      expect(typeof job.finishedAt).toBe('number');
-    }
+describe('cancellation', () => {
+  it('aborts the child and settles cleanup before reporting cancelled', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
+    held.progress('Receiving objects', 10);
+
+    const outcome = requestProjectCreateJobCancel(id);
+
+    expect(outcome.status).toBe('cancelling');
+    expect(held.signal()?.aborted).toBe(true);
+    // Still not cancelled: the child may be mid-write, and claiming otherwise
+    // would let the UI offer a retry into a directory still being touched.
+    expect(getProjectCreateJob(id)?.status).toBe('cancelling');
+
+    held.fail(
+      new ProjectCreateFailureError({ code: 'cancelled', message: 'cancelled', retrySafe: true }),
+    );
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('cancelled'));
   });
 
-  it('schedules job deletion after JOB_TTL_MS', async () => {
-    const result: ProjectCreateResult = {
-      key: 'test-proj',
-      name: 'Test Project',
-      path: '/home/user/Projects/test-proj',
-      mainWorkspaceId: 'ws-123',
-    };
+  it('is idempotent', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    vi.mocked(performProjectCreate).mockResolvedValue(result);
+    expect(requestProjectCreateJobCancel(id).status).toBe('cancelling');
+    expect(requestProjectCreateJobCancel(id).status).toBe('cancelling');
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    // Let job complete
-    vi.advanceTimersByTime(10);
-    await Promise.resolve();
-
-    let job = getProjectCreateJob(id);
-    expect(job).toBeDefined();
-
-    // Advance to just before TTL expiry
-    vi.advanceTimersByTime(JOB_TTL_MS - 1);
-    job = getProjectCreateJob(id);
-    expect(job).toBeDefined();
-
-    // Advance past TTL expiry
-    vi.advanceTimersByTime(2);
-    job = getProjectCreateJob(id);
-    expect(job).toBeUndefined();
+    held.fail(
+      new ProjectCreateFailureError({ code: 'cancelled', message: 'cancelled', retrySafe: true }),
+    );
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('cancelled'));
   });
 
-  it('captures onProgress hooks and updates phase/percent', async () => {
-    const progressCalls: { phase: string; percent: number | null }[] = [];
+  it('does not cancel after registration starts', () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    vi.mocked(performProjectCreate).mockImplementation(async (intent, hooks) => {
-      hooks.onProgress?.({ phase: 'phase1', percent: 10 });
-      hooks.onProgress?.({ phase: 'phase2', percent: 50 });
-      hooks.onProgress?.({ phase: 'phase3', percent: 90 });
-      return {
-        key: 'test-proj',
-        name: 'Test Project',
-        path: '/home/user/Projects/test-proj',
-        mainWorkspaceId: 'ws-123',
-      };
-    });
+    held.progress('registering', null);
+    const outcome = requestProjectCreateJobCancel(id);
 
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    vi.advanceTimersByTime(5);
-    await Promise.resolve();
-
-    const job = getProjectCreateJob(id);
-    if (job?.status === 'running') {
-      // Job should have received the last progress call before settling
-      expect(job.phase).toBe('phase3');
-      expect(job.percent).toBe(90);
-    }
+    // The clone is already on disk and config is being written; aborting now
+    // would strand a half-registered project.
+    expect(outcome.status).toBe('cannot-cancel-setup');
+    expect(held.signal()?.aborted).toBe(false);
   });
 
-  it('does not update a job after it has settled', async () => {
-    const result: ProjectCreateResult = {
-      key: 'test-proj',
-      name: 'Test Project',
-      path: '/home/user/Projects/test-proj',
-      mainWorkspaceId: 'ws-123',
-    };
+  it('returns the terminal result rather than cancelling a finished job', async () => {
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
+    held.release();
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('done'));
 
-    vi.mocked(performProjectCreate).mockImplementation(async (intent, hooks) => {
-      hooks.onProgress?.({ phase: 'starting', percent: 0 });
-      return result;
-    });
-
-    const intent = makeIntent();
-    const id = startProjectCreateJob(intent);
-
-    vi.advanceTimersByTime(10);
-    await Promise.resolve();
-
-    const job = getProjectCreateJob(id);
-    expect(job?.status).toBe('done');
-
-    // Simulate a stray progress callback (should not update)
-    // This is already handled by the implementation, but we verify the guard
-    if (job?.status === 'done') {
-      expect(job.result.key).toBe('test-proj');
-    }
+    expect(requestProjectCreateJobCancel(id).status).toBe('terminal');
   });
 
-  it('stores startedAt timestamp on running jobs', () => {
-    vi.mocked(performProjectCreate).mockImplementation(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      return {
-        key: 'test-proj',
-        name: 'Test Project',
-        path: '/home/user/Projects/test-proj',
-        mainWorkspaceId: 'ws-123',
-      };
-    });
+  it('reports an unknown job rather than inventing one', () => {
+    expect(requestProjectCreateJobCancel('no-such-job').status).toBe('unknown-job');
+  });
+});
 
-    const intent = makeIntent();
-    const beforeStart = Date.now();
-    const id = startProjectCreateJob(intent);
-    const afterStart = Date.now();
+describe('deadlines and retention', () => {
+  it('times out a hung clone without leaving a running job', async () => {
+    vi.useFakeTimers();
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
+    held.progress('Receiving objects', 1);
 
-    const job = getProjectCreateJob(id);
-    expect(job?.status).toBe('running');
-    if (job?.status === 'running') {
-      expect(job.startedAt).toBeGreaterThanOrEqual(beforeStart);
-      expect(job.startedAt).toBeLessThanOrEqual(afterStart);
-    }
+    vi.advanceTimersByTime(CLONE_DEADLINE_MS);
+    expect(held.signal()?.aborted).toBe(true);
+
+    held.fail(
+      new ProjectCreateFailureError({ code: 'timed-out', message: 'timed out', retrySafe: true }),
+    );
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('failed'));
   });
 
-  it('clears all timers on reset', async () => {
-    const result: ProjectCreateResult = {
-      key: 'test-proj',
-      name: 'Test Project',
-      path: '/home/user/Projects/test-proj',
-      mainWorkspaceId: 'ws-123',
-    };
+  it('retires the deadline once registration begins', () => {
+    vi.useFakeTimers();
+    const held = heldPerform();
+    startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    vi.mocked(performProjectCreate).mockResolvedValue(result);
+    held.progress('registering', null);
+    vi.advanceTimersByTime(CLONE_DEADLINE_MS * 2);
 
-    const id1 = startProjectCreateJob(makeIntent());
-    const id2 = startProjectCreateJob(makeIntent());
+    // A deadline firing here would label a still-writing registration as
+    // cancelled and retry-safe, and it is neither.
+    expect(held.signal()?.aborted).toBe(false);
+  });
 
-    vi.advanceTimersByTime(10);
-    await Promise.resolve();
+  it('prunes a settled job after its retention window', async () => {
+    vi.useFakeTimers();
+    const held = heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
+    held.release();
+    await vi.waitFor(() => expect(getProjectCreateJob(id)?.status).toBe('done'));
 
-    // Both jobs should be scheduled for deletion
-    vi.advanceTimersByTime(JOB_TTL_MS - 15);
+    vi.advanceTimersByTime(JOB_TTL_MS + 1);
+    expect(getProjectCreateJob(id)).toBeUndefined();
+  });
 
-    // Before reset, jobs still exist
-    expect(getProjectCreateJob(id1)).toBeDefined();
-    expect(getProjectCreateJob(id2)).toBeDefined();
+  it('never prunes a job that is still running', () => {
+    vi.useFakeTimers();
+    heldPerform();
+    const id = startProjectCreateJob(makeIntent(), { operationId: 'op-1' });
 
-    // Reset clears them immediately
-    __resetProjectCreateJobsForTests();
-
-    expect(getProjectCreateJob(id1)).toBeUndefined();
-    expect(getProjectCreateJob(id2)).toBeUndefined();
+    vi.advanceTimersByTime(JOB_TTL_MS + 1);
+    // Eviction is not a substitute for cancellation.
+    expect(getProjectCreateJob(id)).toBeDefined();
   });
 });
