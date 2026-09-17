@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:09:05.107Z",
+  "updated": "2026-09-17T01:17:29.838Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,16 +351,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "spawn-single-log": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 3550819,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T00:39:52.895Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -482,6 +474,17 @@
         "outcome": "completed",
         "reason": "F-3 unique badge keys (verified the test catches the bug by reverting), F-4 frontend knownModelIds unions the shared class table, F-1 frontend scoping, F-6b both suites added to npm test. 48 frontend tests pass.",
         "releasedAt": "2026-09-17T01:09:05.107Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3550819,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T00:39:52.895Z",
+        "itemId": "spawn-single-log",
+        "outcome": "completed",
+        "reason": "F-6a: new agents-spawn-tier-fitness.test.ts drives real spawnAgent/spawnRun with side effects mocked; 7 tests. Demonstrated it catches the pre-dfe7305 ordering bug in both directions. Also fixed the getDispatchableItems regression (35/35 supervisor tests).",
+        "releasedAt": "2026-09-17T01:17:29.838Z"
       }
     ],
     "statusReasons": {
@@ -506,8 +509,8 @@
         "updatedAt": "2026-09-16T20:06:58.713Z"
       },
       "spawn-single-log": {
-        "reason": "Fixing explicit-override ordering regression",
-        "updatedAt": "2026-09-17T00:39:52.895Z"
+        "reason": "F-6a: new agents-spawn-tier-fitness.test.ts drives real spawnAgent/spawnRun with side effects mocked; 7 tests. Demonstrated it catches the pre-dfe7305 ordering bug in both directions. Also fixed the getDispatchableItems regression (35/35 supervisor tests).",
+        "updatedAt": "2026-09-17T01:17:29.838Z"
       },
       "settings-badges": {
         "reason": "F-3 unique badge keys (verified the test catches the bug by reverting), F-4 frontend knownModelIds unions the shared class table, F-1 frontend scoping, F-6b both suites added to npm test. 48 frontend tests pass.",
@@ -547,11 +550,11 @@
     "spawn-slot-log.ac2": "completed",
     "spawn-slot-log.ac3": "completed",
     "spawn-slot-log.ac4": "completed",
-    "spawn-single-log": "running",
-    "spawn-single-log.ac1": "pending",
-    "spawn-single-log.ac2": "pending",
-    "spawn-single-log.ac3": "pending",
-    "spawn-single-log.ac4": "pending",
+    "spawn-single-log": "completed",
+    "spawn-single-log.ac1": "completed",
+    "spawn-single-log.ac2": "completed",
+    "spawn-single-log.ac3": "completed",
+    "spawn-single-log.ac4": "completed",
     "settings-badges": "completed",
     "settings-badges.ac1": "completed",
     "settings-badges.ac2": "completed",
