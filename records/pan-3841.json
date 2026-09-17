@@ -141,10 +141,10 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:06:24.875Z",
+  "updated": "2026-09-17T01:06:33.261Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "failed",
@@ -152,8 +152,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:06:22.375Z",
-    "reviewNotes": "Verification failed at build — fix and resubmit",
+    "updatedAt": "2026-09-17T01:06:22.420Z",
+    "reviewNotes": "Verification failed at build",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Verification FAILED at build (61825ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
@@ -315,7 +315,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.4456164,
-        "pricingAsOf": "2026-09-17T01:06:24.857Z"
+        "pricingAsOf": "2026-09-17T01:06:28.057Z"
       }
     },
     "merges": [
