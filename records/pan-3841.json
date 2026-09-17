@@ -156,18 +156,18 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:10:10.283Z",
+  "updated": "2026-09-17T01:10:18.664Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:10:07.741Z",
+    "updatedAt": "2026-09-17T01:10:18.620Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Verification FAILED at typecheck (7617ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json",
@@ -247,9 +247,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 3503834,
-            "output": 120761,
-            "cacheRead": 20731904,
+            "input": 3504005,
+            "output": 120906,
+            "cacheRead": 20978688,
             "cacheWrite": 0
           }
         },
@@ -316,9 +316,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 8977055,
-          "output": 286772,
-          "cacheRead": 103573077,
+          "input": 8977226,
+          "output": 286917,
+          "cacheRead": 103819861,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -329,8 +329,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.8299304,
-        "pricingAsOf": "2026-09-17T01:10:10.274Z"
+        "usd": 36.8301554,
+        "pricingAsOf": "2026-09-17T01:10:18.633Z"
       }
     },
     "merges": [
