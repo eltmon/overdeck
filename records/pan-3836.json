@@ -327,6 +327,11 @@
       "timestamp": "2026-09-17T02:34:01.429Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-17T02:36:55.562Z"
     }
   ],
   "feedback": [
@@ -456,19 +461,20 @@
     "recordedAt": "2026-09-17T02:33:56.035Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:36:29.720Z",
+  "updated": "2026-09-17T02:36:55.563Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T02:36:28.819Z",
+    "updatedAt": "2026-09-17T02:36:55.394Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "uatNotes": "Ran against the workspace-built dashboard at https://feature-pan-3836.overdeck.localhost (Vite dev serving 9e039c; workspace server restarted to build 29c8eff, health ok). The UAT-blocking criterion from 18:45 (NewProjectPage crashed on every entry point via react-router useSearchParams with no Router) is fixed: /projects/new?mode=existing renders Create a Project with the guide line, three mode tabs, Add existing preselected from the URL, and all fields; the sidebar Projects + entry navigates to /projects/new and renders; browser console has no uncaught errors and no Router/useSearchParams errors. Limitation: the workspace stack's dashboard session bootstrap returns HTTP 403 (trusted-origin env of the feature stack, pre-existing), which shows the Server unreachable overlay and blocks in-browser mutation calls, so the resolve strip was not exercised in the browser; the resolve route is confirmed mounted on the workspace server (POST /api/projects/resolve returns 401 from the CSRF guard, unknown job id returns 404) and its behavior is covered by tests/unit/dashboard/routes/project-create-routes.test.ts.",
+    "verificationNotes": "Verification FAILED at lint (86364ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3836/.overdeck/verification-latest.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3838",
     "reviewRequestedAt": "2026-09-17T02:33:56.928Z",
     "scopeDrift": {
@@ -696,7 +702,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.318013,
-        "pricingAsOf": "2026-09-17T02:36:29.693Z"
+        "pricingAsOf": "2026-09-17T02:36:55.428Z"
       }
     },
     "merges": [
