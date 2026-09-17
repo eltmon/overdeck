@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:38.075Z",
+  "updated": "2026-09-17T02:10:41.184Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,15 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 77,
+    "sequence": 78,
     "claims": {
-      "docs-projects-and-workspaces": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 842449,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T02:10:24.205Z"
-      },
       "skill-pan-new-project": {
         "writerId": "agent-pan-3836",
         "agentId": "agent-pan-3836",
@@ -1014,6 +1007,17 @@
         "outcome": "completed",
         "reason": "D-10: extras typed as a Pick of ProjectConfig (no Record cast) in create-perform.ts buildExtras; RegisterProjectExtras unchanged. Commit cbd58db24a9 + 452ab45ebbf.",
         "releasedAt": "2026-09-17T02:10:38.074Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 842449,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:24.205Z",
+        "itemId": "docs-projects-and-workspaces",
+        "outcome": "completed",
+        "reason": "WI-7: WORKSPACES-AND-PROJECTS rewritten (modules, route table, operation/job lifecycle, what counts as success, restart limitation), projects.mdx registration section rewritten, CLAUDE.md line added. Commit 368c70abd6a.",
+        "releasedAt": "2026-09-17T02:10:41.184Z"
       }
     ],
     "statusReasons": {
@@ -1066,8 +1070,8 @@
         "updatedAt": "2026-09-17T02:10:34.775Z"
       },
       "docs-projects-and-workspaces": {
-        "reason": "revised PRD",
-        "updatedAt": "2026-09-17T02:10:21.032Z"
+        "reason": "WI-7: WORKSPACES-AND-PROJECTS rewritten (modules, route table, operation/job lifecycle, what counts as success, restart limitation), projects.mdx registration section rewritten, CLAUDE.md line added. Commit 368c70abd6a.",
+        "updatedAt": "2026-09-17T02:10:41.184Z"
       },
       "skill-pan-new-project": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-9/AC-7]: sync-sources/skills/pan-new-project was not rewritten per WI-7: step 2 must become 'run pan project clone <url> or pan project add <path>; both detect remote, default branch and prefix and create the main workspace'; step 3 drops issue_prefix/github_repo/default_branch from the minimum config. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -1142,10 +1146,10 @@
     "delete-new-project-modal.ac1": "completed",
     "delete-new-project-modal.ac2": "completed",
     "delete-new-project-modal.ac3": "completed",
-    "docs-projects-and-workspaces": "running",
-    "docs-projects-and-workspaces.ac1": "pending",
-    "docs-projects-and-workspaces.ac2": "pending",
-    "docs-projects-and-workspaces.ac3": "pending",
+    "docs-projects-and-workspaces": "completed",
+    "docs-projects-and-workspaces.ac1": "completed",
+    "docs-projects-and-workspaces.ac2": "completed",
+    "docs-projects-and-workspaces.ac3": "completed",
     "skill-pan-new-project": "running",
     "skill-pan-new-project.ac1": "pending",
     "skill-pan-new-project.ac2": "pending",
