@@ -107,6 +107,12 @@ tiered_execution:
 
 This follows Devin Fusion's failure-mode lesson: when judgment is the deliverable, delegating it to a cheaper sidekick can backfire. It remains a recommendation because model choice must come from explicit operator configuration, never a hardcoded fallback.
 
+## Single-Agent Staffing
+
+With swarm mode off, one work agent executes the whole plan. That agent is staffed for the plan's hardest remaining item — the maximum difficulty over every item not completed, cancelled, running, or blocked, with `by_kind` applied per item before the maximum, exactly as the resolution chain applies it (a `design` item counts as the difficulty of the tier its kind names). Keying on the first dispatchable item instead misrouted every plan whose hard items came later (PAN-3857).
+
+The per-issue work-model override (`record.workModel`) is written only by an explicit operator choice — `pan start --model`, a model picked in the dashboard spawn or restart-fresh flows, or the Policies panel. A resolved role default is never persisted as an override; when no override exists, single-agent staffing resolves through the tier table above. A stored override still wins through the `issue-override` tier and suspends crew routing for the issue.
+
 ## Standing Warm Tiers
 
 The foreman owns `pan task next`, claiming, status updates, verification commands, commit messages, and task closure. Tier agents do implementation only. They receive the task brief, make the scoped change, and return control to the foreman for verification and commit.
