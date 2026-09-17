@@ -200,7 +200,7 @@ export default function App() {
         ? `/command-deck/${encodeURIComponent(initialProjectRoute)}`
         : '/command-deck',
   );
-  const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
+  const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation', syncUrl = true) => {
     setSelectedConvIdState(id);
     setConversationViewModeState(id ? viewMode : 'conversation');
     setConversationViewModes((current) => {
@@ -210,7 +210,7 @@ export default function App() {
       } else if (id) {
         delete next[id];
       }
-      window.history.replaceState(null, '', id ? buildConversationUrl(id, viewMode, current) : commandDeckPathRef.current);
+      if (syncUrl) window.history.replaceState(null, '', id ? buildConversationUrl(id, viewMode, current) : commandDeckPathRef.current);
       return next;
     });
   }, []);
@@ -241,7 +241,9 @@ export default function App() {
     if (window.location.pathname !== target.path) window.history.pushState(target.state, '', target.path);
     // Same reason as handleSelectProject: the new project is newer intent than a
     // lingering conversation route, which would flip the deck away on remount.
-    setConversationRoute(null);
+    // syncUrl only for the deck target: the route clear replaces the URL with the
+    // deck path, which would clobber the /workspaces/new?project= return path.
+    setConversationRoute(null, 'conversation', target.tab === 'command-deck');
     usePanesStore.getState().ensureHome(project.key);
   }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());

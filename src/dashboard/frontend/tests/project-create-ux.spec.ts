@@ -301,6 +301,25 @@ test.describe('project creation journeys', () => {
     await expect(page.getByLabel('Parent folder')).toBeVisible();
   });
 
+  test('return to the workspace page with the new project preselected', async ({ page }) => {
+    // The workspace-page chips open /projects/new with returnTo=/workspaces/new.
+    // After a successful create the app must land back on /workspaces/new with
+    // the new project preselected — not on the command deck. This journey
+    // exercises the real App handler (the unit test only covers the helper).
+    await stubResolve(page, { mode: 'new', wouldClone: false, wouldGitInit: true, key: 'widget', path: '/tmp/e2e/Projects/widget' });
+    await page.route('**/api/projects', async (route) => {
+      await route.fulfill({
+        json: { status: 'completed', key: 'widget', name: 'widget', path: '/tmp/e2e/Projects/widget' },
+      });
+    });
+    await openCreatePage(page, '?mode=new&returnTo=%2Fworkspaces%2Fnew');
+    await page.getByTestId('new-project-name-input').fill('widget');
+    await page.getByRole('button', { name: 'Create project' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/new\?project=widget$/);
+    await expect(page.locator('[data-selected-project="widget"]')).toBeVisible();
+  });
+
   test('responsive: no horizontal overflow at three viewport sizes', async ({ page }) => {
     await stubResolve(page);
     for (const viewport of [
