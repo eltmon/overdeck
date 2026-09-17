@@ -19,7 +19,6 @@ optional:
   - PROBE_SECTION
   - PRD_REFERENCES
   - MEMORY_CONTEXT
-  - TLDR_AVAILABLE
 ---
 <!-- overdeck:orchestration-context-start -->
 <!-- This is Overdeck orchestration context injected automatically.
@@ -32,7 +31,7 @@ optional:
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
 **YOU ARE IN PLANNING MODE. DO NOT:**
-- Write or modify any code files (except `.pan/continue.json`)
+- Write or modify any code files (except `.overdeck/continue.json`)
 - Run implementation commands (npm install, docker compose, make, etc.)
 - Create actual features or functionality
 - Start implementing the solution
@@ -40,54 +39,9 @@ optional:
 **YOU SHOULD ONLY:**
 - Ask clarifying questions (use AskUserQuestion tool)
 - Explore the codebase to understand context (read files, grep)
-- Generate planning artifacts:
-  - **PRD draft** at `.pan/drafts/{{ISSUE_ID}}.md` in your workspace — the human-readable implementation brief the xBRIEF is lowered from. Written FIRST, before the xBRIEF, whenever no canonical PRD already exists. `pan plan finalize` refuses to run without it (PRD-first gate) and promotes it to `drafts/` on `overdeck-state` through the draft write door.
-  - **continue.json** at `.overdeck/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
-  - **xBRIEF plan** at `.overdeck/spec.vbrief.json` (deliberate legacy-compatible workspace filename; `plan finalize` promotes it to `specs/*.xbrief.json` on `overdeck-state` through the state write door)
 - Present options and tradeoffs for the user to decide
 
-**Finalizing the session:** When your xBRIEF is written and you're ready to hand off, run:
-
-```
-pan plan finalize
-```
-
-This marks your `.overdeck/spec.vbrief.json` as `plan.status = "proposed"`, promotes the canonical spec to `specs/*.xbrief.json` on `overdeck-state` through the state write door, transitions the issue to Planned, and terminates this planning session. The xBRIEF `items[]` array is the executable task checklist.
-
-`pan plan finalize` is your final action — the pipeline terminates this session after it succeeds; no dashboard "Done" click is needed. What happens next is not your decision: if this planning run was launched with `--auto-start` (autonomous orchestrators), the work agent starts automatically; otherwise the issue waits in Planned until a human runs `pan start <id>` or clicks Start Agent. Never try to start the work agent yourself. (The dashboard Done button remains the manual handoff path for `--no-promote` runs.)
-
-## Overdeck Agent Taxonomy
-
-Overdeck orchestrates issue work through five lifecycle **roles**. **You are running the `plan` role.** The other roles have different responsibilities, working directories, and instruction files. Confusing roles with Claude Code subagents is a common planning error — read this section carefully before exploring the codebase.
-
-### Roles in the Overdeck pipeline
-
-| Role | Responsibility | Working dir | Instruction source |
-|------|----------------|-------------|--------------------|
-| **plan** (you) | Discovery, xBRIEF, continue.json. No code. | workspace worktree | `roles/plan.md` + this template |
-| **work** | Implementation from your xBRIEF tasks | workspace worktree | `roles/work.md` |
-| **review** | Review synthesis and approval/blocking decision | project root | `roles/review.md` |
-| **test** | Automated verification and required browser UAT | project root | `roles/test.md` |
-| server-side shipping | Rebase/readyForMerge preparation for human merge | project root | no spawned role file |
-
-Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
-
-**Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test and server-side shipping must enforce should be encoded in the xBRIEF as acceptance criteria, because those criteria propagate through the role prompts and downstream artifacts.
-
-### Claude Code subagents (NOT Overdeck roles)
-
-You may spawn ephemeral **Claude Code subagents** via the `Agent` tool for parallel exploration. These are NOT Overdeck lifecycle roles:
-
-- `codebase-explorer`, `general-purpose` — fast read-only code search
-- `Plan` — architectural planning helper
-
-The review convoy sub-roles (`review.security`, `review.correctness`, `review.performance`, `review.requirements`) are NOT Claude Code subagents — they are harness-agnostic prompt templates in `roles/review-<subRole>.md` that the review role's orchestrator inlines into each convoy spawn message. Plan around the review role itself; convoy mechanics are an implementation detail.
-
-**Claude Code subagents live and die inside one Claude Code session.** They do not own issue state, do not transition the Overdeck pipeline, and do not replace `plan`/`work`/`review`/`test`/`ship`. If you encounter legacy helper model slots or files in `.claude/agents/`, treat them as role-internal helpers, not standalone pipeline agents.
-
-### What happens after you finalize
-
-After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → optional `work.inspect`/`work.inspect-deep` on flagged xBRIEF tasks → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
+Your outputs, their paths, and the finalize handoff are defined in your role instructions (`roles/plan.md`); this message carries the issue and the plan formats.
 
 ---
 {{EFFORT_SECTION}}{{AUTO_SECTION}}{{PROBE_SECTION}}
@@ -125,15 +79,6 @@ You are a planning agent conducting a **discovery session** for this issue.
 3. Identify what subsystems/files this issue affects
 4. Note any existing patterns we should follow
 
-### Codebase Map — read first, keep fresh
-
-Check `<projectRoot>/.pan/context/codebase/` (architecture.md, conventions.md, concerns.md, stack.md):
-
-- **If present:** read all four files FIRST — they are your primary orientation. Use TLDR/Read only for the issue-specific delta. If you discover any statement is stale or wrong, correct the file and update its `<!-- last-verified: -->` date as part of this session.
-- **If absent or empty:** bootstrap it during discovery. Write all four files from what you learn (≤150 lines each, ends with `<!-- last-verified: YYYY-MM-DD -->`). This is part of planning output, not implementation code.
-
-These files are committed on main by `pan plan finalize` along with the spec.
-
 ### Phase 2: Discovery Conversation
 Use AskUserQuestion tool to ask contextual questions:
 - What's the scope? What's explicitly OUT of scope?
@@ -169,21 +114,6 @@ If the issue will require browser-based verification, encode that expectation cl
 - Agents must not depend on another agent's Playwright session or shared browser state.
 - Any required login/setup should be reproducible inside the isolated session.
 
-{{#TLDR_AVAILABLE}}
-### TLDR: Token-Efficient Code Discovery
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-{{/TLDR_AVAILABLE}}
 ### Task Granularity — Decompose Aggressively
 
 **Default to the smallest task you can defend.** Your job is to produce a *lot* of small, independently reviewable xBRIEF tasks — not a handful of large ones.
@@ -234,13 +164,13 @@ For every slot-eligible item, also declare:
 
 For each sub-task, estimate difficulty using this rubric:
 
-| Level | When to Use | Model |
-|-------|-------------|-------|
-| `trivial` | Typo, comment, formatting only | haiku |
-| `simple` | Bug fix, single file, obvious change | haiku |
-| `medium` | New feature, 3-5 files, standard patterns | sonnet |
-| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
-| `expert` | Architecture, security, performance, high risk | opus |
+| Level | When to Use |
+|-------|-------------|
+| `trivial` | Typo, comment, formatting only |
+| `simple` | Bug fix, single file, obvious change |
+| `medium` | New feature, 3-5 files, standard patterns |
+| `complex` | Refactor, migration, 6+ files, some risk |
+| `expert` | Architecture, security, performance, high risk |
 
 ### Inspection Requirement — `metadata.requiresInspection`
 
@@ -285,7 +215,7 @@ When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` 
 6. Do edges encode only real dependencies (output→input, shared mutation, ordering)?
 
 When discovery is complete:
-1. Write the **PRD draft** at `.pan/drafts/{{ISSUE_ID}}.md` in your workspace (unless a canonical PRD already exists on `overdeck-state` and is still accurate). Follow the standard in `.claude/rules/prd-authoring.md`: glossary first, verified file/line references, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, a documentation work item naming exact doc files, mechanically checkable acceptance criteria. The xBRIEF is *lowered from* this PRD — do not write the xBRIEF first. `pan plan finalize` fails without a PRD of at least 20 lines (PRD-first gate) and promotes it to `drafts/` on `overdeck-state`.
+1. Write the **PRD draft** at `.pan/drafts/{{ISSUE_ID}}.md` in your workspace (unless a canonical PRD already exists on `overdeck-state` and is still accurate). Follow the PRD authoring rule in your launch context (Overdeck Engineering Rules, `prd-authoring`): glossary first, verified file/line references, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, a documentation work item naming exact doc files, mechanically checkable acceptance criteria. The xBRIEF is *lowered from* this PRD — do not write the xBRIEF first. `pan plan finalize` fails without a PRD of at least 20 lines (PRD-first gate) and promotes it to `drafts/` on `overdeck-state`.
 2. Create **continue.json** at `.overdeck/continue.json` with decisions, hazards, and approach context (see format below).
 3. Create an **xBRIEF plan** at `.overdeck/spec.vbrief.json` — **MUST follow the exact format below**.
 4. Run `pan plan finalize` from the workspace root. This finalizes the tasks in your xBRIEF and sets `plan.status` to `proposed`.

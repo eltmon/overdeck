@@ -394,7 +394,6 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
       PROBE_SECTION: probeSection,
       PRD_REFERENCES: prdReferences,
       MEMORY_CONTEXT: memoryContext,
-      TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv')),
     },
   }));
 }
