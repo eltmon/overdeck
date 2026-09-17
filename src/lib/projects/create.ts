@@ -71,7 +71,15 @@ export type ProjectIntentCode =
   | 'name-invalid'
   | 'project-exists'
   | 'issue-prefix-invalid'
-  | 'issue-prefix-taken';
+  | 'issue-prefix-taken'
+  /** A relative path, or `~otheruser`, from a caller that has no working directory. */
+  | 'path-not-absolute'
+  /** The path exists but this server cannot stat or read it. */
+  | 'path-unreadable'
+  /** The chosen folder sits inside a repository rooted somewhere else (D-15). */
+  | 'repository-root-elsewhere'
+  /** This exact folder is already registered under this key — open or repair it. */
+  | 'project-exists-here';
 
 export interface ProjectIntentFinding {
   field: ProjectIntentField;
@@ -97,16 +105,28 @@ export interface ResolvedProjectIntent {
   key: string | null;
   name: string;
   path: string | null;
+  /**
+   * The resolved parent directory, always populated — including before the form
+   * has enough input to validate. The UI shows it as a real value rather than a
+   * `~/Projects` placeholder the operator would have to guess at (D-4).
+   */
+  parentDir: string;
+  /** The server's home directory, so a browser never has to infer one (D-4). */
+  homeDir: string;
   cloneUrl: string | null;
   provider: 'github' | 'gitlab' | null;
   repoSlug: string | null;
   defaultBranch: string | null;
   remoteChecked: boolean;
   isGitRepository: boolean;
+  /** Canonical root of the repository containing `path`, when there is one. */
+  gitRoot: string | null;
   proposedIssuePrefix: string | null;
   wouldClone: boolean;
   wouldGitInit: boolean;
   willCreateMainWorkspace: boolean;
+  /** Set when this exact path is already registered under this key (repair target). */
+  registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
 }
 
@@ -160,14 +180,24 @@ function remoteProbeTtl(result: RemoteProbeResult): number {
   return result.ok ? REMOTE_PROBE_TTL_MS : REMOTE_PROBE_FAILURE_TTL_MS;
 }
 
+/** At most this many settled probe results are kept (D-2). */
+const REMOTE_PROBE_MAX_ENTRIES = 128;
+
 /**
- * Drop expired entries. The memo is consulted only on the read path, so without
- * this the Map gains a permanent entry per distinct clone URL for the life of a
- * dashboard process that never restarts.
+ * Drop expired entries, then the oldest ones if the memo is still over its cap.
+ *
+ * The memo is consulted only on the read path, so without this the Map gains a
+ * permanent entry per distinct clone URL for the life of a dashboard process
+ * that never restarts — and the operator types many distinct URLs.
  */
 function pruneRemoteProbeMemo(now: number): void {
   for (const [url, entry] of remoteProbeMemo) {
     if (now - entry.at >= remoteProbeTtl(entry.result)) remoteProbeMemo.delete(url);
+  }
+  if (remoteProbeMemo.size <= REMOTE_PROBE_MAX_ENTRIES) return;
+  const byAge = [...remoteProbeMemo.entries()].sort((a, b) => a[1].at - b[1].at);
+  for (const [url] of byAge.slice(0, remoteProbeMemo.size - REMOTE_PROBE_MAX_ENTRIES)) {
+    remoteProbeMemo.delete(url);
   }
 }
 
@@ -259,6 +289,125 @@ async function isWithinHome(canonicalPath: string, home: string): Promise<boolea
   return canonicalPath === homeReal || canonicalPath.startsWith(homeReal + sep);
 }
 
+/** Bounded git metadata reads: local, so slow here means something is wrong. */
+const GIT_METADATA_TIMEOUT_MS = 5_000;
+
+/**
+ * Expand a user-supplied directory against the *server's* home (D-4).
+ *
+ * A browser has no idea what `~` means on the machine that will hold the
+ * repository, so expansion happens here and the resolved absolute path goes back
+ * to the UI as a real value instead of a placeholder the operator has to guess.
+ */
+function expandServerPath(raw: string, home: string): { path: string } | { reason: 'tilde-user' } {
+  const trimmed = raw.trim();
+  if (trimmed === '~') return { path: home };
+  if (trimmed.startsWith('~/')) return { path: join(home, trimmed.slice(2)) };
+  // `~someone` names another account's home, which this server has no business
+  // writing into on the operator's behalf.
+  if (trimmed.startsWith('~')) return { reason: 'tilde-user' };
+  return { path: trimmed };
+}
+
+type PathKind = 'directory' | 'file' | 'missing' | 'blocked-by-file' | 'unreadable';
+
+/**
+ * Classify a path so each way of being unusable reads differently (D-11).
+ *
+ * "Not found" sends the operator to create it; "a file is in the way" and "this
+ * server cannot read it" send them somewhere else entirely, and collapsing all
+ * three into one message is how a permissions problem gets mistaken for a typo.
+ */
+async function classifyPath(target: string): Promise<PathKind> {
+  try {
+    const stats = await stat(target);
+    return stats.isDirectory() ? 'directory' : 'file';
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return 'missing';
+    // ENOTDIR means an ancestor is a regular file, not that this path is absent.
+    if (code === 'ENOTDIR') return 'blocked-by-file';
+    return 'unreadable';
+  }
+}
+
+const PATH_KIND_MESSAGE: Record<Exclude<PathKind, 'directory'>, string> = {
+  file: 'That path is a file. Choose a directory.',
+  missing: 'Directory not found.',
+  'blocked-by-file': 'Part of that path is a file, so it cannot contain a directory.',
+  unreadable: 'This server cannot read that path. Check its permissions.',
+};
+
+/**
+ * The repository root containing `dir`, or null when `dir` is not inside a repo.
+ *
+ * `rev-parse --show-toplevel` is the only correct check (D-15). `.git` is a
+ * *file* in a linked worktree, and a subdirectory of a repository has no `.git`
+ * at all — the `.git.isDirectory()` test this replaces called both of those
+ * "not a repository", so adding a worktree silently registered a non-Git folder.
+ */
+async function detectGitRoot(dir: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: dir,
+      timeout: GIT_METADATA_TIMEOUT_MS,
+      env: promptGuardGitEnv(),
+    });
+    const root = stdout.trim();
+    return root || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The origin URL of a repository, or null when it has no origin. */
+async function detectOriginUrl(dir: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], {
+      cwd: dir,
+      timeout: GIT_METADATA_TIMEOUT_MS,
+      env: promptGuardGitEnv(),
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The repository's default branch, or null when it genuinely cannot be told.
+ *
+ * Null matters: writing a guessed `main` into `workspace.default_branch` sends
+ * every later workspace at a branch that may not exist.
+ */
+async function detectDefaultBranch(dir: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'],
+      { cwd: dir, timeout: GIT_METADATA_TIMEOUT_MS, env: promptGuardGitEnv() },
+    );
+    const branch = stdout.trim().replace(/^origin\//, '');
+    if (branch) return branch;
+  } catch {
+    // No origin/HEAD recorded; fall back to whatever is checked out.
+  }
+
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: dir,
+      timeout: GIT_METADATA_TIMEOUT_MS,
+      env: promptGuardGitEnv(),
+    });
+    const branch = stdout.trim();
+    // A detached HEAD reports the literal string "HEAD"; an unborn branch errors.
+    // Both mean unknown.
+    return branch && branch !== 'HEAD' ? branch : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve a project creation intent to a computed preview with findings.
  * Writes nothing; safe to call on every keystroke.
@@ -267,26 +416,54 @@ export async function resolveProjectCreateIntent(
   input: ProjectCreateInput,
 ): Promise<ResolvedProjectIntent> {
   const findings: ProjectIntentFinding[] = [];
+  const home = await canonicalizePath(input.homeDir ?? homedir());
+
+  // Defaults are computed before any early return. An empty form still has to
+  // show where files would land, and a missing URL is not a reason to hide it.
+  let parentDir = join(home, 'Projects');
+  if (input.parentDir?.trim()) {
+    const expanded = expandServerPath(input.parentDir, home);
+    if ('reason' in expanded) {
+      findings.push({
+        field: 'parentDir',
+        code: 'path-not-absolute',
+        message: 'Only ~ for your own home directory is supported. Enter an absolute path.',
+        detail: input.parentDir,
+      });
+    } else if (input.homeBoundary && !isAbsolute(expanded.path)) {
+      // There is no working directory to be relative to: the request is a browser's.
+      findings.push({
+        field: 'parentDir',
+        code: 'path-not-absolute',
+        message: 'Enter an absolute path, for example /home/you/Projects.',
+        detail: input.parentDir,
+      });
+    } else {
+      parentDir = resolve(expanded.path);
+    }
+  }
+
   const intent: ResolvedProjectIntent = {
     mode: input.mode,
     key: null,
     name: '',
     path: null,
+    parentDir,
+    homeDir: home,
     cloneUrl: null,
     provider: null,
     repoSlug: null,
     defaultBranch: null,
     remoteChecked: false,
     isGitRepository: false,
+    gitRoot: null,
     proposedIssuePrefix: null,
     wouldClone: false,
     wouldGitInit: false,
     willCreateMainWorkspace: false,
+    registeredKeyAtPath: null,
     findings,
   };
-
-  const home = input.homeDir ?? homedir();
-  const parentDir = resolve(input.parentDir ?? join(home, 'Projects'));
 
   // 1. Mode-specific source validation
   if (input.mode === 'clone') {
@@ -307,7 +484,8 @@ export async function resolveProjectCreateIntent(
     intent.wouldClone = true;
     intent.isGitRepository = true;
   } else if (input.mode === 'existing') {
-    if (!input.path || !isAbsolute(input.path)) {
+    const rawPath = input.path?.trim();
+    if (!rawPath) {
       findings.push({
         field: 'path',
         code: 'path-not-a-directory',
@@ -316,7 +494,28 @@ export async function resolveProjectCreateIntent(
       });
       return intent;
     }
-    intent.name = input.name?.trim() || basename(input.path);
+    const expanded = expandServerPath(rawPath, home);
+    if ('reason' in expanded) {
+      findings.push({
+        field: 'path',
+        code: 'path-not-absolute',
+        message: 'Only ~ for your own home directory is supported. Enter an absolute path.',
+        detail: rawPath,
+      });
+      return intent;
+    }
+    if (!isAbsolute(expanded.path)) {
+      findings.push({
+        field: 'path',
+        code: 'path-not-absolute',
+        message: 'Enter an absolute path, for example /home/you/Projects/my-repo.',
+        detail: rawPath,
+      });
+      return intent;
+    }
+    intent.name = input.name?.trim() || basename(expanded.path);
+    // Stashed for step 3, which canonicalizes it alongside the clone/new branch.
+    input = { ...input, path: expanded.path };
   } else {
     intent.name = input.name?.trim() ?? '';
     intent.wouldGitInit = true;
@@ -336,32 +535,45 @@ export async function resolveProjectCreateIntent(
   }
   intent.key = key;
 
-  if (getProjectSync(key)) {
-    findings.push({
-      field: 'name',
-      code: 'project-exists',
-      message: `Project '${key}' is already registered.`,
-      detail: key,
-    });
-  }
-
   // 3. Path + home boundary + fs checks
   if (input.mode === 'clone' || input.mode === 'new') {
     // Canonical from here on: the boundary check below and the registration that
     // follows must agree on one path, not on a symlink and its target.
     intent.path = await canonicalizePath(join(parentDir, key));
   } else {
-    try {
-      intent.path = await canonicalizePath(input.path!);
-      await stat(intent.path);
-    } catch {
+    intent.path = await canonicalizePath(input.path!);
+    const kind = await classifyPath(intent.path);
+    if (kind !== 'directory') {
       findings.push({
         field: 'path',
-        code: 'path-not-a-directory',
-        message: 'Directory not found.',
-        detail: input.path,
+        code: kind === 'unreadable' ? 'path-unreadable' : 'path-not-a-directory',
+        message: PATH_KIND_MESSAGE[kind],
+        detail: intent.path,
       });
       return intent;
+    }
+  }
+
+  // A project already registered at this exact path is not a duplicate to argue
+  // with — it is the same project, and the operator wants to open or repair it.
+  const registered = getProjectSync(key);
+  if (registered) {
+    const registeredPath = await canonicalizePath(registered.path);
+    if (registeredPath === intent.path) {
+      intent.registeredKeyAtPath = key;
+      findings.push({
+        field: 'name',
+        code: 'project-exists-here',
+        message: `This folder is already registered as project '${key}'.`,
+        detail: intent.path,
+      });
+    } else {
+      findings.push({
+        field: 'name',
+        code: 'project-exists',
+        message: `Project '${key}' is already registered at ${registeredPath}.`,
+        detail: registeredPath,
+      });
     }
   }
 
@@ -377,24 +589,38 @@ export async function resolveProjectCreateIntent(
 
   // Target exists check for clone/new
   if ((input.mode === 'clone' || input.mode === 'new') && intent.path) {
-    try {
-      const stats = await stat(intent.path);
-      const children = await readdir(intent.path);
-      if (stats.isDirectory() && children.length > 0) {
+    const kind = await classifyPath(intent.path);
+    if (kind === 'file') {
+      findings.push({
+        field: input.mode === 'clone' ? 'url' : 'name',
+        code: 'path-not-a-directory',
+        message: 'A file already exists at that destination.',
+        detail: intent.path,
+      });
+    } else if (kind === 'unreadable' || kind === 'blocked-by-file') {
+      findings.push({
+        field: 'parentDir',
+        code: kind === 'unreadable' ? 'path-unreadable' : 'path-not-a-directory',
+        message: PATH_KIND_MESSAGE[kind],
+        detail: intent.path,
+      });
+    } else if (kind === 'directory') {
+      try {
+        const children = await readdir(intent.path);
+        if (children.length > 0) {
+          findings.push({
+            field: input.mode === 'clone' ? 'url' : 'name',
+            code: 'target-exists',
+            message: 'Target directory already exists and is not empty.',
+            detail: intent.path,
+          });
+        }
+      } catch {
         findings.push({
-          field: input.mode === 'clone' ? 'url' : 'name',
-          code: 'target-exists',
-          message: 'Target directory already exists and is not empty.',
+          field: 'parentDir',
+          code: 'path-unreadable',
+          message: 'This server cannot read the destination. Check its permissions.',
           detail: intent.path,
-        });
-      }
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        findings.push({
-          field: 'path',
-          code: 'path-not-a-directory',
-          message: 'Cannot access target directory.',
-          detail: String(err),
         });
       }
     }
@@ -420,66 +646,59 @@ export async function resolveProjectCreateIntent(
       }
     }
   } else if (input.mode === 'existing' && intent.path) {
-    const gitDir = join(intent.path, '.git');
-    try {
-      const gitStats = await stat(gitDir);
-      if (gitStats.isDirectory()) {
-        intent.isGitRepository = true;
-        try {
-          const { stdout: originUrl } = await execFileAsync('git', ['remote', 'get-url', 'origin'], {
-            cwd: intent.path,
-            timeout: 5000,
-          });
-          const parsedOrigin = parseRepoUrl(originUrl.trim());
-          if (parsedOrigin) {
-            intent.provider = parsedOrigin.provider;
-            intent.repoSlug = parsedOrigin.slug;
-          }
-        } catch {
-          // No origin or command failed, that's ok
-        }
+    const root = await detectGitRoot(intent.path);
+    if (root) {
+      const canonicalRoot = await canonicalizePath(root);
+      intent.isGitRepository = true;
+      intent.gitRoot = canonicalRoot;
+      if (canonicalRoot !== intent.path) {
+        // Registering here would root a second project inside an existing repo,
+        // which is how you end up with two projects fighting over one checkout.
+        findings.push({
+          field: 'path',
+          code: 'repository-root-elsewhere',
+          message: `That folder is inside a Git repository rooted at ${canonicalRoot}. Add that folder instead.`,
+          detail: canonicalRoot,
+        });
+      }
 
-        try {
-          const { stdout: headBranch } = await execFileAsync(
-            'git',
-            ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'],
-            { cwd: intent.path, timeout: 5000 },
-          );
-          intent.defaultBranch = headBranch.trim().replace(/^origin\//, '');
-        } catch {
-          try {
-            const { stdout: currentBranch } = await execFileAsync(
-              'git',
-              ['rev-parse', '--abbrev-ref', 'HEAD'],
-              { cwd: intent.path, timeout: 5000 },
-            );
-            intent.defaultBranch = currentBranch.trim();
-          } catch {
-            // No branch, that's ok
-          }
+      const originUrl = await detectOriginUrl(intent.path);
+      if (originUrl) {
+        const parsedOrigin = parseRepoUrl(originUrl);
+        if (parsedOrigin) {
+          intent.provider = parsedOrigin.provider;
+          intent.repoSlug = parsedOrigin.slug;
         }
       }
-    } catch {
+      intent.defaultBranch = await detectDefaultBranch(intent.path);
+    } else {
+      // A plain folder is a perfectly good project; `new` mode's init is what
+      // would turn it into a repository, and existing mode must not do that.
       intent.isGitRepository = false;
     }
   }
 
-  // 5. Issue prefix
-  if (findings.length === 0 && intent.key) {
+  // 5. Issue prefix. Computed whenever a key exists so a prefix problem can open
+  // Options even while another field is still being fixed (D-3).
+  if (intent.key) {
     const proposed = (input.issuePrefix ?? key.toUpperCase().replace(/-/g, '').slice(0, 10)).trim();
     if (!/^[A-Z][A-Z0-9]{0,9}$/.test(proposed)) {
       findings.push({
         field: 'issuePrefix',
         code: 'issue-prefix-invalid',
-        message: 'Issue prefix must start with a letter and contain only uppercase letters and digits (max 10 chars).',
+        message:
+          'Issue prefix must start with a letter and contain only uppercase letters and digits (max 10 chars).',
         detail: proposed,
       });
     } else {
       intent.proposedIssuePrefix = proposed;
       const projectConfigs = await listProjectsAsync();
-      if (
-        projectConfigs.some(({ config }) => config.issue_prefix === proposed || config.issue_prefixes?.includes(proposed))
-      ) {
+      const taken = projectConfigs.some(
+        ({ key: otherKey, config }) =>
+          otherKey !== key &&
+          (config.issue_prefix === proposed || config.issue_prefixes?.includes(proposed)),
+      );
+      if (taken) {
         findings.push({
           field: 'issuePrefix',
           code: 'issue-prefix-taken',
@@ -491,16 +710,27 @@ export async function resolveProjectCreateIntent(
   }
 
   // 6. willCreateMainWorkspace
-  if (findings.length === 0 && intent.key) {
+  if (intent.key) {
     intent.willCreateMainWorkspace = getMainWorkspace(intent.key) === null;
   }
 
   return intent;
 }
 
-/** Build extras from resolved intent. */
-function buildExtras(intent: ResolvedProjectIntent) {
-  const extras: Record<string, string | object> = {};
+/**
+ * Build the detected configuration a fresh registration should carry (D-10).
+ *
+ * Typed as a `Pick` of `ProjectConfig` rather than a `Record<string, …>` so a
+ * future field cannot be spelled wrong on the way into `projects.yaml`, and so
+ * `name` and `path` — which registration owns — cannot be overwritten from here.
+ */
+export type ProjectRegistrationExtras = Pick<
+  ProjectConfig,
+  'tracker' | 'github_repo' | 'gitlab_repo' | 'issue_prefix' | 'workspace'
+>;
+
+function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
+  const extras: ProjectRegistrationExtras = {};
 
   if (intent.provider === 'github' && intent.repoSlug) {
     extras.tracker = 'github';
@@ -514,6 +744,8 @@ function buildExtras(intent: ResolvedProjectIntent) {
     extras.issue_prefix = intent.proposedIssuePrefix;
   }
 
+  // Only a branch we actually determined. A guessed `main` here would point
+  // every later workspace at a branch that may not exist.
   if (intent.defaultBranch) {
     extras.workspace = { default_branch: intent.defaultBranch };
   }

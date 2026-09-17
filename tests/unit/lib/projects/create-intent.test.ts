@@ -195,7 +195,9 @@ describe('resolveProjectCreateIntent', () => {
     execFileSync('git', ['init', '--quiet', '-b', 'main'], { cwd: dir });
 
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
-      if (cmd === 'git' && args[0] === 'remote') {
+      if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
+        cb(null, { stdout: `${dir}\n`, stderr: '' });
+      } else if (cmd === 'git' && args[0] === 'remote') {
         cb(null, { stdout: 'git@github.com:o/r.git\n', stderr: '' });
       } else if (cmd === 'git' && args[0] === 'symbolic-ref') {
         cb(new Error('Not a symbolic ref'));
@@ -214,13 +216,93 @@ describe('resolveProjectCreateIntent', () => {
     });
 
     expect(intent.isGitRepository).toBe(true);
+    expect(intent.gitRoot).toBe(realPathOf(dir));
     expect(intent.repoSlug).toBe('o/r');
     expect(intent.provider).toBe('github');
+    expect(intent.defaultBranch).toBe('main');
     expect(intent.findings).toHaveLength(0);
+  });
+
+  it('flags a subdirectory of a repository and offers its root (D-15)', async () => {
+    const root = makeProjectDir('repo-root');
+    const nested = join(root, 'packages', 'inner');
+    mkdirSync(nested, { recursive: true });
+
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
+        cb(null, { stdout: `${root}\n`, stderr: '' });
+      } else {
+        cb(new Error('Unknown command'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: nested,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    // Registering here would root a second project inside an existing checkout.
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({
+        field: 'path',
+        code: 'repository-root-elsewhere',
+        detail: realPathOf(root),
+      }),
+    );
+  });
+
+  it('detects a linked worktree, whose .git is a file not a directory (D-15)', async () => {
+    const dir = makeProjectDir('worktree');
+    writeFileSync(join(dir, '.git'), 'gitdir: /somewhere/.git/worktrees/wt\n');
+
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
+        cb(null, { stdout: `${dir}\n`, stderr: '' });
+      } else {
+        cb(new Error('no origin'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    // The old `.git.isDirectory()` check called this a plain folder.
+    expect(intent.isGitRepository).toBe(true);
+  });
+
+  it('reports an unknown default branch rather than inventing main', async () => {
+    const dir = makeProjectDir('detached');
+
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
+        cb(null, { stdout: `${dir}\n`, stderr: '' });
+      } else if (cmd === 'git' && args[0] === 'rev-parse') {
+        cb(null, { stdout: 'HEAD\n', stderr: '' }); // detached
+      } else {
+        cb(new Error('no origin/HEAD'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    // Writing a guessed `main` would send every later workspace at a dead branch.
+    expect(intent.defaultBranch).toBeNull();
   });
 
   it('detects non-git directory in existing mode', async () => {
     const dir = makeProjectDir('no-git');
+    execFileMock.mockImplementation((cmd, args, opts, cb) => cb(new Error('not a git repository')));
 
     const intent = await resolveProjectCreateIntent({
       mode: 'existing',
@@ -260,11 +342,33 @@ describe('resolveProjectCreateIntent', () => {
       homeDir: TEST_HOME,
     });
 
+    // Same canonical path: this is the same project, so offer to open or repair
+    // it rather than arguing that the name is taken.
     expect(intent2.findings).toContainEqual(
-      expect.objectContaining({
-        code: 'project-exists',
-      }),
+      expect.objectContaining({ code: 'project-exists-here' }),
     );
+    expect(intent2.registeredKeyAtPath).toBe('my-proj');
+  });
+
+  it('reports a key registered at a different path as a genuine conflict', async () => {
+    const elsewhere = makeProjectDir('elsewhere');
+    writeFileSync(
+      PROJECTS_CONFIG_FILE,
+      `projects:\n  taken-name:\n    name: taken-name\n    path: ${elsewhere}\n`,
+    );
+    invalidateProjectsConfigCache();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'taken-name',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({ code: 'project-exists' }),
+    );
+    expect(intent.registeredKeyAtPath).toBeNull();
   });
 
   it('returns issue-prefix-invalid finding for bad prefix', async () => {
@@ -547,9 +651,10 @@ describe('resolveProjectCreateIntent', () => {
     expect(callCount).toBe(1);
 
     // Past it, the URL is probed again instead of staying pinned as unreachable.
-    // Fake timers so the TTL is crossed by advancing the clock, never by sleeping.
-    vi.useFakeTimers();
-    vi.advanceTimersByTime(6_000);
+    // Fake only Date: the memo TTL is a clock comparison, and faking the task
+    // queues as well would stall the async `realpath` calls resolve now makes.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 6_000);
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         callCount++;
@@ -562,6 +667,123 @@ describe('resolveProjectCreateIntent', () => {
     expect(callCount).toBe(2);
     expect(recovered.defaultBranch).toBe('main');
     vi.useRealTimers();
+  });
+
+  describe('server-resolved defaults (D-4)', () => {
+    it('returns homeDir and a default parentDir before the form can validate', async () => {
+      // An empty clone form still has to show where files would land; a missing
+      // URL is not a reason to hide the destination.
+      const intent = await resolveProjectCreateIntent({
+        mode: 'clone',
+        url: '',
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.homeDir).toBe(realPathOf(TEST_HOME));
+      expect(intent.parentDir).toBe(join(realPathOf(TEST_HOME), 'Projects'));
+      expect(intent.findings).toContainEqual(expect.objectContaining({ code: 'url-invalid' }));
+    });
+
+    it('expands ~ and ~/sub against the server home, not the browser', async () => {
+      const bare = await resolveProjectCreateIntent({
+        mode: 'new',
+        name: 'tilde',
+        parentDir: '~',
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+      expect(bare.parentDir).toBe(realPathOf(TEST_HOME));
+
+      const nested = await resolveProjectCreateIntent({
+        mode: 'new',
+        name: 'tilde',
+        parentDir: '~/Code',
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+      expect(nested.parentDir).toBe(join(realPathOf(TEST_HOME), 'Code'));
+      expect(nested.path).toBe(join(realPathOf(TEST_HOME), 'Code', 'tilde'));
+    });
+
+    it('rejects ~otheruser instead of writing into another account', async () => {
+      const intent = await resolveProjectCreateIntent({
+        mode: 'new',
+        name: 'nope',
+        parentDir: '~someoneelse/Projects',
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings).toContainEqual(
+        expect.objectContaining({ field: 'parentDir', code: 'path-not-absolute' }),
+      );
+    });
+
+    it('rejects a relative parent from a caller with no working directory', async () => {
+      const intent = await resolveProjectCreateIntent({
+        mode: 'new',
+        name: 'relative',
+        parentDir: 'some/where',
+        homeBoundary: true,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings).toContainEqual(
+        expect.objectContaining({ field: 'parentDir', code: 'path-not-absolute' }),
+      );
+    });
+
+    it('still accepts a relative path for the CLI, which does have a cwd', async () => {
+      const intent = await resolveProjectCreateIntent({
+        mode: 'new',
+        name: 'relative',
+        parentDir: 'some/where',
+        homeBoundary: false,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings.filter((f) => f.code === 'path-not-absolute')).toHaveLength(0);
+    });
+  });
+
+  describe('path accessibility findings (D-11)', () => {
+    it('says a file is a file rather than reporting it as missing', async () => {
+      const filePath = join(TEST_HOME, 'a-file.txt');
+      writeFileSync(filePath, 'not a directory');
+
+      const intent = await resolveProjectCreateIntent({
+        mode: 'existing',
+        path: filePath,
+        homeBoundary: false,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings).toContainEqual(
+        expect.objectContaining({ field: 'path', code: 'path-not-a-directory' }),
+      );
+      expect(intent.findings[0].message).toMatch(/is a file/i);
+    });
+
+    it('reports a file in the middle of a path distinctly from a missing one', async () => {
+      // ENOTDIR, not ENOENT: an ancestor is a regular file. "Directory not found"
+      // would send the operator to create something that can never exist there.
+      const blocker = join(TEST_HOME, 'blocker.txt');
+      writeFileSync(blocker, 'a file, not a directory');
+
+      const intent = await resolveProjectCreateIntent({
+        mode: 'existing',
+        path: join(blocker, 'inside'),
+        homeBoundary: false,
+        homeDir: TEST_HOME,
+      });
+
+      expect(intent.findings).toContainEqual(
+        expect.objectContaining({ field: 'path', code: 'path-not-a-directory' }),
+      );
+      expect(intent.findings[0].message).toMatch(/is a file, so it cannot contain/i);
+    });
+
   });
 
   it('promptGuardGitEnv sets correct environment variables', () => {
