@@ -35,7 +35,7 @@
 - Every state domain has **one read door and one write door**; never touch stores directly. [docs/API-SURFACE.md](docs/API-SURFACE.md)
 - The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md)
 - The post-merge lifecycle runs **at most once per merge** — keep `tests/unit/lib/cloister/in-flight-guard.test.ts` green. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
-- `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; three shipped subagents hardcode `model: haiku` (breaks on CLIProxy-routed models — prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
+- `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Pipeline membership, decisions, and workspace tables each have a canonical resolver — never derive independently. [docs/PIPELINE-MEMBERSHIP.md](docs/PIPELINE-MEMBERSHIP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md)
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
 

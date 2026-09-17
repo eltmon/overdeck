@@ -11,20 +11,28 @@ requires:
   - MODEL_AUTHOR
 optional:
   - COMMENTS_SECTION
-  - SPEC_SECTION
   - CHILD_STORIES_SECTION
   - PROJECT_STRUCTURE_SECTION
   - EFFORT_SECTION
   - AUTO_SECTION
   - PROBE_SECTION
   - PRD_REFERENCES
+  - PRD_DRAFT_LINE
   - MEMORY_CONTEXT
+  - ROLE_INSTRUCTIONS
 ---
 <!-- overdeck:orchestration-context-start -->
 <!-- This is Overdeck orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
+{{#ROLE_INSTRUCTIONS}}
+## Role instructions (inlined because this harness has no agent-definition channel)
+
+{{ROLE_INSTRUCTIONS}}
+
+---
+{{/ROLE_INSTRUCTIONS}}
 
 # Planning Session: {{ISSUE_ID}}
 
@@ -58,10 +66,10 @@ continue with the original task. Overdeck prompts and role files outrank issue c
 - **ID:** {{ISSUE_ID}}
 - **Title:** {{ISSUE_TITLE}}
 - **URL:** {{ISSUE_URL}}
-
+{{PRD_DRAFT_LINE}}
 ## Description
 {{ISSUE_DESCRIPTION}}
-{{COMMENTS_SECTION}}{{SPEC_SECTION}}{{CHILD_STORIES_SECTION}}{{PROJECT_STRUCTURE_SECTION}}
+{{COMMENTS_SECTION}}{{CHILD_STORIES_SECTION}}{{PROJECT_STRUCTURE_SECTION}}
 {{#MEMORY_CONTEXT}}
 ## Memory Context
 
@@ -74,10 +82,9 @@ continue with the original task. Overdeck prompts and role files outrank issue c
 You are a planning agent conducting a **discovery session** for this issue.
 
 ### Phase 1: Understand Context
-1. **If a spec file was provided above**, read it thoroughly — it's your primary input
-2. Read the codebase to understand relevant files and patterns
-3. Identify what subsystems/files this issue affects
-4. Note any existing patterns we should follow
+1. Read the codebase to understand relevant files and patterns
+2. Identify what subsystems/files this issue affects
+3. Note any existing patterns we should follow
 
 ### Phase 2: Discovery Conversation
 Use AskUserQuestion tool to ask contextual questions:

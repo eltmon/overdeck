@@ -40,6 +40,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getIssueDraftPath } from '../pan-dir/drafts.js';
 import {
   appendSessionEntrySync,
   getIssueRecordPath,
@@ -89,35 +90,6 @@ async function getPackageVersion(): Promise<string> {
   } catch {
     return '0.0.0';
   }
-}
-
-/**
- * Discover PRD files matching an issue ID from docs/prds directories.
- * Returns list of { path, label } for use in references template.
- */
-async function discoverPrdFiles(workspacePath: string, issueId: string): Promise<Array<{ path: string; label: string }>> {
-  const issueLower = issueId.toLowerCase();
-  const searchDirs = [
-    join(workspacePath, 'docs', 'prds', 'planned'),
-    join(workspacePath, 'docs', 'prds', 'active'),
-    // Also check two levels up (worktrees)
-    join(workspacePath, '..', '..', 'docs', 'prds', 'planned'),
-    join(workspacePath, '..', '..', 'docs', 'prds', 'active'),
-  ];
-
-  const found: Array<{ path: string; label: string }> = [];
-  for (const dir of searchDirs) {
-    if (!existsSync(dir)) continue;
-    try {
-      const files = await readdir(dir);
-      for (const file of files) {
-        if (file.toLowerCase().includes(issueLower)) {
-          found.push({ path: join(dir, file), label: file });
-        }
-      }
-    } catch { /* ignore read errors */ }
-  }
-  return found;
 }
 
 const execAsync = promisify(exec);
@@ -242,11 +214,26 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = ''): Promise<string> {
+/**
+ * Read the plan role definition and strip its YAML frontmatter. Harnesses
+ * without an agent-definition channel (everything but claude-code) never see
+ * `roles/plan.md`, so the role body is inlined into the planning message as
+ * the ROLE_INSTRUCTIONS template var.
+ */
+async function readRoleInstructionsBody(): Promise<string> {
+  const raw = await readFile(roleAgentDefinitionPath('plan'), 'utf-8');
+  const match = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  return (match ? raw.slice(match[0].length) : raw).trim();
+}
+
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = '', harness?: RuntimeName): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
-  const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
-  const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
+  if (!planningModel) throw new Error('buildPlanningPrompt: planningModel is required (resolved by roles.plan.model)');
+  const modelAuthor = `agent:${planningModel}`;
+  const roleInstructions = harness && harness !== 'claude-code'
+    ? await readRoleInstructionsBody()
+    : '';
 
   // Build comments section
   let commentsSection = '';
@@ -259,38 +246,6 @@ export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: s
         return `### ${c.author} (${date}):\n${body}`;
       });
     commentsSection = `\n## Issue Comments\n\n**IMPORTANT: Read these comments carefully — they contain context, decisions, and references to previous work.**\n\n${commentLines.join('\n\n---\n\n')}\n`;
-  }
-
-  // Check for spec file
-  let specSection = '';
-  const specSearchDirs = [
-    join(workspacePath, 'docs', 'prds', 'active'),
-    join(workspacePath, '..', '..', 'docs', 'prds', 'active'),
-  ];
-  for (const specDir of specSearchDirs) {
-    if (!existsSync(specDir)) continue;
-    try {
-      const files = await readdir(specDir);
-      const specFile = files.find(f =>
-        f.toLowerCase().includes(issueLower) && f.endsWith('-spec.md')
-      );
-      if (specFile) {
-        const specContent = await readFile(join(specDir, specFile), 'utf-8');
-        specSection = `
-## Feature Spec (Human-Written)
-
-**A spec has been written for this feature.** This is your primary input — read it carefully before starting discovery.
-
-**File:** \`${join(specDir, specFile)}\`
-
-<spec>
-${specContent}
-</spec>
-
-`;
-        break;
-      }
-    } catch { /* ignore read errors */ }
   }
 
   // Check for polyrepo structure
@@ -345,8 +300,16 @@ ${effort === 'high'
 
 ` : '';
 
-  const prdReferences = prdFiles.length > 0
-    ? `,\n      ${prdFiles.map(p => `{ "uri": "${p.path}", "label": "${p.label}", "type": "prd" }`).join(',\n      ')}`
+  // Canonical PRD reference: the draft lives at drafts/<issue-lower>.md on
+  // overdeck-state (through the draft write door). Reference it — never
+  // inline it; the role instructions tell the agent to read it.
+  const prdPath = projectConfig ? getIssueDraftPath(projectConfig.path, issue.identifier) : null;
+  const prdExists = prdPath !== null && existsSync(prdPath);
+  const prdReferences = prdExists
+    ? `,\n      { "uri": "${prdPath}", "label": "PRD draft (drafts/${issueLower}.md on overdeck-state)", "type": "prd" }`
+    : '';
+  const prdDraftLine = prdExists
+    ? `- **PRD draft:** ${prdPath}\n`
     : '';
 
   const autoSection = auto ? `
@@ -386,14 +349,15 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
       VERSION: version,
       MODEL_AUTHOR: modelAuthor,
       COMMENTS_SECTION: commentsSection,
-      SPEC_SECTION: specSection,
       CHILD_STORIES_SECTION: childStoriesSection,
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
       AUTO_SECTION: autoSection,
       PROBE_SECTION: probeSection,
       PRD_REFERENCES: prdReferences,
+      PRD_DRAFT_LINE: prdDraftLine,
       MEMORY_CONTEXT: memoryContext,
+      ROLE_INSTRUCTIONS: roleInstructions,
     },
   }));
 }
@@ -581,27 +545,12 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
-    // Discover and copy PRD files to workspace
-    const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
-    if (prdFiles.length > 0) {
-      const prdDestPath = join(workspacePanPaths.panDir, 'prd.md');
-      if (!existsSync(prdDestPath)) {
-        try {
-          const prdContent = await readFile(prdFiles[0].path, 'utf-8');
-          await writeFile(prdDestPath, prdContent, 'utf-8');
-          console.log(`[start-planning] Copied PRD to ${prdDestPath} from ${prdFiles[0].path}`);
-        } catch (err: any) {
-          console.warn(`[start-planning] Could not copy PRD: ${err.message}`);
-        }
-      }
-    }
-
-    progress(3, 'Loading specs & PRDs', prdFiles.length > 0 ? prdFiles[0].label : 'No PRDs found', 'complete');
+    progress(3, 'Loading specs & PRDs', 'PRD comes from the canonical draft path', 'complete');
 
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, '', effectiveHarness);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
       prompt: planningPrompt,
       issueId: issue.identifier,
@@ -611,7 +560,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       harness: effectiveHarness,
     });
     if (memoryContext) {
-      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext, effectiveHarness);
     }
 
     // Capture planning prompt in per-issue record (PAN-1919: replaces workspace continue.json).

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
@@ -184,15 +184,27 @@ describe('role definitions', () => {
   // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See
   // docs/MERGE-WORKFLOW.md for the new two-actor design.
 
-  it('keeps legacy pan plan/work/review/inspect/test/uat/merge agent definitions until spawn migration deletes them', () => {
+  it('keeps legacy pan work/review/inspect/test/uat/merge agent definitions until spawn migration deletes them', () => {
     // Check sync-sources/agents/ (the committed source); .claude/agents/ is gitignored and populated by pan install.
-    expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-planning-agent.md'))).toBe(true);
+    // Planning has no agent definition: Cloister launches roles/plan.md (runtime-command.ts).
+    expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-planning-agent.md'))).toBe(false);
+    expect(existsSync(join(process.cwd(), 'sync-sources/agents/planning-agent.md'))).toBe(false);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-work-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-review-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-inspect-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-test-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-uat-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-merge-agent.md'))).toBe(true);
+  });
+
+  it('pins no model in any shipped agent definition', () => {
+    // Claude Code subagents without `model:` inherit the parent session's
+    // model, which is what Cloister routing wants.
+    for (const file of readdirSync(join(process.cwd(), 'sync-sources/agents'))) {
+      if (!file.endsWith('.md')) continue;
+      const { frontmatter } = splitFrontmatter(readRepoFile(`sync-sources/agents/${file}`));
+      expect(frontmatter.model).toBeUndefined();
+    }
   });
 
   // Convoy sub-role prompt templates are harness-agnostic — no YAML frontmatter,

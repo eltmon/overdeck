@@ -1,7 +1,6 @@
 ---
 name: codebase-explorer
 description: Fast read-only codebase exploration and architecture discovery
-model: haiku
 tools:
   - Read
   - Grep
@@ -488,7 +487,7 @@ When exploration is complete, provide:
 ## Remember
 
 - You're **read-only** - no modifications
-- Be **fast** - use haiku model for speed
+- Be **fast** - favor speed over exhaustive reads
 - Be **thorough** - but don't read every file
 - Be **accurate** - verify findings
 - Be **helpful** - answer the actual question

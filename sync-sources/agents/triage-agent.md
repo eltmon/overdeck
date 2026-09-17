@@ -1,7 +1,6 @@
 ---
 name: triage-agent
 description: Categorizes and prioritizes issues with complexity estimation
-model: haiku
 tools:
   - Read
   - Grep

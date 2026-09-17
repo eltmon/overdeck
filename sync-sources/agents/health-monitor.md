@@ -1,7 +1,6 @@
 ---
 name: health-monitor
 description: Monitors agent health, detects stuck agents, analyzes logs
-model: haiku
 tools:
   - Bash
   - Read
