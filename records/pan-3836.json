@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:54:38.617Z",
+  "updated": "2026-09-17T02:09:44.402Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 63,
-    "claims": {
-      "use-project-create-intent-hook": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 578792,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:54:38.616Z"
-      }
-    },
+    "sequence": 64,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -952,6 +944,17 @@
         "outcome": "completed",
         "reason": "WI-2.3-2.6: cancel, reconcile (read-only) and finish-setup routes in project-create-routes.ts; resolve returns the redacted public intent; job poll carries structured failure plus legacy error. Commit 69079096aa3.",
         "releasedAt": "2026-09-17T01:53:26.048Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 578792,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:54:38.616Z",
+        "itemId": "use-project-create-intent-hook",
+        "outcome": "completed",
+        "reason": "WI-4 hook: discriminated submission state, operation correlation with synchronous submit guard, 750ms poll with 1/2/4/8/8s backoff then Check again, 404->reconcile once, cancel, sessionStorage observation, overrides vs proposals. The HTTP 503 regression is a real-hook test. Commit c870fae1f4e.",
+        "releasedAt": "2026-09-17T02:09:44.401Z"
       }
     ],
     "statusReasons": {
@@ -988,8 +991,8 @@
         "updatedAt": "2026-09-17T01:53:16.157Z"
       },
       "use-project-create-intent-hook": {
-        "reason": "WI-4 revised: discriminated submission state, overrides vs proposals, operation correlation, poll retry ladder, cancel, sessionStorage observation",
-        "updatedAt": "2026-09-17T01:54:35.372Z"
+        "reason": "WI-4 hook: discriminated submission state, operation correlation with synchronous submit guard, 750ms poll with 1/2/4/8/8s backoff then Check again, 404->reconcile once, cancel, sessionStorage observation, overrides vs proposals. The HTTP 503 regression is a real-hook test. Commit c870fae1f4e.",
+        "updatedAt": "2026-09-17T02:09:44.401Z"
       },
       "new-project-page": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-7, WI-5 rows 3 and 5]: NewProjectPage.tsx replaced the modal's FolderPicker directory browsing with bare text inputs. Mount FolderPicker (as NewWorkspacePage does) for the existing-mode path and the clone/new parent directory, feeding setPath/setParentDir; add data-testid=new-project-name-input to the name input. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -1058,12 +1061,12 @@
     "cli-project-clone.ac2": "completed",
     "cli-project-clone.ac3": "completed",
     "cli-project-clone.ac4": "completed",
-    "use-project-create-intent-hook": "running",
-    "use-project-create-intent-hook.ac1": "pending",
-    "use-project-create-intent-hook.ac2": "pending",
-    "use-project-create-intent-hook.ac3": "pending",
-    "use-project-create-intent-hook.ac4": "pending",
-    "use-project-create-intent-hook.ac5": "pending",
+    "use-project-create-intent-hook": "completed",
+    "use-project-create-intent-hook.ac1": "completed",
+    "use-project-create-intent-hook.ac2": "completed",
+    "use-project-create-intent-hook.ac3": "completed",
+    "use-project-create-intent-hook.ac4": "completed",
+    "use-project-create-intent-hook.ac5": "completed",
     "new-project-page": "pending",
     "new-project-page.ac1": "pending",
     "new-project-page.ac2": "pending",
