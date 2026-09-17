@@ -18,6 +18,12 @@ vi.mock('util', async () => {
   return { ...actual, promisify: () => mockExecAsync };
 });
 
+
+/** Matches both exec shell strings and execFile argv vectors for `git worktree add`. */
+const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
+  (typeof command === 'string' && command.includes('git worktree add'))
+  || (command === 'git' && Array.isArray(args) && args[0] === 'worktree' && args[1] === 'add');
+
 import { createWorkspacePromise } from '../../../../src/lib/workspace-manager/create.js';
 import { getWorkspaceForIssue, getProjectByPath } from '../../../../src/lib/workspaces/resolver.js';
 import { upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
@@ -43,8 +49,8 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
 
     let rowExistedDuringWorktreeAdd: boolean | null = null;
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (typeof command === 'string' && command.includes('git worktree add')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
         rowExistedDuringWorktreeAdd = getWorkspaceForIssue('PAN-2050') !== null;
       }
       return { stdout: '', stderr: '' };
@@ -97,8 +103,8 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
       expect(getProjectByPath(tempDir)).toBeNull();
 
       let rowExistedDuringWorktreeAdd: boolean | null = null;
-      mockExecAsync.mockImplementation(async (command: string) => {
-        if (typeof command === 'string' && command.includes('git worktree add')) {
+      mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+        if (isWorktreeAddCall(command, args)) {
           rowExistedDuringWorktreeAdd = getWorkspaceForIssue('PAN-4000') !== null;
         }
         return { stdout: '', stderr: '' };
@@ -132,8 +138,8 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
 
   it('deletes the pre-created workspace row when git worktree add fails (non-blocking review fix)', async () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (typeof command === 'string' && command.includes('git worktree add')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
         throw new Error('fatal: could not create worktree');
       }
       return { stdout: '', stderr: '' };
@@ -152,8 +158,8 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
 
   it('keeps the workspace row when a failure occurs AFTER the worktree already exists on disk (cycle-3 review fix)', async () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (typeof command === 'string' && command.includes('git worktree add')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
         // Real git isn't run in this mocked harness, so the worktree
         // directory itself must exist for later steps to run inside it.
         const { mkdirSync } = await import('node:fs');
@@ -181,8 +187,10 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
 
   it('keeps the workspace row for a partial polyrepo failure (repo A created, repo B fails) (cycle-4 review fix)', async () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (typeof command === 'string' && command.includes('git worktree add') && command.includes('repo-b')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      const mentionsRepoB = String(command).includes('repo-b')
+        || (Array.isArray(args) && args.some((a) => String(a).includes('repo-b')));
+      if (isWorktreeAddCall(command, args) && mentionsRepoB) {
         throw new Error('fatal: repo-b worktree failed');
       }
       return { stdout: '', stderr: '' };

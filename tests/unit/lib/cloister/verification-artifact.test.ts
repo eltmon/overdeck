@@ -158,4 +158,22 @@ describe('immutable per-run verification artifacts (PAN-3847)', () => {
     // Missing directory is a no-op.
     expect(pruneVerificationRunArtifacts(join(workspace, 'nonexistent-ws'), now)).toBe(0);
   });
+
+  it('a terminal write without head8 still gets an immutable per-run file (PR #3872 finding 5)', () => {
+    const artifact = writeVerificationArtifact(workspace, 'PAN-8', [
+      gate({ name: 'test', passed: false, output: 'failure evidence', error: 'exit 1' }),
+    ], { ranAt: '2026-09-17T03:00:00.000Z' });
+
+    expect(artifact.path).toBe(
+      join(workspace, '.overdeck', 'verification', '2026-09-17T03-00-00-000Z-unknown-head.json'),
+    );
+    expect(existsSync(artifact.path!)).toBe(true);
+    // The latest copy matches, and the failed gate's output survives in both.
+    const perRun = JSON.parse(readFileSync(artifact.path!, 'utf-8'));
+    const latest = JSON.parse(readFileSync(verificationArtifactPath(workspace), 'utf-8'));
+    for (const doc of [perRun, latest]) {
+      expect(doc.gates[0].output).toBe('failure evidence');
+      expect(doc.outcome).toBe('failed');
+    }
+  });
 });

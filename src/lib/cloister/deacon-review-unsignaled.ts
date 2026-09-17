@@ -14,11 +14,30 @@ import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import { recordReviewVerdict } from './review-verdict-writer.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
+import { readHeadEvidenceAsync } from './synthesis-verdict.js';
 import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
 
 // ============================================================================
 // Stuck review detection (PAN-733)
 // ============================================================================
+
+/**
+ * PR #3872 finding 2: the auto-complete anchors the verdict to the review RUN's
+ * spawn-time head (its context.json), never to the recovery-time workspace head —
+ * the report only covers the run's anchor. Returns null when the auto-complete
+ * must be skipped: the run has no anchor, or the workspace head moved past it.
+ */
+async function reviewRunAnchorForAutoComplete(
+  issueId: string,
+  runDir: string,
+  wsPath: string,
+): Promise<HeadAnchor | null> {
+  const runAnchor = await readHeadEvidenceAsync(runDir).catch(() => undefined);
+  if (!runAnchor) return null;
+  const currentHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
+  if (!currentHead || currentHead !== runAnchor) return null;
+  return runAnchor as HeadAnchor;
+}
 
 /**
  * Detect issues stuck in `reviewing` status with no active review session.
@@ -423,9 +442,10 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
         if (lastNudged) {
           const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`;
-          // PAN-3847: the verdict door refuses anchorless verdicts — snapshot the workspace head.
-          const evidenceHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
-          if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: no workspace head snapshot available`); continue; }
+          // PR #3872 finding 2: anchor to the review RUN's head (context.json) —
+          // the report covers that head, not the recovery-time workspace head.
+          const evidenceHead = await reviewRunAnchorForAutoComplete(issueId, latestDir, wsPath);
+          if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: workspace head no longer matches the review-run anchor (or the run has none)`); continue; }
           const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
           if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
           actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
@@ -453,9 +473,10 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       } else {
         // Session is dead — auto-complete so the pipeline isn't blocked
         const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`;
-        // PAN-3847: the verdict door refuses anchorless verdicts — snapshot the workspace head.
-        const evidenceHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
-        if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: no workspace head snapshot available`); continue; }
+        // PR #3872 finding 2: anchor to the review RUN's head (context.json) —
+        // the report covers that head, not the recovery-time workspace head.
+        const evidenceHead = await reviewRunAnchorForAutoComplete(issueId, latestDir, wsPath);
+        if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: workspace head no longer matches the review-run anchor (or the run has none)`); continue; }
         const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
         if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
         actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
