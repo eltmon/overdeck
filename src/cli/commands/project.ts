@@ -18,9 +18,112 @@ import { registerProjectFromPath, installGitHooksInDir, DuplicateProjectError } 
 import { addProjectTarget, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
 import {
   resolveProjectCreateIntent,
-  performProjectCreate,
+  toPublicProjectIntent,
+  ProjectCreateFailureError,
   type ProjectCreateInput,
+  type ProjectCreateProgress,
+  type ResolvedProjectIntent,
 } from '../../lib/projects/create.js';
+import { performProjectCreate, finishProjectSetup } from '../../lib/projects/create-perform.js';
+import type { ProjectCreateFailure } from '../../lib/projects/create-errors.js';
+
+/**
+ * Print findings and exit non-zero.
+ *
+ * A finding means nothing was created, so the command has failed — returning 0
+ * here let `pan project clone <bad-url>` succeed from a script's point of view.
+ */
+async function reportFindingsAndExit(intent: ResolvedProjectIntent): Promise<never> {
+  console.error(chalk.yellow('\nValidation issues:'));
+  for (const finding of intent.findings) {
+    console.error(chalk.red(`  ✗ ${finding.field}: ${finding.message}`));
+    if (finding.detail) console.error(chalk.dim(`    ${finding.detail}`));
+  }
+  console.error('');
+  return exitCli(1);
+}
+
+/**
+ * Print the resolved intent as one JSON document on stdout and nothing else.
+ *
+ * `--dry-run` exists to be piped into `jq`, so decorated prose defeats it. The
+ * public projection is used so a credential-bearing transport URL is redacted.
+ */
+function printDryRun(intent: ResolvedProjectIntent): void {
+  console.log(JSON.stringify(toPublicProjectIntent(intent), null, 2));
+}
+
+/** Report a typed failure, with its repair command when there is one. */
+async function reportFailureAndExit(failure: ProjectCreateFailure): Promise<never> {
+  console.error('');
+  console.error(chalk.red(`✗ ${failure.message}`));
+  if (failure.detail) console.error(chalk.dim(failure.detail));
+  if (failure.recovery?.action === 'finish-setup') {
+    // The repository is on disk and registered; creating again would clone a
+    // second copy or hit the duplicate guard. Name the one command that works.
+    console.error('');
+    console.error(chalk.dim(`  Repair with: pan project finish-setup ${failure.recovery.key}`));
+  } else if (failure.recovery?.action === 'use-existing') {
+    console.error('');
+    console.error(chalk.dim(`  Add the existing folder: pan project add ${failure.recovery.path}`));
+  }
+  console.error('');
+  return exitCli(failure.code === 'cancelled' ? 130 : 1);
+}
+
+/**
+ * Run a clone with SIGINT wired to a real abort.
+ *
+ * Ctrl-C has to stop the child and let cleanup settle before the process exits,
+ * or it leaves a half-written directory behind. The previous listeners are
+ * restored afterwards so a CLI test does not inherit a process-global handler.
+ */
+async function withInterruptibleClone<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const previous = process.listeners('SIGINT');
+  const onInterrupt = (): void => {
+    process.stderr.write('\nCancelling…\n');
+    controller.abort();
+  };
+
+  process.removeAllListeners('SIGINT');
+  process.on('SIGINT', onInterrupt);
+  try {
+    return await run(controller.signal);
+  } finally {
+    process.removeListener('SIGINT', onInterrupt);
+    for (const listener of previous) {
+      process.on('SIGINT', listener as NodeJS.SignalsListener);
+    }
+  }
+}
+
+/** Stream clone progress to stderr so stdout stays machine-readable. */
+function writeProgress(progress: ProjectCreateProgress): void {
+  if (progress.percent !== null) {
+    process.stderr.write(`\r${progress.phase}: ${progress.percent}%`);
+  } else {
+    process.stderr.write(`\r${progress.phase}…`);
+  }
+}
+
+/** Report a completed creation, including the metadata registration produced. */
+function reportCreated(
+  verb: string,
+  result: { key: string; name: string; path: string; seededContextLayer: boolean; hooksInstalled: number },
+): void {
+  console.log(chalk.green(`✓ ${verb}: ${result.name}`));
+  console.log(chalk.dim(`  Key: ${result.key}`));
+  console.log(chalk.dim(`  Path: ${result.path}`));
+  if (result.hooksInstalled > 0) {
+    console.log(chalk.dim(`  Installed ${result.hooksInstalled} git hook(s) for branch protection`));
+  }
+  if (result.seededContextLayer) {
+    console.log(chalk.dim('  Context layer: .overdeck/context/project.md (commit this)'));
+  }
+}
 
 interface AddOptions {
   name?: string;
@@ -61,32 +164,35 @@ export async function projectAddCommand(
     mode: 'existing',
     path: fullPath,
     name: options.name,
-    issuePrefix: linearTeam,
+    // A team read from .pan/project.toml may be lower case, and the prefix rule
+    // is uppercase. Rejecting the add over that would regress a flag that has
+    // always worked.
+    issuePrefix: linearTeam ? linearTeam.toUpperCase() : undefined,
     homeBoundary: false, // CLI does not enforce home directory boundary
   };
 
   const intent = await resolveProjectCreateIntent(input);
 
-  // Show findings if there are any
-  if (intent.findings.length > 0) {
-    console.log(chalk.yellow('\nValidation issues:'));
-    for (const finding of intent.findings) {
-      console.log(chalk.red(`  ✗ ${finding.field}: ${finding.message}`));
-      if (finding.detail) {
-        console.log(chalk.dim(`    ${finding.detail}`));
-      }
-    }
+  const alreadyHere = intent.findings.find((f) => f.code === 'project-exists-here');
+  if (alreadyHere) {
+    // Same folder, same key: this *is* the project, not a name collision, so
+    // point at the two things the operator can actually do with it.
+    console.log(chalk.yellow(`\nAlready registered as '${intent.registeredKeyAtPath}': ${intent.path}`));
+    console.log(chalk.dim(`  Open it:   pan project show ${intent.registeredKeyAtPath}`));
+    console.log(chalk.dim(`  Repair it: pan project finish-setup ${intent.registeredKeyAtPath}`));
     console.log('');
     return;
   }
 
-  // Step 2: Dry-run mode - stop after validation
+  if (intent.findings.length > 0) {
+    await reportFindingsAndExit(intent);
+    return;
+  }
+
+  // Step 2: Dry run stops here having created nothing — no directory, no
+  // registration, no context layer, no hooks.
   if (options.dryRun) {
-    console.log(chalk.blue('\n✓ Validation passed (dry-run mode)'));
-    console.log(chalk.dim(`  Key: ${intent.key}`));
-    console.log(chalk.dim(`  Path: ${intent.path}`));
-    console.log(chalk.dim(`  Name: ${intent.name}`));
-    console.log('');
+    printDryRun(intent);
     return;
   }
 
@@ -94,12 +200,25 @@ export async function projectAddCommand(
   let regResult: Awaited<ReturnType<typeof registerProjectFromPath>>;
   try {
     const result = await performProjectCreate(intent);
-    regResult = { key: result.key, config: { name: result.name, path: result.path }, hooksInstalled: 0, seededContextLayer: false };
+    // The real written config, not a stub: the spread below replaces the whole
+    // entry, so a hand-built { name, path } would silently drop the detected
+    // tracker, repo slug and default branch that registration just wrote.
+    const written = getProjectSync(result.key);
+    regResult = {
+      key: result.key,
+      config: written ?? { name: result.name, path: result.path },
+      hooksInstalled: result.hooksInstalled,
+      seededContextLayer: result.seededContextLayer,
+    };
   } catch (err) {
     if (err instanceof DuplicateProjectError) {
       console.log(chalk.yellow(`Project already registered with key: ${err.key}`));
       console.log(chalk.dim(`Existing path: ${err.existingPath}`));
       console.log(chalk.dim(`To update, first run: pan project remove ${err.key}`));
+      return;
+    }
+    if (err instanceof ProjectCreateFailureError) {
+      await reportFailureAndExit(err.failure);
       return;
     }
     throw err;
@@ -122,7 +241,7 @@ export async function projectAddCommand(
     console.log(chalk.dim('  Context layer: .overdeck/context/project.md (commit this)'));
   }
   if (linearTeam) {
-    console.log(chalk.dim(`  Linear team: ${linearTeam}`));
+    console.log(chalk.dim(`  Linear team: ${linearTeam.toUpperCase()}`));
   }
   if (options.rallyProject) {
     console.log(chalk.dim(`  Rally project: ${options.rallyProject}`));
@@ -256,53 +375,80 @@ export async function projectCloneCommand(
 
   const intent = await resolveProjectCreateIntent(input);
 
-  // Show findings if there are any
   if (intent.findings.length > 0) {
-    console.log(chalk.yellow('\nValidation issues:'));
-    for (const finding of intent.findings) {
-      console.log(chalk.red(`  ✗ ${finding.field}: ${finding.message}`));
-      if (finding.detail) {
-        console.log(chalk.dim(`    ${finding.detail}`));
-      }
-    }
-    console.log('');
+    await reportFindingsAndExit(intent);
     return;
   }
 
-  // Step 2: Dry-run mode - stop after validation
+  // Dry run stops here having cloned nothing and written nothing.
   if (options.dryRun) {
-    console.log(chalk.blue('\n✓ Validation passed (dry-run mode)'));
-    console.log(chalk.dim(`  Key: ${intent.key}`));
-    console.log(chalk.dim(`  Clone URL: ${intent.cloneUrl}`));
-    console.log(chalk.dim(`  Target: ${intent.path}`));
-    console.log(chalk.dim(`  Repository: ${intent.repoSlug || '(unknown)'}`));
-    console.log('');
+    printDryRun(intent);
     return;
   }
 
   // Step 3: Perform the actual clone
   console.log('');
   try {
-    const result = await performProjectCreate(intent, {
-      onProgress: (progress) => {
-        if (progress.percent !== null) {
-          process.stderr.write(`\r${progress.phase}: ${progress.percent}%`);
-        } else {
-          process.stderr.write(`\r${progress.phase}...`);
-        }
-      },
-    });
+    const result = await withInterruptibleClone((signal) =>
+      performProjectCreate(intent, { onProgress: writeProgress, signal }),
+    );
 
     process.stderr.write('\n');
-    console.log(chalk.green(`✓ Cloned and registered: ${result.name}`));
-    console.log(chalk.dim(`  Key: ${result.key}`));
-    console.log(chalk.dim(`  Path: ${result.path}`));
+    reportCreated('Cloned and registered', result);
     console.log('');
   } catch (err) {
+    process.stderr.write('\n');
     if (err instanceof DuplicateProjectError) {
       console.log(chalk.yellow(`Project already registered with key: ${err.key}`));
       console.log(chalk.dim(`Existing path: ${err.existingPath}`));
       console.log(chalk.dim(`To update, first run: pan project remove ${err.key}`));
+      return;
+    }
+    if (err instanceof ProjectCreateFailureError) {
+      await reportFailureAndExit(err.failure);
+      return;
+    }
+    throw err;
+  }
+}
+
+interface FinishSetupOptions {
+  path?: string;
+}
+
+/**
+ * Repair a registered project whose setup did not finish.
+ *
+ * A thin wrapper over the shared idempotent helper: it never clones and never
+ * registers, so running it against an already-complete project is a no-op that
+ * reports the same result.
+ */
+export async function projectFinishSetupCommand(
+  key: string,
+  options: FinishSetupOptions = {},
+): Promise<void> {
+  const config = getProjectSync(key);
+  if (!config) {
+    console.error(chalk.red(`No project registered under '${key}'.`));
+    await exitCli(1);
+    return;
+  }
+
+  // `--path` is a consistency check, not a relocation: repairing the wrong
+  // project is worse than refusing to repair anything.
+  const expectedPath = options.path ? resolve(options.path) : config.path;
+
+  try {
+    const result = await finishProjectSetup({ key, expectedPath });
+    console.log('');
+    console.log(chalk.green(`✓ Setup complete: ${result.name}`));
+    console.log(chalk.dim(`  Key: ${result.key}`));
+    console.log(chalk.dim(`  Path: ${result.path}`));
+    console.log(chalk.dim(`  Main workspace: ${result.mainWorkspaceId}`));
+    console.log('');
+  } catch (err) {
+    if (err instanceof ProjectCreateFailureError) {
+      await reportFailureAndExit(err.failure);
       return;
     }
     throw err;
@@ -508,6 +654,12 @@ export function registerProjectCommands(command: Command): void {
     .option('--issue-prefix <prefix>', 'Issue prefix (default: derived from the name)')
     .option('--dry-run', 'Print the resolved intent as JSON and create nothing')
     .action(projectCloneCommand);
+
+  command
+    .command('finish-setup <key>')
+    .description('Finish setup for a registered project whose creation did not complete')
+    .option('--path <path>', 'Expected project path; refuses if it does not match the registration')
+    .action(projectFinishSetupCommand);
 
   command
     .command('list')
