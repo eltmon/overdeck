@@ -131,18 +131,18 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:00:06.983Z",
+  "updated": "2026-09-17T01:00:11.305Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:00:06.981Z",
+    "updatedAt": "2026-09-17T01:00:10.940Z",
     "reviewNotes": "P1: roles/retrospective.md:27 instructs 'pan records show' (CLI verb does not exist; pan show does not emit the listed record fields). Test pins the broken instruction. Fix exists in working tree — commit it. Auth and window checks pass; convergence gate does not apply (cycle 2).",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -150,6 +150,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "reviewedAtCommit": "1199e01ffef113ab3c9aa9498b9931123eb2c898",
     "lastVerifiedCommit": "1199e01ffef113ab3c9aa9498b9931123eb2c898",
+    "reviewRequestedAt": "2026-09-17T01:00:06.981Z",
     "reviewSpawnedAt": "2026-09-16T22:28:38.199Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -198,8 +199,7 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.467Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
-    "reviewRequestedAt": "2026-09-17T01:00:06.981Z"
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -270,9 +270,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 3994402,
-            "output": 100284,
-            "cacheRead": 53449216,
+            "input": 3995538,
+            "output": 102104,
+            "cacheRead": 53949440,
             "cacheWrite": 0
           }
         }
@@ -291,9 +291,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 7785291,
-          "output": 262345,
-          "cacheRead": 100028629,
+          "input": 7786427,
+          "output": 264165,
+          "cacheRead": 100528853,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -304,8 +304,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.4430924,
-        "pricingAsOf": "2026-09-16T22:55:47.531Z"
+        "usd": 36.4456164,
+        "pricingAsOf": "2026-09-17T01:00:10.973Z"
       }
     },
     "merges": [
@@ -314,7 +314,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3841",
