@@ -26,17 +26,17 @@
  * process and reports a dead agent alive.
  */
 
-import { execFileSync } from 'node:child_process';
-
 import { Effect } from 'effect';
 
 import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';
-import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentStateSync } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
-import { findAgentRuntimePidInSubtree } from './runtime-command.js';
+import {
+  findAgentRuntimePidInSubtree,
+  findAgentRuntimePidInSubtreeSync,
+} from './runtime-pid-probe.js';
 
 export type LivenessVerdict =
   | { alive: true; paneAlive: true; runtimePid?: number }
@@ -138,43 +138,6 @@ export function isAliveSync(agentId: string, deps: LivenessSyncDeps = {}): Liven
   return { alive: false, reason: 'runtime-missing' };
 }
 
-
-/**
- * Synchronous variant of runtime-command.ts's subtree walk, for
- * {@link isAliveSync}. Each node is a sync `ps`/`pgrep` exec — acceptable for
- * the lifecycle classifier's per-agent calls, never for a hot loop.
- */
-function findAgentRuntimePidInSubtreeSync(rootPid: string, harness: RuntimeName = 'claude-code'): number | null {
-  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
-  const queue: string[] = [rootPid];
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const pid = queue.shift()!;
-    if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
-    seen.add(pid);
-
-    try {
-      const name = execFileSync('ps', ['-p', pid, '-o', 'comm='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      if (matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
-    } catch {
-      continue;
-    }
-
-    try {
-      const kids = execFileSync('pgrep', ['-P', pid], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      for (const kid of kids.trim().split('\n').filter(Boolean)) {
-        queue.push(kid);
-      }
-    } catch {
-      // pgrep exits non-zero when there are no children — not an error.
-    }
-  }
-  return null;
-}
-
-function matchesHarnessProcess(name: string, expectedProcessNames: ReadonlySet<string>, harness: RuntimeName): boolean {
-  return expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'));
-}
 
 /**
  * The union of every activity signal, INCLUDING tmux `window_activity`.

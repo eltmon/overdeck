@@ -81,9 +81,13 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
   getRoleRuntimeBaseCommand: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
   getCodexAppServerStatus: mocks.getCodexAppServerStatus,
+  waitForPromptReady: vi.fn(),
+}));
+
+// PAN-3849: the liveness oracle's process probe lives in runtime-pid-probe.js.
+vi.mock('../../../../src/lib/agents/runtime-pid-probe.js', () => ({
   findAgentRuntimePidInSubtree: mocks.findAgentRuntimePidInSubtree,
   findAgentRuntimePidInSubtreeSync: vi.fn(() => null),
-  waitForPromptReady: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({

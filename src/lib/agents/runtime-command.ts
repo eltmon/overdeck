@@ -15,6 +15,7 @@ import type { RoleEffort } from '../config-yaml.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { findAgentRuntimePidInSubtree } from './runtime-pid-probe.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
@@ -89,49 +90,11 @@ function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
-function matchesHarnessProcess(name: string, expectedProcessNames: ReadonlySet<string>, harness: RuntimeName): boolean {
-  return expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'));
-}
-
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for the active agent
- * runtime. Returns the matching process's pid, null if the tree exists but no
- * match, null on any error.
- *
- * Used by sendAgentMessage zombie detection and the liveness oracle
- * (PAN-3849). pane_pid is the tmux pane's root process, which is bash for
- * work-agent launchers (`bash launcher.sh`) but can be the runtime directly
- * for specialists (`exec claude ...` / `exec pi ...`).
+ * True when the pane's process subtree contains the expected harness runtime.
+ * The walk lives in runtime-pid-probe.ts (PAN-3849) so the liveness oracle and
+ * its no-loss audit share one mockable boundary.
  */
-export async function findAgentRuntimePidInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<number | null> {
-  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
-  const queue: string[] = [rootPid];
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const pid = queue.shift()!;
-    if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
-    seen.add(pid);
-
-    try {
-      const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
-      const name = comm.trim();
-      if (matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
-    } catch {
-      continue;
-    }
-
-    try {
-      const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
-      for (const kid of kids.trim().split('\n').filter(Boolean)) {
-        queue.push(kid);
-      }
-    } catch {
-      // pgrep exits non-zero when there are no children — not an error.
-    }
-  }
-  return null;
-}
-
 export async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
   return (await findAgentRuntimePidInSubtree(rootPid, harness)) !== null;
 }

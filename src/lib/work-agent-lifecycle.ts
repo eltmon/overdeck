@@ -158,7 +158,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = sessionResetRequiredReason(agentId, agentOrIssueId);
@@ -263,7 +263,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = sessionResetRequiredReason(agentId, agentOrIssueId);

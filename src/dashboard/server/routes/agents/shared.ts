@@ -322,7 +322,7 @@ function buildStoppedAgentLifecycle(
     recommendedAction = 'start';
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
-      : `Agent ${agentId} is an orphaned stale record. Start Agent should create a fresh session.`;
+      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (canWarmResumeAfterHandoff) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
