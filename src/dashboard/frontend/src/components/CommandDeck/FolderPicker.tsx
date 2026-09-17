@@ -26,6 +26,13 @@ async function listDirs(path?: string): Promise<ListDirsResponse> {
   return res.json() as Promise<ListDirsResponse>;
 }
 
+/**
+ * Every button here declares `type="button"` (PAN-3836 D-21).
+ *
+ * The default is `type="submit"`, which is harmless while the picker floats on
+ * its own but submits the surrounding form the moment it is nested inside one —
+ * so navigating into a folder would create the project.
+ */
 export function FolderPicker({ onSelect, initialPath }: FolderPickerProps) {
   const [data, setData] = useState<ListDirsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +68,7 @@ export function FolderPicker({ onSelect, initialPath }: FolderPickerProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24 }}>
         {data?.parent != null && (
           <button
+            type="button"
             data-testid="folder-picker-up"
             onClick={() => navigate(data.parent ?? undefined)}
             style={{
@@ -89,8 +97,9 @@ export function FolderPicker({ onSelect, initialPath }: FolderPickerProps) {
           {data?.path ?? ''}
         </span>
         <button
+          type="button"
           data-testid="folder-picker-select"
-          disabled={!data}
+          disabled={!data || loading}
           onClick={() => { if (data) onSelect(data.path); }}
           style={{
             padding: '2px 10px',
@@ -131,6 +140,7 @@ export function FolderPicker({ onSelect, initialPath }: FolderPickerProps) {
           )}
           {data.entries.map((entry) => (
             <button
+              type="button"
               key={entry.path}
               data-testid="folder-picker-entry"
               data-path={entry.path}

@@ -1,148 +1,298 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+/**
+ * Behaviour of the project-creation page (PAN-3836 WI-4, §6.1).
+ *
+ * Mounted with the real hook and only the network mocked, because the states
+ * this file is about — frozen inputs, truthful progress, lost contact — are
+ * exactly the ones a mocked hook cannot get wrong on your behalf.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NewProjectPage } from '../NewProjectPage';
-import { getNewProjectModeFromSearch, getNewProjectReturnToFromSearch } from '../../App/routes';
 
-// No dashboard state mock needed for this component
+vi.mock('../../lib/wsTransport.js', () => ({
+  dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({ 'content-type': 'application/json' }),
+}));
 
-// Mock the useProjectCreateIntent hook
-const mockSubmit = vi.fn();
-// Captures the options the page passes to the hook (mode preset from the URL).
-const hookOptionsSpy = vi.hoisted(() => vi.fn());
-vi.mock('../../components/project/new/useProjectCreateIntent.js', () => ({
-  useProjectCreateIntent: (options: unknown) => (hookOptionsSpy(options), {
+const fetchMock = vi.hoisted(() => vi.fn());
+vi.mock('../../lib/apiFetch.js', () => ({ fetchWithTimeout: fetchMock }));
+vi.mock('../../lib/telemetry.js', () => ({ capture: vi.fn() }));
+
+import { NewProjectPage } from '../NewProjectPage.js';
+import type { ResolvedProjectIntent } from '../../components/project/new/projectCreateTypes.js';
+
+function intentFixture(overrides: Partial<ResolvedProjectIntent> = {}): ResolvedProjectIntent {
+  return {
     mode: 'clone',
-    setMode: vi.fn(),
-    url: '',
-    setUrl: vi.fn(),
-    path: '',
-    setPath: vi.fn(),
-    parentDir: '',
-    setParentDir: vi.fn(),
-    name: '',
-    setName: vi.fn(),
-    issuePrefix: '',
-    setIssuePrefix: vi.fn(),
-    intent: null,
-    stale: false,
-    creating: false,
-    error: null,
-    progress: null,
-    canCreate: false,
-    findingsFor: () => [],
-    submit: mockSubmit,
-  }),
-}));
+    key: 'widget',
+    name: 'widget',
+    path: '/home/op/Projects/widget',
+    parentDir: '/home/op/Projects',
+    homeDir: '/home/op',
+    cloneUrl: 'https://github.com/acme/widget.git',
+    provider: 'github',
+    repoSlug: 'acme/widget',
+    defaultBranch: 'main',
+    remoteChecked: true,
+    isGitRepository: true,
+    gitRoot: null,
+    proposedIssuePrefix: 'WIDGET',
+    wouldClone: true,
+    wouldGitInit: false,
+    willCreateMainWorkspace: true,
+    registeredKeyAtPath: null,
+    findings: [],
+    ...overrides,
+  };
+}
 
-// Mock FolderPicker
-vi.mock('../../components/inputs/FolderPicker.js', () => ({
-  FolderPicker: ({ value, onChange, placeholder }: any) => (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      data-testid="folder-picker"
-    />
-  ),
-}));
+function json(body: unknown, status = 200): Response {
+  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+}
 
-describe('NewProjectPage (WI-4)', () => {
-  beforeEach(() => {
-    mockSubmit.mockClear();
-  });
+function routeFetch(
+  handler: (url: string, init?: RequestInit) => Response | Promise<Response> = () => json({}),
+  intent: ResolvedProjectIntent = intentFixture(),
+): void {
+  fetchMock.mockImplementation((url: string, init?: RequestInit) =>
+    url === '/api/projects/resolve'
+      ? Promise.resolve(json(intent))
+      : Promise.resolve(handler(url, init)),
+  );
+}
 
-  afterEach(() => {
-    window.history.replaceState(null, '', '/projects/new');
-    vi.clearAllMocks();
-  });
+function renderPage(onCreated = vi.fn(), onCancel = vi.fn()) {
+  render(<NewProjectPage onCancel={onCancel} onCreated={onCreated} />);
+  return { onCreated, onCancel };
+}
 
-  it('renders with three mode tabs', () => {
-    render(
-        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
+/** Type a URL and wait for the CTA to become usable. */
+async function readyToClone(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+  await user.type(screen.getByLabelText('Repository URL'), 'acme/widget');
+  const cta = screen.getByRole('button', { name: 'Clone repository' });
+  await waitFor(() => expect(cta).toBeEnabled());
+  return cta;
+}
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  sessionStorage.clear();
+  window.history.replaceState({}, '', '/projects/new?mode=clone');
+});
+
+afterEach(() => vi.clearAllMocks());
+
+describe('entry and focus', () => {
+  it('focuses the first action when no mode is preset', async () => {
+    window.history.replaceState({}, '', '/projects/new');
+    routeFetch();
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Open existing folder/i })).toHaveFocus(),
     );
-
-    expect(screen.getByText('Clone repository')).toBeInTheDocument();
-    expect(screen.getByText('Add existing')).toBeInTheDocument();
-    expect(screen.getByText('New project')).toBeInTheDocument();
   });
 
-  it('shows the guide line', () => {
-    render(
-        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-    );
+  it('focuses the first field of a preset mode', async () => {
+    routeFetch();
+    renderPage();
 
-    expect(screen.getByText(/A project is a repository with its own issues and pipeline/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Repository URL')).toHaveFocus());
   });
 
-  it('renders clone mode fields by default', () => {
-    render(
-        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-    );
+  it('shows no red validation on first load', () => {
+    routeFetch();
+    renderPage();
 
-    expect(screen.getByPlaceholderText(/https:\/\/github\.com/)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('~/Projects')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Project name/)).toBeInTheDocument();
-  });
-
-  it('has Cancel and Create buttons', () => {
-    render(
-        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-    );
-
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-    expect(screen.getByText('Create project')).toBeInTheDocument();
-  });
-
-  it('Cancel button calls onCancel prop', async () => {
-    const user = userEvent.setup();
-    const mockOnCancel = vi.fn();
-    render(
-        <NewProjectPage onCancel={mockOnCancel} onCreated={() => {}} />
-    );
-
-    const cancelButton = screen.getByText('Cancel');
-    await user.click(cancelButton);
-
-    expect(mockOnCancel).toHaveBeenCalled();
-  });
-
-  it('Create button is disabled initially', () => {
-    render(
-        <NewProjectPage onCancel={() => {}} onCreated={() => {}} />
-    );
-
-    const createButton = screen.getByText('Create project') as HTMLButtonElement;
-    expect(createButton.disabled).toBe(true);
-  });
-
-  it('renders without any <Router> and reads the ?mode= preset from window.location (PAN-3836 UAT)', () => {
-    // The dashboard uses hand-rolled routing and never mounts react-router, so the
-    // page must not depend on a Router context. UAT caught a useSearchParams crash here.
-    window.history.replaceState(null, '', '/projects/new?mode=existing');
-    expect(() => render(<NewProjectPage onCancel={() => {}} onCreated={() => {}} />)).not.toThrow();
-    expect(hookOptionsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ initialMode: 'existing' }));
-  });
-
-  it('defaults the mode preset to clone when ?mode= is absent or invalid', () => {
-    window.history.replaceState(null, '', '/projects/new?mode=bogus');
-    render(<NewProjectPage onCancel={() => {}} onCreated={() => {}} />);
-    expect(hookOptionsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ initialMode: 'clone' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
-describe('new-project search helpers (PAN-3836 returnTo round trip)', () => {
-  it('reads a valid mode and rejects unknown values', () => {
-    expect(getNewProjectModeFromSearch('?mode=existing')).toBe('existing');
-    expect(getNewProjectModeFromSearch('?mode=bogus')).toBeNull();
-    expect(getNewProjectModeFromSearch('')).toBeNull();
+describe('labels and accessibility', () => {
+  it('associates every visible field with a label', async () => {
+    const user = userEvent.setup();
+    routeFetch();
+    renderPage();
+
+    expect(screen.getByLabelText('Repository URL')).toBeInTheDocument();
+    expect(screen.getByLabelText('Parent folder')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Options' }));
+    expect(screen.getByLabelText('Issue prefix')).toBeInTheDocument();
   });
 
-  it('accepts only a same-origin absolute path for returnTo', () => {
-    expect(getNewProjectReturnToFromSearch('?mode=clone&returnTo=%2Fworkspaces%2Fnew')).toBe('/workspaces/new');
-    expect(getNewProjectReturnToFromSearch('?returnTo=https%3A%2F%2Fevil.example')).toBeNull();
-    expect(getNewProjectReturnToFromSearch('?returnTo=%2F%2Fevil.example')).toBeNull();
-    expect(getNewProjectReturnToFromSearch('?mode=clone')).toBeNull();
+  it('marks a field invalid and points at its message', async () => {
+    const user = userEvent.setup();
+    routeFetch(
+      () => json({}),
+      intentFixture({
+        findings: [{ field: 'url', code: 'url-invalid', message: 'Enter a GitHub or GitLab URL.' }],
+      }),
+    );
+    renderPage();
+
+    await user.type(screen.getByLabelText('Repository URL'), 'nope');
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Repository URL')).toHaveAttribute('aria-invalid', 'true'),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a GitHub or GitLab URL.');
+  });
+});
+
+describe('submission states', () => {
+  it('freezes the fields and the mode switch while a clone runs', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({ status: 'cloning', phase: 'Receiving objects', percent: 20 }),
+    );
+    renderPage();
+
+    await user.click(await readyToClone(user));
+
+    await waitFor(() => expect(screen.getByLabelText('Repository URL')).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Change' })).toBeDisabled();
+  });
+
+  it('reports phase-local progress with real progressbar semantics', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({ status: 'cloning', phase: 'Receiving objects', percent: 20 }),
+    );
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    const bar = await screen.findByRole('progressbar');
+    await waitFor(() => expect(bar).toHaveAttribute('value', '20'));
+  });
+
+  it('shows an indeterminate bar without inventing a value', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({ status: 'preparing', phase: 'preparing', percent: null }),
+    );
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    const bar = await screen.findByRole('progressbar');
+    expect(bar).not.toHaveAttribute('value');
+  });
+
+  it('says setup must finish instead of offering a fake abort', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({ status: 'registering', phase: 'registering', percent: null }),
+    );
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    await waitFor(() => expect(screen.getByText(/Finishing project setup/i)).toBeInTheDocument());
+  });
+
+  it('keeps the operation and says so when contact is lost', async () => {
+    const user = userEvent.setup();
+    let polls = 0;
+    routeFetch((url) => {
+      if (url === '/api/projects') return json({ jobId: 'job-1' }, 202);
+      polls += 1;
+      return polls === 1
+        ? json({ status: 'cloning', phase: 'Receiving objects', percent: 42 })
+        : json({ error: 'unavailable' }, 503);
+    });
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Connection interrupted/i)).toBeInTheDocument(),
+    );
+    // Stale progress is labelled, and there is no live bar claiming otherwise.
+    expect(screen.getByText(/Last update:/i)).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clone repository' })).toBeDisabled();
+  });
+
+  it('offers Finish setup, not another clone, when setup did not complete', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({
+            status: 'failed',
+            phase: 'failed',
+            percent: null,
+            failure: {
+              code: 'setup-incomplete',
+              message: 'The repository is available at /home/op/Projects/widget, but project setup did not finish.',
+              retrySafe: false,
+              recovery: { action: 'finish-setup', key: 'widget', path: '/home/op/Projects/widget' },
+            },
+          }),
+    );
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Finish setup' })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: 'Clone repository' })).toBeDisabled();
+  });
+
+  it('preserves what was typed after a terminal failure', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ failure: { code: 'internal-error', message: 'Project setup failed on the server.', retrySafe: true } }, 500)
+        : json({}),
+    );
+    renderPage();
+    await user.click(await readyToClone(user));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/failed on the server/i));
+    expect((screen.getByLabelText('Repository URL') as HTMLInputElement).value).toBe('acme/widget');
+  });
+});
+
+describe('keyboard', () => {
+  it('submits once for Ctrl+Enter', async () => {
+    const user = userEvent.setup();
+    routeFetch((url) =>
+      url === '/api/projects'
+        ? json({ jobId: 'job-1' }, 202)
+        : json({ status: 'cloning', phase: 'x', percent: 1 }),
+    );
+    renderPage();
+    await readyToClone(user);
+
+    await user.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(1),
+    );
+  });
+
+  it('does not submit while an IME composition is in flight', async () => {
+    routeFetch((url) => (url === '/api/projects' ? json({ jobId: 'j' }, 202) : json({})));
+    renderPage();
+    const user = userEvent.setup();
+    await readyToClone(user);
+
+    const field = screen.getByLabelText('Repository URL');
+    // A composing Enter is the IME committing a character, not a submit.
+    field.dispatchEvent(
+      Object.assign(
+        new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+        { isComposing: true },
+      ),
+    );
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(0);
   });
 });

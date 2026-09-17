@@ -1,5 +1,6 @@
 /**
- * Verifies the success-path wiring for NewProjectModal in App:
+ * Verifies the success-path wiring for project creation in App (the modal this
+ * once named was replaced by the /projects/new page in PAN-3836):
  *   - Both ['command-deck-projects'] and ['registered-projects'] are invalidated
  *   - The new project key is selected (setSelectedProjectKey called)
  *   - ensureHome is called with the new key

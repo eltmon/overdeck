@@ -1,253 +1,399 @@
 /**
- * @vitest-environment jsdom
+ * Tests for useProjectCreateIntent (PAN-3836 WI-4).
+ *
+ * The centrepiece is the HTTP 503 regression. The reviewed hook did
+ * `setCreating(false)` on a failed poll, so a transient error while a clone was
+ * still running re-enabled Create, kept a stale 42% on screen, and showed an
+ * error — three contradictory things at once, and an invitation to start a
+ * second clone. That case is written here against the real hook.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
 
-// Mock API fetches — mock fetchWithTimeout to avoid AbortSignal.timeout() blocking under fake timers
-vi.mock('../../../../lib/apiFetch.js', () => ({
-  fetchWithTimeout: vi.fn(),
-}));
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
-import { fetchWithTimeout } from '../../../../lib/apiFetch.js';
-import { useProjectCreateIntent, RESOLVE_DEBOUNCE_MS } from '../useProjectCreateIntent.js';
-
-const mockFetch = fetchWithTimeout as ReturnType<typeof vi.fn>;
-
-const mockDashboardHeaders = vi.fn().mockResolvedValue({ 'Content-Type': 'application/json' });
 vi.mock('../../../../lib/wsTransport.js', () => ({
-  dashboardMutationJsonHeaders: () => mockDashboardHeaders(),
+  dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({ 'content-type': 'application/json' }),
 }));
 
-describe('useProjectCreateIntent (PAN-3836)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    mockFetch.mockClear();
+const fetchMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../../lib/apiFetch.js', () => ({ fetchWithTimeout: fetchMock }));
+
+const captureMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../../lib/telemetry.js', () => ({ capture: captureMock }));
+
+import {
+  useProjectCreateIntent,
+  RESOLVE_DEBOUNCE_MS,
+  POLL_INTERVAL_MS,
+  OBSERVATION_STORAGE_KEY,
+} from '../useProjectCreateIntent.js';
+import type { ResolvedProjectIntent } from '../projectCreateTypes.js';
+
+function intentFixture(overrides: Partial<ResolvedProjectIntent> = {}): ResolvedProjectIntent {
+  return {
+    mode: 'clone',
+    key: 'widget',
+    name: 'widget',
+    path: '/home/op/Projects/widget',
+    parentDir: '/home/op/Projects',
+    homeDir: '/home/op',
+    cloneUrl: 'https://github.com/acme/widget.git',
+    provider: 'github',
+    repoSlug: 'acme/widget',
+    defaultBranch: 'main',
+    remoteChecked: true,
+    isGitRepository: true,
+    gitRoot: null,
+    proposedIssuePrefix: 'WIDGET',
+    wouldClone: true,
+    wouldGitInit: false,
+    willCreateMainWorkspace: true,
+    registeredKeyAtPath: null,
+    findings: [],
+    ...overrides,
+  };
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  } as Response;
+}
+
+/** Answer the resolve call, and route everything else through `handler`. */
+function route(handler: (url: string, init?: RequestInit) => Response | Promise<Response>): void {
+  fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+    if (url === '/api/projects/resolve') return Promise.resolve(jsonResponse(intentFixture()));
+    return Promise.resolve(handler(url, init));
+  });
+}
+
+async function settleResolve(): Promise<void> {
+  await act(async () => {
+    vi.advanceTimersByTime(RESOLVE_DEBOUNCE_MS);
+  });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  fetchMock.mockReset();
+  captureMock.mockReset();
+  sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('resolve', () => {
+  it('debounces and exposes server-resolved defaults as real values', async () => {
+    route(() => jsonResponse({}));
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+
+    act(() => result.current.setUrl('acme/widget'));
+    expect(fetchMock).not.toHaveBeenCalled(); // not until it settles
+
+    await settleResolve();
+    await waitFor(() => expect(result.current.intent).not.toBeNull());
+
+    // Defaults are values, not placeholders (D-4).
+    expect(result.current.parentDir).toBe('/home/op/Projects');
+    expect(result.current.name).toBe('widget');
+    expect(result.current.issuePrefix).toBe('WIDGET');
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it('keeps an explicit edit when the source changes (D-17)', async () => {
+    route(() => jsonResponse({}));
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+
+    act(() => result.current.setUrl('acme/widget'));
+    await settleResolve();
+    await waitFor(() => expect(result.current.intent).not.toBeNull());
+
+    act(() => result.current.setName('my-own-name'));
+    act(() => result.current.setUrl('acme/other'));
+    await settleResolve();
+
+    // The proposal changed underneath; the typed name did not.
+    expect(result.current.name).toBe('my-own-name');
+    expect(result.current.hasOverrides).toBe(true);
+
+    act(() => result.current.resetOverrides());
+    await waitFor(() => expect(result.current.name).toBe('widget'));
   });
 
-  it('WI-4.1: debounces resolve on rapid field changes', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        mode: 'clone',
-        key: 'test-proj',
-        name: 'Test Proj',
-        path: '/home/test/test-proj',
-        findings: [],
-        isGitRepository: true,
-        wouldClone: true,
-        wouldGitInit: false,
-        willCreateMainWorkspace: false,
-        cloneUrl: 'https://github.com/o/r.git',
-        provider: 'github',
-        repoSlug: 'o/r',
-        defaultBranch: 'main',
-        remoteChecked: true,
-        proposedIssuePrefix: 'TR',
-      }),
-    });
+  it('shows no findings before the operator has typed anything', () => {
+    route(() => jsonResponse({}));
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
 
-    const { result } = renderHook(() => useProjectCreateIntent());
+    expect(result.current.findingsFor('url')).toHaveLength(0);
+    expect(result.current.canCreate).toBe(false);
+  });
+});
 
-    // Rapid edits wrapped in act — start without awaiting, advance timers, then check
-    act(() => {
-      result.current.setUrl('https://github.com');
-      result.current.setUrl('https://github.com/');
-      result.current.setUrl('https://github.com/o');
-      result.current.setUrl('https://github.com/o/r');
-    });
+describe('submission', () => {
+  async function readyHook() {
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+    act(() => result.current.setUrl('acme/widget'));
+    await settleResolve();
+    await waitFor(() => expect(result.current.canCreate).toBe(true));
+    return result;
+  }
 
-    // No resolve yet
-    expect(mockFetch).not.toHaveBeenCalled();
-
-    // After debounce — advance timers to trigger resolve, wrapped in act
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
-    });
-
-    // Should have resolved only once
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/projects/resolve',
-      expect.objectContaining({ method: 'POST' })
+  it('starts one operation for two submits in the same tick', async () => {
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ jobId: 'job-1' }, 202)
+        : jsonResponse({ status: 'cloning', phase: 'Receiving objects', percent: 10 }),
     );
+    const result = await readyHook();
 
-    // Advance timers to allow json() promise to settle
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
+      // No await between them: the synchronous guard is the only thing that can
+      // stop the second.
+      void result.current.submit();
+      void result.current.submit();
     });
-    expect(result.current.intent?.key).toBe('test-proj');
+
+    const creates = fetchMock.mock.calls.filter(([url]) => url === '/api/projects');
+    expect(creates).toHaveLength(1);
   });
 
-  it('WI-4.2: 202 response triggers polling', async () => {
+  it('sends one stable operationId so a retry can attach server-side', async () => {
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ jobId: 'job-1' }, 202)
+        : jsonResponse({ status: 'cloning', phase: 'x', percent: 1 }),
+    );
+    const result = await readyHook();
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    const [, init] = fetchMock.mock.calls.find(([url]) => url === '/api/projects')!;
+    expect(JSON.parse((init as RequestInit).body as string).operationId).toEqual(expect.any(String));
+  });
+
+  it('folds a 422 back into field findings and stays editable', async () => {
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ findings: [{ field: 'url', code: 'remote-unreachable', message: 'nope' }] }, 422)
+        : jsonResponse({}),
+    );
+    const result = await readyHook();
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(result.current.submission.kind).toBe('editing');
+    expect(result.current.findingsFor('url')).toHaveLength(1);
+  });
+
+  it('treats a 202 without a job id as unknown, never as a retry invitation', async () => {
+    route((url) => (url === '/api/projects' ? jsonResponse({}, 202) : jsonResponse({})));
+    const result = await readyHook();
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(result.current.submission.kind).toBe('connection-lost');
+    expect(result.current.canCreate).toBe(false);
+  });
+
+  it('emits project_created exactly once and calls onCreated once', async () => {
     const onCreated = vi.fn();
-
-    // First: resolve
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        mode: 'clone',
-        key: 'orca',
-        name: 'Orca',
-        path: '/home/test/orca',
-        findings: [],
-        isGitRepository: true,
-        wouldClone: true,
-        wouldGitInit: false,
-        willCreateMainWorkspace: false,
-        cloneUrl: 'https://github.com/stablyai/orca.git',
-        provider: 'github',
-        repoSlug: 'stablyai/orca',
-        defaultBranch: 'main',
-        remoteChecked: true,
-        proposedIssuePrefix: 'ORCA',
-      }),
-    });
-
-    // Second: create project (returns 202 with jobId)
-    mockFetch.mockResolvedValueOnce({
-      status: 202,
-      ok: false,
-      json: async () => ({ jobId: 'job-123' }),
-    });
-
-    // Third: poll job (running)
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        id: 'job-123',
-        status: 'running',
-        phase: 'Receiving objects',
-        percent: 50,
-      }),
-    });
-
-    // Fourth: poll job (done)
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        id: 'job-123',
-        status: 'done',
-        result: {
-          key: 'orca',
-          name: 'Orca',
-          path: '/home/test/orca',
-          mainWorkspaceId: 'ws-123',
-        },
-      }),
-    });
-
-    const { result } = renderHook(() => useProjectCreateIntent({ onCreated }));
-
-    act(() => {
-      result.current.setUrl('stablyai/orca');
-      result.current.setMode('clone');
-    });
-
-    // Wait for resolve
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
-    });
-
-    // Submit WITHOUT awaiting — start async call, advance timers, THEN await
-    const submitPromise = result.current.submit();
-
-    // Advance to allow /api/projects POST to resolve
-    await vi.advanceTimersByTimeAsync(0);
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }));
-
-    // Advance for first poll (running) at 750ms
-    await vi.advanceTimersByTimeAsync(760);
-    expect(result.current.progress?.phase).toBe('Receiving objects');
-    expect(result.current.progress?.percent).toBe(50);
-
-    // Advance for second poll (done) at 750ms
-    await vi.advanceTimersByTimeAsync(760);
-
-    // NOW await the submit promise which has been progressing in the background
-    await submitPromise;
-
-    // Advance for final state update
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
-    });
-    expect(onCreated).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: 'orca',
-        path: '/home/test/orca',
-      })
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ key: 'widget', name: 'widget', path: '/home/op/Projects/widget' })
+        : jsonResponse({}),
     );
+    const { result } = renderHook(() =>
+      useProjectCreateIntent({ initialMode: 'existing', onCreated }),
+    );
+    act(() => result.current.setPath('/home/op/Projects/widget'));
+    await settleResolve();
+    await waitFor(() => expect(result.current.canCreate).toBe(true));
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(captureMock).toHaveBeenCalledWith('project_created', { mode: 'existing' });
+  });
+});
+
+describe('polling and lost contact', () => {
+  async function runningHook() {
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+    act(() => result.current.setUrl('acme/widget'));
+    await settleResolve();
+    await waitFor(() => expect(result.current.canCreate).toBe(true));
+    await act(async () => {
+      await result.current.submit();
+    });
+    return result;
+  }
+
+  it('REGRESSION: an HTTP 503 poll keeps the operation instead of re-enabling Create', async () => {
+    // The reviewed hook set creating = false here, which produced a stale
+    // percentage, an error, and an enabled Create button simultaneously.
+    let polls = 0;
+    route((url) => {
+      if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);
+      polls += 1;
+      if (polls === 1) return jsonResponse({ status: 'cloning', phase: 'Receiving objects', percent: 42 });
+      return jsonResponse({ error: 'unavailable' }, 503);
+    });
+
+    const result = await runningHook();
+    await act(async () => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS * 2);
+    });
+
+    await waitFor(() => expect(result.current.submission.kind).toBe('connection-lost'));
+    // The three things the old hook got wrong, asserted together:
+    expect(result.current.canCreate).toBe(false); // Create stayed enabled before
+    if (result.current.submission.kind === 'connection-lost') {
+      // Progress is kept, but as an explicitly stale "last update", and the page
+      // renders no live progress bar for it.
+      expect(result.current.submission.lastProgress?.percent).toBe(42);
+      expect(result.current.submission.exhausted).toBe(false); // still retrying
+    }
   });
 
-  it('WI-4.3: 422 response folds findings into intent', async () => {
-    // First: resolve succeeds
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        mode: 'existing',
-        key: 'test-proj',
-        name: 'Test Proj',
-        path: '/home/test/test-proj',
-        findings: [],
-        isGitRepository: false,
-        wouldClone: false,
-        wouldGitInit: false,
-        willCreateMainWorkspace: false,
-        cloneUrl: null,
-        provider: null,
-        repoSlug: null,
-        defaultBranch: null,
-        remoteChecked: false,
-        proposedIssuePrefix: null,
-      }),
+  it('reconciles exactly once on a 404 rather than resubmitting', async () => {
+    let reconciles = 0;
+    route((url) => {
+      if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);
+      if (url === '/api/projects/create-jobs/reconcile') {
+        reconciles += 1;
+        return jsonResponse({ status: 'unknown', reason: 'no proof' });
+      }
+      return jsonResponse({ error: 'Unknown job' }, 404);
     });
 
-    // Second: create fails with 422 (duplicate)
-    mockFetch.mockResolvedValueOnce({
-      status: 422,
-      ok: false,
-      json: async () => ({
-        findings: [
-          {
-            field: 'name',
-            code: 'project-exists',
-            message: 'Project already exists',
-          },
-        ],
-      }),
-    });
-
-    const { result } = renderHook(() => useProjectCreateIntent());
-
-    act(() => {
-      result.current.setPath('/home/test/test-proj');
-      result.current.setMode('existing');
-    });
-
-    // Wait for resolve
+    const result = await runningHook();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(RESOLVE_DEBOUNCE_MS + 10);
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
     });
 
-    // Submit WITHOUT awaiting — start async call, advance timers, THEN await
-    const submitPromise = result.current.submit();
+    await waitFor(() => expect(reconciles).toBe(1));
+    // Unknown is not success and not a retry.
+    expect(result.current.submission.kind).toBe('connection-lost');
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(1);
+  });
 
-    // Allow the async submit to progress
-    await vi.advanceTimersByTimeAsync(0);
+  it('surfaces a completed reconcile as success', async () => {
+    route((url) => {
+      if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);
+      if (url === '/api/projects/create-jobs/reconcile') {
+        return jsonResponse({
+          status: 'completed',
+          key: 'widget',
+          path: '/home/op/Projects/widget',
+          mainWorkspaceId: 'ws-1',
+        });
+      }
+      return jsonResponse({ error: 'Unknown job' }, 404);
+    });
 
-    // Await the submit promise which has been progressing
-    await submitPromise;
-
-    // Advance for final state update
+    const result = await runningHook();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
     });
-    expect(result.current.intent?.findings.length).toBeGreaterThan(0);
-    expect(result.current.intent?.findings[0].code).toBe('project-exists');
-    expect(result.current.error).toContain('already exists');
+
+    await waitFor(() => expect(result.current.submission.kind).toBe('done'));
+  });
+
+  it('offers repair without cloning again when setup did not finish', async () => {
+    route((url) => {
+      if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);
+      return jsonResponse({
+        status: 'failed',
+        phase: 'failed',
+        percent: null,
+        failure: {
+          code: 'setup-incomplete',
+          message: 'setup did not finish',
+          retrySafe: false,
+          recovery: { action: 'finish-setup', key: 'widget', path: '/home/op/Projects/widget' },
+        },
+      });
+    });
+
+    const result = await runningHook();
+    await act(async () => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+
+    await waitFor(() => expect(result.current.submission.kind).toBe('needs-setup'));
+    expect(result.current.canCreate).toBe(false);
+  });
+
+  it('suspends automatic retries on an auth failure', async () => {
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ jobId: 'job-1' }, 202)
+        : jsonResponse({ error: 'unauthorized' }, 401),
+    );
+
+    const result = await runningHook();
+    await act(async () => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+
+    await waitFor(() => {
+      expect(result.current.submission.kind).toBe('connection-lost');
+      if (result.current.submission.kind === 'connection-lost') {
+        expect(result.current.submission.exhausted).toBe(true);
+      }
+    });
+  });
+});
+
+describe('observation across a reload', () => {
+  it('stores a safe observation while an operation runs', async () => {
+    route((url) =>
+      url === '/api/projects'
+        ? jsonResponse({ jobId: 'job-1' }, 202)
+        : jsonResponse({ status: 'cloning', phase: 'x', percent: 1 }),
+    );
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+    act(() => result.current.setUrl('acme/widget'));
+    await settleResolve();
+    await waitFor(() => expect(result.current.canCreate).toBe(true));
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    const stored = JSON.parse(sessionStorage.getItem(OBSERVATION_STORAGE_KEY)!);
+    expect(stored).toMatchObject({ version: 1, jobId: 'job-1', expectedKey: 'widget' });
+    // Never the transport URL: it can carry a token.
+    expect(JSON.stringify(stored)).not.toContain('github.com');
+  });
+
+  it('resumes observing a stored operation on mount', async () => {
+    sessionStorage.setItem(
+      OBSERVATION_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        operationId: 'op-1',
+        jobId: 'job-9',
+        mode: 'clone',
+        expectedKey: 'widget',
+        expectedPath: '/home/op/Projects/widget',
+      }),
+    );
+    route(() => jsonResponse({ status: 'cloning', phase: 'Receiving objects', percent: 5 }));
+
+    const { result } = renderHook(() => useProjectCreateIntent({ initialMode: 'clone' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith('/api/projects/create-jobs/job-9', expect.anything()),
+    );
+    expect(result.current.canCreate).toBe(false);
   });
 });
