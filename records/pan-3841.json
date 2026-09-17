@@ -88,9 +88,6 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/architecture.md",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
     "declaredScopeUntouched": [
@@ -122,9 +119,6 @@
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/RetrospectiveButton.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-      "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-      "src/dashboard/frontend/tests/talk-it-through.spec.ts",
       "src/dashboard/server/routes/__tests__/conversations-retrospective.test.ts",
       "src/dashboard/server/routes/conversations-retrospective.ts",
       "src/dashboard/server/routes/conversations.ts",
@@ -134,10 +128,10 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "tests/unit/prompts/retrospective-template.test.ts"
     ],
-    "recordedAt": "2026-09-16T20:37:56.228Z"
+    "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T00:59:52.072Z",
+  "updated": "2026-09-17T01:00:05.969Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
