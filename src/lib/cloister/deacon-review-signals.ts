@@ -9,6 +9,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { getReviewStatusSync } from '../review-status.js';
 import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, listSessions, sessionExists, sessionExistsSync } from '../tmux.js';
 import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
@@ -630,8 +631,9 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  * spawn/resume) with an implicit fallback from the last (re)start for parents
  * predating the arming code.
  */
-export async function checkStalledReviewParents(): Promise<string[]> {
+export async function checkStalledReviewParents(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const { listAgentStates } = await import('../agents.js');
     const { PARENT_REVIEW_TIMEOUT_MS } = await import('./review-agent.js');
@@ -660,6 +662,14 @@ export async function checkStalledReviewParents(): Promise<string[]> {
       // not need the same alarm every 60 seconds.
       const escalationKey = `${state.id}:${deadlineMs}`;
       if (stalledReviewParentEscalations.has(escalationKey)) continue;
+
+      // PAN-3848 (W30): count the would-fire; shadow mode leaves the escalation
+      // set untouched so detection repeats and the soak measures every pass.
+      recordWouldFire('checkStalledReviewParents', state.issueId);
+      if (shadow) {
+        actions.push(`checkStalledReviewParents: would escalate ${state.id} past review deadline with no verdict for ${state.issueId} (shadow)`);
+        continue;
+      }
       stalledReviewParentEscalations.add(escalationKey);
 
       const paneTail = await Effect.runPromise(capturePane(state.id, 30)).catch(() => '');

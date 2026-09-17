@@ -7,6 +7,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
+import { isPatrolShadowMode, readWouldFireCounts } from '../../lib/cloister/patrol-would-fire.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -332,6 +333,29 @@ function countItems(path: string): number {
     return readdirSync(path).length;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * PAN-3848 (W30): print the per-patrol would-have-fired counts for the last 7
+ * days. During a soak (OVERDECK_PATROL_SHADOW=1 on the dashboard) the wrapped
+ * patrols detect but never act; a week of zeroes is the deletion gate's
+ * evidence. Outside a soak the counts show which patrols actually fired.
+ */
+export function printPatrolWouldFireTable(): void {
+  const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const counts = readWouldFireCounts(sinceIso);
+  const shadow = isPatrolShadowMode();
+
+  console.log(chalk.bold(`Patrol would-fire counts (last 7 days${shadow ? ', shadow mode ON — patrols are suppressed' : ''}):`));
+  const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  if (entries.length === 0) {
+    console.log(chalk.dim('  (no would-fire events recorded)'));
+    return;
+  }
+  for (const [patrol, count] of entries) {
+    const line = `  ${patrol}: ${count}`;
+    console.log(count > 0 && shadow ? chalk.yellow(line) : line);
   }
 }
 
@@ -985,6 +1009,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     if (check.status === 'error') hasErrors = true;
     if (check.status === 'warn') hasWarnings = true;
   }
+
+  // PAN-3848 (W30): the patrol soak table — would-have-fired counts per patrol
+  // for the last 7 days. Zeroes across the board while OVERDECK_PATROL_SHADOW=1
+  // prove the deleted-patrol candidates' repaired states are unreachable.
+  printPatrolWouldFireTable();
 
   console.log('');
 
