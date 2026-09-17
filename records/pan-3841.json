@@ -176,10 +176,10 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T02:22:20.163Z",
+  "updated": "2026-09-17T02:24:20.537Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
@@ -187,12 +187,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T02:22:20.084Z",
-    "reviewNotes": "Agent re-review request (1/25): Cycle-5 required corrections all five landed. SHAs f865018e2fb (corrections) and 9098a72e464 (docs).\n\n1 Global byte budget: formatEvidence enforces EVIDENCE_LIMITS.maxRenderedBytes (256KiB), stops at the first block that would cross it, byte-trims a single oversized block, discloses what was dropped. My first attempt overshot its own cap by 90 bytes because the truncation footer was itself uncounted — it now reserves footer space and trims by bytes, not characters. Regression asserts the 1MB-notes probe case renders <= cap and says TRUNCATED.\n\n2 Bounded resolver IO + surfaced diagnostics: record-list.ts had an unbounded Promise.all and swallowed readdir (.catch(()=>[])) and parse failures, so an unreadable store was indistinguishable from an empty one. Added concurrency 8, a workspace-scan cap, and listIssueRecordsDetailed returning {records, failures}. listIssueRecords keeps its array signature and delegates, so parked-residue.ts and state-plane-patrol.ts are untouched. ENOENT stays a normal empty shape. The adapter consumes the detailed form and renders unreadable paths as INCOMPLETE.\n\n3 start <= updated <= now: isRecordInWindow now takes now, returns a distinct 'future' verdict; future-dated records are excluded and counted, not silently ranked first. Regression covers updated=2099.\n\n4 Newest-first nested selection: feedback/sessionHistory/recoveryTrips sorted newest-first before slicing, stable, unparseable timestamps last and not dropped. Regression asserts event-20 survives and event-0 does not. Also fixed scopeDrift truncation to count BOTH arrays (16 untouched vs 15 cap reported 0).\n\n5 Real-resolver fixtures: new src/lib/pan-dir/__tests__/record-list-real-fs.test.ts drives the ACTUAL door against temp filesystems — legacy layout across project root AND per-issue workspace dirs, absent dir, corrupt record, unreadable dir, a directory larger than the concurrency bound, non-JSON ignored. 6/6.\n\nGates: typecheck 0, lint 0, npm test 1527 files / 14366 passed. ONE failure, NOT mine: tests/unit/lib/cloister/deacon-swarm-doneness.test.ts, which is already registered in scripts/flaky-quarantine.txt:20 under PAN-2421, has no import path to record-list, and passes 14/14 in isolation.\n\nUnchanged and still blocked: running-conversation UAT (no claude binary or credentials in the workspace containers).",
+    "updatedAt": "2026-09-17T02:24:20.463Z",
+    "reviewNotes": "Cycle-6 addresses all five required corrections from operator's 01:04:52 feedback: (1) EVIDENCE_LIMITS.maxRenderedBytes=262144 + applyRenderedByteBudget enforces block-by-block; (2) record-list.ts adds RECORD_ENUMERATION_CONCURRENCY=8, RECORD_ENUMERATION_MAX_WORKSPACES=200, mapBounded, failures[] surfaced via listIssueRecordsDetailed, ENOENT treated as normal absence; (3) isRecordInWindow returns 'future' for parsed>now, future count disclosed; (4) newestFirst sorts feedback/sessionHistory/recoveryTrips newest-first before slice; (5) new record-list-real-fs.test.ts (132 lines) exercises real resolver via mkdtemp+writeFile for migrated+legacy+corrupt+unreadable+large-dir cases. Bonus: scopeDrift.truncated now sums both arrays' overflow. Tests cover all five contracts. File-size ratchets intact (1070/1163/1605).",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
-    "reviewedAtCommit": "ffb32f54751e36d9b70d79f850df62bb61936161",
+    "reviewedAtCommit": "9098a72e46497af38c9db3043ca27c1246548c7b",
     "lastVerifiedCommit": "9098a72e46497af38c9db3043ca27c1246548c7b",
     "reviewSpawnedAt": "2026-09-17T02:22:10.559Z",
     "scopeDrift": {
@@ -265,9 +266,9 @@
         },
         "review": {
           "custom/MiniMax-M3": {
-            "input": 3562198,
-            "output": 164412,
-            "cacheRead": 28999936,
+            "input": 4738485,
+            "output": 184411,
+            "cacheRead": 36522240,
             "cacheWrite": 0
           }
         },
@@ -334,9 +335,9 @@
           "cacheWrite": 249772
         },
         "custom/MiniMax-M3": {
-          "input": 9035419,
-          "output": 330423,
-          "cacheRead": 111841109,
+          "input": 10211706,
+          "output": 350422,
+          "cacheRead": 119363413,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -347,8 +348,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 41.1516064,
-        "pricingAsOf": "2026-09-17T02:22:20.129Z"
+        "usd": 41.5284944,
+        "pricingAsOf": "2026-09-17T02:24:20.525Z"
       }
     },
     "merges": [
