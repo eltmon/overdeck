@@ -42,6 +42,12 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     }
     console.log(chalk.green(`Message delivered to ${agentId}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
     console.log(chalk.dim(`  "${message}"`));
+    // PAN-3736: when the delivery door explains itself — a busy agent whose
+    // message went to its mail file, a dedup — print that reason. It names the
+    // mail file, so the reader can check or hand-deliver the message.
+    if (outcome.reason) {
+      console.log(chalk.dim(`  ${outcome.reason}`));
+    }
     return exitCli(0);
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));

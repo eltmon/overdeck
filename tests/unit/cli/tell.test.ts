@@ -10,26 +10,26 @@ const mocks = vi.hoisted(() => ({
   exitCli: vi.fn(async (_code: number) => undefined as never),
 }));
 
-vi.mock('../../src/lib/agents.js', () => ({
+vi.mock('../../../src/lib/agents.js', () => ({
   resolveAgentTargetSync: mocks.resolveAgentTargetSync,
   getAgentStateSync: mocks.getAgentStateSync,
   messageAgent: mocks.messageAgent,
 }));
 
-vi.mock('../../src/lib/work-agent-lifecycle.js', () => ({
+vi.mock('../../../src/lib/work-agent-lifecycle.js', () => ({
   issueOwesReworkSync: mocks.issueOwesReworkSync,
 }));
 
-vi.mock('../../src/lib/remote/index.js', () => ({
+vi.mock('../../../src/lib/remote/index.js', () => ({
   loadRemoteAgentState: mocks.loadRemoteAgentState,
   sendToRemoteAgent: mocks.sendToRemoteAgent,
 }));
 
-vi.mock('../../src/cli/exit.js', () => ({
+vi.mock('../../../src/cli/exit.js', () => ({
   exitCli: mocks.exitCli,
 }));
 
-import { tellCommand } from '../../src/cli/commands/tell.js';
+import { tellCommand } from '../../../src/cli/commands/tell.js';
 
 describe('pan tell', () => {
   beforeEach(() => {
