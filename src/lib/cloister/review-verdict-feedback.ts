@@ -249,6 +249,21 @@ async function deliverReviewVerdictFeedbackPromise(
                 break;
               }
             }
+            // PAN-3846: delivered now means "confirmed as a new turn" for
+            // Claude Code targets. A non-throwing delivered:false (injected
+            // but no turn appeared) is the same stall as an unreachable
+            // target — escalate it, never count it as sent.
+            if (!deliveryOutcome.delivered) {
+              const reason = deliveryOutcome.reason ?? 'delivery was not accepted';
+              console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+              try {
+                await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+                  specialist: 'review-agent',
+                  feedbackPath: fileResult.filePath,
+                  slotItemId: opts.slotItemId,
+                });
+              } catch { /* best-effort — the warn above still records the failure */ }
+            } else {
             agentMessageSent = true;
             let repeatedDeliveryLoop = false;
             if (deliveryOutcome.deduplicated && dedupKey) {
@@ -272,6 +287,7 @@ async function deliverReviewVerdictFeedbackPromise(
             // repeated suppressions surface a loop, preserve that operator-visible
             // state until a non-deduplicated delivery proves the loop ended.
             if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
+            }
           } catch (err) {
             // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
             // not a shrug. Surface it as needs-you so the stall is visible instead of
