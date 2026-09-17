@@ -122,30 +122,51 @@ describe('retrospective template invariants', () => {
     }
   });
 
-  it('points at the verified canonical read door for per-issue records', () => {
-    // Operator review: there is no `pan records show` CLI verb and `pan show`
-    // alone is the runtime lens (issueId/agentId/shadow/health/cv/pipeline),
-    // not the full record (no feedback / scopeDrift / sessionHistory /
-    // recoveryTrips). The actual canonical read door is the lib function
-    // `readIssueRecord` (and `readIssueRecordSync`) in
-    // `src/lib/pan-dir/record.ts`, with `getIssueRecordPath` resolving the
-    // path. The prompt must reference that lib surface and must teach the
-    // agent that the non-existent CLI verb does not exist.
+  it('locates records under the server-resolved state root, with no invented command', () => {
+    // Two earlier cycles shipped fabricated instructions here: first
+    // `pan records show` (no such CLI verb), then a `node -e` import of
+    // `src/lib/pan-dir/record.js` (the source is TypeScript; that path does
+    // not exist). Neither was runnable. What IS verified: the server resolves
+    // each project's state root through the canonical state resolver and
+    // renders it into PROJECT_LINES before the prompt is delivered, and the
+    // records sit under that root in one of two documented layouts. Assert
+    // the facts the prompt must carry, never a command string.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    expect(inputsSection, RAIL_MESSAGE).toContain('readIssueRecord');
-    expect(inputsSection, RAIL_MESSAGE).toContain('src/lib/pan-dir/record.ts');
-    expect(inputsSection, RAIL_MESSAGE).toContain('getIssueRecordPath');
+    expect(inputsSection, RAIL_MESSAGE).toContain('state root');
+    expect(inputsSection, RAIL_MESSAGE).toContain('records/<issue>.json');
+    expect(inputsSection, RAIL_MESSAGE).toContain('.pan/records/<issue>.json');
+    // No fabricated invocation may reappear in any form.
+    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/pan records show/i);
+    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/node\s+(-e|--input-type)/);
+    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/readIssueRecord|getIssueRecordPath/);
+  });
+
+  it('states that records are a source of truth, not a cache', () => {
+    // sync-sources/rules/single-source-of-truth.md:19 — the SQLite DB is the
+    // disposable cache, rebuilt FROM `records/` on overdeck-state. A previous
+    // cycle inverted this and told the agent the record was "a derived cache";
+    // that would make it discount the only evidence it has for feedback,
+    // scopeDrift, sessionHistory and recoveryTrips.
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    expect(inputs, RAIL_MESSAGE).not.toBeNull();
+    const inputsSection = inputs![1];
+    expect(inputsSection, RAIL_MESSAGE).toContain('source of truth');
+    expect(inputsSection, RAIL_MESSAGE).not.toMatch(/derived cache|merely a cache/i);
+  });
+
+  it('discloses that no shell-reachable door returns the full record', () => {
+    // `pan show --json` is the runtime lens and `pan task show` is one plan
+    // item; neither reaches the four forensic fields. The prompt must say so
+    // rather than implying a door exists, so the retrospective reports the
+    // limitation instead of inventing a workaround.
+    const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
+    expect(inputs, RAIL_MESSAGE).not.toBeNull();
+    const inputsSection = inputs![1];
     expect(inputsSection, RAIL_MESSAGE).toContain('pan show');
-    expect(inputsSection, RAIL_MESSAGE).toContain('does NOT expose');
-    // The prompt is allowed to name the non-existent verb — but only in a
-    // "There is no X" sentence that teaches the agent to stop searching.
-    // A positive assertion ("records show" appears as a working command)
-    // is what the operator forbade. Check that any reference is in the
-    // "no such verb" framing.
-    if (inputsSection.toLowerCase().includes('pan records show')) {
-      expect(inputsSection.toLowerCase(), RAIL_MESSAGE).toMatch(/there is no.*pan records show|pan records show.*does not exist/);
+    for (const field of ['feedback', 'scopeDrift', 'sessionHistory', 'recoveryTrips']) {
+      expect(inputsSection, `Expected Inputs to name ${field}. ${RAIL_MESSAGE}`).toContain(field);
     }
   });
 
