@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:10:01.920Z",
+  "updated": "2026-09-17T01:10:05.576Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "reviewing",
@@ -352,16 +352,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "retro-template": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 4070132,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:10:01.920Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -450,12 +442,23 @@
         "outcome": "completed",
         "reason": "Evidence bridge: collectRetrospectiveEvidence enumerates via listIssueRecords read door (migrated + legacy), window-filters, bounds with disclosed truncation, renders to {{EVIDENCE}}. 28 data-flow tests pass.",
         "releasedAt": "2026-09-17T01:09:51.903Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 4070132,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:10:01.920Z",
+        "itemId": "retro-template",
+        "outcome": "completed",
+        "reason": "roles/retrospective.md rewritten in bf27cbe09fc: Inputs item 1 instructs no record read, points at the server-collected snapshot, requires repeating stated omissions; new '## Record evidence' section carries {{EVIDENCE}}. No fabricated command remains.",
+        "releasedAt": "2026-09-17T01:10:05.576Z"
       }
     ],
     "statusReasons": {
       "retro-template": {
-        "reason": "Template already carries the evidence contract in bf27cbe09fc; verifying and completing",
-        "updatedAt": "2026-09-17T01:10:01.920Z"
+        "reason": "roles/retrospective.md rewritten in bf27cbe09fc: Inputs item 1 instructs no record read, points at the server-collected snapshot, requires repeating stated omissions; new '## Record evidence' section carries {{EVIDENCE}}. No fabricated command remains.",
+        "updatedAt": "2026-09-17T01:10:05.576Z"
       },
       "retro-template-test": {
         "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
@@ -484,11 +487,11 @@
     }
   },
   "statusOverrides": {
-    "retro-template": "running",
-    "retro-template.ac1": "pending",
-    "retro-template.ac2": "pending",
-    "retro-template.ac3": "pending",
-    "retro-template.ac4": "pending",
+    "retro-template": "completed",
+    "retro-template.ac1": "completed",
+    "retro-template.ac2": "completed",
+    "retro-template.ac3": "completed",
+    "retro-template.ac4": "completed",
     "retro-template-test": "pending",
     "retro-template-test.ac1": "pending",
     "retro-template-test.ac2": "pending",
