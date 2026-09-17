@@ -45,6 +45,7 @@ import {
 import { performProjectCreate } from '../../../lib/projects/create-perform.js';
 import { startProjectCreateJob } from './project-create-jobs.js';
 import { projectCreateJobRoutesLayer } from './project-create-routes.js';
+import { readProjectJsonBody } from './project-body.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
@@ -662,11 +663,10 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
-export const readProjectJsonBody = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const text = yield* request.text;
-  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
-});
+// Defined in project-body.ts so project-create-routes.ts can use it without
+// importing this module back (the circular-dependency guard refuses that cycle).
+// Re-exported here because existing consumers import it from this path.
+export { readProjectJsonBody };
 
 // ─── Route: GET /api/projects/:projectKey/release-status ─────────────────────
 // PAN-2555: release/publish pipeline visibility — npm dist-tags, release

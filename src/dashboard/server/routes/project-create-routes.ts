@@ -42,7 +42,7 @@ import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
-import { readProjectJsonBody } from './projects.js';
+import { readProjectJsonBody } from './project-body.js';
 
 // ─── Route: GET /api/projects/create-jobs/:jobId ────────────────────────────
 // PAN-3836: poll background job status during clone operations.
