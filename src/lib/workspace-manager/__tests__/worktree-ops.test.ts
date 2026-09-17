@@ -120,4 +120,47 @@ describe('createWorktree — CWE-78: branch config never reaches a shell', () =>
     expect(result.success).toBe(true);
     expect(existsSync(join(targetPath, '.git'))).toBe(true);
   });
+
+  it('a $(...) payload in branchName or targetPath is never executed', async () => {
+    const { createWorktree } = await import('../worktree-ops.js');
+    const markerBranch = join(dirname(marker), 'pwned-branch');
+    const markerPath = join(dirname(marker), 'pwned-path');
+
+    const maliciousBranch = `scratch/$(touch ${markerBranch})`;
+    const maliciousPath = join(repoPath, `wt-$(touch ${markerPath})`);
+    cleanup.push(maliciousPath);
+
+    const result = await createWorktree(repoPath, maliciousPath, maliciousBranch, 'main');
+
+    expect(existsSync(markerBranch)).toBe(false);
+    expect(existsSync(markerPath)).toBe(false);
+    expect(result.success).toBe(false);
+  });
+
+  it('removeWorktree never executes a $(...) payload in targetPath or branchName', async () => {
+    const { removeWorktree } = await import('../worktree-ops.js');
+    const markerRemove = join(dirname(marker), 'pwned-remove');
+    const markerBranch = join(dirname(marker), 'pwned-rmbranch');
+
+    await removeWorktree(
+      repoPath,
+      join(repoPath, `wt-$(touch ${markerRemove})`),
+      `scratch/$(touch ${markerBranch})`,
+    );
+
+    expect(existsSync(markerRemove)).toBe(false);
+    expect(existsSync(markerBranch)).toBe(false);
+  });
+
+  it('a quoted-breakout payload in defaultBranch is never executed', async () => {
+    const { createWorktree } = await import('../worktree-ops.js');
+    const markerQuote = join(dirname(marker), 'pwned-quote');
+
+    // An embedded double-quote would break out of a "..."-interpolated shell string.
+    const result = await createWorktree(repoPath, join(repoPath, 'wt-q'), 'scratch/q', `main"; touch ${markerQuote}; echo "`);
+    cleanup.push(join(repoPath, 'wt-q'));
+
+    expect(existsSync(markerQuote)).toBe(false);
+    expect(result.success).toBe(false);
+  });
 });

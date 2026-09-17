@@ -334,7 +334,8 @@ async function isMergeSetMergedIntoTargets(
     });
 
     try {
-      await execAsync(`git merge-base --is-ancestor HEAD origin/${repo.targetBranch}`, {
+      // CWE-78: the ref travels as one argv element, never through a shell.
+      await execFileAsync('git', ['merge-base', '--is-ancestor', 'HEAD', `origin/${repo.targetBranch}`], {
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 10000,

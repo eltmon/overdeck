@@ -206,11 +206,12 @@ export async function removeWorktree(
   branchName: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Remove worktree
-    await execAsync(`git worktree remove "${targetPath}" --force`, { cwd: repoPath }).catch(() => {});
+    // CWE-78: path and branch travel as argv elements — double quotes stop a
+    // semicolon but never a $(...) substitution or a quote break-out.
+    await execFileAsync('git', ['worktree', 'remove', targetPath, '--force'], { cwd: repoPath }).catch(() => {});
 
     // Optionally delete the branch
-    await execAsync(`git branch -D "${branchName}"`, { cwd: repoPath }).catch(() => {});
+    await execFileAsync('git', ['branch', '-D', branchName], { cwd: repoPath }).catch(() => {});
 
     return { success: true, message: `Removed worktree at ${targetPath}` };
   } catch (error) {
