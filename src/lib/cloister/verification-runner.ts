@@ -21,6 +21,7 @@ import {
   verificationArtifactPath,
   writeVerificationArtifact,
 } from './verification-artifact.js';
+import { runTestSkipGate } from './test-skip-gate.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -594,7 +595,17 @@ async function runVerificationForIssuePromise(
     };
     writeLiveArtifact();
 
-    const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+    // PAN-3847 (FR-12): the test-skip gate runs before the quality gates — a diff
+    // that adds skipped/only tests or removes test cases fails verification as a
+    // required `test-skip` gate without burning a full suite run.
+    const testSkipStart = Date.now();
+    const testSkip = await runTestSkipGate(workspacePath, changedBase);
+    if (testSkip.diffUnavailable) {
+      console.warn(`[${logPrefix}] test-skip gate abstained for ${issueId}: could not diff ${changedBase}...HEAD`);
+    }
+
+    const gateResults = testSkip.passed
+      ? await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
@@ -623,7 +634,15 @@ async function runVerificationForIssuePromise(
         liveGateTail = '';
         writeLiveArtifact();
       },
-    }));
+    }))
+      : [{
+        name: 'test-skip',
+        passed: false,
+        required: true,
+        output: testSkip.violations.map(v => `${v.file}: [${v.kind}] ${v.line}`).join('\n'),
+        durationMs: Date.now() - testSkipStart,
+        error: 'Diff adds skipped or only-tests or removes test cases',
+      }];
 
     const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
     if (postGateMergedOutcome) return postGateMergedOutcome;
