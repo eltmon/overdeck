@@ -497,6 +497,29 @@ export function writeDoneCompletionMarker(agentId: string, comment: string | und
   }));
 }
 
+/**
+ * PAN-3848 (W25): the loud failure path for a review-request record write that
+ * failed every retry. Writes the completion marker anyway (the branch is
+ * pushed and the PR exists, so the work is real) and records a
+ * `review-request-unrecorded` needs-you naming the missing reviewRequestedAt.
+ */
+export async function handleUnrecordedReviewRequest(
+  issueId: string,
+  agentId: string,
+  prUrl: string | undefined,
+  comment: string | undefined,
+  error: unknown,
+): Promise<void> {
+  writeDoneCompletionMarker(agentId, comment, false);
+  const reason = error instanceof Error ? error.message : String(error);
+  await recordDeadEndNeedsYou(
+    issueId,
+    'review-request-unrecorded',
+    prUrl ?? '',
+    `${reason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
+  );
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const slotInput = parseSlotAgentId(id);
@@ -855,14 +878,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // write the completion marker anyway, then fail loudly with a needs-you
       // naming the missing reviewRequestedAt. A pushed PR with no recorded
       // review request is never silent.
-      writeDoneCompletionMarker(agentId, options.comment, false);
+      await handleUnrecordedReviewRequest(issueId, agentId, reviewArtifactUrl, options.comment, intentError);
       const intentReason = intentError instanceof Error ? intentError.message : String(intentError);
-      await recordDeadEndNeedsYou(
-        issueId,
-        'review-request-unrecorded',
-        reviewArtifactUrl ?? '',
-        `${intentReason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
-      );
       spinner.fail(`Work completed but the review request was not recorded for ${issueId}: ${intentReason}`);
       console.error(chalk.dim(`  The completion marker was written and the PR exists. Recover with: pan review request ${issueId}`));
       return exitCli(1);
