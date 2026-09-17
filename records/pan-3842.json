@@ -174,17 +174,17 @@
     "recordedAt": "2026-09-17T01:40:01.804Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:40:01.807Z",
+  "updated": "2026-09-17T01:40:02.848Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-16T22:55:47.496Z",
+    "updatedAt": "2026-09-17T01:40:02.844Z",
     "reviewNotes": "Cycle 3 clean: 4/4 reviewers zero blockers at 4f4d3e1a; both cycle-1 blockers now fixed structurally via resolveSlotSpawnFitness, tree clean, simulation tests replaced with production-helper regressions",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs verified by trace: underpowered/overpowered/unknown-model/provider-not-enabled/staffing paths match spec; type-only imports satisfy NFR-1; no model literals (NFR-3). Non-blocking: out-of-union difficulty string would throw in DIFFICULTY_CLASS_BANDS[d] — call-site beads must narrow input (FR-7).",
@@ -195,13 +195,15 @@
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
-        "docs/DASHBOARD-ARCHITECTURE.md",
+        "package.json",
         "scripts/file-size-allowlist.txt",
         "scripts/source-introspection-baseline.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-        "src/dashboard/frontend/tests/talk-it-through.spec.ts"
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+        "src/dashboard/frontend/src/components/Settings/types.ts",
+        "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+        "src/lib/__tests__/configurable-providers.test.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/configurable-providers.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -227,23 +229,23 @@
       ],
       "actualChangedFiles": [
         ".overdeck/context/codebase/architecture.md",
-        "docs/DASHBOARD-ARCHITECTURE.md",
         "docs/MODEL_ROUTING.md",
         "docs/TIERED-EXECUTION.md",
+        "package.json",
         "reference/troubleshooting.mdx",
         "scripts/file-size-allowlist.txt",
         "scripts/source-introspection-baseline.txt",
         "src/cli/commands/__tests__/doctor-tier-fitness.test.ts",
         "src/cli/commands/doctor-tier-fitness.ts",
         "src/cli/commands/doctor.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
         "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
         "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
         "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
         "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
-        "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
-        "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+        "src/dashboard/frontend/src/components/Settings/types.ts",
+        "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+        "src/lib/__tests__/configurable-providers.test.ts",
         "src/lib/__tests__/model-capability-class.test.ts",
         "src/lib/agents/__tests__/dispatch-tier.test.ts",
         "src/lib/agents/__tests__/tier-fitness-context.test.ts",
@@ -252,13 +254,16 @@
         "src/lib/agents/spawn.ts",
         "src/lib/agents/tier-fitness-context.ts",
         "src/lib/agents/tier-fitness.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/configurable-providers.ts",
         "src/lib/model-capability-class.ts"
       ],
-      "recordedAt": "2026-09-16T21:34:52.900Z"
+      "recordedAt": "2026-09-17T01:40:01.804Z"
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
+    "reviewRequestedAt": "2026-09-17T01:40:02.844Z"
   },
   "closeOut": {
     "usage": {
