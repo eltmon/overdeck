@@ -769,6 +769,7 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
     mergeRetryCount: 0,
     recoveryStartedAt: undefined,
     reviewedAtCommit: undefined,
+    reviewStaleSince: undefined,
     lastVerifiedCommit: undefined,
     reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
     conflictResolutionDispatchedAt: undefined, blockerReasons: undefined,

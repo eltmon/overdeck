@@ -101,6 +101,7 @@ async function reopenWorkspaceStatePromise(
     // Start a new evidence cycle while retaining status history and prior
     // strike-landing attempts.
     reviewedAtCommit: undefined,
+    reviewStaleSince: undefined,
     lastVerifiedCommit: undefined,
     strikeReadyHead: undefined,
     strikeReadyAt: undefined,

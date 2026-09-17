@@ -225,6 +225,28 @@ describe('review status', () => {
     });
   });
 
+  it('PAN-3847: a fully green row with reviewStaleSince derives readyForMerge false', () => {
+    setReviewStatusSync('PAN-3847', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'pending',
+      readyForMerge: true,
+    });
+    expect(getReviewStatusSync('PAN-3847')?.readyForMerge).toBe(true);
+
+    // Post-review drift marks the row stale — a later write without an explicit
+    // readyForMerge must derive false even though every gate verdict is green.
+    setReviewStatusSync('PAN-3847', { reviewStaleSince: new Date().toISOString() });
+    const stale = getReviewStatusSync('PAN-3847');
+    expect(stale?.reviewStaleSince).toBeTruthy();
+    expect(stale?.readyForMerge).toBe(false);
+
+    // Clearing the marker (pan done / pan review request) restores derivation.
+    setReviewStatusSync('PAN-3847', { reviewStaleSince: undefined });
+    expect(getReviewStatusSync('PAN-3847')?.readyForMerge).toBe(true);
+  });
+
   it('consumes a serviced review request when review passes', () => {
     const initial = setReviewStatusSync('PAN-3083', {
       reviewStatus: 'pending',

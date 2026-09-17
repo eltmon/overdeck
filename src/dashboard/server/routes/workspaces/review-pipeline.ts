@@ -262,6 +262,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       verificationCycleCount: 0,
       verificationStatus: 'pending',
       verificationNotes: undefined,
+      reviewStaleSince: undefined,
     };
     if (forceReview) {
       reviewReset.readyForMerge = false;
@@ -564,6 +565,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           reviewNotes: undefined,
           testNotes: undefined,
           mergeNotes: undefined,
+          reviewStaleSince: undefined,
         });
 
         (async () => {

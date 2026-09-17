@@ -361,12 +361,14 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     });
 
     try {
-      // Write an issue that has passed review at an OLD commit
-      // (different from the current HEAD → triggers the reset path)
+      // Write an issue with a BLOCKED review at an OLD commit (different from the
+      // current HEAD → triggers the reset path). PAN-3847: a passed review is
+      // stale-marked instead of reset; only blocked reviews re-dispatch, so the
+      // ciRetryMap clear is exercised through the blocked path.
       writeStatusFile({
         [ISSUE_ID]: {
-          reviewStatus: 'passed',
-          readyForMerge: true,
+          reviewStatus: 'blocked',
+          readyForMerge: false,
           mergeStatus: undefined,
           reviewedAtCommit: 'deadbeef00000000000000000000000000000000',
         },
@@ -378,17 +380,23 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       ciRetryMap.set(ISSUE_ID, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
       expect(ciRetryMap.has(ISSUE_ID)).toBe(true);
 
-      // checkPostReviewCommits detects new commits and should clear the CI retry counter
+      // checkPostReviewCommits detects new commits and should clear the CI retry counter.
+      // Blocked reviews debounce one tick before resetting.
+      await checkPostReviewCommits();
+      expect(ciRetryMap.has(ISSUE_ID)).toBe(true);
+      // After the reset write the patrol re-reads the row to decide whether to
+      // dispatch; make it see a pending review so the dispatch action is recorded.
+      (mockGetReviewStatusSync as any).mockReturnValue({ reviewStatus: 'pending' });
       const resetActions = await checkPostReviewCommits();
 
       expect(resetActions).toHaveLength(1);
       expect(resetActions[0]).toContain(ISSUE_ID);
       // ciRetryMap must be cleared — the fix under test
       expect(ciRetryMap.has(ISSUE_ID)).toBe(false);
-      // mergeRetryCount also reset to 0
+      // reviewRetryCount also reset to 0 for the fresh cycle
       expect(mockSetReviewStatus).toHaveBeenCalledWith(
         ISSUE_ID,
-        expect.objectContaining({ mergeRetryCount: 0 }),
+        expect.objectContaining({ reviewRetryCount: 0 }),
       );
 
       // On the next patrol: checkFailedMergeRetry should now treat this as a fresh start
@@ -429,10 +437,12 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     });
 
     try {
+      // PAN-3847: passed reviews are stale-marked, never re-dispatched — the gated
+      // deferral path is exercised through a blocked review's re-dispatch.
       writeStatusFile({
         [ISSUE_ID]: {
-          reviewStatus: 'passed',
-          readyForMerge: true,
+          reviewStatus: 'blocked',
+          readyForMerge: false,
           mergeStatus: undefined,
           reviewedAtCommit: 'deadbeef00000000000000000000000000000000',
           reviewRetryCount: 0,
@@ -449,6 +459,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       // path is exercised.
       (mockGetReviewStatusSync as any).mockReturnValue({ reviewStatus: 'pending' });
 
+      await checkPostReviewCommits(); // blocked debounce tick
       const actions = await checkPostReviewCommits();
 
       expect(actions.length).toBeGreaterThanOrEqual(1);
@@ -463,10 +474,10 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       );
       expect(incrementedCalls).toHaveLength(0);
 
-      // A successful dispatch was attempted exactly once
+      // A successful dispatch was attempted exactly once, without force (PAN-3847)
       expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
       expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ issueId: ISSUE_ID, workspace: workspacePath, force: true }),
+        expect.objectContaining({ issueId: ISSUE_ID, workspace: workspacePath, force: false }),
       );
       expect(mockReleaseAdvancingSlot).toHaveBeenCalledOnce();
     } finally {

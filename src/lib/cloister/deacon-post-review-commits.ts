@@ -52,6 +52,11 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       }
       if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
 
+      // PAN-3847: a review already marked stale needs no further drift handling —
+      // only `pan done` / `pan review request` clears the marker, and leaving the
+      // row untouched here keeps the PAN-3254 reset-loop guard from misfiring on it.
+      if (status.reviewStaleSince) continue;
+
       const reviewedAnchor = status.reviewedAtCommit;
       if (!reviewedAnchor) {
         blockedReviewDriftObservations.delete(issueId);
@@ -136,7 +141,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       console.log(
         `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — resetting review`,
+        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — ${isBlocked ? 'resetting review' : 'marking review stale'}`,
       );
       lastResetAnchors.set(issueId, currentHead);
       resetLoopEscalated.delete(issueId);
@@ -149,29 +154,22 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           recoveryStartedAt: undefined,
         });
       } else {
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          readyForMerge: false,
-          reviewedAtCommit: undefined,
-          reviewNotes: undefined,
-          testNotes: undefined,
-          // Reset merge retry counter so checkFailedMergeRetry can retry again after
-          // the work agent pushes a fix (e.g. to address a CI check failure).
-          mergeRetryCount: 0,
-          // PAN-794: new commits open a fresh recovery cycle — stale infra
-          // failures from the previous cycle must not poison the breaker budget.
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-        });
+        // PAN-3847 (FR-8): a passed review is never reset by a patrol. Drift marks
+        // the row stale; only `pan done` or `pan review request` clears staleness.
+        if (!status.reviewStaleSince) {
+          setReviewStatusSync(issueId, {
+            reviewStaleSince: new Date().toISOString(),
+            readyForMerge: false,
+            mergeNotes: `Review stale: approved ${formatAnchorShort(reviewedAnchor)}, workspace HEAD is ${formatAnchorShort(currentHead)}. Run pan done or pan review request to re-review.`,
+          });
+          actions.push(`Marked review stale for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)}); no automatic re-dispatch`);
+        }
+        continue;
       }
       // Also clear the CI transient retry counter so the next merge attempt
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      if (!isBlocked) {
-        actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)})`);
-      }
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
@@ -192,7 +190,9 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           issueId,
           workspace: workspacePath,
           branch,
-          force: true,
+          // PAN-3847 (FR-16): never force — the runId guard refuses a convoy for
+          // an unchanged head.
+          force: false,
         }));
         if (dispatchResult.gated) {
           releaseAdvancingSlot();

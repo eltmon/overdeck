@@ -576,11 +576,14 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   }
 
   // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
+  // PAN-3847: `pan done` is also one of the two doors that clear a stale-review
+  // marker (the other is `pan review request`) — the re-review it requests is
+  // exactly what the stale marker exists to force.
   try {
     const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
     await updateIssueRecord(project, issueId, (record) => {
-      if (!record.pipeline.panDoneRecoveredAt) return;
-      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
+      if (!record.pipeline.panDoneRecoveredAt && !record.pipeline.reviewStaleSince) return;
+      const { panDoneRecoveredAt: _, reviewStaleSince: _stale, ...pipeline } = record.pipeline;
       return { ...record, pipeline };
     });
   } catch (e: any) {

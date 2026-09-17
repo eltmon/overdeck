@@ -49,7 +49,6 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/cloister/review-verdict-writer.ts', 'reviewedAtCommit', 'reviewedAtCommit: input.evidenceHead as HeadAnchor', 'Verdict write door persists the producer-issued evidence anchor after freshness classification.'),
   allow('src/lib/cloister/deacon-post-review-commits.ts', 'reviewedAtCommit', 'reviewedAtCommit: verdict.currentAnchor', 'Drift evaluator advances a proven-benign anchor.'),
   allow('src/lib/cloister/deacon-post-review-commits.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit blocked-review stale anchor clear before re-dispatch.'),
-  allow('src/lib/cloister/deacon-post-review-commits.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit passed-review stale anchor clear before re-dispatch.'),
   allow('src/dashboard/server/routes/workspaces/merge-strike.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: verifiedAnchor', 'Producer-fed CI-green merge verification stamp (PAN-3067).'),
   allow('src/lib/cloister/uat-promote-verification.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: rehydrateHeadAnchor(member.headSha)', 'UAT member HEAD rehydrated at the generation-record boundary (PAN-3114).'),
   allow('src/lib/cloister/verification-runner.ts', 'lastVerifiedCommit', 'lastVerifiedCommit', 'Producer-fed verification stamp.'),
