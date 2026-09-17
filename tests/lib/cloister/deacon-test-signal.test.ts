@@ -99,6 +99,13 @@ vi.mock('../../../src/lib/agents.js', () => ({
   messageAgent: (...args: unknown[]) => mockMessageAgent(...args),
   spawnRun: (...args: unknown[]) => mockSpawnRun(...args),
 }));
+// PAN-3849: the liveness oracle reads the runtime mirror from
+// agents/runtime-state.js directly, not through the agents.js barrel — mirror
+// the same mock there or isIdle reads the real filesystem.
+vi.mock('../../../src/lib/agents/runtime-state.js', () => ({
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+}));
+
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),

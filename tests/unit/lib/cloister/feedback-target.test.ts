@@ -7,6 +7,7 @@ const {
   mockReadIssueRecordSync,
   mockMarkWorkspaceStuck,
   mockSessionExists,
+  mockIsAlive,
   mockListSessionNames,
   mockUpdateIssueRecord,
   mockListOverdeckAgentStatesSync,
@@ -16,6 +17,7 @@ const {
   mockReadIssueRecordSync: vi.fn(),
   mockMarkWorkspaceStuck: vi.fn(),
   mockSessionExists: vi.fn(),
+  mockIsAlive: vi.fn(),
   mockListSessionNames: vi.fn(),
   mockUpdateIssueRecord: vi.fn().mockResolvedValue(undefined),
   mockListOverdeckAgentStatesSync: vi.fn(),
@@ -44,8 +46,14 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
-  sessionExists: (agentId: string) => Effect.succeed(Boolean(mockSessionExists(agentId))),
   listSessionNames: () => Effect.succeed(mockListSessionNames()),
+}));
+
+// PAN-3849 (W32): feedback routing reads liveness from the single oracle. The
+// default verdict mirrors the legacy mockSessionExists fixture so existing
+// cases keep their meaning; zombie cases override mockIsAlive directly.
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: (agentId: string) => Promise.resolve(mockIsAlive(agentId)),
 }));
 
 import {
@@ -58,6 +66,11 @@ vi.setConfig({ testTimeout: 15_000 });
 describe('resolveIssueFeedbackTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsAlive.mockImplementation((agentId: string) => (
+      mockSessionExists(agentId)
+        ? { alive: true, paneAlive: true }
+        : { alive: false, reason: 'no-session' }
+    ));
     mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'test', projectPath: '/repo' });
     mockGetProjectSync.mockReturnValue({ name: 'Test', path: '/repo' });
     mockListSessionNames.mockReturnValue([]);
@@ -108,6 +121,25 @@ describe('resolveIssueFeedbackTarget', () => {
 
     await expect(resolveIssueFeedbackTarget('PAN-2214', { itemId: 'item-missing' })).resolves.toEqual({
       agentId: 'agent-pan-2214-slot-1',
+    });
+  });
+
+  it('PAN-3849 AC4: a remain-on-exit zombie pane is not a live feedback target', async () => {
+    // The tmux session exists (has-session passes) but the harness process is
+    // gone from the pane — the oracle says pane-dead / runtime-missing, and
+    // routing must fall through to resurrection instead of pasting feedback
+    // into the dead shell (pipeline-reliability-review F12, last bullet).
+    mockIsAlive.mockImplementation((agentId: string) => (
+      agentId === 'agent-pan-2214'
+        ? { alive: false, reason: 'pane-dead' }
+        : { alive: false, reason: 'no-session' }
+    ));
+
+    const target = await resolveIssueFeedbackTarget('PAN-2214');
+
+    expect(target).toEqual({
+      needsYou: true,
+      reason: expect.stringContaining('No live feedback target for PAN-2214'),
     });
   });
 

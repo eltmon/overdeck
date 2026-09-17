@@ -183,7 +183,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getAgentIdleAgeMs, isAgentIdleForNudge } from './agent-idle.js';
+import { idleAgeMs, isIdle } from '../agents/liveness.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
@@ -797,8 +797,8 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
  *
  * Stuck detection is now hook-based and lives in `checkStuckAgentRemediation`
  * (stuck-remediation.ts), which reads the runtime mirror via
- * `isAgentIdleForNudge` + `getAgentRuntimeStateSync` and escalates
- * nudge → resume → troubled. PAN-1586 made `isAgentIdleForNudge` treat a stale
+ * `isIdle` + `getAgentRuntimeStateSync` and escalates
+ * nudge → resume → troubled. PAN-1586 made `isIdle` treat a stale
  * 'active' mirror (Stop hook never fired) as idle, so a genuinely-stalled agent
  * — regardless of spinner word or duration — is now caught there.
  *
@@ -1326,7 +1326,7 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
  * Guards (hazard H4):
  *   - Only fires when reviewStatus === 'passed' && testStatus ∈ {testing,pending}
  *   - Skips closed issues (isIssueClosed) and stuck/ignored issues
- *   - Gates a live session on isAgentIdleForNudge + a 5-min settle window
+ *   - Gates a live session on isIdle + a 5-min settle window
  *   - Nudges at most once per test cycle (deduped by session) before completing
  *   - Only honors an artifact newer than the current test dispatch (H3)
  */
@@ -1359,7 +1359,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
       const sessionAlive = sessionExistsSync(testSession);
       const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(testSession)).catch(() => true) : true;
       const sessionLive = sessionAlive && !paneDead;
-      const idle = sessionLive ? isAgentIdleForNudge(testSession, TEST_SETTLE_MS, now) : false;
+      const idle = sessionLive ? isIdle(testSession, TEST_SETTLE_MS, now) : false;
 
       // Only honor an artifact newer than the current test dispatch so a previous
       // cycle's verdict is never read after a re-dispatch (H3). The latest
@@ -1786,7 +1786,7 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
       }
 
       // Check if agent is idle via Stop hook state (authoritative idle signal)
-      if (!isAgentIdleForNudge(agentSessionName)) {
+      if (!isIdle(agentSessionName)) {
         // Agent is still working or has no hook state — let it finish
         continue;
       }
@@ -1810,7 +1810,7 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
         // Clean up accumulated stale feedback so the work agent doesn't read them
         await clearStaleCiFeedback(issueId).catch(() => {});
         console.log(`[deacon] Cleared stale CI-blocked merge for ${issueId} — reset to readyForMerge`);
-        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000)}m)`);
+        actions.push(`Dead-end recovery: cleared CI-blocked merge for ${issueId} (${statusType}, idle for ${Math.round((idleAgeMs(agentSessionName, now) ?? 0) / 60000)}m)`);
         continue;
       }
 
@@ -1849,7 +1849,7 @@ export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Pro
 
         const { messageAgent } = await import('../agents/messaging.js');
         const outcome = await messageAgent(agentSessionName, nudgeMessage, 'deacon:dead-end', { owesRework: true });
-        const idleMin = Math.round((getAgentIdleAgeMs(agentSessionName, now) ?? 0) / 60000);
+        const idleMin = Math.round((idleAgeMs(agentSessionName, now) ?? 0) / 60000);
         if (outcome.delivered) actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${idleMin}m, turn confirmed=${outcome.confirmed === true})`);
         else actions.push(`Dead-end recovery: nudge NOT delivered to ${agentSessionName} (${statusType}): ${outcome.reason ?? 'unknown'}`);
       } catch (error: unknown) {

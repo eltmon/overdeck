@@ -14,6 +14,14 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../s
 import * as paths from '../../src/lib/paths.js';
 import * as reviewStatus from '../../src/lib/review-status.js';
 import * as tmux from '../../src/lib/tmux.js';
+import * as liveness from '../../src/lib/agents/liveness.js';
+
+// PAN-3849: "live agent" is the liveness oracle's verdict — mock the oracle
+// at its boundary for fixtures that mean "the agent is genuinely alive".
+function spyLiveAgent() {
+  const spy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
+  return { restore: () => spy.mockRestore() };
+}
 
 describe('work-agent-lifecycle', () => {
   const testAgentIds: string[] = [];
@@ -166,7 +174,7 @@ describe('work-agent-lifecycle', () => {
     });
     saveSessionId(agentId, 'session-running');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.hasLiveTmuxSession).toBe(true);
@@ -176,7 +184,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('none');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
   });
 
   // Regression: PAN-1014 — running agent with idle runtime incorrectly showed
@@ -210,7 +218,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // The session IS alive and the agent IS running — isRunning must stay true.
@@ -223,7 +231,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain('runtime is idle');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
     Effect.runSync(setAgentRuntimeMirror({}));
   });
 
@@ -264,7 +272,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-suspended');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isRunning).toBe(true);
@@ -272,7 +280,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('resume');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
     Effect.runSync(setAgentRuntimeMirror({}));
   });
 

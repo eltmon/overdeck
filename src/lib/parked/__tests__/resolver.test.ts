@@ -22,6 +22,17 @@ vi.mock('../../agents/queries.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../agents/queries.js')>();
   return { ...actual, listAgentStates: () => gather.agents, listRunningAgentsSync: () => gather.liveAgents };
 });
+// PAN-3849 (W32): the sweeper's "live" filter is the liveness oracle now. Map
+// each fixture's tmuxActive flag to the verdict it stood for, so every case
+// keeps its original intent.
+vi.mock('../../agents/liveness.js', () => ({
+  isAliveSync: (agentId: string) => (
+    (gather.liveAgents as { id: string; tmuxActive?: boolean }[])
+      .some((a) => a.id === agentId && a.tmuxActive === true)
+      ? { alive: true, paneAlive: true }
+      : { alive: false, reason: 'no-session' }
+  ),
+}));
 
 const projects = vi.hoisted(() => ({
   registry: new Map<string, { projectKey: string; projectPath: string }>(),

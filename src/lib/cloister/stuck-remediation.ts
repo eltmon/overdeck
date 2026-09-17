@@ -12,7 +12,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSession, killSessionSync, listPaneValuesSync, sendEscapeKeyAsync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
-import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAgentIdleForNudge } from './agent-idle.js';
+import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isIdle } from '../agents/liveness.js';
 import { describeAgentDeath } from './agent-death.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
@@ -164,7 +164,7 @@ function shouldCheckReadyBeadsForAgent(agent: AgentState, now: number): boolean 
   if (agent.paused || agent.troubled || completedAt) return false;
   if (!sessionExistsSync(agentId)) return false;
   if (shouldSkipReviewStatus(getReviewStatusSync(issueIdForAgent(agent)))) return false;
-  return isAgentIdleForNudge(agentId, 5 * 60 * 1000, now);
+  return isIdle(agentId, 5 * 60 * 1000, now);
 }
 
 function firstStuckAt(runtimeLastActivity: string, stuckState: StuckRemediationState | null): string {
@@ -498,7 +498,7 @@ async function evaluatePlanningAgent(
   // An unanswered AskUserQuestion parks the session on the operator. Manual
   // sessions wait by design; --auto sessions get the default-choice nudge.
   if (pendingQuestions > 0) {
-    if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+    if (!isIdle(agentId, 5 * 60 * 1000, now)) return;
     if (agent.auto !== true) return;
     const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
     if (lastActivityMs === null || !Number.isFinite(lastActivityMs)) return;
@@ -718,7 +718,7 @@ async function evaluateFlywheelOrchestrator(
     return;
   }
 
-  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+  if (!isIdle(agentId, 5 * 60 * 1000, now)) return;
 
   const runtime = getAgentRuntimeStateSync(agentId);
   if (!runtime?.lastActivity) return;

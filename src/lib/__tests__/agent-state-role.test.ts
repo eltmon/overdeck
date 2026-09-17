@@ -50,7 +50,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
     vi.doUnmock('../agents.js');
-    vi.doUnmock('../cloister/agent-idle.js');
+    vi.doUnmock('../agents/liveness.js');
     vi.doUnmock('../cloister/issue-closed.js');
     vi.doUnmock('../cloister/specialists.js');
     vi.doUnmock('../transcript-landing.js');

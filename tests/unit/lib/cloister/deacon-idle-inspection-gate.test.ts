@@ -50,8 +50,10 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
 }));
 
-vi.mock('../../../../src/lib/cloister/agent-idle.js', () => ({
-  isAgentIdleForNudge: vi.fn(() => true),
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: vi.fn(async () => ({ alive: true, paneAlive: true })),
+  isAliveSync: vi.fn(() => ({ alive: true, paneAlive: true })),
+  isIdle: vi.fn(() => true),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({

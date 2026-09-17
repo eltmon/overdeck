@@ -12,7 +12,8 @@ import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFi
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { createSession, killSession } from '../tmux.js';
+import { isAlive } from './liveness.js';
 import {
   clearReadySignal,
   normalizeAgentId,
@@ -43,7 +44,6 @@ import {
   getCodexAppServerStatus,
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
-  hasAgentRuntimeInSubtree,
   waitForPromptReady,
 } from './runtime-command.js';
 import {
@@ -293,9 +293,9 @@ export async function messageAgent(
   // prior conversation, destroying agent continuity every time feedback arrived.
   //
   // We also restart when the tmux session still exists. Planning/work sessions use
-  // `remain-on-exit on` so the shell persists after the agent process exits, and
-  // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
-  // session before re-creating it.
+  // `remain-on-exit on` so the shell persists after the agent process exits, and the
+  // liveness oracle (src/lib/agents/liveness.ts) reports that dead shell as not alive.
+  // resumeAgent() kills the zombie session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
     const stoppedGate = decideMessageGate();
     if (stoppedGate.decision !== 'proceed') {
@@ -305,7 +305,7 @@ export async function messageAgent(
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
-    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (alive: ${(await isAlive(normalizedId)).alive})`);
 
     if (opts.dedupKey !== undefined) {
       // Keyed deliveries resume bare and then enforce the key at the delivery
@@ -362,9 +362,9 @@ export async function messageAgent(
     }
 
     clearReadySignal(normalizedId);
-    if (await Effect.runPromise(sessionExists(normalizedId))) {
-      try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
-    }
+    // Kill any leftover session unconditionally — killSession on a missing
+    // session throws and is ignored; no separate existence check needed.
+    try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -559,20 +559,16 @@ export async function messageAgent(
     };
   }
 
-  if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
+  // Guard: if the tmux session exists but the harness process is gone (a
+  // remain-on-exit dead shell), resume instead of typing the message into a
+  // bare bash shell. Liveness is the single oracle (PAN-3849): session +
+  // live pane + harness process in the pane's process subtree.
+  const liveness = await isAlive(normalizedId);
+  if (!liveness.alive && liveness.reason === 'no-session') {
     throw new Error(`Agent ${normalizedId} not running`);
   }
-
-  // Guard: if tmux session exists but Claude Code has exited, resume instead
-  // of typing the message into a bare bash shell.
-  //
-  // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
-  // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
-  // runs as a descendant. Walk the pane's process subtree and treat the pane
-  // as live if any descendant is the expected runtime for the saved harness.
-  const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
-  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
-    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
+  if (!liveness.alive) {
+    console.warn(`[agents] ${normalizedId} tmux session is a zombie (${liveness.reason}: no ${expectedHarness} runtime in a live pane) — attempting resume`);
     if (opts.dedupKey !== undefined) {
       return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
     }

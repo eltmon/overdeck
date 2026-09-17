@@ -48,7 +48,7 @@ vi.mock('../../src/lib/agents.js', () => ({
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
 
-vi.mock('../../src/lib/cloister/agent-idle.js', () => ({
+vi.mock('../../src/lib/agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: getAgentEffectiveLastActivityMsMock,
 }));
 

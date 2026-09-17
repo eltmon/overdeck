@@ -99,7 +99,7 @@ vi.mock('../../../src/lib/review-findings.js', () => ({
   findBlockingFindings: vi.fn(() => []),
 }));
 
-vi.mock('../../../src/lib/cloister/agent-idle.js', () => ({
+vi.mock('../../../src/lib/agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: vi.fn(() => null),
 }));
 
