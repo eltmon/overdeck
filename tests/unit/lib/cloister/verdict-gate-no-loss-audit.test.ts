@@ -153,6 +153,10 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   stopAgent: vi.fn(),
 }));
 
+vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
+  runTestSkipGate: vi.fn(async () => ({ passed: true, violations: [] })),
+}));
+
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
   DEFAULT_GATES: {},
   runQualityGates: mocks.runQualityGates,

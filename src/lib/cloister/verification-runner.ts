@@ -21,7 +21,7 @@ import {
   verificationArtifactPath,
   writeVerificationArtifact,
 } from './verification-artifact.js';
-import { runTestSkipGate } from './test-skip-gate.js';
+import { runTestSkipGate, type TestSkipViolation } from './test-skip-gate.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -597,14 +597,24 @@ async function runVerificationForIssuePromise(
 
     // PAN-3847 (FR-12): the test-skip gate runs before the quality gates — a diff
     // that adds skipped/only tests or removes test cases fails verification as a
-    // required `test-skip` gate without burning a full suite run.
+    // required `test-skip` gate without burning a full suite run. PR #3872
+    // finding 4: a diff that cannot be computed fails the gate too. Finding 6:
+    // the gate runs once per repository root and violations aggregate, so a
+    // skipped test in a secondary repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkip = await runTestSkipGate(workspacePath, changedBase);
-    if (testSkip.diffUnavailable) {
-      console.warn(`[${logPrefix}] test-skip gate abstained for ${issueId}: could not diff ${changedBase}...HEAD`);
+    const testSkipViolations: TestSkipViolation[] = [];
+    const testSkipErrors: string[] = [];
+    for (const root of repoRoots) {
+      const outcome = await runTestSkipGate(root.dir, `origin/${root.targetBranch}`);
+      if (outcome.error) testSkipErrors.push(`${root.repoKey}: ${outcome.error}`);
+      testSkipViolations.push(...outcome.violations.map(v => ({
+        ...v,
+        file: root.isPolyrepo ? `${root.repoKey}/${v.file}` : v.file,
+      })));
     }
+    const testSkipFailed = testSkipErrors.length > 0 || testSkipViolations.length > 0;
 
-    const gateResults = testSkip.passed
+    const gateResults = !testSkipFailed
       ? await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
@@ -639,9 +649,12 @@ async function runVerificationForIssuePromise(
         name: 'test-skip',
         passed: false,
         required: true,
-        output: testSkip.violations.map(v => `${v.file}: [${v.kind}] ${v.line}`).join('\n'),
+        output: [
+          ...testSkipErrors,
+          ...testSkipViolations.map(v => `${v.file}: [${v.kind}] ${v.line}`),
+        ].join('\n'),
         durationMs: Date.now() - testSkipStart,
-        error: 'Diff adds skipped or only-tests or removes test cases',
+        error: testSkipErrors[0] ?? 'Diff adds skipped or only-tests or removes test cases',
       }];
 
     const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
