@@ -44,6 +44,7 @@ import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 import { postDoneDashboardJson, waitForDoneReviewHandoff } from './done-dashboard-client.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
+import { recordDeadEndNeedsYou } from '../../lib/cloister/dead-end-trip.js';
 import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -477,6 +478,25 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
   console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
 }
 
+/**
+ * The durable completion marker file for a work agent. Extracted so the
+ * PAN-3848 (W25) review-request failure path can write it even when the record
+ * write failed — the branch is pushed and the PR exists, so the work is real.
+ */
+export function writeDoneCompletionMarker(agentId: string, comment: string | undefined, trackerUpdated: boolean): void {
+  mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
+  const completedFile = join(AGENTS_DIR, agentId, 'completed');
+  const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
+  if (existsSync(processedMarker)) {
+    try { unlinkSync(processedMarker); } catch {}
+  }
+  writeFileSync(completedFile, JSON.stringify({
+    timestamp: new Date().toISOString(),
+    trackerUpdated,
+    comment,
+  }));
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const slotInput = parseSlotAgentId(id);
@@ -823,11 +843,30 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // branch push loses a remote-ref race, updateIssueRecord reconciles it; if
     // durability still fails, the command exits before all later pipeline progression.
     const reviewRequestedAt = new Date().toISOString();
-    await persistDoneReviewIntent(issueId, workspacePath, {
-      reviewRequestedAt,
-      scopeDrift,
-      prUrl: reviewArtifactUrl,
-    });
+    try {
+      await persistDoneReviewIntent(issueId, workspacePath, {
+        reviewRequestedAt,
+        scopeDrift,
+        prUrl: reviewArtifactUrl,
+      });
+    } catch (intentError: any) {
+      // PAN-3848 (W25, FR-20): the review-request record write failed after all
+      // retries. The branch is pushed and the PR exists, so the work is real —
+      // write the completion marker anyway, then fail loudly with a needs-you
+      // naming the missing reviewRequestedAt. A pushed PR with no recorded
+      // review request is never silent.
+      writeDoneCompletionMarker(agentId, options.comment, false);
+      const intentReason = intentError instanceof Error ? intentError.message : String(intentError);
+      await recordDeadEndNeedsYou(
+        issueId,
+        'review-request-unrecorded',
+        reviewArtifactUrl ?? '',
+        `${intentReason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
+      );
+      spinner.fail(`Work completed but the review request was not recorded for ${issueId}: ${intentReason}`);
+      console.error(chalk.dim(`  The completion marker was written and the PR exists. Recover with: pan review request ${issueId}`));
+      return exitCli(1);
+    }
 
     // Step 4: Update status (either tracker or shadow) only after the canonical
     // request is durable.
@@ -891,16 +930,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     });
 
     mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
-    const completedFile = join(AGENTS_DIR, agentId, 'completed');
-    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
-    if (existsSync(processedMarker)) {
-      try { unlinkSync(processedMarker); } catch {}
-    }
-    writeFileSync(completedFile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      trackerUpdated,
-      comment: options.comment,
-    }));
+    writeDoneCompletionMarker(agentId, options.comment, trackerUpdated);
 
     try {
       const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
