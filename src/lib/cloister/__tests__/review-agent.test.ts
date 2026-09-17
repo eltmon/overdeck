@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
   archiveFeedbackFiles: vi.fn(),
+  clearFeedbackFiles: vi.fn(),
   convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
   notifyPipelineSync: vi.fn(),
@@ -97,6 +98,7 @@ vi.mock('../review-monitor.js', () => ({
 
 vi.mock('../feedback-writer.js', () => ({
   archiveFeedbackFiles: mocks.archiveFeedbackFiles,
+  clearFeedbackFiles: mocks.clearFeedbackFiles,
 }));
 
 vi.mock('../merge-verification.js', () => ({
@@ -316,6 +318,35 @@ describe('spawnReviewRoleForIssue', () => {
     });
     expect(mocks.killSession).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('does not clear pending feedback when the dispatch is skipped as already running (PR #3870 finding 4)', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-current',
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('already running');
+    // A duplicate dispatch must not delete feedback the skipped cycle still owns.
+    expect(mocks.archiveFeedbackFiles).not.toHaveBeenCalled();
+    expect(mocks.clearFeedbackFiles).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('clears previous-cycle feedback once a real dispatch passes the checks', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-fresh',
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.archiveFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
   });
 
   it('converges a current-run verdict artifact before treating a live parent as active', async () => {

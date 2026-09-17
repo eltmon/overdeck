@@ -78,4 +78,25 @@ describe('pan tell', () => {
     expect(mocks.exitCli).toHaveBeenCalledWith(0);
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Message delivered to agent-pan-3846 (turn confirmed)'));
   });
+
+  it('exits 1 with the failure when remote delivery fails (PR #3870 finding 1)', async () => {
+    mocks.loadRemoteAgentState.mockReturnValue({ location: 'remote', vmName: 'vm-1' });
+    mocks.sendToRemoteAgent.mockResolvedValue({ ok: false, failure: 'remote paste-buffer failed for agent-pan-3846 on vm-1 (exit 1): tmux: no such session' });
+
+    await tellCommand('PAN-3846', 'hello remote');
+
+    expect(mocks.exitCli).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Message NOT delivered to agent-pan-3846 (remote: vm-1)'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('remote paste-buffer failed'));
+  });
+
+  it('reports success without exit 1 when remote delivery succeeds', async () => {
+    mocks.loadRemoteAgentState.mockReturnValue({ location: 'remote', vmName: 'vm-1' });
+    mocks.sendToRemoteAgent.mockResolvedValue({ ok: true });
+
+    await tellCommand('PAN-3846', 'hello remote');
+
+    expect(mocks.exitCli).not.toHaveBeenCalledWith(1);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Message sent to agent-pan-3846 (remote: vm-1)'));
+  });
 });
