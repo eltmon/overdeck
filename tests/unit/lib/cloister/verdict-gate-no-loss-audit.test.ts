@@ -375,4 +375,14 @@ describe('verdict-and-gate no-loss audit (PAN-3847 W21)', () => {
     expect(row?.verificationStatus).toBe('failed');
     expect(row?.verificationNotes ?? '').not.toContain('PAN-1215');
   });
+
+  it('(2c) the deleted patrols #35 and #41 are gone from src/', async () => {
+    // NOTE: existsSync is mocked file-wide — probe existence with readFileSync.
+    const { readFileSync } = await import('node:fs');
+    expect(() => readFileSync('src/lib/cloister/test-status-green-ci-reconciler.ts', 'utf-8')).toThrow();
+    const deacon = readFileSync('src/lib/cloister/deacon.ts', 'utf-8');
+    expect(deacon).not.toContain('reconcileTestStatusFromGreenCi');
+    expect(deacon).not.toContain('checkVerificationReviewContradiction');
+    expect(deacon).not.toContain('test-status-green-ci-reconciler');
+  });
 });

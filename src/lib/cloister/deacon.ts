@@ -194,7 +194,6 @@ import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcilePendingPromotions } from './pending-promotion-reconciler.js';
-import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
@@ -1453,66 +1452,6 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
 }
 
 // ============================================================================
-// Verification/review contradiction (PAN-796)
-// ============================================================================
-
-export async function checkVerificationReviewContradiction(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { loadReviewStatuses } = await import('../review-status.js');
-    const { resolveProjectFromIssueSync } = await import('../projects.js');
-    const statuses = loadReviewStatuses();
-
-    for (const [issueId, status] of Object.entries(statuses)) {
-      if (
-        status.verificationStatus === 'passed' &&
-        status.reviewStatus === 'reviewing' &&
-        status.stuckReason === 'review_infrastructure_failure'
-      ) {
-        // Snapshot the workspace HEAD so reviewedAtCommit is populated — without
-        // it, checkPostReviewCommits can never confirm the review is current and
-        // PAN-3847's verdict door refuses the bypass, leaving the issue jammed at
-        // passed-but-stuck forever (PAN-977).
-        let reviewedAtCommit;
-        try {
-          const project = resolveProjectFromIssueSync(issueId);
-          if (project) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${issueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-              reviewedAtCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
-            }
-          }
-        } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
-
-        // Clearing the stuck marker is mandatory: the bypass *resolves* the
-        // review-infra failure, so the issue must no longer be skipped by the
-        // deacon's stuck-issue guards or it deadlocks at passed+stuck.
-        // PAN-3512: this carries a LIVE head, so dispatch-not-drop lands and re-gates it rather than silently rejecting it against a stale row anchor — intended.
-        const { recordReviewVerdict } = await import('./review-verdict-writer.js');
-        const bypass = await recordReviewVerdict(issueId, {
-          verdict: 'passed',
-          notes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
-          ...(reviewedAtCommit ? { evidenceHead: reviewedAtCommit } : {}),
-          extra: { stuck: false, stuckReason: undefined, stuckAt: undefined, stuckDetails: undefined },
-          writer: 'infra-bypass',
-        });
-        const msg = bypass.landed ? `Bypassed review for ${issueId}: verification passed, review infra failed` : `Review bypass for ${issueId} not recorded (${bypass.reason})`;
-        actions.push(msg);
-        console.log(`[deacon] ${msg}`);
-      }
-    }
-  } catch (error: unknown) {
-    console.error('[deacon] Error checking verification/review contradiction:', error);
-  }
-  return actions;
-}
-
-// ============================================================================
 // Post-review commit detection
 // ============================================================================
 
@@ -1614,26 +1553,6 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
 
 
-const testStatusGreenCiReconcileCooldowns = new Map<string, number>();
-const TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS = 5 * 60 * 1000;
-
-
-
-export async function reconcileTestStatusFromGreenCi(): Promise<string[]> {
-  const { getCiCheckRunsState, getPullRequestHeadState, isGitHubAppConfigured } = await import('../github-app.js');
-  return reconcileTestStatusFromGreenCiWithDeps({
-    isGitHubAppConfigured,
-    loadReviewStatuses,
-    getPullRequestHeadState,
-    getCiCheckRunsState,
-    setReviewStatusSync,
-    cooldowns: testStatusGreenCiReconcileCooldowns,
-    cooldownMs: TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS,
-    now: () => Date.now(),
-    log: (message) => console.log(`[deacon] ${message}`),
-    warn: (message) => console.warn(`[deacon] ${message}`),
-  });
-}
 
 
 
@@ -2836,13 +2755,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...unsignaledTestActions);
   for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-1658: after a rebase, reviewStatus may already be passed while testStatus
-  // remains pending. Run before the dispatcher so green GitHub Actions CI on the
-  // current PR HEAD can clear stale pending state instead of spawning a new test.
-  const greenCiTestStatusActions = await reconcileTestStatusFromGreenCi();
-  actions.push(...greenCiTestStatusActions);
-  for (const a of greenCiTestStatusActions) addLog('action', a, state.patrolCycle);
-
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
   const pendingTestActions = await checkPendingTestDispatch();
   actions.push(...pendingTestActions);
@@ -2874,11 +2786,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   );
   actions.push(...verdictFallbackActions);
   for (const a of verdictFallbackActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
-  const verifContradictionActions = await checkVerificationReviewContradiction();
-  actions.push(...verifContradictionActions);
-  for (const a of verifContradictionActions) addLog('action', a, state.patrolCycle);
 
   // Kill orphaned planning sessions whose issue has already progressed past planning.
   // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`
