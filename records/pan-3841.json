@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:14:07.369Z",
+  "updated": "2026-09-17T01:14:10.563Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -352,16 +352,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "retro-docs": {
-        "writerId": "agent-pan-3841",
-        "agentId": "agent-pan-3841",
-        "pid": 4165258,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:14:07.369Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -472,6 +464,17 @@
         "outcome": "completed",
         "reason": "11 prompt invariants pass: EVIDENCE added to the pinned placeholder set, evidence-section and omission-disclosure assertions added, negative guards on 'pan records show' and 'node -e'; removed the assertion that banned legitimate resolver API names.",
         "releasedAt": "2026-09-17T01:10:41.059Z"
+      },
+      {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 4165258,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:14:07.369Z",
+        "itemId": "retro-docs",
+        "outcome": "completed",
+        "reason": "docs/DASHBOARD-ARCHITECTURE.md now describes the server-side evidence bridge (listIssueRecords enumeration, window filter, {{EVIDENCE}} embed), warns that the legacy layout is issue-workspace scoped so a state-root concatenation is not equivalent, and records the omission-disclosure contract including EVIDENCE UNAVAILABLE.",
+        "releasedAt": "2026-09-17T01:14:10.563Z"
       }
     ],
     "statusReasons": {
@@ -500,8 +503,8 @@
         "updatedAt": "2026-09-16T20:13:54.637Z"
       },
       "retro-docs": {
-        "reason": "Document the evidence bridge",
-        "updatedAt": "2026-09-17T01:14:07.369Z"
+        "reason": "docs/DASHBOARD-ARCHITECTURE.md now describes the server-side evidence bridge (listIssueRecords enumeration, window filter, {{EVIDENCE}} embed), warns that the legacy layout is issue-workspace scoped so a state-root concatenation is not equivalent, and records the omission-disclosure contract including EVIDENCE UNAVAILABLE.",
+        "updatedAt": "2026-09-17T01:14:10.563Z"
       }
     }
   },
@@ -536,8 +539,8 @@
     "retro-mount.ac2": "completed",
     "retro-mount.ac3": "completed",
     "retro-mount.ac4": "completed",
-    "retro-docs": "running",
-    "retro-docs.ac1": "pending",
-    "retro-docs.ac2": "pending"
+    "retro-docs": "completed",
+    "retro-docs.ac1": "completed",
+    "retro-docs.ac2": "completed"
   }
 }
