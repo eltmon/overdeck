@@ -7,6 +7,8 @@ import { Effect } from 'effect';
 vi.mock('../auto-commit.js', () => ({
   queueAutoCommit: vi.fn(),
   flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  commitAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  pushAutoCommits: vi.fn(() => Effect.succeed(null)),
 }));
 
 import type { ProjectConfig } from '../../projects.js';

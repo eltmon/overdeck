@@ -531,7 +531,7 @@ export async function flushAgentPlaneWrites(issueId: string, agentId: string): P
   const desired = readAgentPlaneRecordAtPath(context.path);
   if (!desired) return null;
 
-  return withStateGitLock(context.root, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
+  return withStateGitLock(context.root, issueId, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
     const flushed = await Effect.runPromise(flushAutoCommits(context.project.path));
     if (flushed.errored) return flushed;
     if (flushed.committed && flushed.pushed !== true) {

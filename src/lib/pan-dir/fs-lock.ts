@@ -16,6 +16,8 @@ export interface RecordLockOwner {
 export interface RecordLockOptions {
   writerId: string;
   recordPath: string;
+  /** Names the lock's issue in the RecordLockError text (PAN-3848 W23). */
+  issueId?: string;
   retryDelaysMs?: readonly number[];
 }
 
@@ -23,8 +25,11 @@ export class RecordLockError extends Error {
   constructor(
     public readonly lockPath: string,
     public readonly owner: string,
+    public readonly issueId?: string,
   ) {
-    super(`The per-issue record lock at ${lockPath} is held by ${owner}. Retry the command after that writer finishes.`);
+    super(issueId
+      ? `The record lock for ${issueId} at ${lockPath} is held by ${owner}. Retry the command after that writer finishes.`
+      : `The per-issue record lock at ${lockPath} is held by ${owner}. Retry the command after that writer finishes.`);
     this.name = 'RecordLockError';
   }
 }
@@ -105,7 +110,7 @@ export async function acquireRecordLock(lockPath: string, options: RecordLockOpt
     if (delay === undefined) break;
     await new Promise<void>((resolve) => setTimeout(resolve, delay));
   }
-  throw new RecordLockError(lockPath, lastOwner);
+  throw new RecordLockError(lockPath, lastOwner, options.issueId);
 }
 
 export async function releaseRecordLock(lockPath: string): Promise<void> {
@@ -119,7 +124,7 @@ export async function withRecordFsLock<T>(
   operation: () => Promise<T>,
 ): Promise<T> {
   const lockPath = recordLockPath(project, issueId);
-  await acquireRecordLock(lockPath, options);
+  await acquireRecordLock(lockPath, { ...options, issueId });
   try {
     return await operation();
   } finally {

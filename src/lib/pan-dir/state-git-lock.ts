@@ -21,18 +21,26 @@ export const STATE_GIT_LOCK_RETRY_DELAYS_MS = [
 
 const processQueues = new Map<string, Promise<void>>();
 
-export function stateGitLockPath(gitRoot: string): string {
-  const key = createHash('sha256').update(resolve(gitRoot)).digest('hex');
+/**
+ * PAN-3848 (W23): the state git lock is keyed per issue, not per project. A
+ * project-wide lock held across a network push starved peer writers (F1: one
+ * patrol took it 23 times in 70 seconds and starved a spawn). The lock scope id
+ * is the issue id for record writes; the agent-plane flush passes its own
+ * per-agent scope.
+ */
+export function stateGitLockPath(gitRoot: string, issueId: string): string {
+  const key = createHash('sha256').update(`${resolve(gitRoot)}::${issueId.toUpperCase()}`).digest('hex');
   return join(getOverdeckHome(), 'locks', 'state-git', `${key}.lock`);
 }
 
 export async function withStateGitLock<T>(
   gitRoot: string,
+  issueId: string,
   writerId: string,
   recordPath: string,
   operation: () => Promise<T>,
 ): Promise<T> {
-  const key = resolve(gitRoot);
+  const key = `${resolve(gitRoot)}::${issueId.toUpperCase()}`;
   const prior = processQueues.get(key) ?? Promise.resolve();
   let releaseQueue!: () => void;
   const gate = new Promise<void>((resolveGate) => {
@@ -42,11 +50,12 @@ export async function withStateGitLock<T>(
   processQueues.set(key, tail);
 
   await prior.catch(() => undefined);
-  const lockPath = stateGitLockPath(gitRoot);
+  const lockPath = stateGitLockPath(gitRoot, issueId);
   try {
     await acquireRecordLock(lockPath, {
       writerId,
       recordPath,
+      issueId,
       retryDelaysMs: STATE_GIT_LOCK_RETRY_DELAYS_MS,
     });
     try {

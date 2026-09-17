@@ -333,7 +333,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     });
     const failedUpdateAssertion = expect(failedUpdate).rejects.toThrow('specs/shared.json');
     await deliveryStarted;
-    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    expect(existsSync(stateGitLockPath(stateRoot, ISSUE_ID))).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     settleDelivery('failed');
     await failedUpdateAssertion;
@@ -434,7 +434,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     });
     await deliveryStarted;
 
-    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    expect(existsSync(stateGitLockPath(stateRoot, ISSUE_ID))).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     settleDelivery('failed');
 

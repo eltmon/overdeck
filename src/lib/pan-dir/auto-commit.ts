@@ -93,6 +93,12 @@ export interface FlushResult {
   /** True only when the new commit is confirmed on origin. */
   pushed?: boolean;
   /**
+   * True when the commit landed locally but the push was deliberately deferred
+   * to a post-lock `pushAutoCommits` call (PAN-3848 W23): the record writer
+   * holds its per-issue locks only across the commit, never across the push.
+   */
+  pushDeferred?: boolean;
+  /**
    * True when a git operation actually errored (branch resolution, `git add`,
    * or `git commit` exited non-zero) as opposed to a benign no-op such as
    * "no diff" or "not on main". Door writers that await the flush surface this
@@ -325,6 +331,52 @@ export function flushAutoCommits(
 }
 
 /**
+ * PAN-3848 (W23): the commit half of a flush, with the push deferred. The
+ * record writer runs this under its per-issue locks and then pushes after the
+ * locks are released via `pushAutoCommits`, so a slow network push never
+ * starves peer writers. The result carries `pushDeferred: true` when a commit
+ * landed and still needs the post-lock push.
+ */
+export function commitAutoCommits(
+  projectRoot: string,
+  signal?: AbortSignal,
+): Effect.Effect<FlushResult, never> {
+  return Effect.promise(() => flushPromise(projectRoot, signal, true));
+}
+
+/**
+ * The push half of a split flush (PAN-3848 W23): push whatever local commits
+ * already exist on the checkout's state-plane branch. Resolves `projectRoot`
+ * the same way the queue does (state worktree for migrated projects), so the
+ * caller can pass the same root it passed to `commitAutoCommits`. Returns null
+ * when there is no repo, no matching branch, or no `origin` remote — the same
+ * "not part of the write" convention as `maybePushStateCommit`.
+ */
+export function pushAutoCommits(
+  projectRoot: string,
+): Effect.Effect<PushResult | null, never> {
+  let gitRoot = projectRoot;
+  let expectedBranch = existsSync(join(projectRoot, 'migration-complete.json')) ? STATE_BRANCH : 'main';
+  const project = findProjectByPathSync(projectRoot);
+  if (project) {
+    const stateHome = resolveStateReadHomeSync(project);
+    if (stateHome.migrated) {
+      gitRoot = stateHome.root;
+      expectedBranch = STATE_BRANCH;
+    }
+  }
+  if (!existsSync(join(gitRoot, '.git'))) return Effect.succeed(null);
+
+  return runGit(['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot).pipe(
+    Effect.matchEffect({
+      onSuccess: (r) => Effect.succeed(r.stdout.trim() as string | null),
+      onFailure: () => Effect.succeed(null as string | null),
+    }),
+    Effect.flatMap((branch) => branch === expectedBranch ? maybePushStateCommit(gitRoot, expectedBranch) : Effect.succeed(null)),
+  );
+}
+
+/**
  * Force a flush of every project root with a pending auto-commit. Used during
  * graceful process shutdown so the fixed window does not strand committable
  * state as a dirty tree.
@@ -339,6 +391,7 @@ export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never
 function flushPromise(
   projectRoot: string,
   signal?: AbortSignal,
+  deferPush = false,
 ): Promise<FlushResult> {
   const gitRoot = pending.get(projectRoot)?.repoRoot
     ?? active.get(projectRoot)?.gitRoot
@@ -348,7 +401,7 @@ function flushPromise(
   for (const [queuedProjectRoot, batch] of pending) {
     if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
     if (batch.timer) clearTimeout(batch.timer);
-    const started = flushInner(queuedProjectRoot);
+    const started = flushInner(queuedProjectRoot, deferPush);
     if (started) matching.add(started);
   }
   for (const activeFlush of active.values()) {
@@ -362,7 +415,7 @@ function flushPromise(
   return waitForFlushes(gitRoot, [...matching], signal);
 }
 
-function flushInner(projectRoot: string): ActiveFlush | undefined {
+function flushInner(projectRoot: string, deferPush = false): ActiveFlush | undefined {
   const batch = pending.get(projectRoot);
   if (!batch) return active.get(projectRoot);
   pending.delete(projectRoot);
@@ -371,7 +424,7 @@ function flushInner(projectRoot: string): ActiveFlush | undefined {
   return startSerializedFlush(
     projectRoot,
     gitRoot,
-    doBoundedCommit(projectRoot, batch),
+    doBoundedCommit(projectRoot, batch, deferPush),
   );
 }
 
@@ -459,6 +512,11 @@ function combineFlushResults(results: FlushResult[]): FlushResult {
   else if (committed.length > 0 && committed.every((result) => result.pushed === true)) {
     combined.pushed = true;
   }
+  // A deferred push still needs the post-lock pushAutoCommits unless one of the
+  // combined flushes already pushed (PAN-3848 W23).
+  if (results.some((result) => result.pushDeferred) && !results.some((result) => result.pushed === true)) {
+    combined.pushDeferred = true;
+  }
   if (results.some((result) => result.errored)) combined.errored = true;
   const reasons = results.flatMap((result) => result.reason ? [result.reason] : []);
   if (reasons.length > 0) combined.reason = reasons.join('; ');
@@ -486,8 +544,9 @@ function clearActiveFlush(
 function doBoundedCommit(
   projectRoot: string,
   batch: QueuedCommit,
+  deferPush = false,
 ): Effect.Effect<FlushResult, never> {
-  return boundStateFlush(doCommit(projectRoot, batch));
+  return boundStateFlush(doCommit(projectRoot, batch, deferPush));
 }
 
 function boundStateFlush(
@@ -510,6 +569,7 @@ function boundStateFlush(
 function doCommit(
   projectRoot: string,
   batch: QueuedCommit,
+  deferPush = false,
 ): Effect.Effect<FlushResult, never> {
   const gitRoot = batch.repoRoot ?? projectRoot;
   return Effect.gen(function* () {
@@ -652,6 +712,12 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
+    // PAN-3848 (W23): the record writer pushes after releasing its per-issue
+    // locks, so the commit phase reports the deferral instead of pushing here.
+    if (deferPush) {
+      return { committed: true, pushDeferred: true };
+    }
+
     const push = yield* maybePushStateCommit(gitRoot, branch);
     if (push && !push.pushed) {
       return { committed: true, pushed: false, reason: push.reason };
@@ -683,25 +749,7 @@ export interface PushResult {
  * "no origin = not part of the write" convention for local/test repos).
  */
 export function pushPendingStateCommits(projectRoot: string): Effect.Effect<PushResult | null, never> {
-  const project = findProjectByPathSync(projectRoot);
-  let gitRoot = projectRoot;
-  let expectedBranch = 'main';
-  if (project) {
-    const stateHome = resolveStateReadHomeSync(project);
-    if (stateHome.migrated) {
-      gitRoot = stateHome.root;
-      expectedBranch = STATE_BRANCH;
-    }
-  }
-  if (!existsSync(join(gitRoot, '.git'))) return Effect.succeed(null);
-
-  return runGit(['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot).pipe(
-    Effect.matchEffect({
-      onSuccess: (r) => Effect.succeed(r.stdout.trim() as string | null),
-      onFailure: () => Effect.succeed(null as string | null),
-    }),
-    Effect.flatMap((branch) => branch === expectedBranch ? maybePushStateCommit(gitRoot, expectedBranch) : Effect.succeed(null)),
-  );
+  return pushAutoCommits(projectRoot);
 }
 
 function maybePushStateCommit(
