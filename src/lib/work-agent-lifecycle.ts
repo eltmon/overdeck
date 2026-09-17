@@ -21,11 +21,11 @@ function canStartFresh(lifecycle: WorkAgentLifecycleState, fresh: boolean): bool
 /**
  * PAN-3555: a completion marker stops meaning "nothing to resume" the moment the
  * pipeline owes the agent rework — a failed verification, a blocked/failed review,
- * or a failed test after the handoff makes the warm session the rework target
- * (the same condition PAN-2668 uses to clear stoppedByUser for feedback delivery).
- * Without this, the handed-off branch routed `pan start` to a silent fresh session
- * whenever the feedback loop's direct resumeAgent() path failed, abandoning the
- * resumable transcript with no refusal and no logged reason.
+ * a failed test, or a failed UAT after the handoff makes the warm session the
+ * rework target (the same condition PAN-2668 uses to clear stoppedByUser for
+ * feedback delivery). Without this, the handed-off branch routed `pan start` to a
+ * silent fresh session whenever the feedback loop's direct resumeAgent() path
+ * failed, abandoning the resumable transcript with no refusal and no logged reason.
  */
 export function issueOwesReworkSync(issueId: string | undefined): boolean {
   if (!issueId) return false;
@@ -35,7 +35,8 @@ export function issueOwesReworkSync(issueId: string | undefined): boolean {
     return row.verificationStatus === 'failed'
       || row.reviewStatus === 'blocked'
       || row.reviewStatus === 'failed'
-      || row.testStatus === 'failed';
+      || row.testStatus === 'failed'
+      || row.uatStatus === 'failed';
   } catch {
     return false;
   }
@@ -67,9 +68,9 @@ export interface WorkAgentLifecycleState {
    * directly, not through this read door. */
   handedOff: boolean;
   /** PAN-3555: true when the agent handed off but the canonical review row shows the
-   * pipeline owes it rework (failed verification, blocked/failed review, or failed
-   * test). An owed-rework handoff is resumable again — `handedOff` alone no longer
-   * closes the resume doors. */
+   * pipeline owes it rework (failed verification, blocked/failed review, failed
+   * test, or failed UAT). An owed-rework handoff is resumable again — `handedOff`
+   * alone no longer closes the resume doors. */
   owesRework: boolean;
   runtimeState: string;
   agentStatus: string;
@@ -140,7 +141,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
   } else if (canWarmResumeAfterHandoff) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
+    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, failed test, or failed UAT). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
     // only relaunches a finished transcript (which the harness then compacts)
@@ -247,7 +248,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
   } else if (canWarmResumeAfterHandoff) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
+    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, failed test, or failed UAT). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
     // only relaunches a finished transcript (which the harness then compacts)

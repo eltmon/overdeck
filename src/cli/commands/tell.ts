@@ -1,6 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { messageAgent, resolveAgentTargetSync } from '../../lib/agents.js';
+import { getAgentStateSync, messageAgent, resolveAgentTargetSync } from '../../lib/agents.js';
+import { issueOwesReworkSync } from '../../lib/work-agent-lifecycle.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
 
 export async function tellCommand(id: string, message: string): Promise<void> {
@@ -26,7 +27,10 @@ export async function tellCommand(id: string, message: string): Promise<void> {
       return;
     }
 
-    const outcome = await messageAgent(agentId, message, 'pan-tell');
+    const issueId = getAgentStateSync(agentId)?.issueId;
+    const outcome = await messageAgent(agentId, message, 'pan-tell', {
+      owesRework: issueOwesReworkSync(issueId),
+    });
     console.log(chalk.green('Message sent to ' + agentId));
     console.log(chalk.dim(`  "${message}"`));
     // PAN-3736: when the delivery door explains itself — a busy agent whose
