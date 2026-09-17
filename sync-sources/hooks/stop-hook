@@ -202,6 +202,10 @@ if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
     if [ ! -f "$CONVOY_MARKER" ]; then
       continue
     fi
+    # PAN-3848 (FR-21): the reap is the reviewer's exit transition — write
+    # status: stopped through the CLI verb before killing the session, so no
+    # patrol has to infer the exit from the missing tmux session afterwards.
+    pan admin agents exited "$CONVOY_SESSION" --code 0 >/dev/null 2>&1 || true
     if tmux -L overdeck kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
       KILLED_ANY=true
       echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION (signaled)" \
