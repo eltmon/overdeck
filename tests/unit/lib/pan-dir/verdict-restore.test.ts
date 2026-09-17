@@ -386,6 +386,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'pr_number',
       'reviewed_at_commit',
       'last_verified_commit',
+      'review_stale_since',
       'auto_merge',
       'deacon_ignored',
       'deacon_ignored_at',
