@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:45:32.222Z",
+  "updated": "2026-09-17T00:45:35.522Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 21,
+    "sequence": 22,
     "claims": {
       "spawn-single-log": {
         "writerId": "agent-pan-3842",
@@ -468,8 +468,8 @@
         "updatedAt": "2026-09-17T00:45:32.222Z"
       },
       "fitness-checker": {
-        "reason": "Added src/lib/agents/tier-fitness.ts (checkTierFitness/checkStaffingFitness, §5.2 bands, §5.3 shapes, per-entry algorithm per WI-2) plus 17-case test with injected literal ctx; typecheck green; type-only imports keep module fs-free.",
-        "updatedAt": "2026-09-16T19:43:22.151Z"
+        "reason": "Adjudicated F-5/C1: underpowered message interpolates a single max requirement after listing every failing difficulty, implying medium needs frontier",
+        "updatedAt": "2026-09-17T00:45:35.522Z"
       },
       "fitness-context": {
         "reason": "Added src/lib/agents/tier-fitness-context.ts per WI-3 verbatim plus 4-case test; all pass, typecheck green.",
@@ -504,12 +504,12 @@
     "class-table.ac3": "completed",
     "class-table.ac4": "completed",
     "class-table.ac5": "completed",
-    "fitness-checker": "completed",
-    "fitness-checker.ac1": "completed",
-    "fitness-checker.ac2": "completed",
-    "fitness-checker.ac3": "completed",
-    "fitness-checker.ac4": "completed",
-    "fitness-checker.ac5": "completed",
+    "fitness-checker": "pending",
+    "fitness-checker.ac1": "pending",
+    "fitness-checker.ac2": "pending",
+    "fitness-checker.ac3": "pending",
+    "fitness-checker.ac4": "pending",
+    "fitness-checker.ac5": "pending",
     "fitness-context": "completed",
     "fitness-context.ac1": "completed",
     "fitness-context.ac2": "completed",
