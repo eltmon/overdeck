@@ -16,7 +16,7 @@ import type { SqliteDatabase } from '../../../lib/database/driver.js';
 import { getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
 import { stateToOverdeckParamsForDb, AGENT_COLUMNS_FOR_DB } from '../../../lib/overdeck/agent-state-sync.js';
 import { getEventStore, type EventStore, type StoredEvent } from '../event-store.js';
-import { writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
+import { getAgentStateSync, writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
 import { WORK_LAUNCHER_GRACE_MS } from '../../../lib/cloister/agent-grace.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import { getWorkspaceForIssue } from '../../../lib/workspaces/resolver.js';
@@ -276,4 +276,108 @@ export function rollbackAgentStartPlaceholderProgram(
     fallback,
     event,
   ));
+}
+
+// ─── PTY-supervisor lifecycle events (PAN-3849 W33) ─────────────────────────
+//
+// The PTY supervisor observes the harness process directly (it owns the PTY
+// master), so ITS events — not a patrol inferring exit from a missing tmux
+// session — are the write source for running/stopped transitions of
+// supervisor-launched agents. Every event writes state.json and the agents
+// row through the same one-transaction projection above.
+
+export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn-ended' | 'exited';
+
+export interface AgentLifecycleEventInput {
+  event: AgentLifecycleEventName;
+  at: string;
+  exitCode?: number;
+}
+
+export type AgentLifecycleApplyResult =
+  | { applied: true; status: AgentState['status'] }
+  | { applied: false; reason: 'no-state' | 'already-stopped' };
+
+function snapshotFromState(state: AgentState) {
+  return {
+    id: state.id,
+    issueId: state.issueId,
+    ...(state.workspace ? { workspace: state.workspace } : {}),
+    ...(state.harness ? { runtime: state.harness } : {}),
+    ...(state.model ? { model: state.model } : {}),
+    status: state.status,
+    ...(state.startedAt ? { startedAt: state.startedAt } : {}),
+    ...(state.lastActivity ? { lastActivity: state.lastActivity } : {}),
+    ...(state.startedBy ? { startedBy: state.startedBy } : {}),
+    ...(state.role ? { role: state.role } : {}),
+    ...(state.sessionId ? { sessionId: state.sessionId } : {}),
+  };
+}
+
+export function applyAgentLifecycleEventWithDeps(
+  db: SqliteDatabase,
+  eventStore: AgentProjectionEventStore,
+  agentId: string,
+  input: AgentLifecycleEventInput,
+): AgentLifecycleApplyResult {
+  const state = getAgentStateSync(agentId);
+  if (!state) return { applied: false, reason: 'no-state' };
+  const at = input.at;
+
+  switch (input.event) {
+    case 'session-started': {
+      // agent.started is emitted HERE — when the harness process actually
+      // exists — and nowhere earlier (W34: no placeholder row pre-emits it).
+      // A duplicate/late event must not resurrect an agent that already
+      // stopped (event retries are not a total order).
+      if (state.status === 'stopped') return { applied: false, reason: 'already-stopped' };
+      const next: AgentState = { ...state, status: 'running', lastActivity: at };
+      saveAgentStateAndEmitEventWithDeps(db, eventStore, next, {
+        type: 'agent.started',
+        timestamp: at,
+        payload: { agentId, issueId: next.issueId, agent: snapshotFromState(next) },
+      });
+      return { applied: true, status: 'running' };
+    }
+    case 'turn-started':
+    case 'turn-ended': {
+      const next: AgentState = { ...state, lastActivity: at };
+      saveAgentStateAndEmitEventWithDeps(db, eventStore, next, {
+        type: 'agent.activity_changed',
+        timestamp: at,
+        payload: { agentId, activity: input.event === 'turn-started' ? 'working' : 'idle' },
+      });
+      return { applied: true, status: next.status };
+    }
+    case 'exited': {
+      const next: AgentState = {
+        ...state,
+        status: 'stopped',
+        stoppedAt: state.stoppedAt ?? at,
+        lastActivity: at,
+      };
+      saveAgentStateAndEmitEventWithDeps(db, eventStore, next, {
+        type: 'agent.stopped',
+        timestamp: at,
+        payload: {
+          agentId,
+          issueId: next.issueId,
+          ...(next.sessionId ? { sessionId: next.sessionId } : {}),
+        },
+      });
+      return { applied: true, status: 'stopped' };
+    }
+  }
+}
+
+export function applyAgentLifecycleEvent(
+  agentId: string,
+  input: AgentLifecycleEventInput,
+): AgentLifecycleApplyResult {
+  return applyAgentLifecycleEventWithDeps(
+    getOverdeckDatabaseSync(),
+    getEventStore(),
+    agentId,
+    input,
+  );
 }
