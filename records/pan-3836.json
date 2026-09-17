@@ -472,10 +472,10 @@
       "tests/unit/lib/projects/repo-url.test.ts",
       "tests/unit/telemetry-docs.test.ts"
     ],
-    "recordedAt": "2026-09-17T04:20:26.020Z"
+    "recordedAt": "2026-09-17T04:24:56.466Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T04:24:52.649Z",
+  "updated": "2026-09-17T04:24:56.468Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
