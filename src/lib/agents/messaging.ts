@@ -647,6 +647,19 @@ export async function messageAgent(
     return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
+  // Claude Code agent without an identifiable transcript: the confirmed-turn
+  // contract (PAN-3846 FR-1) cannot be satisfied, so fail loudly instead of
+  // falling through to an unconfirmed composer delivery that reports
+  // delivered:true. Conversations (no agent state) and keyed or non-Claude
+  // deliveries keep the composer-level contract below.
+  if (agentState && getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl' && opts.dedupKey === undefined) {
+    const reason = `cannot confirm delivery: no Claude transcript identifiable for ${normalizedId} (workspace: ${agentState.workspace ?? 'none'}, sessionId: ${transcriptSessionId ?? 'none'})`;
+    logAgentLifecycleSync(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+    queueAgentMail(normalizedId, message, 'queued', undefined, caller);
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    return { delivered: false, queuedToMail: true, confirmed: false, reason };
+  }
+
   // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
   const delivery = await deliverWithOptionalKey(
     normalizedId,

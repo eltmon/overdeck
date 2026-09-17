@@ -172,14 +172,17 @@ describe('messageAgent', () => {
       issueId: 'PAN-2262',
       status: 'running',
       workspace: '/repo',
+      harness: 'claude-code',
+      sessionId: 'session-2262',
       troubled: true,
       consecutiveFailures: 3,
     });
+    mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
 
     await expect(messageAgent('agent-pan-2262', 'review feedback', 'pan-tell')).resolves.toEqual({
       delivered: true,
       queuedToMail: true,
-      confirmed: false,
+      confirmed: true,
     });
 
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
@@ -191,6 +194,61 @@ describe('messageAgent', () => {
     expect(mocks.logAgentLifecycleSync).not.toHaveBeenCalledWith(
       'agent-pan-2262',
       expect.stringContaining('queued mail without resume'),
+    );
+  });
+
+  it('fails loudly for a Claude Code agent with no identifiable transcript (PR #3870 finding 2)', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'claude-code',
+      // no sessionId, and none recorded in activity
+    });
+    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+
+    const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.confirmed).toBe(false);
+    expect(outcome.reason).toContain('no Claude transcript identifiable');
+    // Nothing was injected — the composer path must not claim an unconfirmed success.
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+      'agent-pan-2262',
+      expect.stringContaining('messageAgent NOT confirmed'),
+    );
+  });
+
+  it('fails loudly for a Claude Code agent with no workspace on record', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'running',
+      harness: 'claude-code',
+      sessionId: 'session-2262',
+    });
+
+    const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.reason).toContain('no Claude transcript identifiable');
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the composer-level contract for a Claude conversation without agent state', async () => {
+    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
+
+    const outcome = await messageAgent('conv-20260716-1234', 'operator message', 'pan-tell');
+
+    expect(outcome).toEqual({ delivered: true, queuedToMail: true, confirmed: false });
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'conv-20260716-1234',
+      'operator message',
+      'messageAgent:pan-tell',
+      undefined,
     );
   });
 
