@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:17:36.061Z",
+  "updated": "2026-09-17T01:18:33.564Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,16 +351,8 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 30,
-    "claims": {
-      "docs-fitness": {
-        "writerId": "agent-pan-3842",
-        "agentId": "agent-pan-3842",
-        "pid": 32145,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:17:36.060Z"
-      }
-    },
+    "sequence": 31,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -493,6 +485,17 @@
         "outcome": "completed",
         "reason": "F-6a: new agents-spawn-tier-fitness.test.ts drives real spawnAgent/spawnRun with side effects mocked; 7 tests. Demonstrated it catches the pre-dfe7305 ordering bug in both directions. Also fixed the getDispatchableItems regression (35/35 supervisor tests).",
         "releasedAt": "2026-09-17T01:17:29.838Z"
+      },
+      {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 32145,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:17:36.060Z",
+        "itemId": "docs-fitness",
+        "outcome": "completed",
+        "reason": "Documented literal-first classification (R1), grouped mixed-difficulty wording (R2), provider scoping (F-1), final-selected-model ordering, and the Settings catalog union.",
+        "releasedAt": "2026-09-17T01:18:33.564Z"
       }
     ],
     "statusReasons": {
@@ -525,8 +528,8 @@
         "updatedAt": "2026-09-17T01:09:05.107Z"
       },
       "docs-fitness": {
-        "reason": "docs for the three corrections",
-        "updatedAt": "2026-09-17T01:17:36.060Z"
+        "reason": "Documented literal-first classification (R1), grouped mixed-difficulty wording (R2), provider scoping (F-1), final-selected-model ordering, and the Settings catalog union.",
+        "updatedAt": "2026-09-17T01:18:33.564Z"
       }
     }
   },
@@ -569,10 +572,10 @@
     "settings-badges.ac3": "completed",
     "settings-badges.ac4": "completed",
     "settings-badges.ac5": "completed",
-    "docs-fitness": "running",
-    "docs-fitness.ac1": "pending",
-    "docs-fitness.ac2": "pending",
-    "docs-fitness.ac3": "pending",
-    "docs-fitness.ac4": "pending"
+    "docs-fitness": "completed",
+    "docs-fitness.ac1": "completed",
+    "docs-fitness.ac2": "completed",
+    "docs-fitness.ac3": "completed",
+    "docs-fitness.ac4": "completed"
   }
 }
