@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T00:32:18.348Z",
+  "updated": "2026-09-17T00:35:25.544Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 42,
+    "sequence": 43,
     "claims": {},
     "claimHistory": [
       {
@@ -871,8 +871,8 @@
     ],
     "statusReasons": {
       "repo-url-parser": {
-        "reason": "Implemented parseRepoUrl with comprehensive URL parsing for shorthand, SCP-like, SSH, and HTTPS formats. Created unit tests covering all acceptance criteria.",
-        "updatedAt": "2026-09-16T14:37:44.754Z"
+        "reason": "WI-1.1 revised: transport URLs must be preserved verbatim (no SSH->HTTPS rewrite, no port-as-path, dotted names accepted). Old acceptance superseded by the revised PRD.",
+        "updatedAt": "2026-09-17T00:35:25.544Z"
       },
       "registration-extras": {
         "reason": "Added RegisterProjectExtras type and optional extras parameter. Tests verify extras are saved and backward compatibility is maintained.",
@@ -929,12 +929,12 @@
     }
   },
   "statusOverrides": {
-    "repo-url-parser": "completed",
-    "repo-url-parser.ac1": "completed",
-    "repo-url-parser.ac2": "completed",
-    "repo-url-parser.ac3": "completed",
-    "repo-url-parser.ac4": "completed",
-    "repo-url-parser.ac5": "completed",
+    "repo-url-parser": "pending",
+    "repo-url-parser.ac1": "pending",
+    "repo-url-parser.ac2": "pending",
+    "repo-url-parser.ac3": "pending",
+    "repo-url-parser.ac4": "pending",
+    "repo-url-parser.ac5": "pending",
     "registration-extras": "completed",
     "registration-extras.ac1": "completed",
     "registration-extras.ac2": "completed",
