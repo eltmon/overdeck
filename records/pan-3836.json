@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:52:34.605Z",
+  "updated": "2026-09-17T01:52:42.370Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,8 +678,16 @@
     }
   ],
   "tasks": {
-    "sequence": 51,
-    "claims": {},
+    "sequence": 52,
+    "claims": {
+      "cli-project-add-dry-run": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 556047,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:52:42.370Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -996,7 +1004,7 @@
     "project-create-routes.ac3": "completed",
     "project-create-routes.ac4": "completed",
     "project-create-routes.ac5": "completed",
-    "cli-project-add-dry-run": "pending",
+    "cli-project-add-dry-run": "running",
     "cli-project-add-dry-run.ac1": "pending",
     "cli-project-add-dry-run.ac2": "pending",
     "cli-project-add-dry-run.ac3": "pending",
