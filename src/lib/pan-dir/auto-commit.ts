@@ -728,16 +728,14 @@ function pushStateBranch(
     DEFAULT_STATE_PUSH_TIMEOUT_MS,
   );
 
-  return Effect.promise(() =>
-    pushWithRetry(async () => {
-      const outcome = await Effect.runPromise(
-        Effect.either(runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs)),
-      );
-      return outcome._tag === 'Right'
-        ? { ok: true as const }
-        : { ok: false as const, message: outcome.left.stderr || outcome.left._tag };
+  const attempt = runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
+    Effect.match({
+      onSuccess: (): PushAttemptOutcome => ({ ok: true }),
+      onFailure: (err): PushAttemptOutcome => ({ ok: false, message: err.stderr || err._tag }),
     }),
-  ).pipe(
+  );
+
+  return Effect.promise(() => pushWithRetry(() => Effect.runPromise(attempt))).pipe(
     Effect.map((result) => {
       // The paths-only queue has no mutation intent and must never replay or
       // rebase. Domain writers resolve non-fast-forward conflicts before
