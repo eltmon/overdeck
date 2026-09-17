@@ -30,4 +30,11 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     expect(typeof mod.getIssueTasks).toBe('function');
     expect(typeof mod.getIssuePrd).toBe('function');
   });
+
+  it('W3: the legacy ModelRouter module is unimportable', async () => {
+    // ModelRouter/routeTask/getGlobalRouter/getSpecialistModel/getDefaultModel
+    // had zero non-test callers; the parity-lock test the deletion was waiting
+    // on existed only to guard the legacy mapping and was deleted with it.
+    await expect(import('../../../../src/lib/cloister/router.js')).rejects.toThrow();
+  });
 });
