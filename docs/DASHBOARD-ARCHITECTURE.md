@@ -65,6 +65,26 @@ through `handleConversationCreate`, so it appears under the sidebar's
 (no tool sandbox); `tests/unit/prompts/retrospective-template.test.ts` pins
 the read-only clause and the placeholder set.
 
+Because the endpoint spawns a billable model session, it is gated by
+`rejectUnsafeDashboardMutationRequest` — the same authenticated-mutation
+contract as the other launch routes — not by `validateOrigin` alone. A
+trusted `Origin` with no credentials gets 401; a session cookie without the
+matching CSRF header gets 403; the server-side internal token is accepted on
+its own. The button therefore sends `dashboardMutationJsonHeaders()`, with no
+argument: that helper resolves a WebSocket RPC URL internally, so passing it a
+relative REST path would throw in `new URL(...)`.
+
+The kickoff prompt locates per-issue records under the `state root` the server
+already resolved through the canonical state resolver and rendered into
+`{{PROJECT_LINES}}` (`<state root>/records/<issue>.json` when migrated,
+`<state root>/.pan/records/<issue>.json` when legacy). Those records are a
+source of truth, not a cache. Note the standing gap: no `pan` verb and no
+dashboard endpoint returns a **full** record to a shell consumer — `pan show
+--json` is the runtime lens and `pan task show --json` is a single plan item,
+so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
+`recoveryTrips`. The template discloses that limitation rather than implying a
+door that does not exist; a real record read door would be a separate change.
+
 **DB job worker lanes:**
 - The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
   reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
