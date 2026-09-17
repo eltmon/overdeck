@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:04.912Z",
+  "updated": "2026-09-17T02:10:08.123Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 67,
+    "sequence": 68,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -1022,8 +1022,8 @@
         "updatedAt": "2026-09-16T22:59:52.306Z"
       },
       "delete-new-project-modal": {
-        "reason": "NewProjectModal component and all references deleted; typecheck passes",
-        "updatedAt": "2026-09-16T16:06:11.488Z"
+        "reason": "revised PRD",
+        "updatedAt": "2026-09-17T02:10:08.123Z"
       },
       "docs-projects-and-workspaces": {
         "reason": "Documentation updates complete: added section to WORKSPACES-AND-PROJECTS.md, extended CLAUDE.md, updated configuration/projects.mdx, added module header to create.ts, updated pan-new-project skill with dashboard flow",
@@ -1098,10 +1098,10 @@
     "wire-entry-points-no-loss.ac3": "pending",
     "wire-entry-points-no-loss.ac4": "pending",
     "wire-entry-points-no-loss.ac5": "pending",
-    "delete-new-project-modal": "completed",
-    "delete-new-project-modal.ac1": "completed",
-    "delete-new-project-modal.ac2": "completed",
-    "delete-new-project-modal.ac3": "completed",
+    "delete-new-project-modal": "pending",
+    "delete-new-project-modal.ac1": "pending",
+    "delete-new-project-modal.ac2": "pending",
+    "delete-new-project-modal.ac3": "pending",
     "docs-projects-and-workspaces": "completed",
     "docs-projects-and-workspaces.ac1": "completed",
     "docs-projects-and-workspaces.ac2": "completed",
