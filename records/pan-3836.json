@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T01:53:22.817Z",
+  "updated": "2026-09-17T01:53:26.048Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 60,
-    "claims": {
-      "project-create-routes": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 562866,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T01:53:22.817Z"
-      }
-    },
+    "sequence": 61,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -941,6 +933,17 @@
         "outcome": "completed",
         "reason": "WI-3: pan project clone shares the core, preserves the transport URL verbatim, JSON --dry-run, SIGINT->abort->130, typed failure reporting with the finish-setup repair command. Commit 0f67887d08d.",
         "releasedAt": "2026-09-17T01:53:16.157Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 562866,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:53:22.817Z",
+        "itemId": "project-create-routes",
+        "outcome": "completed",
+        "reason": "WI-2.3-2.6: cancel, reconcile (read-only) and finish-setup routes in project-create-routes.ts; resolve returns the redacted public intent; job poll carries structured failure plus legacy error. Commit 69079096aa3.",
+        "releasedAt": "2026-09-17T01:53:26.048Z"
       }
     ],
     "statusReasons": {
@@ -965,8 +968,8 @@
         "updatedAt": "2026-09-17T01:53:03.400Z"
       },
       "project-create-routes": {
-        "reason": "WI-2.3-2.6: cancel/reconcile/finish-setup routes and safe DTOs",
-        "updatedAt": "2026-09-17T01:53:19.367Z"
+        "reason": "WI-2.3-2.6: cancel, reconcile (read-only) and finish-setup routes in project-create-routes.ts; resolve returns the redacted public intent; job poll carries structured failure plus legacy error. Commit 69079096aa3.",
+        "updatedAt": "2026-09-17T01:53:26.048Z"
       },
       "cli-project-add-dry-run": {
         "reason": "WI-3: JSON --dry-run via toPublicProjectIntent (credentials redacted), real registration metadata instead of a stub that dropped detected config, uppercased --linear-team, findings exit 1, SIGINT->abort->130, new pan project finish-setup. Commit 0f67887d08d.",
@@ -1031,12 +1034,12 @@
     "create-job-store.ac2": "completed",
     "create-job-store.ac3": "completed",
     "create-job-store.ac4": "completed",
-    "project-create-routes": "running",
-    "project-create-routes.ac1": "pending",
-    "project-create-routes.ac2": "pending",
-    "project-create-routes.ac3": "pending",
-    "project-create-routes.ac4": "pending",
-    "project-create-routes.ac5": "pending",
+    "project-create-routes": "completed",
+    "project-create-routes.ac1": "completed",
+    "project-create-routes.ac2": "completed",
+    "project-create-routes.ac3": "completed",
+    "project-create-routes.ac4": "completed",
+    "project-create-routes.ac5": "completed",
     "cli-project-add-dry-run": "completed",
     "cli-project-add-dry-run.ac1": "completed",
     "cli-project-add-dry-run.ac2": "completed",
