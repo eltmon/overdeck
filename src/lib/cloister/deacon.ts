@@ -1471,8 +1471,8 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
       ) {
         // Snapshot the workspace HEAD so reviewedAtCommit is populated — without
         // it, checkPostReviewCommits can never confirm the review is current and
-        // the canSkipTests fast-path in setReviewStatus never fires, leaving the
-        // issue jammed at passed-but-stuck forever (PAN-977).
+        // PAN-3847's verdict door refuses the bypass, leaving the issue jammed at
+        // passed-but-stuck forever (PAN-977).
         let reviewedAtCommit;
         try {
           const project = resolveProjectFromIssueSync(issueId);

@@ -535,7 +535,7 @@ export async function reconcileMergedButReviewing(): Promise<string[]> {
       if (mergedReviewingReconciled.has(issueId)) continue;
 
       // Set BOTH review and test to 'passed' atomically. Setting only review='passed'
-      // trips the canSkipTests dispatch path in setReviewStatus and spawns a test-agent
+      // trips the review.approved dispatch in setReviewStatus and spawns a test-agent
       // for an already-merged issue — pure waste. The merge is terminal, no test needed.
       setReviewStatusSync(issueId, {
         reviewStatus: 'passed',
