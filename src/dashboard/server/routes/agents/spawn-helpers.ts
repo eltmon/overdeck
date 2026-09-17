@@ -279,7 +279,9 @@ export function handleContainerOrchestration(input: {
   effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
   startedBy: string;
   allowHost: boolean;
-  spawnModel: string;
+  /** Explicit operator-chosen model only — forwarded to `pan start` as
+   * `--model`; null lets `pan start` resolve staffing itself (PAN-3857). */
+  explicitModel: string | null;
   spawnGuardrails: SpawnGuardrailDecision;
   projectPath: string;
   eventStore: EventStoreAppend;
@@ -297,7 +299,7 @@ export function handleContainerOrchestration(input: {
       effectiveHarness,
       startedBy,
       allowHost,
-      spawnModel,
+      explicitModel,
       spawnGuardrails,
       projectPath,
       eventStore,
@@ -492,7 +494,7 @@ export function handleContainerOrchestration(input: {
                   const activityId = await requestWorkStartAfterContainers({
                     args: buildPanStartArgs({
                       issueId,
-                      model: spawnModel,
+                      model: explicitModel,
                       harness: effectiveHarness,
                       allowHost,
                     }),

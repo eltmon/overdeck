@@ -54,7 +54,14 @@ type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
 
 export function buildPanStartArgs(input: {
   issueId: string;
-  model: string;
+  /**
+   * Explicit operator-chosen model only. When omitted, no `--model` is emitted
+   * and `pan start` resolves staffing itself (tier table / issue override /
+   * role default). Forwarding a resolved default here made `pan start` treat
+   * it as an explicit override — skipping tier resolution and stamping it as
+   * the durable per-issue `record.workModel` (PAN-3857).
+   */
+  model?: string | null;
   harness?: RuntimeName | null;
   allowHost?: boolean;
   offBook?: boolean;
@@ -63,8 +70,7 @@ export function buildPanStartArgs(input: {
     'start',
     input.issueId,
     '--local',
-    '--model',
-    input.model,
+    ...(input.model ? ['--model', input.model] : []),
     ...(input.harness ? ['--harness', input.harness] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
     ...(input.offBook ? ['--off-book'] : []),
