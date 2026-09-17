@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { XBriefDifficulty } from '../../xbrief/types.js';
 import type { ModelCapabilityClass } from '../../model-capability-class.js';
+import { CONFIGURABLE_PROVIDER_SET } from '../../configurable-providers.js';
 import {
   CAPABILITY_CLASS_RANK,
   DIFFICULTY_CLASS_BANDS,
@@ -30,6 +31,10 @@ function makeCtx(overrides: Partial<TierFitnessContext> = {}): TierFitnessContex
     knownModelIds: new Set(Object.keys(CLASSES)),
     classOf: (m) => CLASSES[m],
     providerOf: (m) => PROVIDERS[m],
+    // The fixture's providers are synthetic, so declare them configurable —
+    // otherwise the PAN-3842 F-1 scoping would silence every provider case
+    // below. Real-catalog scoping is covered in its own describe block.
+    configurableProviders: new Set(Object.values(PROVIDERS)),
     ...overrides,
   };
 }
@@ -230,5 +235,53 @@ describe('underpowered wording across mixed difficulties', () => {
     // A workhorse only fails 'expert', so only that group is named.
     expect(mixed[0].difficulties).toEqual(['expert']);
     expect(mixed[0].message).toContain('items at that difficulty need at least frontier-class');
+  });
+});
+
+
+// PAN-3842 (adjudicated F-1): provider-not-enabled names Settings › Providers
+// as the remedy, so it may only fire where that control exists.
+describe('provider-not-enabled is scoped to providers the operator can enable', () => {
+  const ctxFor = (provider: string, overrides: Partial<TierFitnessContext> = {}): TierFitnessContext => ({
+    knownModelIds: new Set(['some-model']),
+    classOf: () => 'workhorse',
+    providerOf: () => provider,
+    enabledProviders: new Set(['anthropic']),
+    ...overrides,
+  });
+
+  it('warns for a configurable provider that is switched off', () => {
+    const warnings = checkStaffingFitness({ tierName: 'staff', model: 'some-model' }, ['medium'], ctxFor('openai'));
+    expect(warnings.map((w) => w.code)).toEqual(['provider-not-enabled']);
+  });
+
+  it.each(['xai', 'groq', 'cerebras', 'mistral', 'quantumllama'])(
+    'stays silent for %s, which has no enable control',
+    (provider) => {
+      expect(CONFIGURABLE_PROVIDER_SET.has(provider)).toBe(false);
+      const warnings = checkStaffingFitness({ tierName: 'staff', model: 'some-model' }, ['medium'], ctxFor(provider));
+      expect(warnings).toEqual([]);
+    },
+  );
+
+  it('defaults to the real configurable set when the caller omits it', () => {
+    // No configurableProviders in the context — the checker must still scope.
+    const warnings = checkStaffingFitness({ tierName: 'staff', model: 'some-model' }, ['medium'], ctxFor('groq'));
+    expect(warnings).toEqual([]);
+  });
+
+  it('scopes the supervisor check the same way', () => {
+    const config = { tiers: {}, supervisor: { model: 'some-model' } };
+    expect(checkTierFitness(config, ctxFor('groq'))).toEqual([]);
+    expect(checkTierFitness(config, ctxFor('openai')).map((w) => w.code)).toEqual(['provider-not-enabled']);
+  });
+
+  it('never blocks the band check — an unenableable provider still gets its fitness verdict', () => {
+    const warnings = checkStaffingFitness(
+      { tierName: 'staff', model: 'some-model' },
+      ['expert'],
+      ctxFor('groq', { classOf: () => 'small' }),
+    );
+    expect(warnings.map((w) => w.code)).toEqual(['underpowered']);
   });
 });

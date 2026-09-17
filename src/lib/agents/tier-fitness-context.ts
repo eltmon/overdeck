@@ -1,6 +1,7 @@
 import { PROVIDERS, getProviderForModelSync } from '../providers.js';
 import { MODEL_CAPABILITIES } from '../model-capabilities.js';
 import { capabilityClassOf } from '../model-capability-class.js';
+import { CONFIGURABLE_PROVIDER_SET } from '../configurable-providers.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import type { TierFitnessContext } from './tier-fitness.js';
 
@@ -14,5 +15,8 @@ export function buildTierFitnessContextSync(config: Pick<NormalizedConfig, 'enab
     classOf: capabilityClassOf,
     providerOf: (model) => getProviderForModelSync(model).name,
     enabledProviders: new Set(config.enabledProviders),
+    // PAN-3842 F-1: PROVIDERS carries environment-only providers that no
+    // config key can enable; only warn about ones Settings can switch on.
+    configurableProviders: CONFIGURABLE_PROVIDER_SET,
   };
 }

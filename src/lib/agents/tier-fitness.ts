@@ -1,5 +1,6 @@
 import type { XBriefDifficulty } from '../xbrief/types.js';
 import type { ModelCapabilityClass } from '../model-capability-class.js';
+import { CONFIGURABLE_PROVIDER_SET } from '../configurable-providers.js';
 
 // §5.2 Difficulty bands
 export const CAPABILITY_CLASS_RANK: Record<ModelCapabilityClass, number> = { small: 0, workhorse: 1, frontier: 2 };
@@ -39,6 +40,17 @@ export interface TierFitnessContext {
   providerOf: (model: string) => string | undefined;
   /** undefined ⇒ skip the provider check (frontend without provider info). */
   enabledProviders?: ReadonlySet<string>;
+  /**
+   * Providers the operator can actually enable. Defaults to
+   * CONFIGURABLE_PROVIDERS; both callers pass that set.
+   *
+   * PAN-3842 (adjudicated F-1): `provider-not-enabled` names "Settings ›
+   * Providers" as the remedy, so it may only fire for a provider with a
+   * control there. Environment-only providers (xai, groq, cerebras, mistral,
+   * quantumllama) have no YAML key and no merge branch that can ever add them
+   * to `enabledProviders`, so the warning was permanent and unclearable.
+   */
+  configurableProviders?: ReadonlySet<string>;
 }
 
 /** Structural input so both lib and frontend config shapes fit. */
@@ -96,6 +108,22 @@ function underpoweredDetail(bad: XBriefDifficulty[]): string {
     .join('; ');
 }
 
+/**
+ * Whether to warn that `provider` is not enabled.
+ *
+ * Silent when the caller supplied no `enabledProviders` (frontend contexts
+ * without provider info), when the model has no known provider, and — PAN-3842
+ * F-1 — when the provider has no enable control for the operator to use. The
+ * message points at Settings › Providers, so firing it for an environment-only
+ * provider produces advice that cannot be followed.
+ */
+function providerIsDisabled(provider: string | undefined, ctx: TierFitnessContext): provider is string {
+  if (ctx.enabledProviders === undefined || provider === undefined) return false;
+  const configurable = ctx.configurableProviders ?? CONFIGURABLE_PROVIDER_SET;
+  if (!configurable.has(provider)) return false;
+  return !ctx.enabledProviders.has(provider);
+}
+
 /** Steps 1–5 of the per-entry algorithm for one staffed (model, harness). */
 function checkEntry(
   entry: { model: string; harness?: string },
@@ -110,7 +138,7 @@ function checkEntry(
   }
   const warnings: TierFitnessWarning[] = [];
   const provider = ctx.providerOf(model);
-  if (ctx.enabledProviders !== undefined && provider !== undefined && !ctx.enabledProviders.has(provider)) {
+  if (providerIsDisabled(provider, ctx)) {
     warnings.push(
       warn(
         'provider-not-enabled',
@@ -172,7 +200,7 @@ export function checkTierFitness(config: TierFitnessConfig, ctx: TierFitnessCont
       warnings.push(warn('unknown-model', path, 'supervisor', model, harness, [], `${path}: ${model} is not in the model catalog`));
     } else {
       const provider = ctx.providerOf(model);
-      if (ctx.enabledProviders !== undefined && provider !== undefined && !ctx.enabledProviders.has(provider)) {
+      if (providerIsDisabled(provider, ctx)) {
         warnings.push(
           warn(
             'provider-not-enabled',

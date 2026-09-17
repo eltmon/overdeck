@@ -1,3 +1,4 @@
+import type { ConfigurableProvider } from '../configurable-providers.js';
 import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
@@ -480,10 +481,7 @@ export interface YamlConfig {
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
-    providers?: Partial<Record<
-      'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' |
-      'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', ProviderConfig | boolean
-    >>;
+    providers?: Partial<Record<ConfigurableProvider, ProviderConfig | boolean>>;
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<string, ModelId>>;

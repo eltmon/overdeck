@@ -1,6 +1,7 @@
 import { MODELS_BY_PROVIDER, type ModelDef } from '../modelCatalog';
 import { checkTierFitness, type TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
 import { capabilityClassOf } from '../../../../../../lib/model-capability-class.js';
+import { CONFIGURABLE_PROVIDER_SET } from '../../../../../../lib/configurable-providers.js';
 import type {
   Harness,
   ModelId,
@@ -218,7 +219,7 @@ export function tierFitnessWarnings(
   const knownModelIds = new Set(Object.values(catalog).flatMap((provider) => provider.models.map((model) => model.id as string)));
   const providerOf = (model: string) => Object.entries(catalog).find(([, provider]) => provider.models.some((candidate) => candidate.id === model))?.[0];
   const enabledProviders = new Set(Object.entries(settings.models.providers).filter(([, on]) => on).map(([name]) => name));
-  return checkTierFitness(config, { knownModelIds, classOf: capabilityClassOf, providerOf, enabledProviders });
+  return checkTierFitness(config, { knownModelIds, classOf: capabilityClassOf, providerOf, enabledProviders, configurableProviders: CONFIGURABLE_PROVIDER_SET });
 }
 
 export function renderYamlPreview(config: TieredExecutionConfig): string {
